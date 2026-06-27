@@ -53,13 +53,18 @@ export function buildUpdatedIncomeSource(
   referenceDate = new Date(),
 ): IncomeSource {
   const frequency = normalizeIncomeFrequency(input.frequency);
+  const startDate = input.startDate
+    ? parseDateString(input.startDate)
+    : existing.schedule
+      ? parseDateString(existing.schedule.startDate)
+      : defaultStartDate(referenceDate);
   let schedule = existing.schedule;
 
-  if (!schedule || frequency !== normalizeIncomeFrequency(existing.frequency)) {
-    const startDate = schedule
-      ? parseDateString(schedule.startDate)
-      : defaultStartDate(referenceDate);
-
+  if (
+    !schedule ||
+    frequency !== normalizeIncomeFrequency(existing.frequency) ||
+    input.startDate
+  ) {
     schedule = createSchedule(
       startDate,
       frequency,
@@ -79,6 +84,7 @@ export function buildUpdatedIncomeSource(
     amount: input.amount,
     frequency,
     category: input.category.trim(),
+    depositAccountId: input.depositAccountId ?? null,
     schedule,
   };
 }

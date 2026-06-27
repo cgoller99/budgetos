@@ -45,6 +45,8 @@ export type AddIncomeInput = {
   amount: number;
   frequency: IncomeFrequency;
   category: string;
+  startDate?: string;
+  depositAccountId?: string | null;
 };
 
 export type EditIncomeInput = AddIncomeInput;
@@ -96,6 +98,8 @@ export type AddBillInput = {
   autopay: boolean;
   recurring: boolean;
   category: string;
+  frequency?: BillFrequency;
+  startDate?: string;
   paycheckAssignment?: PaycheckAssignment;
   customPayDay?: number | null;
   paymentAccountId?: string | null;
@@ -108,6 +112,8 @@ export type EditBillInput = {
   autopay: boolean;
   recurring: boolean;
   category: string;
+  frequency?: BillFrequency;
+  startDate?: string;
   paycheckAssignment?: PaycheckAssignment;
   customPayDay?: number | null;
   paymentAccountId?: string | null;
@@ -188,6 +194,7 @@ export type BillsDashboardSummary = {
   totalMonthlyBills: number;
   nextBill: NextBillSummary | null;
   monthlyCashRemaining: number;
+  safeToSpendAfterUpcomingBills: number;
 };
 
 export type CalendarBillEntry = {
@@ -272,6 +279,7 @@ export type IncomeSource = {
   amount: number;
   frequency: IncomeFrequency;
   category: string;
+  depositAccountId?: string | null;
   schedule?: RecurringSchedule;
 };
 
@@ -523,6 +531,7 @@ export type DashboardData = {
   smartInsights: SmartInsight[];
   nextGoal: NextGoalSummary | null;
   nextMilestone: NextMilestoneSummary | null;
+  nextPaycheck: IncomeDashboardSummary["nextPaycheck"];
   billsSummary: BillsDashboardSummary;
   debtsSummary: DebtsDashboardSummary;
   weeklyPlan: WeeklyPlanRecommendation[];

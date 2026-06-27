@@ -22,6 +22,7 @@ import {
   applyGoalContributionToData,
 } from "@/lib/finance/balanceEffects";
 import { buildUpdatedDebt } from "@/lib/finance/debts";
+import { buildUpdatedBill } from "@/lib/finance/bills";
 import { buildUpdatedIncomeSource } from "@/lib/finance/income";
 import { getGoalTypeMeta } from "@/lib/finance/goalTypes";
 import type {
@@ -883,27 +884,20 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
 
   const editBill = useCallback(
     async (billId: string, input: EditBillInput) => {
+      const normalized = normalizeRecurringFinanceData(data);
+      const existing = normalized.bills.find((bill) => bill.id === billId);
+
+      if (!existing) {
+        return;
+      }
+
+      const updated = buildUpdatedBill(existing, input);
+
       await runMutation(
         {
-          ...data,
-          bills: data.bills.map((bill) =>
-            bill.id === billId
-              ? {
-                  ...bill,
-                  name: input.name.trim(),
-                  amount: input.amount,
-                  dueDay: input.dueDay,
-                  autopay: input.autopay,
-                  recurring: input.recurring,
-                  category: normalizeBillCategory(input.category),
-                  paycheckAssignment: normalizePaycheckAssignment(
-                    input.paycheckAssignment ?? bill.paycheckAssignment,
-                  ),
-                  customPayDay: input.customPayDay ?? bill.customPayDay,
-                  paymentAccountId:
-                    input.paymentAccountId ?? bill.paymentAccountId,
-                }
-              : bill,
+          ...normalized,
+          bills: normalized.bills.map((bill) =>
+            bill.id === billId ? updated : bill,
           ),
         },
         (repository, userId) => repository.updateBill(userId, billId, input),

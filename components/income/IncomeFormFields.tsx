@@ -1,6 +1,7 @@
 "use client";
 
 import { FormField, Input, Select } from "@/components/ui";
+import { useFinance } from "@/context/FinanceContext";
 import { INCOME_FREQUENCY_OPTIONS } from "@/lib/recurring/frequencies";
 import type { IncomeFrequency } from "@/lib/finance/types";
 
@@ -9,6 +10,8 @@ export type IncomeFormState = {
   amount: string;
   frequency: IncomeFrequency;
   category: string;
+  startDate: string;
+  depositAccountId: string;
 };
 
 type IncomeFormFieldsProps = {
@@ -21,19 +24,29 @@ export function incomeToFormState(source: {
   amount: number;
   frequency: IncomeFrequency;
   category: string;
+  depositAccountId?: string | null;
+  schedule?: { startDate: string };
 }): IncomeFormState {
   return {
     name: source.name,
     amount: String(source.amount),
     frequency: source.frequency === "every_2_weeks" ? "biweekly" : source.frequency,
     category: source.category,
+    startDate:
+      source.schedule?.startDate ?? new Date().toISOString().split("T")[0] ?? "",
+    depositAccountId: source.depositAccountId ?? "",
   };
 }
 
 export function parseIncomeForm(form: IncomeFormState) {
   const amount = Number.parseFloat(form.amount);
 
-  if (!form.name.trim() || !form.category.trim() || Number.isNaN(amount)) {
+  if (
+    !form.name.trim() ||
+    !form.category.trim() ||
+    !form.startDate.trim() ||
+    Number.isNaN(amount)
+  ) {
     return null;
   }
 
@@ -42,10 +55,14 @@ export function parseIncomeForm(form: IncomeFormState) {
     amount,
     frequency: form.frequency,
     category: form.category,
+    startDate: form.startDate,
+    depositAccountId: form.depositAccountId || null,
   };
 }
 
 export function IncomeFormFields({ form, onChange }: IncomeFormFieldsProps) {
+  const { accounts } = useFinance();
+
   return (
     <>
       <FormField label="Income Name">
@@ -91,6 +108,33 @@ export function IncomeFormFields({ form, onChange }: IncomeFormFieldsProps) {
               className="bg-[#111827] text-white"
             >
               {option.label}
+            </option>
+          ))}
+        </Select>
+      </FormField>
+
+      <FormField label="Start date">
+        <Input
+          type="date"
+          value={form.startDate}
+          onChange={(event) =>
+            onChange({ ...form, startDate: event.target.value })
+          }
+          required
+        />
+      </FormField>
+
+      <FormField label="Deposit account">
+        <Select
+          value={form.depositAccountId}
+          onChange={(event) =>
+            onChange({ ...form, depositAccountId: event.target.value })
+          }
+        >
+          <option value="">Primary cash account</option>
+          {accounts.map((account) => (
+            <option key={account.id} value={account.id}>
+              {account.name}
             </option>
           ))}
         </Select>

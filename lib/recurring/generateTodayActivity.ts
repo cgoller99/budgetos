@@ -1,9 +1,7 @@
-import { formatCurrency } from "@/lib/finance/format";
 import type { FinanceData } from "@/lib/finance/types";
 import {
   getBillFrequencyLabel,
   getContributionFrequencyLabel,
-  getIncomeFrequencyLabel,
 } from "@/lib/recurring/frequencies";
 import { isActivityDue } from "@/lib/recurring/schedule";
 import type { TodayActivity, TodayActivitySummary } from "@/lib/recurring/types";
@@ -26,14 +24,12 @@ export function generateTodayActivity(
       continue;
     }
 
-    const frequencyLabel = getIncomeFrequencyLabel(income.frequency);
-
     activities.push({
       id: buildActivityId("income", income.id),
       entityType: "income",
       entityId: income.id,
       icon: "💵",
-      label: `${frequencyLabel} ${income.name} Ready`,
+      label: `${income.name} — Paycheck received`,
       amount: income.amount,
       applied: false,
     });
@@ -49,7 +45,7 @@ export function generateTodayActivity(
       entityType: "bill",
       entityId: bill.id,
       icon: "📋",
-      label: `${bill.name} Bill Due Today`,
+      label: `${bill.name} — Bill due`,
       amount: bill.amount,
       applied: false,
     });
@@ -71,7 +67,7 @@ export function generateTodayActivity(
       entityType: "goal",
       entityId: goal.id,
       icon: goal.icon,
-      label: `Transfer ${formatCurrency(contribution.amount)} to ${goal.name}`,
+      label: `Recurring savings contribution — ${goal.name}`,
       amount: contribution.amount,
       applied: false,
     });

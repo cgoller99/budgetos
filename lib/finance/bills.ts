@@ -1,12 +1,22 @@
 import { toMonthlyAmount } from "@/lib/calculations/monthlyAmount";
 import { calculateMonthlyIncome, calculateMonthlySpending } from "@/lib/calculations/cashFlow";
+import { isCashAccountType } from "@/lib/finance/accountTypes";
 import type {
   Bill,
   BillProgress,
   BillsDashboardSummary,
   BillStatus,
+  EditBillInput,
   FinanceData,
 } from "@/lib/finance/types";
+import { normalizeBillFrequency } from "@/lib/recurring/frequencies";
+import {
+  createSchedule,
+  isActivityDue,
+  isSameDay,
+  parseDateString,
+  startOfDay,
+} from "@/lib/recurring/schedule";
 
 const DUE_SOON_DAYS = 3;
 
@@ -27,9 +37,7 @@ export function getCurrentYearMonth(date = new Date()): string {
   return `${date.getFullYear()}-${month}`;
 }
 
-export function startOfDay(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
-}
+export { startOfDay };
 
 export function getDueDateForMonth(
   dueDay: number,
@@ -47,10 +55,62 @@ export function getDueDateForMonth(
   return new Date(year, month, day);
 }
 
+function getBillDueDate(
+  bill: Bill,
+  referenceDate: Date,
+): Date | null {
+  if (bill.schedule?.status === "paused") {
+    return null;
+  }
+
+  if (bill.schedule) {
+    return parseDateString(bill.schedule.nextOccurrence);
+  }
+
+  return getDueDateForMonth(bill.dueDay, referenceDate);
+}
+
 export function getBillStatus(
   bill: Bill,
   referenceDate = new Date(),
 ): BillStatus {
+  if (bill.schedule) {
+    if (bill.schedule.status === "paused") {
+      return "upcoming";
+    }
+
+    const today = startOfDay(referenceDate);
+    const nextDue = startOfDay(parseDateString(bill.schedule.nextOccurrence));
+
+    if (bill.schedule.lastProcessedDate) {
+      const lastProcessed = startOfDay(
+        parseDateString(bill.schedule.lastProcessedDate),
+      );
+
+      if (isSameDay(lastProcessed, today)) {
+        return "paid";
+      }
+    }
+
+    if (isSameDay(nextDue, today)) {
+      return isActivityDue(bill.schedule, referenceDate) ? "due_today" : "paid";
+    }
+
+    if (nextDue < today) {
+      return isActivityDue(bill.schedule, referenceDate) ? "overdue" : "paid";
+    }
+
+    const daysUntilDue = Math.ceil(
+      (nextDue.getTime() - today.getTime()) / MS_PER_DAY,
+    );
+
+    if (daysUntilDue <= DUE_SOON_DAYS) {
+      return "due_soon";
+    }
+
+    return "upcoming";
+  }
+
   const currentMonth = getCurrentYearMonth(referenceDate);
 
   if (bill.paidMonth === currentMonth) {
@@ -91,7 +151,7 @@ export function formatBillDueDate(
   dueDate: Date | null,
   dueDay: number,
 ): string {
-  if (dueDay <= 0) {
+  if (dueDay <= 0 && !dueDate) {
     return "Flexible";
   }
 
@@ -109,7 +169,7 @@ export function enrichBill(
   bill: Bill,
   referenceDate = new Date(),
 ): BillProgress {
-  const dueDate = getDueDateForMonth(bill.dueDay, referenceDate);
+  const dueDate = getBillDueDate(bill, referenceDate);
   const status = getBillStatus(bill, referenceDate);
 
   return {
@@ -125,6 +185,66 @@ export function enrichBill(
     status,
     statusLabel: STATUS_LABELS[status],
     paycheckAssignment: bill.paycheckAssignment ?? "first_paycheck",
+  };
+}
+
+function billStartDateFromDueDay(dueDay: number, referenceDate: Date): Date {
+  if (dueDay <= 0) {
+    return startOfDay(referenceDate);
+  }
+
+  return new Date(
+    referenceDate.getFullYear(),
+    referenceDate.getMonth(),
+    Math.min(dueDay, 28),
+  );
+}
+
+export function buildUpdatedBill(
+  existing: Bill,
+  input: EditBillInput,
+  referenceDate = new Date(),
+): Bill {
+  const frequency = normalizeBillFrequency(
+    input.frequency ?? existing.frequency ?? "monthly",
+  );
+  const status = input.recurring ? ("active" as const) : ("paused" as const);
+  const startDate = input.startDate
+    ? parseDateString(input.startDate)
+    : existing.schedule
+      ? parseDateString(existing.schedule.startDate)
+      : billStartDateFromDueDay(input.dueDay, referenceDate);
+
+  let schedule = existing.schedule;
+
+  if (
+    !schedule ||
+    frequency !== normalizeBillFrequency(existing.frequency ?? "monthly") ||
+    input.startDate ||
+    schedule.status !== status
+  ) {
+    schedule = createSchedule(startDate, frequency, referenceDate, status);
+  } else {
+    schedule = {
+      ...schedule,
+      frequency,
+      status,
+    };
+  }
+
+  return {
+    ...existing,
+    name: input.name.trim(),
+    amount: input.amount,
+    dueDay: input.dueDay,
+    autopay: input.autopay,
+    recurring: input.recurring,
+    category: input.category.trim(),
+    frequency,
+    schedule,
+    paycheckAssignment: input.paycheckAssignment ?? "first_paycheck",
+    customPayDay: input.customPayDay ?? null,
+    paymentAccountId: input.paymentAccountId ?? null,
   };
 }
 
@@ -252,6 +372,12 @@ export function getTotalMonthlyBills(data: FinanceData): number {
     );
 }
 
+function getTotalCashBalance(data: FinanceData): number {
+  return (data.accounts ?? [])
+    .filter((account) => isCashAccountType(account.type))
+    .reduce((total, account) => total + account.balance, 0);
+}
+
 export function getBillsDashboardSummary(
   data: FinanceData,
   referenceDate = new Date(),
@@ -259,13 +385,14 @@ export function getBillsDashboardSummary(
   const dueThisWeek = getBillsDueThisWeek(data, referenceDate);
   const nextBill = getNextBillDue(data, referenceDate);
   const totalMonthlyBills = getTotalMonthlyBills(data);
+  const dueThisWeekAmount = dueThisWeek.reduce(
+    (total, bill) => total + bill.amount,
+    0,
+  );
 
   return {
     dueThisWeekCount: dueThisWeek.length,
-    dueThisWeekAmount: dueThisWeek.reduce(
-      (total, bill) => total + bill.amount,
-      0,
-    ),
+    dueThisWeekAmount,
     totalMonthlyBills,
     nextBill: nextBill
       ? {
@@ -282,6 +409,10 @@ export function getBillsDashboardSummary(
     monthlyCashRemaining:
       calculateMonthlyIncome(data, referenceDate) -
       calculateMonthlySpending(data, referenceDate),
+    safeToSpendAfterUpcomingBills: Math.max(
+      0,
+      getTotalCashBalance(data) - dueThisWeekAmount,
+    ),
   };
 }
 

@@ -15,11 +15,14 @@ export {
 } from "./applyActivity";
 export {
   BILL_FREQUENCY_LABELS,
+  BILL_FREQUENCY_OPTIONS,
   CONTRIBUTION_FREQUENCY_LABELS,
   INCOME_FREQUENCY_LABELS,
+  INCOME_FREQUENCY_OPTIONS,
   getBillFrequencyLabel,
   getContributionFrequencyLabel,
   getIncomeFrequencyLabel,
+  normalizeBillFrequency,
   normalizeIncomeFrequency,
 } from "./frequencies";
 export {

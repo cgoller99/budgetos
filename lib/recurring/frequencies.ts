@@ -26,10 +26,22 @@ export const INCOME_FREQUENCY_OPTIONS: {
 
 export const BILL_FREQUENCY_LABELS: Record<BillFrequency, string> = {
   weekly: "Weekly",
+  biweekly: "Biweekly",
   monthly: "Monthly",
   quarterly: "Quarterly",
   yearly: "Yearly",
 };
+
+export const BILL_FREQUENCY_OPTIONS: {
+  value: BillFrequency;
+  label: string;
+}[] = [
+  { value: "weekly", label: "Weekly" },
+  { value: "biweekly", label: "Biweekly" },
+  { value: "monthly", label: "Monthly" },
+  { value: "quarterly", label: "Quarterly" },
+  { value: "yearly", label: "Yearly" },
+];
 
 export const CONTRIBUTION_FREQUENCY_LABELS: Record<
   ContributionFrequency,
@@ -58,9 +70,21 @@ export function getIncomeFrequencyLabel(frequency: string): string {
   );
 }
 
+export function normalizeBillFrequency(frequency: string): BillFrequency {
+  if (frequency === "every_2_weeks") {
+    return "biweekly";
+  }
+
+  if (frequency in BILL_FREQUENCY_LABELS) {
+    return frequency as BillFrequency;
+  }
+
+  return "monthly";
+}
+
 export function getBillFrequencyLabel(frequency: string): string {
   return (
-    BILL_FREQUENCY_LABELS[frequency as BillFrequency] ?? "Monthly"
+    BILL_FREQUENCY_LABELS[normalizeBillFrequency(frequency)] ?? "Monthly"
   );
 }
 

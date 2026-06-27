@@ -266,6 +266,7 @@ export function mapIncomeRow(row: TransactionRow): IncomeSource {
     amount: toNumber(row.amount),
     frequency: normalizeIncomeFrequency(row.frequency ?? "monthly") as IncomeFrequency,
     category: row.category,
+    depositAccountId: row.account_id ?? null,
     schedule: mapIncomeSchedule(row),
   };
 }
@@ -411,6 +412,7 @@ export function buildIncomeUpdate(income: IncomeSource) {
     amount: income.amount,
     frequency: income.frequency,
     category: income.category,
+    account_id: income.depositAccountId ?? null,
     ...(income.schedule ? serializeSchedule(income.schedule) : {}),
     updated_at: new Date().toISOString(),
   };

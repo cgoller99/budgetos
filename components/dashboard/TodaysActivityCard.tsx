@@ -58,7 +58,7 @@ export function TodaysActivityCard() {
   return (
     <Card padding="lg">
       <CardHeader
-        title="Today"
+        title="Process Today's Activity"
         action={
           <Button
             onClick={() => void handleApplyAll()}

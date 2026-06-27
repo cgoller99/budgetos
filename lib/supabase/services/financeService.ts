@@ -1,6 +1,6 @@
 import type { FinanceEvent } from "@/lib/events/types";
 import { normalizeBillCategory } from "@/lib/finance/billCategories";
-import { getCurrentYearMonth } from "@/lib/finance/bills";
+import { buildUpdatedBill, getCurrentYearMonth } from "@/lib/finance/bills";
 import {
   applyBillPaymentToData,
   applyDebtPaymentToData,
@@ -26,12 +26,12 @@ import type {
   Transaction,
 } from "@/lib/finance/types";
 import { applyActivityToData } from "@/lib/recurring/applyActivity";
-import { normalizeIncomeFrequency } from "@/lib/recurring/frequencies";
+import { normalizeBillFrequency, normalizeIncomeFrequency } from "@/lib/recurring/frequencies";
 import {
   normalizeRecurringFinanceData,
   serializeSchedule,
 } from "@/lib/recurring/normalize";
-import { createSchedule } from "@/lib/recurring/schedule";
+import { createSchedule, parseDateString } from "@/lib/recurring/schedule";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import type { BudgetOsSupabaseClient } from "@/lib/supabase/client";
 import {
@@ -298,8 +298,13 @@ export class FinanceService {
     const householdId = await resolveUserHouseholdId(this.supabase, userId);
     const frequency = normalizeIncomeFrequency(input.frequency);
     const referenceDate = new Date();
-    const startDate = new Date(referenceDate);
-    startDate.setDate(startDate.getDate() - 120);
+    const startDate = input.startDate
+      ? parseDateString(input.startDate)
+      : (() => {
+          const fallback = new Date(referenceDate);
+          fallback.setDate(fallback.getDate() - 120);
+          return fallback;
+        })();
     const schedule = createSchedule(startDate, frequency, referenceDate);
 
     const { error } = await this.supabase.from("transactions").insert(
@@ -312,6 +317,7 @@ export class FinanceService {
           amount: input.amount,
           frequency,
           category: input.category.trim(),
+          account_id: input.depositAccountId ?? null,
           ...serializeSchedule(schedule),
         },
         householdId,
@@ -514,6 +520,22 @@ export class FinanceService {
 
   async createBill(userId: string, input: AddBillInput, id?: string): Promise<FinanceData> {
     const householdId = await resolveUserHouseholdId(this.supabase, userId);
+    const frequency = normalizeBillFrequency(input.frequency ?? "monthly");
+    const referenceDate = new Date();
+    const startDate = input.startDate
+      ? parseDateString(input.startDate)
+      : new Date(
+          referenceDate.getFullYear(),
+          referenceDate.getMonth(),
+          Math.min(input.dueDay > 0 ? input.dueDay : referenceDate.getDate(), 28),
+        );
+    const schedule = createSchedule(
+      startDate,
+      frequency,
+      referenceDate,
+      input.recurring ? "active" : "paused",
+    );
+
     const { error } = await this.supabase.from("bills").insert(
       this.withHouseholdId(
         {
@@ -522,13 +544,15 @@ export class FinanceService {
           name: input.name.trim(),
           amount: input.amount,
           due_day: input.dueDay,
-      autopay: input.autopay,
+          autopay: input.autopay,
           recurring: input.recurring,
           category: normalizeBillCategory(input.category),
           paid_month: null,
+          bill_frequency: frequency,
           paycheck_assignment: input.paycheckAssignment ?? "first_paycheck",
           custom_pay_day: input.customPayDay ?? null,
           payment_account_id: input.paymentAccountId ?? null,
+          ...serializeSchedule(schedule),
         },
         householdId,
       ),
@@ -543,20 +567,18 @@ export class FinanceService {
     billId: string,
     input: EditBillInput,
   ): Promise<FinanceData> {
+    const current = await this.loadFinanceData(userId);
+    const normalized = normalizeRecurringFinanceData(current);
+    const existing = normalized.bills.find((bill) => bill.id === billId);
+
+    if (!existing) {
+      throw new Error("Bill not found.");
+    }
+
+    const updated = buildUpdatedBill(existing, input);
     const { error } = await this.supabase
       .from("bills")
-      .update({
-        name: input.name.trim(),
-        amount: input.amount,
-        due_day: input.dueDay,
-        autopay: input.autopay,
-        recurring: input.recurring,
-        category: normalizeBillCategory(input.category),
-        paycheck_assignment: input.paycheckAssignment ?? "first_paycheck",
-        custom_pay_day: input.customPayDay ?? null,
-        payment_account_id: input.paymentAccountId ?? null,
-        updated_at: new Date().toISOString(),
-      })
+      .update(buildBillUpdate(updated))
       .eq("id", billId)
       .eq("user_id", userId);
 
@@ -700,6 +722,17 @@ export class FinanceService {
     data: FinanceData,
   ): Promise<FinanceData> {
     const timestamp = new Date().toISOString();
+    const current = await this.loadFinanceData(userId);
+    const existingTransactionIds = new Set(
+      current.transactions.map((transaction) => transaction.id),
+    );
+    const newTransactions = data.transactions.filter(
+      (transaction) => !existingTransactionIds.has(transaction.id),
+    );
+
+    for (const transaction of newTransactions) {
+      await this.insertTransaction(userId, transaction);
+    }
 
     const accountUpdates = data.accounts.map((account) =>
       this.supabase

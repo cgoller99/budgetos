@@ -8,13 +8,19 @@ import {
 import { useFinance } from "@/context/FinanceContext";
 import { BILL_CATEGORY_OPTIONS } from "@/lib/finance/billCategories";
 import { PAYCHECK_ASSIGNMENT_OPTIONS } from "@/lib/finance/paycheckSplit";
-import type { PaycheckAssignment } from "@/lib/finance/types";
+import {
+  BILL_FREQUENCY_OPTIONS,
+  INCOME_FREQUENCY_OPTIONS,
+} from "@/lib/recurring/frequencies";
+import type { BillFrequency, PaycheckAssignment } from "@/lib/finance/types";
 
 export type BillFormState = {
   name: string;
   amount: string;
   dueDay: string;
   category: string;
+  frequency: BillFrequency;
+  startDate: string;
   autopay: boolean;
   recurring: boolean;
   paycheckAssignment: PaycheckAssignment;
@@ -54,6 +60,35 @@ export function BillFormFields({ form, onChange }: BillFormFieldsProps) {
             onChange({ ...form, amount: event.target.value })
           }
           placeholder="0.00"
+          required
+        />
+      </FormField>
+
+      <FormField label="Frequency">
+        <Select
+          value={form.frequency}
+          onChange={(event) =>
+            onChange({
+              ...form,
+              frequency: event.target.value as BillFrequency,
+            })
+          }
+        >
+          {BILL_FREQUENCY_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </Select>
+      </FormField>
+
+      <FormField label="Start date">
+        <Input
+          type="date"
+          value={form.startDate}
+          onChange={(event) =>
+            onChange({ ...form, startDate: event.target.value })
+          }
           required
         />
       </FormField>
@@ -152,7 +187,7 @@ export function BillFormFields({ form, onChange }: BillFormFieldsProps) {
             className="h-4 w-4 rounded border-white/20 bg-white/10 accent-[#0077ed]"
           />
           <span className="text-sm font-medium text-white/70">
-            Recurring monthly bill
+            Active recurring bill
           </span>
         </label>
 
@@ -177,6 +212,8 @@ export const initialBillFormState: BillFormState = {
   amount: "",
   dueDay: "1",
   category: "",
+  frequency: "monthly",
+  startDate: new Date().toISOString().split("T")[0] ?? "",
   autopay: true,
   recurring: true,
   paycheckAssignment: "first_paycheck",
@@ -191,6 +228,8 @@ export function billToFormState(bill: {
   autopay: boolean;
   recurring: boolean;
   category: string;
+  frequency?: BillFrequency;
+  schedule?: { startDate: string; status: string };
   paycheckAssignment?: PaycheckAssignment;
   customPayDay?: number | null;
   paymentAccountId?: string | null;
@@ -200,8 +239,10 @@ export function billToFormState(bill: {
     amount: String(bill.amount),
     dueDay: String(bill.dueDay),
     category: bill.category,
+    frequency: bill.frequency ?? "monthly",
+    startDate: bill.schedule?.startDate ?? new Date().toISOString().split("T")[0] ?? "",
     autopay: bill.autopay,
-    recurring: bill.recurring,
+    recurring: bill.schedule?.status !== "paused" && bill.recurring,
     paycheckAssignment: bill.paycheckAssignment ?? "first_paycheck",
     customPayDay: String(bill.customPayDay ?? 15),
     paymentAccountId: bill.paymentAccountId ?? "",
@@ -219,6 +260,7 @@ export function parseBillForm(form: BillFormState) {
   if (
     !form.name.trim() ||
     !form.category.trim() ||
+    !form.startDate.trim() ||
     Number.isNaN(amount) ||
     Number.isNaN(dueDay) ||
     (form.paycheckAssignment === "custom" &&
@@ -234,6 +276,8 @@ export function parseBillForm(form: BillFormState) {
     autopay: form.autopay,
     recurring: form.recurring,
     category: form.category,
+    frequency: form.frequency,
+    startDate: form.startDate,
     paycheckAssignment: form.paycheckAssignment,
     customPayDay,
     paymentAccountId: form.paymentAccountId || null,

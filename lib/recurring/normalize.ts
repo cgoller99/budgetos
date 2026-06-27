@@ -5,7 +5,7 @@ import {
   parseDateString,
   toDateString,
 } from "@/lib/recurring/schedule";
-import { normalizeIncomeFrequency } from "@/lib/recurring/frequencies";
+import { normalizeBillFrequency, normalizeIncomeFrequency } from "@/lib/recurring/frequencies";
 
 function defaultStartDate(referenceDate: Date, daysAgo = 90): Date {
   const start = new Date(referenceDate);
@@ -14,11 +14,7 @@ function defaultStartDate(referenceDate: Date, daysAgo = 90): Date {
 }
 
 function billFrequencyFromLegacy(bill: FinanceData["bills"][number]): string {
-  if (!bill.recurring) {
-    return "monthly";
-  }
-
-  return "monthly";
+  return bill.frequency ?? "monthly";
 }
 
 function billStartDateFromDueDay(
@@ -70,7 +66,9 @@ export function normalizeRecurringFinanceData(
       };
     }),
     bills: bills.map((bill) => {
-      const frequency = bill.frequency ?? billFrequencyFromLegacy(bill);
+      const frequency = normalizeBillFrequency(
+        bill.frequency ?? billFrequencyFromLegacy(bill),
+      );
       const schedule =
         bill.schedule ??
         createSchedule(
@@ -82,7 +80,7 @@ export function normalizeRecurringFinanceData(
 
       return {
         ...bill,
-        frequency: frequency as FinanceData["bills"][number]["frequency"],
+        frequency,
         schedule,
       };
     }),

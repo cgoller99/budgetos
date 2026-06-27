@@ -8,6 +8,7 @@ import { formatCurrency } from "@/lib/finance/format";
 import { getBillsDashboardSummary } from "@/lib/finance/bills";
 import { getDebtsDashboardSummary } from "@/lib/finance/debts";
 import { formatGoalDate, getNextGoal } from "@/lib/finance/goals";
+import { getNextPaycheck } from "@/lib/finance/income";
 import { calculateMoneyFlow } from "@/lib/finance/moneyFlow";
 import { generateWeeklyPlan } from "@/lib/intelligence";
 import {
@@ -173,6 +174,7 @@ export function computeDashboard(data: FinanceData): DashboardData {
         }
       : null,
     nextMilestone: toNextMilestoneSummary(roadmap.nextMilestone),
+    nextPaycheck: getNextPaycheck(normalized),
     billsSummary: getBillsDashboardSummary(normalized),
     debtsSummary: getDebtsDashboardSummary(normalized),
     weeklyPlan: generateWeeklyPlan(normalized),

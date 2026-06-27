@@ -1,33 +1,30 @@
 import { getCurrentYearMonth } from "@/lib/finance/bills";
-import { isCashAccountType } from "@/lib/finance/accountTypes";
-import type { FinanceData } from "@/lib/finance/types";
+import { resolvePaymentAccountId } from "@/lib/finance/balanceEffects";
+import type { FinanceData, Transaction } from "@/lib/finance/types";
 import { parseActivityId } from "@/lib/recurring/generateTodayActivity";
 import { markScheduleProcessed } from "@/lib/recurring/schedule";
 import type { TodayActivity } from "@/lib/recurring/types";
+import {
+  applyGoalContributionEffect,
+  applyTransactionEffect,
+} from "@/lib/transactions/applyTransactionEffects";
 
-function getPrimaryCashAccount(data: FinanceData) {
-  return (
-    data.accounts.find((account) => account.type === "checking") ??
-    data.accounts.find((account) => isCashAccountType(account.type)) ??
-    data.accounts[0]
-  );
-}
-
-function adjustCashBalance(
-  data: FinanceData,
-  delta: number,
-): FinanceData["accounts"] {
-  const account = getPrimaryCashAccount(data);
-
-  if (!account) {
-    return data.accounts;
-  }
-
-  return data.accounts.map((item) =>
-    item.id === account.id
-      ? { ...item, balance: Math.max(0, item.balance + delta) }
-      : item,
-  );
+function createTransaction(
+  partial: Omit<Transaction, "id"> & { id?: string },
+): Transaction {
+  return {
+    id: partial.id ?? crypto.randomUUID(),
+    amount: partial.amount,
+    type: partial.type,
+    category: partial.category,
+    accountId: partial.accountId,
+    transferAccountId: partial.transferAccountId ?? null,
+    date: partial.date,
+    notes: partial.notes,
+    goalId: partial.goalId ?? null,
+    billId: partial.billId ?? null,
+    debtId: partial.debtId ?? null,
+  };
 }
 
 function applyIncomeActivity(
@@ -41,9 +38,37 @@ function applyIncomeActivity(
     return data;
   }
 
-  return {
+  const accountId = resolvePaymentAccountId(data, income.depositAccountId);
+
+  if (!accountId) {
+    return {
+      ...data,
+      income: data.income.map((item) =>
+        item.id === entityId
+          ? {
+              ...item,
+              schedule: markScheduleProcessed(item.schedule!, referenceDate),
+            }
+          : item,
+      ),
+    };
+  }
+
+  const date =
+    referenceDate.toISOString().split("T")[0] ?? referenceDate.toISOString();
+  const transaction = createTransaction({
+    amount: income.amount,
+    type: "income",
+    category: income.category,
+    accountId,
+    transferAccountId: null,
+    date,
+    notes: `${income.name} paycheck received`,
+  });
+
+  let next: FinanceData = {
     ...data,
-    accounts: adjustCashBalance(data, income.amount),
+    transactions: [transaction, ...data.transactions],
     income: data.income.map((item) =>
       item.id === entityId
         ? {
@@ -53,6 +78,9 @@ function applyIncomeActivity(
         : item,
     ),
   };
+
+  next = applyTransactionEffect(next, transaction);
+  return next;
 }
 
 function applyBillActivity(
@@ -66,9 +94,12 @@ function applyBillActivity(
     return data;
   }
 
-  return {
+  const accountId = resolvePaymentAccountId(data, bill.paymentAccountId);
+  const date =
+    referenceDate.toISOString().split("T")[0] ?? referenceDate.toISOString();
+
+  let next: FinanceData = {
     ...data,
-    accounts: adjustCashBalance(data, -bill.amount),
     bills: data.bills.map((item) =>
       item.id === entityId
         ? {
@@ -79,6 +110,28 @@ function applyBillActivity(
         : item,
     ),
   };
+
+  if (!accountId) {
+    return next;
+  }
+
+  const transaction = createTransaction({
+    amount: bill.amount,
+    type: "expense",
+    category: bill.category,
+    accountId,
+    transferAccountId: null,
+    date,
+    notes: `${bill.name} bill payment`,
+    billId: bill.id,
+  });
+
+  next = {
+    ...next,
+    transactions: [transaction, ...next.transactions],
+  };
+  next = applyTransactionEffect(next, transaction);
+  return next;
 }
 
 function applyGoalActivity(
@@ -93,16 +146,17 @@ function applyGoalActivity(
     return data;
   }
 
-  const nextAmount = Math.min(goal.current + contribution.amount, goal.target);
+  const accountId = resolvePaymentAccountId(data, null);
+  const date =
+    referenceDate.toISOString().split("T")[0] ?? referenceDate.toISOString();
 
-  return {
+  let next: FinanceData = {
     ...data,
-    accounts: adjustCashBalance(data, -contribution.amount),
     savingsGoals: data.savingsGoals.map((item) =>
       item.id === entityId
         ? {
             ...item,
-            current: nextAmount,
+            current: Math.min(item.current + contribution.amount, item.target),
             autoContribution: {
               ...contribution,
               schedule: markScheduleProcessed(
@@ -114,6 +168,29 @@ function applyGoalActivity(
         : item,
     ),
   };
+
+  if (!accountId) {
+    return next;
+  }
+
+  const transaction = createTransaction({
+    amount: contribution.amount,
+    type: "expense",
+    category: "Goal Contribution",
+    accountId,
+    transferAccountId: null,
+    date,
+    notes: `Recurring savings contribution to ${goal.name}`,
+    goalId: goal.id,
+  });
+
+  next = {
+    ...next,
+    transactions: [transaction, ...next.transactions],
+  };
+  next = applyTransactionEffect(next, transaction);
+  next = applyGoalContributionEffect(next, transaction);
+  return next;
 }
 
 function applyInvestmentActivity(
@@ -128,9 +205,44 @@ function applyInvestmentActivity(
     return data;
   }
 
-  return {
+  const accountId = resolvePaymentAccountId(data, null);
+
+  if (!accountId) {
+    return {
+      ...data,
+      investments: data.investments.map((item) =>
+        item.id === entityId
+          ? {
+              ...item,
+              value: item.value + contribution.amount,
+              autoContribution: {
+                ...contribution,
+                schedule: markScheduleProcessed(
+                  contribution.schedule,
+                  referenceDate,
+                ),
+              },
+            }
+          : item,
+      ),
+    };
+  }
+
+  const date =
+    referenceDate.toISOString().split("T")[0] ?? referenceDate.toISOString();
+  const transaction = createTransaction({
+    amount: contribution.amount,
+    type: "expense",
+    category: "Investment Contribution",
+    accountId,
+    transferAccountId: null,
+    date,
+    notes: `${investment.name} contribution`,
+  });
+
+  let next: FinanceData = {
     ...data,
-    accounts: adjustCashBalance(data, -contribution.amount),
+    transactions: [transaction, ...data.transactions],
     investments: data.investments.map((item) =>
       item.id === entityId
         ? {
@@ -147,6 +259,9 @@ function applyInvestmentActivity(
         : item,
     ),
   };
+
+  next = applyTransactionEffect(next, transaction);
+  return next;
 }
 
 export function applyActivityToData(

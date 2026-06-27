@@ -8,7 +8,12 @@ export type IncomeFrequency =
   | "monthly"
   | "yearly";
 
-export type BillFrequency = "weekly" | "monthly" | "quarterly" | "yearly";
+export type BillFrequency =
+  | "weekly"
+  | "biweekly"
+  | "monthly"
+  | "quarterly"
+  | "yearly";
 
 export type ContributionFrequency = "weekly" | "biweekly" | "monthly";
 

@@ -20,6 +20,8 @@ const initialFormState: IncomeFormState = {
   amount: "",
   frequency: "monthly",
   category: "",
+  startDate: new Date().toISOString().split("T")[0] ?? "",
+  depositAccountId: "",
 };
 
 export function AddIncomeModal({ isOpen, onClose }: AddIncomeModalProps) {

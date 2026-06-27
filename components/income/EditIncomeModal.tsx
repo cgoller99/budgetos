@@ -27,6 +27,10 @@ export function EditIncomeModal({ income, onClose }: EditIncomeModalProps) {
           amount: 0,
           frequency: "monthly",
           category: "",
+          depositAccountId: null,
+          schedule: {
+            startDate: new Date().toISOString().split("T")[0] ?? "",
+          },
         }),
   );
 
