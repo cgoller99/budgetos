@@ -27,6 +27,10 @@ const REQUIRED_TABLES = [
 
 const REQUIRED_PROFILE_COLUMNS = ["household_id"];
 
+const TABLE_SELECT_COLUMN = {
+  household_members: "household_id,user_id",
+};
+
 const MIGRATION_FILES = [
   "supabase/schema.sql",
   "supabase/migrations/20260627_auth_rls.sql",
@@ -167,10 +171,14 @@ async function main() {
   };
 
   async function tableExists(table) {
-    const response = await fetch(`${restBase}/${table}?select=id&limit=0`, {
+    const selectColumn = TABLE_SELECT_COLUMN[table] ?? "id";
+    const response = await fetch(
+      `${restBase}/${table}?select=${selectColumn}&limit=0`,
+      {
       method: "GET",
       headers: restHeaders,
-    });
+      },
+    );
 
     if (response.status === 404) {
       return { exists: false, reason: "not in schema cache" };

@@ -92,6 +92,11 @@ create policy "Households readable by members"
   on public.households for select
   using (id in (select public.user_household_ids()));
 
+drop policy if exists "Households readable by owner" on public.households;
+create policy "Households readable by owner"
+  on public.households for select
+  using (auth.uid() = owner_id);
+
 drop policy if exists "Households insertable by owner" on public.households;
 create policy "Households insertable by owner"
   on public.households for insert
@@ -106,6 +111,11 @@ drop policy if exists "Household members readable by members" on public.househol
 create policy "Household members readable by members"
   on public.household_members for select
   using (household_id in (select public.user_household_ids()));
+
+drop policy if exists "Household members readable by self" on public.household_members;
+create policy "Household members readable by self"
+  on public.household_members for select
+  using (user_id = auth.uid());
 
 drop policy if exists "Household members insertable by owner" on public.household_members;
 create policy "Household members insertable by owner"
