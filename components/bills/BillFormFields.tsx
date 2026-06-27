@@ -5,7 +5,10 @@ import {
   Input,
   Select,
 } from "@/components/ui";
+import { useFinance } from "@/context/FinanceContext";
 import { BILL_CATEGORY_OPTIONS } from "@/lib/finance/billCategories";
+import { PAYCHECK_ASSIGNMENT_OPTIONS } from "@/lib/finance/paycheckSplit";
+import type { PaycheckAssignment } from "@/lib/finance/types";
 
 export type BillFormState = {
   name: string;
@@ -14,6 +17,9 @@ export type BillFormState = {
   category: string;
   autopay: boolean;
   recurring: boolean;
+  paycheckAssignment: PaycheckAssignment;
+  customPayDay: string;
+  paymentAccountId: string;
 };
 
 type BillFormFieldsProps = {
@@ -22,6 +28,8 @@ type BillFormFieldsProps = {
 };
 
 export function BillFormFields({ form, onChange }: BillFormFieldsProps) {
+  const { accounts } = useFinance();
+
   return (
     <>
       <FormField label="Bill Name">
@@ -84,6 +92,55 @@ export function BillFormFields({ form, onChange }: BillFormFieldsProps) {
         </Select>
       </FormField>
 
+      <FormField label="Paycheck assignment">
+        <Select
+          value={form.paycheckAssignment}
+          onChange={(event) =>
+            onChange({
+              ...form,
+              paycheckAssignment: event.target.value as PaycheckAssignment,
+            })
+          }
+        >
+          {PAYCHECK_ASSIGNMENT_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </Select>
+      </FormField>
+
+      {form.paycheckAssignment === "custom" && (
+        <FormField label="Custom pay day">
+          <Input
+            type="number"
+            min="1"
+            max="31"
+            value={form.customPayDay}
+            onChange={(event) =>
+              onChange({ ...form, customPayDay: event.target.value })
+            }
+            placeholder="15"
+          />
+        </FormField>
+      )}
+
+      <FormField label="Payment account">
+        <Select
+          value={form.paymentAccountId}
+          onChange={(event) =>
+            onChange({ ...form, paymentAccountId: event.target.value })
+          }
+        >
+          <option value="">Primary cash account</option>
+          {accounts.map((account) => (
+            <option key={account.id} value={account.id}>
+              {account.name}
+            </option>
+          ))}
+        </Select>
+      </FormField>
+
       <div className="space-y-2">
         <label className="flex items-center gap-3 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-3 transition-colors duration-200 hover:bg-white/[0.05]">
           <input
@@ -122,6 +179,9 @@ export const initialBillFormState: BillFormState = {
   category: "",
   autopay: true,
   recurring: true,
+  paycheckAssignment: "first_paycheck",
+  customPayDay: "15",
+  paymentAccountId: "",
 };
 
 export function billToFormState(bill: {
@@ -131,6 +191,9 @@ export function billToFormState(bill: {
   autopay: boolean;
   recurring: boolean;
   category: string;
+  paycheckAssignment?: PaycheckAssignment;
+  customPayDay?: number | null;
+  paymentAccountId?: string | null;
 }): BillFormState {
   return {
     name: bill.name,
@@ -139,18 +202,27 @@ export function billToFormState(bill: {
     category: bill.category,
     autopay: bill.autopay,
     recurring: bill.recurring,
+    paycheckAssignment: bill.paycheckAssignment ?? "first_paycheck",
+    customPayDay: String(bill.customPayDay ?? 15),
+    paymentAccountId: bill.paymentAccountId ?? "",
   };
 }
 
 export function parseBillForm(form: BillFormState) {
   const amount = Number.parseFloat(form.amount);
   const dueDay = Number.parseInt(form.dueDay, 10);
+  const customPayDay =
+    form.paycheckAssignment === "custom"
+      ? Number.parseInt(form.customPayDay, 10)
+      : null;
 
   if (
     !form.name.trim() ||
     !form.category.trim() ||
     Number.isNaN(amount) ||
-    Number.isNaN(dueDay)
+    Number.isNaN(dueDay) ||
+    (form.paycheckAssignment === "custom" &&
+      (customPayDay === null || Number.isNaN(customPayDay)))
   ) {
     return null;
   }
@@ -162,5 +234,8 @@ export function parseBillForm(form: BillFormState) {
     autopay: form.autopay,
     recurring: form.recurring,
     category: form.category,
+    paycheckAssignment: form.paycheckAssignment,
+    customPayDay,
+    paymentAccountId: form.paymentAccountId || null,
   };
 }

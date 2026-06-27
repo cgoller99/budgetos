@@ -5,6 +5,7 @@ import { AddBillModal } from "@/components/bills/AddBillModal";
 import { BillCard } from "@/components/bills/BillCard";
 import { DeleteBillModal } from "@/components/bills/DeleteBillModal";
 import { EditBillModal } from "@/components/bills/EditBillModal";
+import { PaycheckSplitPanel } from "@/components/paycheck/PaycheckSplitPanel";
 import { Button, EmptyState, PageHeader, SkeletonGrid, StatCard } from "@/components/ui";
 import { pageContainerWideClassName } from "@/components/ui/tokens";
 import { useFinance } from "@/context/FinanceContext";
@@ -118,6 +119,8 @@ export function BillsContent() {
           positive={summary.monthlyCashRemaining >= 0}
         />
       </div>
+
+      <PaycheckSplitPanel />
 
       {finance.bills.length === 0 ? (
         <EmptyState

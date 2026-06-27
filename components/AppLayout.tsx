@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { DemoModeBanner } from "@/components/demo/DemoModeBanner";
 import { FinanceSyncAlert } from "@/components/FinanceSyncAlert";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import { Sidebar } from "@/components/Sidebar";
@@ -26,6 +27,7 @@ export function AppLayout({ children }: AppLayoutProps) {
           notificationCenter={<NotificationCenter />}
         />
         <main className="flex-1 px-6 py-8 lg:px-10 lg:py-12">
+          <DemoModeBanner />
           <FinanceSyncAlert />
           {children}
         </main>

@@ -27,6 +27,9 @@ export function EditBillModal({ bill, onClose }: EditBillModalProps) {
       autopay: true,
       recurring: true,
       category: "",
+      paycheckAssignment: "first_paycheck",
+      customPayDay: 15,
+      paymentAccountId: null,
     }),
   );
 

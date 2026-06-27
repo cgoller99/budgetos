@@ -14,8 +14,12 @@ import { useToast } from "@/context/ToastContext";
 import { useAuth } from "@/context/AuthContext";
 import { getDemoFinanceData } from "@/lib/demo/data";
 import { computeFinanceHub } from "@/lib/finance/computeFinanceHub";
-import { emptyFinanceData, coerceFinanceData } from "@/lib/finance/emptyFinanceData";
-import { adjustPrimaryCashBalance } from "@/lib/finance/cashAccount";
+import { coerceFinanceData, emptyFinanceData } from "@/lib/finance/emptyFinanceData";
+import {
+  applyBillPaymentToData,
+  applyDebtPaymentToData,
+  applyGoalContributionToData,
+} from "@/lib/finance/balanceEffects";
 import { buildUpdatedDebt } from "@/lib/finance/debts";
 import { buildUpdatedIncomeSource } from "@/lib/finance/income";
 import { getGoalTypeMeta } from "@/lib/finance/goalTypes";
@@ -54,9 +58,14 @@ import {
   markAllEventsRead,
   markEventRead,
 } from "@/lib/events";
-import { getCurrentYearMonth } from "@/lib/finance/bills";
+import { normalizePaycheckAssignment } from "@/lib/finance/paycheckSplit";
 import { normalizeBillCategory } from "@/lib/finance/billCategories";
 import type { DemoProfileId, OnboardingMode, OnboardingState } from "@/lib/onboarding/types";
+import {
+  createDemoOnboardingState,
+  createFreshOnboardingState,
+  isDemoMode as checkIsDemoMode,
+} from "@/lib/onboarding/demoMode";
 import {
   applyActivityToData,
   applyAllActivitiesToData,
@@ -105,12 +114,14 @@ export type FinanceContextValue = FinanceData & {
   onboardingComplete: boolean;
   onboardingMode: OnboardingMode | null;
   demoProfileId: DemoProfileId | null;
+  isDemoMode: boolean;
   refreshFinance: () => Promise<void>;
   completeOnboarding: (
     mode: OnboardingMode,
     demoProfileId?: DemoProfileId,
   ) => Promise<void>;
   switchDemoProfile: (demoProfileId: DemoProfileId) => Promise<void>;
+  exitDemoMode: () => Promise<void>;
   addAccount: (input: AddAccountInput) => Promise<void>;
   addIncome: (input: AddIncomeInput) => Promise<void>;
   editIncome: (incomeId: string, input: EditIncomeInput) => Promise<void>;
@@ -398,15 +409,22 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
         throw new Error(message);
       }
 
+      if (mode === "demo" && !profileId) {
+        showToast({
+          title: "Choose a demo profile",
+          subtitle: "Select a sample profile to explore demo mode.",
+        });
+        throw new Error("Demo profile is required for demo mode.");
+      }
+
       const nextData =
         mode === "demo" && profileId
           ? getDemoFinanceData(profileId)
           : emptyFinanceData;
-      const onboardingState: OnboardingState = {
-        complete: true,
-        mode,
-        demoProfileId: mode === "demo" ? (profileId ?? null) : null,
-      };
+      const onboardingState: OnboardingState =
+        mode === "demo" && profileId
+          ? createDemoOnboardingState(profileId)
+          : createFreshOnboardingState();
 
       setIsSyncing(true);
 
@@ -442,12 +460,16 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
         throw new Error(message);
       }
 
+      if (!checkIsDemoMode(onboardingMode)) {
+        showToast({
+          title: "Demo mode is off",
+          subtitle: "Choose Explore a Demo during onboarding to try sample data.",
+        });
+        throw new Error("Demo mode is not active.");
+      }
+
       const nextData = getDemoFinanceData(profileId);
-      const onboardingState: OnboardingState = {
-        complete: true,
-        mode: "demo",
-        demoProfileId: profileId,
-      };
+      const onboardingState = createDemoOnboardingState(profileId);
 
       setIsSyncing(true);
 
@@ -469,8 +491,45 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
         setIsSyncing(false);
       }
     },
-    [error, showToast],
+    [error, onboardingMode, showToast],
   );
+
+  const exitDemoMode = useCallback(async () => {
+    const repository = repositoryRef.current;
+    const userId = userIdRef.current;
+
+    if (!repository || !userId) {
+      const message = error ?? "Finance data is not ready yet.";
+      showToast({ title: "Unable to exit demo mode", subtitle: message });
+      throw new Error(message);
+    }
+
+    if (!checkIsDemoMode(onboardingMode)) {
+      return;
+    }
+
+    const onboardingState = createFreshOnboardingState();
+
+    setIsSyncing(true);
+
+    try {
+      const next = await repository.replaceFinanceData(userId, emptyFinanceData);
+      await repository.saveOnboardingState(userId, onboardingState);
+      setData(coerceFinanceData(next));
+      applyOnboardingState(onboardingState, {
+        setOnboardingComplete,
+        setOnboardingMode,
+        setDemoProfileId,
+      });
+    } catch (exitError) {
+      const message = getErrorMessage(exitError);
+      setError(message);
+      showToast({ title: "Could not exit demo mode", subtitle: message });
+      throw exitError;
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [error, onboardingMode, showToast]);
 
   const addAccount = useCallback(
     async (input: AddAccountInput) => {
@@ -731,21 +790,10 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
       }
 
       const paymentAmount = Math.min(Math.max(amount, 0), debt.balance);
+      const next = applyDebtPaymentToData(data, debtId, paymentAmount);
 
       await runMutation(
-        {
-          ...data,
-          accounts: adjustPrimaryCashBalance(data, -paymentAmount),
-          debts: data.debts.map((item) =>
-            item.id === debtId
-              ? {
-                  ...item,
-                  balance: Math.max(item.balance - paymentAmount, 0),
-                  monthlyChange: -paymentAmount,
-                }
-              : item,
-          ),
-        },
+        next,
         (repository, userId) =>
           repository.makeDebtPayment(userId, debtId, paymentAmount),
         {
@@ -776,6 +824,11 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
               recurring: input.recurring,
               category: normalizeBillCategory(input.category),
               paidMonth: null,
+              paycheckAssignment: normalizePaycheckAssignment(
+                input.paycheckAssignment,
+              ),
+              customPayDay: input.customPayDay ?? null,
+              paymentAccountId: input.paymentAccountId ?? null,
             },
           ],
         },
@@ -803,6 +856,12 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
                   autopay: input.autopay,
                   recurring: input.recurring,
                   category: normalizeBillCategory(input.category),
+                  paycheckAssignment: normalizePaycheckAssignment(
+                    input.paycheckAssignment ?? bill.paycheckAssignment,
+                  ),
+                  customPayDay: input.customPayDay ?? bill.customPayDay,
+                  paymentAccountId:
+                    input.paymentAccountId ?? bill.paymentAccountId,
                 }
               : bill,
           ),
@@ -834,16 +893,10 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
         return;
       }
 
-      const paidMonth = getCurrentYearMonth();
+      const next = applyBillPaymentToData(data, bill);
 
       await runMutation(
-        {
-          ...data,
-          accounts: adjustPrimaryCashBalance(data, -bill.amount),
-          bills: data.bills.map((item) =>
-            item.id === billId ? { ...item, paidMonth } : item,
-          ),
-        },
+        next,
         (repository, userId) => repository.markBillPaid(userId, billId),
         {
           events: [buildBillPaidEvent(bill.name, bill.amount, bill.id)],
@@ -916,19 +969,14 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
         return;
       }
 
+      const next = applyGoalContributionToData(
+        data,
+        input.goalId,
+        input.amount,
+      );
+
       await runMutation(
-        {
-          ...data,
-          accounts: adjustPrimaryCashBalance(data, -input.amount),
-          savingsGoals: data.savingsGoals.map((item) =>
-            item.id === input.goalId
-              ? {
-                  ...item,
-                  current: Math.min(item.current + input.amount, item.target),
-                }
-              : item,
-          ),
-        },
+        next,
         (repository, userId) => repository.addMoneyToGoal(userId, input),
         {
           events: [
@@ -1037,6 +1085,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
   );
 
   const hub = useMemo(() => computeFinanceHub(data), [data]);
+  const isDemoMode = checkIsDemoMode(onboardingMode);
 
   const value = useMemo<FinanceContextValue>(
     () => ({
@@ -1051,9 +1100,11 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
       onboardingComplete,
       onboardingMode,
       demoProfileId,
+      isDemoMode,
       refreshFinance,
       completeOnboarding,
       switchDemoProfile,
+      exitDemoMode,
       addAccount,
       addIncome,
       editIncome,
@@ -1104,12 +1155,14 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
       editIncome,
       editTransaction,
       error,
+      exitDemoMode,
       hub.dashboard,
       hub.notifications,
       hub.recentActivity,
       hub.unreadNotificationCount,
       isLoading,
       isSyncing,
+      isDemoMode,
       markAllNotificationsRead,
       markBillPaid,
       markIncomeReceived,

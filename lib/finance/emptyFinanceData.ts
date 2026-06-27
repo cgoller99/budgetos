@@ -1,6 +1,6 @@
 import type { FinanceEvent, FinanceEventSurface, FinanceEventTone, FinanceEventType } from "@/lib/events/types";
 import { inferDebtAccountType } from "@/lib/finance/debts";
-import type { Debt, FinanceData } from "@/lib/finance/types";
+import type { Bill, Debt, FinanceData } from "@/lib/finance/types";
 
 export const emptyFinanceData: FinanceData = {
   accounts: [],
@@ -40,6 +40,15 @@ function sanitizeFinanceEvent(
   };
 }
 
+function normalizeBill(bill: Bill): Bill {
+  return {
+    ...bill,
+    paycheckAssignment: bill.paycheckAssignment ?? "first_paycheck",
+    customPayDay: bill.customPayDay ?? null,
+    paymentAccountId: bill.paymentAccountId ?? null,
+  };
+}
+
 function normalizeDebt(debt: Debt): Debt {
   return {
     ...debt,
@@ -62,7 +71,7 @@ export function coerceFinanceData(
 
   return {
     accounts: data.accounts ?? [],
-    bills: data.bills ?? [],
+    bills: (data.bills ?? []).map(normalizeBill),
     income: data.income ?? [],
     savingsGoals: data.savingsGoals ?? [],
     debts: (data.debts ?? []).map(normalizeDebt),

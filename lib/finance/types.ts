@@ -75,7 +75,19 @@ export type IncomeTableRow = {
   canMarkReceived: boolean;
 };
 
-export type BillStatus = "upcoming" | "due_today" | "overdue" | "paid";
+export type BillStatus =
+  | "upcoming"
+  | "due_soon"
+  | "due_today"
+  | "overdue"
+  | "paid";
+
+export type PaycheckAssignment =
+  | "first_paycheck"
+  | "second_paycheck"
+  | "weekly"
+  | "biweekly"
+  | "custom";
 
 export type AddBillInput = {
   name: string;
@@ -84,6 +96,9 @@ export type AddBillInput = {
   autopay: boolean;
   recurring: boolean;
   category: string;
+  paycheckAssignment?: PaycheckAssignment;
+  customPayDay?: number | null;
+  paymentAccountId?: string | null;
 };
 
 export type EditBillInput = {
@@ -93,6 +108,9 @@ export type EditBillInput = {
   autopay: boolean;
   recurring: boolean;
   category: string;
+  paycheckAssignment?: PaycheckAssignment;
+  customPayDay?: number | null;
+  paymentAccountId?: string | null;
 };
 
 export type GoalType =
@@ -135,6 +153,9 @@ export type Bill = {
   paidMonth: string | null;
   frequency?: BillFrequency;
   schedule?: RecurringSchedule;
+  paycheckAssignment?: PaycheckAssignment;
+  customPayDay?: number | null;
+  paymentAccountId?: string | null;
 };
 
 export type BillProgress = {
@@ -149,6 +170,7 @@ export type BillProgress = {
   recurring: boolean;
   status: BillStatus;
   statusLabel: string;
+  paycheckAssignment: PaycheckAssignment;
 };
 
 export type NextBillSummary = {
@@ -166,6 +188,82 @@ export type BillsDashboardSummary = {
   totalMonthlyBills: number;
   nextBill: NextBillSummary | null;
   monthlyCashRemaining: number;
+};
+
+export type CalendarBillEntry = {
+  id: string;
+  name: string;
+  amount: number;
+  status: BillStatus;
+  statusLabel: string;
+  category: string;
+};
+
+export type CalendarDaySummary = {
+  date: string;
+  day: number;
+  bills: CalendarBillEntry[];
+  totalDue: number;
+  dominantStatus: BillStatus | null;
+};
+
+export type PaycheckPeriodSummary = {
+  id: PaycheckAssignment;
+  label: string;
+  income: number;
+  billsTotal: number;
+  remaining: number;
+  bills: BillProgress[];
+  isUpcoming: boolean;
+};
+
+export type PaycheckSplitSummary = {
+  periods: PaycheckPeriodSummary[];
+  upcomingPeriodId: PaycheckAssignment | null;
+  totalIncome: number;
+  totalBills: number;
+  totalRemaining: number;
+};
+
+export type HouseholdRole = "owner" | "member";
+
+export type Household = {
+  id: string;
+  name: string;
+  ownerId: string;
+  createdAt: string;
+};
+
+export type HouseholdMember = {
+  householdId: string;
+  userId: string;
+  role: HouseholdRole;
+  joinedAt: string;
+  email?: string | null;
+};
+
+export type HouseholdInvite = {
+  id: string;
+  householdId: string;
+  email: string;
+  role: HouseholdRole;
+  status: "pending" | "accepted" | "revoked" | "expired";
+  expiresAt: string;
+  createdAt: string;
+};
+
+export type BankConnectionStatus =
+  | "pending"
+  | "connected"
+  | "error"
+  | "disconnected";
+
+export type BankConnection = {
+  id: string;
+  provider: string;
+  status: BankConnectionStatus;
+  institutionName: string | null;
+  lastSyncedAt: string | null;
 };
 
 export type IncomeSource = {
@@ -292,6 +390,8 @@ export type Transaction = {
   date: string;
   notes: string;
   goalId?: string | null;
+  billId?: string | null;
+  debtId?: string | null;
 };
 
 export type AddTransactionInput = {

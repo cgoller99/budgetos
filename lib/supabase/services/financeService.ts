@@ -1,7 +1,11 @@
 import type { FinanceEvent } from "@/lib/events/types";
 import { normalizeBillCategory } from "@/lib/finance/billCategories";
-import { getPrimaryCashAccount } from "@/lib/finance/cashAccount";
 import { getCurrentYearMonth } from "@/lib/finance/bills";
+import {
+  applyBillPaymentToData,
+  applyDebtPaymentToData,
+  applyGoalContributionToData,
+} from "@/lib/finance/balanceEffects";
 import { emptyFinanceData } from "@/lib/finance/emptyFinanceData";
 import { getGoalTypeMeta } from "@/lib/finance/goalTypes";
 import { buildUpdatedIncomeSource } from "@/lib/finance/income";
@@ -354,43 +358,45 @@ export class FinanceService {
   ): Promise<FinanceData> {
     const current = await this.loadFinanceData(userId);
     const debt = current.debts.find((item) => item.id === debtId);
-    const cashAccount = getPrimaryCashAccount(current);
 
     if (!debt) {
       throw new Error("Debt not found.");
     }
 
     const paymentAmount = Math.min(Math.max(amount, 0), debt.balance);
-    const nextBalance = Math.max(debt.balance - paymentAmount, 0);
+    const next = applyDebtPaymentToData(current, debtId, paymentAmount);
+    const updatedDebt = next.debts.find((item) => item.id === debtId);
+    const newTransaction = next.transactions.find(
+      (transaction) =>
+        transaction.debtId === debtId &&
+        !current.transactions.some((item) => item.id === transaction.id),
+    );
     const timestamp = new Date().toISOString();
 
-    const { error: debtError } = await this.supabase
-      .from("accounts")
-      .update({
-        balance: nextBalance,
-        monthly_change: -paymentAmount,
-        updated_at: timestamp,
-      })
-      .eq("id", debtId)
-      .eq("user_id", userId)
-      .eq("record_kind", "debt");
-
-    if (debtError) throw debtError;
-
-    if (cashAccount && paymentAmount > 0) {
-      const { error: accountError } = await this.supabase
+    if (updatedDebt) {
+      const { error: debtError } = await this.supabase
         .from("accounts")
         .update({
-          balance: cashAccount.balance - paymentAmount,
+          balance: updatedDebt.balance,
+          monthly_change: updatedDebt.monthlyChange,
           updated_at: timestamp,
         })
-        .eq("id", cashAccount.id)
-        .eq("user_id", userId);
+        .eq("id", debtId)
+        .eq("user_id", userId)
+        .eq("record_kind", "debt");
 
-      if (accountError) throw accountError;
+      if (debtError) throw debtError;
     }
 
-    return this.loadFinanceData(userId);
+    if (newTransaction) {
+      const { error: transactionError } = await this.supabase
+        .from("transactions")
+        .insert(buildTransactionInsert(userId, newTransaction));
+
+      if (transactionError) throw transactionError;
+    }
+
+    return this.persistAccountBalances(userId, next);
   }
 
   async createBill(userId: string, input: AddBillInput, id?: string): Promise<FinanceData> {
@@ -404,6 +410,9 @@ export class FinanceService {
       recurring: input.recurring,
       category: normalizeBillCategory(input.category),
       paid_month: null,
+      paycheck_assignment: input.paycheckAssignment ?? "first_paycheck",
+      custom_pay_day: input.customPayDay ?? null,
+      payment_account_id: input.paymentAccountId ?? null,
     });
 
     if (error) throw error;
@@ -424,6 +433,9 @@ export class FinanceService {
         autopay: input.autopay,
         recurring: input.recurring,
         category: normalizeBillCategory(input.category),
+        paycheck_assignment: input.paycheckAssignment ?? "first_paycheck",
+        custom_pay_day: input.customPayDay ?? null,
+        payment_account_id: input.paymentAccountId ?? null,
         updated_at: new Date().toISOString(),
       })
       .eq("id", billId)
@@ -445,32 +457,21 @@ export class FinanceService {
   }
 
   async markBillPaid(userId: string, billId: string): Promise<FinanceData> {
-    const { data: bill, error: billError } = await this.supabase
-      .from("bills")
-      .select("amount")
-      .eq("id", billId)
-      .eq("user_id", userId)
-      .single();
-
-    if (billError) throw billError;
-
     const current = await this.loadFinanceData(userId);
-    const cashAccount = getPrimaryCashAccount(current);
+    const bill = current.bills.find((item) => item.id === billId);
 
-    if (cashAccount) {
-      const { error: accountError } = await this.supabase
-        .from("accounts")
-        .update({
-          balance: cashAccount.balance - Number(bill.amount),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", cashAccount.id)
-        .eq("user_id", userId);
-
-      if (accountError) throw accountError;
+    if (!bill) {
+      throw new Error("Bill not found.");
     }
 
-    const { error } = await this.supabase
+    const next = applyBillPaymentToData(current, bill);
+    const newTransaction = next.transactions.find(
+      (transaction) =>
+        transaction.billId === billId &&
+        !current.transactions.some((item) => item.id === transaction.id),
+    );
+
+    const { error: billError } = await this.supabase
       .from("bills")
       .update({
         paid_month: getCurrentYearMonth(),
@@ -479,8 +480,17 @@ export class FinanceService {
       .eq("id", billId)
       .eq("user_id", userId);
 
-    if (error) throw error;
-    return this.loadFinanceData(userId);
+    if (billError) throw billError;
+
+    if (newTransaction) {
+      const { error: transactionError } = await this.supabase
+        .from("transactions")
+        .insert(buildTransactionInsert(userId, newTransaction));
+
+      if (transactionError) throw transactionError;
+    }
+
+    return this.persistAccountBalances(userId, next);
   }
 
   async createGoal(
@@ -531,60 +541,41 @@ export class FinanceService {
     userId: string,
     input: AddMoneyToGoalInput,
   ): Promise<FinanceData> {
-    const { data: goal, error: goalError } = await this.supabase
-      .from("goals")
-      .select("current_amount, target_amount")
-      .eq("id", input.goalId)
-      .eq("user_id", userId)
-      .single();
-
-    if (goalError) throw goalError;
-
-    const nextAmount = Math.min(
-      Number(goal.current_amount) + input.amount,
-      Number(goal.target_amount),
+    const current = await this.loadFinanceData(userId);
+    const next = applyGoalContributionToData(
+      current,
+      input.goalId,
+      input.amount,
+    );
+    const updatedGoal = next.savingsGoals.find((item) => item.id === input.goalId);
+    const newTransaction = next.transactions.find(
+      (transaction) =>
+        transaction.goalId === input.goalId &&
+        !current.transactions.some((item) => item.id === transaction.id),
     );
 
-    const { error: updateError } = await this.supabase
-      .from("goals")
-      .update({
-        current_amount: nextAmount,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", input.goalId)
-      .eq("user_id", userId);
-
-    if (updateError) throw updateError;
-
-    const current = await this.loadFinanceData(userId);
-    const cashAccount = getPrimaryCashAccount(current);
-
-    if (cashAccount) {
-      const { error: accountError } = await this.supabase
-        .from("accounts")
+    if (updatedGoal) {
+      const { error: updateError } = await this.supabase
+        .from("goals")
         .update({
-          balance: cashAccount.balance - input.amount,
+          current_amount: updatedGoal.current,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", cashAccount.id)
+        .eq("id", input.goalId)
         .eq("user_id", userId);
 
-      if (accountError) throw accountError;
+      if (updateError) throw updateError;
     }
 
-    const { error: transactionError } = await this.supabase
-      .from("transactions")
-      .insert({
-        user_id: userId,
-        transaction_type: "goal_contribution",
-        name: "Goal contribution",
-        amount: input.amount,
-        category: "Savings",
-        goal_id: input.goalId,
-      });
+    if (newTransaction) {
+      const { error: transactionError } = await this.supabase
+        .from("transactions")
+        .insert(buildTransactionInsert(userId, newTransaction));
 
-    if (transactionError) throw transactionError;
-    return this.loadFinanceData(userId);
+      if (transactionError) throw transactionError;
+    }
+
+    return this.persistAccountBalances(userId, next);
   }
 
   async saveRecurringState(

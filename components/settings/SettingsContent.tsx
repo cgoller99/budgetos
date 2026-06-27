@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { HouseholdSection } from "@/components/household/HouseholdSection";
 import { Button, Card, CardContent, CardHeader } from "@/components/ui";
 import { pageContainerClassName } from "@/components/ui/tokens";
 import { cn } from "@/components/ui/cn";
@@ -16,12 +17,16 @@ export function SettingsContent() {
   const { showToast } = useToast();
   const { user, isConfigured, signOut } = useAuth();
   const {
+    isDemoMode,
     onboardingMode,
     demoProfileId,
     switchDemoProfile,
+    exitDemoMode,
     isLoading,
+    isSyncing,
   } = useFinance();
   const [switchingId, setSwitchingId] = useState<DemoProfileId | null>(null);
+  const [isExitingDemo, setIsExitingDemo] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
 
   async function handleSwitchProfile(profileId: DemoProfileId) {
@@ -40,6 +45,29 @@ export function SettingsContent() {
       router.push("/dashboard");
     } finally {
       setSwitchingId(null);
+    }
+  }
+
+  async function handleExitDemoMode() {
+    const confirmed = window.confirm(
+      "Exit demo mode? Sample accounts, bills, and goals will be removed. You'll start with your own empty BudgetOS workspace.",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setIsExitingDemo(true);
+
+    try {
+      await exitDemoMode();
+      showToast({
+        title: "Demo mode exited",
+        subtitle: "You're now viewing your own BudgetOS data.",
+      });
+      router.push("/dashboard");
+    } finally {
+      setIsExitingDemo(false);
     }
   }
 
@@ -86,30 +114,46 @@ export function SettingsContent() {
         </Card>
       )}
 
+      {isConfigured && <HouseholdSection />}
+
       <Card padding="lg">
         <CardHeader title="Experience" />
-        <CardContent>
-          <p className="text-base font-medium text-white">
-            {onboardingMode === "demo"
-              ? "Demo mode"
-              : onboardingMode === "fresh"
-                ? "Fresh start"
-                : "Not configured"}
-          </p>
-          <p className="mt-2 text-base text-white/38">
-            {onboardingMode === "demo" && demoProfileId
-              ? `Exploring ${getDemoProfile(demoProfileId).name}'s finances`
-              : onboardingMode === "fresh"
-                ? "Building your own financial picture."
-                : "Complete onboarding to get started."}
-          </p>
+        <CardContent className="space-y-4">
+          <div>
+            <p className="text-base font-medium text-white">
+              {isDemoMode
+                ? "Demo mode"
+                : onboardingMode === "fresh"
+                  ? "Your workspace"
+                  : "Not configured"}
+            </p>
+            <p className="mt-2 text-base text-white/38">
+              {isDemoMode && demoProfileId
+                ? `Exploring ${getDemoProfile(demoProfileId).name}'s sample finances.`
+                : onboardingMode === "fresh"
+                  ? "Using your own BudgetOS data. Add accounts, bills, and goals to get started."
+                  : "Complete onboarding to get started."}
+            </p>
+          </div>
+
+          {isDemoMode && (
+            <Button
+              onClick={() => void handleExitDemoMode()}
+              disabled={isSyncing || isExitingDemo}
+            >
+              {isExitingDemo ? "Exiting demo mode..." : "Exit Demo Mode"}
+            </Button>
+          )}
         </CardContent>
       </Card>
 
-      {onboardingMode === "demo" && (
+      {isDemoMode && (
         <Card padding="lg">
           <CardHeader title="Demo profiles" />
           <CardContent>
+            <p className="mb-4 text-sm text-white/45">
+              Switch between sample profiles without leaving demo mode.
+            </p>
             <div className="grid gap-4 sm:grid-cols-2">
               {DEMO_PROFILES.map((profile) => {
                 const isActive = profile.id === demoProfileId;
@@ -154,8 +198,10 @@ export function SettingsContent() {
 
       <p className="text-sm leading-relaxed text-white/28">
         {isConfigured
-          ? "Your finance data syncs to Supabase and is protected by Row Level Security."
-          : "Demo data is stored locally on this device."}
+          ? isDemoMode
+            ? "Demo data is stored in your Supabase account until you exit demo mode."
+            : "Your finance data syncs to Supabase and is protected by Row Level Security."
+          : "Connect Supabase to sync your finance data across devices."}
       </p>
     </div>
   );

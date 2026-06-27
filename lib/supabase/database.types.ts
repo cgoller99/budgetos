@@ -17,6 +17,7 @@ export type ProfileRow = {
   onboarding_complete: boolean;
   onboarding_mode: string | null;
   demo_profile_id: string | null;
+  household_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -28,6 +29,7 @@ export type ProfileInsert = {
   onboarding_complete?: boolean;
   onboarding_mode?: string | null;
   demo_profile_id?: string | null;
+  household_id?: string | null;
   created_at?: string;
   updated_at?: string;
 };
@@ -96,6 +98,10 @@ export type BillRow = RecurringColumns & {
   category: string;
   paid_month: string | null;
   bill_frequency: string | null;
+  paycheck_assignment: string | null;
+  custom_pay_day: number | null;
+  payment_account_id: string | null;
+  household_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -115,6 +121,10 @@ export type BillInsert = {
   next_occurrence?: string | null;
   last_processed_date?: string | null;
   recurring_status?: string | null;
+  paycheck_assignment?: string | null;
+  custom_pay_day?: number | null;
+  payment_account_id?: string | null;
+  household_id?: string | null;
   created_at?: string;
   updated_at?: string;
 };
@@ -291,6 +301,88 @@ export type NotificationInsert = {
 
 export type NotificationUpdate = Partial<NotificationInsert>;
 
+export type HouseholdRow = {
+  id: string;
+  name: string;
+  owner_id: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type HouseholdInsert = {
+  id?: string;
+  name: string;
+  owner_id: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type HouseholdUpdate = Partial<HouseholdInsert>;
+
+export type HouseholdMemberRow = {
+  household_id: string;
+  user_id: string;
+  role: string;
+  joined_at: string;
+};
+
+export type HouseholdMemberInsert = {
+  household_id: string;
+  user_id: string;
+  role?: string;
+  joined_at?: string;
+};
+
+export type HouseholdInviteRow = {
+  id: string;
+  household_id: string;
+  email: string;
+  role: string;
+  token: string;
+  status: string;
+  invited_by: string;
+  expires_at: string;
+  created_at: string;
+};
+
+export type HouseholdInviteInsert = {
+  id?: string;
+  household_id: string;
+  email: string;
+  role?: string;
+  token?: string;
+  status?: string;
+  invited_by: string;
+  expires_at?: string;
+  created_at?: string;
+};
+
+export type BankConnectionRow = {
+  id: string;
+  user_id: string;
+  household_id: string | null;
+  provider: string;
+  status: string;
+  institution_name: string | null;
+  external_item_id: string | null;
+  last_synced_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type BankConnectionInsert = {
+  id?: string;
+  user_id: string;
+  household_id?: string | null;
+  provider?: string;
+  status?: string;
+  institution_name?: string | null;
+  external_item_id?: string | null;
+  last_synced_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -340,6 +432,30 @@ export type Database = {
         Row: NotificationRow;
         Insert: NotificationInsert;
         Update: NotificationUpdate;
+        Relationships: [];
+      };
+      households: {
+        Row: HouseholdRow;
+        Insert: HouseholdInsert;
+        Update: HouseholdUpdate;
+        Relationships: [];
+      };
+      household_members: {
+        Row: HouseholdMemberRow;
+        Insert: HouseholdMemberInsert;
+        Update: Partial<HouseholdMemberInsert>;
+        Relationships: [];
+      };
+      household_invites: {
+        Row: HouseholdInviteRow;
+        Insert: HouseholdInviteInsert;
+        Update: Partial<HouseholdInviteInsert>;
+        Relationships: [];
+      };
+      bank_connections: {
+        Row: BankConnectionRow;
+        Insert: BankConnectionInsert;
+        Update: Partial<BankConnectionInsert>;
         Relationships: [];
       };
     };

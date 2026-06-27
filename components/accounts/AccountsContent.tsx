@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { AccountCard } from "@/components/accounts/AccountCard";
 import { AddAccountModal } from "@/components/accounts/AddAccountModal";
+import { BankSyncPlaceholder } from "@/components/accounts/BankSyncPlaceholder";
 import { Button, EmptyState, PageHeader, SkeletonGrid } from "@/components/ui";
 import { pageContainerWideClassName } from "@/components/ui/tokens";
 import { useFinance } from "@/context/FinanceContext";
@@ -23,6 +24,8 @@ export function AccountsContent() {
           <Button onClick={() => setIsModalOpen(true)}>Add account</Button>
         }
       />
+
+      <BankSyncPlaceholder />
 
       {accounts.length === 0 ? (
         <EmptyState

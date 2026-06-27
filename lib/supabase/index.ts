@@ -35,6 +35,7 @@ export {
   emptyFinanceData,
   getErrorMessage,
 } from "./services/financeService";
+export { HouseholdService } from "./services/householdService";
 export { mapFinanceData } from "./mappers";
 export { seedFinanceData, seedFinanceDataIfEmpty } from "./seed";
 export { ProfilesRepository } from "./repositories/profilesRepository";

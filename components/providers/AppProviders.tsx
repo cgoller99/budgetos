@@ -2,6 +2,7 @@
 
 import { AuthProvider } from "@/context/AuthContext";
 import { FinanceProvider } from "@/context/FinanceContext";
+import { HouseholdProvider } from "@/context/HouseholdContext";
 import { ToastProvider } from "@/context/ToastContext";
 
 type AppProvidersProps = {
@@ -12,7 +13,9 @@ export function AppProviders({ children }: AppProvidersProps) {
   return (
     <ToastProvider>
       <AuthProvider>
-        <FinanceProvider>{children}</FinanceProvider>
+        <HouseholdProvider>
+          <FinanceProvider>{children}</FinanceProvider>
+        </HouseholdProvider>
       </AuthProvider>
     </ToastProvider>
   );

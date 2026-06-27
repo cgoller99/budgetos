@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AuthShell } from "@/components/auth/AuthShell";
-import { Button, FormField, Input } from "@/components/ui";
+import { Button, FormField, Input, PasswordInput } from "@/components/ui";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
 
@@ -16,6 +16,8 @@ export function ResetPasswordForm() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const passwordInputId = useId();
+  const confirmPasswordInputId = useId();
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -102,9 +104,9 @@ export function ResetPasswordForm() {
       }
     >
       <form className="space-y-4" onSubmit={(event) => void handleSubmit(event)}>
-        <FormField label="New password">
-          <Input
-            type="password"
+        <FormField label="New password" htmlFor={passwordInputId}>
+          <PasswordInput
+            id={passwordInputId}
             autoComplete="new-password"
             placeholder="At least 6 characters"
             value={password}
@@ -114,9 +116,9 @@ export function ResetPasswordForm() {
           />
         </FormField>
 
-        <FormField label="Confirm password">
-          <Input
-            type="password"
+        <FormField label="Confirm password" htmlFor={confirmPasswordInputId}>
+          <PasswordInput
+            id={confirmPasswordInputId}
             autoComplete="new-password"
             placeholder="Repeat your password"
             value={confirmPassword}

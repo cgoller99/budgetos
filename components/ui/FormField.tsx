@@ -1,22 +1,30 @@
-import type { LabelHTMLAttributes, ReactNode } from "react";
+import type { HTMLAttributes, ReactNode } from "react";
 import { cn } from "./cn";
 import { labelClassName } from "./tokens";
 
-type FormFieldProps = LabelHTMLAttributes<HTMLLabelElement> & {
+type FormFieldProps = HTMLAttributes<HTMLDivElement> & {
   label: string;
   children: ReactNode;
+  htmlFor?: string;
 };
 
 export function FormField({
   label,
   children,
   className,
+  htmlFor,
   ...props
 }: FormFieldProps) {
   return (
-    <label className={cn("block", className)} {...props}>
-      <span className={labelClassName}>{label}</span>
+    <div className={cn("block", className)} {...props}>
+      {htmlFor ? (
+        <label htmlFor={htmlFor} className={labelClassName}>
+          {label}
+        </label>
+      ) : (
+        <span className={labelClassName}>{label}</span>
+      )}
       {children}
-    </label>
+    </div>
   );
 }

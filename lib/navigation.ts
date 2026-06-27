@@ -28,6 +28,13 @@ export const NAV_ROUTES = [
       "Monitor recurring expenses, due dates, and autopay status so nothing catches you off guard.",
   },
   {
+    label: "Calendar",
+    href: "/calendar",
+    eyebrow: "Cash Flow",
+    subtitle:
+      "See upcoming bills by due date in a monthly calendar with paid, due soon, and overdue states.",
+  },
+  {
     label: "Transactions",
     href: "/transactions",
     eyebrow: "Cash Flow",

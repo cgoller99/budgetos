@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AuthShell } from "@/components/auth/AuthShell";
-import { Button, FormField, Input } from "@/components/ui";
+import { Button, FormField, Input, PasswordInput } from "@/components/ui";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
 
@@ -17,6 +17,7 @@ export function LoginForm() {
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const passwordInputId = useId();
 
   useEffect(() => {
         if (searchParams.get("error") === "auth_callback_failed") {
@@ -96,9 +97,9 @@ export function LoginForm() {
           />
         </FormField>
 
-        <FormField label="Password">
-          <Input
-            type="password"
+        <FormField label="Password" htmlFor={passwordInputId}>
+          <PasswordInput
+            id={passwordInputId}
             autoComplete="current-password"
             placeholder="••••••••"
             value={password}

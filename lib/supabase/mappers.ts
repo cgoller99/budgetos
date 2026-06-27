@@ -18,6 +18,7 @@ import type {
   IncomeFrequency,
   IncomeSource,
   Investment,
+  PaycheckAssignment,
   SavingsGoal,
   Transaction,
   TransactionType as LedgerTransactionType,
@@ -29,6 +30,7 @@ import {
 } from "@/lib/recurring/normalize";
 import { normalizeIncomeFrequency } from "@/lib/recurring/frequencies";
 import { inferDebtAccountType } from "@/lib/finance/debts";
+import { normalizePaycheckAssignment } from "@/lib/finance/paycheckSplit";
 import type { AutoContribution } from "@/lib/recurring/types";
 
 function toNumber(value: number | string | null | undefined): number {
@@ -238,6 +240,9 @@ export function mapBillRow(row: BillRow): Bill {
     paidMonth: row.paid_month,
     frequency: (row.bill_frequency ?? "monthly") as BillFrequency,
     schedule: mapBillSchedule(row),
+    paycheckAssignment: normalizePaycheckAssignment(row.paycheck_assignment),
+    customPayDay: row.custom_pay_day ?? null,
+    paymentAccountId: row.payment_account_id ?? null,
   };
 }
 
@@ -292,6 +297,8 @@ export function mapTransactionRow(row: TransactionRow): Transaction {
     date: row.transaction_date.split("T")[0] ?? row.transaction_date,
     notes: row.notes ?? row.name ?? "",
     goalId: row.goal_id,
+    billId: row.bill_id,
+    debtId: null,
   };
 }
 
@@ -374,6 +381,9 @@ export function buildBillUpdate(bill: Bill) {
     category: bill.category,
     paid_month: bill.paidMonth,
     bill_frequency: bill.frequency ?? bill.schedule?.frequency ?? "monthly",
+    paycheck_assignment: bill.paycheckAssignment,
+    custom_pay_day: bill.customPayDay,
+    payment_account_id: bill.paymentAccountId,
     ...(bill.schedule ? serializeSchedule(bill.schedule) : {}),
     updated_at: new Date().toISOString(),
   };
@@ -420,6 +430,7 @@ export function buildTransactionInsert(
     account_id: transaction.accountId,
     transfer_to_account_id: transaction.transferAccountId,
     goal_id: transaction.goalId ?? null,
+    bill_id: transaction.billId ?? null,
     notes: transaction.notes,
     transaction_date: transaction.date,
     frequency: null,
@@ -435,6 +446,7 @@ export function buildTransactionUpdate(transaction: Transaction) {
     account_id: transaction.accountId,
     transfer_to_account_id: transaction.transferAccountId,
     goal_id: transaction.goalId ?? null,
+    bill_id: transaction.billId ?? null,
     notes: transaction.notes,
     transaction_date: transaction.date,
     updated_at: new Date().toISOString(),

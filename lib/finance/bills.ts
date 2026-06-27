@@ -8,12 +8,17 @@ import type {
   FinanceData,
 } from "@/lib/finance/types";
 
-const STATUS_LABELS: Record<BillStatus, string> = {
+const DUE_SOON_DAYS = 3;
+
+export const CALENDAR_STATUS_LABELS: Record<BillStatus, string> = {
   upcoming: "Upcoming",
+  due_soon: "Due Soon",
   due_today: "Due Today",
   overdue: "Overdue",
   paid: "Paid",
 };
+
+const STATUS_LABELS = CALENDAR_STATUS_LABELS;
 
 const MS_PER_DAY = 86_400_000;
 
@@ -73,6 +78,12 @@ export function getBillStatus(
     return "overdue";
   }
 
+  const daysUntilDue = Math.ceil((due.getTime() - today.getTime()) / MS_PER_DAY);
+
+  if (daysUntilDue <= DUE_SOON_DAYS) {
+    return "due_soon";
+  }
+
   return "upcoming";
 }
 
@@ -113,6 +124,7 @@ export function enrichBill(
     recurring: bill.recurring,
     status,
     statusLabel: STATUS_LABELS[status],
+    paycheckAssignment: bill.paycheckAssignment ?? "first_paycheck",
   };
 }
 
@@ -140,8 +152,9 @@ export function getUpcomingBills(
       const statusOrder: Record<BillStatus, number> = {
         overdue: 0,
         due_today: 1,
-        upcoming: 2,
-        paid: 3,
+        due_soon: 2,
+        upcoming: 3,
+        paid: 4,
       };
 
       if (statusOrder[left.status] !== statusOrder[right.status]) {
@@ -280,9 +293,11 @@ export function getBillStatusVariant(
       return "success";
     case "due_today":
       return "accent";
+    case "due_soon":
+      return "warning";
     case "overdue":
       return "danger";
     default:
-      return "warning";
+      return "default";
   }
 }

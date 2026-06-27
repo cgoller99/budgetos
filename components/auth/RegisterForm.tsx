@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AuthShell } from "@/components/auth/AuthShell";
-import { Button, FormField, Input } from "@/components/ui";
+import { Button, FormField, Input, PasswordInput } from "@/components/ui";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
 
@@ -17,6 +17,7 @@ export function RegisterForm() {
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const passwordInputId = useId();
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -100,9 +101,9 @@ export function RegisterForm() {
           />
         </FormField>
 
-        <FormField label="Password">
-          <Input
-            type="password"
+        <FormField label="Password" htmlFor={passwordInputId}>
+          <PasswordInput
+            id={passwordInputId}
             autoComplete="new-password"
             placeholder="At least 6 characters"
             value={password}
