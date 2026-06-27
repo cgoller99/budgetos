@@ -1,5 +1,8 @@
 -- Household sharing: tables, RLS, invite accept, and shared finance policies.
 -- Safe to run on databases that never applied 20260627_feature_expansion.sql.
+-- Paste this entire file into Supabase Dashboard → SQL Editor → Run.
+
+create extension if not exists "pgcrypto";
 
 create table if not exists public.households (
   id uuid primary key default gen_random_uuid(),
