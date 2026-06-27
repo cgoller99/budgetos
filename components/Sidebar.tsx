@@ -1,46 +1,37 @@
-export const NAV_ITEMS = [
-  "Dashboard",
-  "Accounts",
-  "Income",
-  "Bills",
-  "Savings",
-  "Debt",
-  "Reports",
-  "Settings",
-] as const;
-
-export type NavItem = (typeof NAV_ITEMS)[number];
+import Link from "next/link";
+import { NAV_ROUTES } from "@/lib/navigation";
 
 type SidebarProps = {
   className?: string;
-  activeItem?: NavItem;
+  activeHref?: string;
 };
 
-export function Sidebar({ className = "", activeItem = "Dashboard" }: SidebarProps) {
+export function Sidebar({ className = "", activeHref = "/dashboard" }: SidebarProps) {
   return (
     <aside
-      className={`flex w-56 shrink-0 flex-col border-r border-white/[0.06] bg-[#080d18] px-4 py-6 ${className}`}
+      className={`flex w-60 shrink-0 flex-col border-r border-white/[0.04] bg-[#07090d] px-5 py-8 ${className}`}
     >
-      <div className="mb-8 px-3">
-        <p className="text-lg font-semibold tracking-tight text-white">
-          BudgetOS
-        </p>
-        <p className="mt-0.5 text-xs text-white/40">Finance OS</p>
+      <div className="mb-10 px-2">
+        <Link href="/dashboard" className="block">
+          <p className="text-xl font-semibold tracking-tight text-white">
+            BudgetOS
+          </p>
+        </Link>
       </div>
 
-      <nav className="flex flex-1 flex-col gap-0.5">
-        {NAV_ITEMS.map((item) => (
-          <a
-            key={item}
-            href="#"
-            className={`rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
-              item === activeItem
-                ? "bg-white/[0.08] text-white"
-                : "text-white/50 hover:bg-white/[0.04] hover:text-white/80"
+      <nav className="flex flex-1 flex-col gap-1">
+        {NAV_ROUTES.map((route) => (
+          <Link
+            key={route.href}
+            href={route.href}
+            className={`min-h-11 rounded-2xl px-4 py-3 text-[15px] font-medium transition-colors ${
+              route.href === activeHref
+                ? "bg-white/[0.06] text-white"
+                : "text-white/45 hover:bg-white/[0.03] hover:text-white/80"
             }`}
           >
-            {item}
-          </a>
+            {route.label}
+          </Link>
         ))}
       </nav>
     </aside>

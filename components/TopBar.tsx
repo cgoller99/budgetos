@@ -1,45 +1,40 @@
-import { NAV_ITEMS, type NavItem } from "./Sidebar";
+import Link from "next/link";
+import type { ReactNode } from "react";
+import { NAV_ROUTES } from "@/lib/navigation";
 
 type TopBarProps = {
-  activeItem?: NavItem;
-  eyebrow?: string;
+  activeHref?: string;
   title?: string;
-  date?: string;
+  notificationCenter?: ReactNode;
 };
 
 export function TopBar({
-  activeItem = "Dashboard",
-  eyebrow = "Overview",
+  activeHref = "/dashboard",
   title = "Dashboard",
-  date = "June 2026",
+  notificationCenter,
 }: TopBarProps) {
   return (
     <>
-      <header className="flex items-center justify-between border-b border-white/[0.06] px-5 py-4 lg:px-8">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-widest text-white/35">
-            {eyebrow}
-          </p>
-          <h1 className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">
-            {title}
-          </h1>
-        </div>
-        <p className="hidden text-sm text-white/40 sm:block">{date}</p>
+      <header className="flex items-center justify-between border-b border-white/[0.04] px-6 py-6 lg:px-10 lg:py-7">
+        <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+          {title}
+        </h1>
+        <div className="flex items-center gap-4">{notificationCenter}</div>
       </header>
 
-      <nav className="flex gap-1 overflow-x-auto border-b border-white/[0.06] px-5 py-3 lg:hidden">
-        {NAV_ITEMS.map((item) => (
-          <a
-            key={item}
-            href="#"
-            className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors ${
-              item === activeItem
-                ? "bg-white/[0.1] text-white"
+      <nav className="flex gap-2 overflow-x-auto border-b border-white/[0.04] px-6 py-4 lg:hidden">
+        {NAV_ROUTES.map((route) => (
+          <Link
+            key={route.href}
+            href={route.href}
+            className={`shrink-0 rounded-2xl px-4 py-2.5 text-sm font-medium transition-colors ${
+              route.href === activeHref
+                ? "bg-white/[0.06] text-white"
                 : "text-white/45 hover:text-white/70"
             }`}
           >
-            {item}
-          </a>
+            {route.label}
+          </Link>
         ))}
       </nav>
     </>

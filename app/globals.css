@@ -1,8 +1,11 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #090b10;
+  --foreground: #f5f5f7;
+  --surface: #0f1419;
+  --border: rgba(255, 255, 255, 0.04);
+  --accent: #0077ed;
 }
 
 @theme inline {
@@ -12,15 +15,212 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.goal-card-enter {
+  animation: fade-in-up 0.4s ease-out;
+}
+
+.account-card-enter {
+  animation: fade-in-up 0.35s ease-out;
+}
+
+.bill-card-enter {
+  animation: fade-in-up 0.4s ease-out;
+}
+
+.money-flow-enter {
+  animation: fade-in-up 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes flow-line-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+
+  50% {
+    opacity: 0.85;
+  }
+}
+
+.flow-line-active {
+  animation: flow-line-pulse 2s ease-in-out infinite;
+}
+
+.plan-rec-enter {
+  animation: fade-in-up 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes plan-list-highlight {
+  0% {
+    opacity: 0.85;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+.plan-list-animate .plan-rec-enter {
+  animation: fade-in-up 0.45s cubic-bezier(0.22, 1, 0.36, 1) both,
+    plan-list-highlight 0.5s ease-out both;
+}
+
+.timeline-chart-enter {
+  animation: fade-in-up 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes timeline-draw {
+  from {
+    stroke-dashoffset: 1000;
+    opacity: 0.2;
+  }
+
+  to {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+
+@keyframes timeline-area-fade {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.timeline-line-animate {
+  stroke-dasharray: 1000;
+  animation: timeline-draw 1s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.timeline-area-animate {
+  animation: timeline-area-fade 0.8s ease-out forwards;
+}
+
+.milestone-enter {
+  animation: fade-in-up 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.activity-enter {
+  animation: fade-in-up 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes toast-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(16px) translateY(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0) translateY(0);
+  }
+}
+
+.toast-enter {
+  animation: toast-slide-in 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes kpi-highlight {
+  0% {
+    color: #ffffff;
+    transform: scale(1);
+  }
+
+  35% {
+    color: #0077ed;
+    transform: scale(1.02);
+  }
+
+  100% {
+    color: #ffffff;
+    transform: scale(1);
+  }
+}
+
+.kpi-value-animate {
+  animation: kpi-highlight 0.65s ease-out;
+}
+
+@keyframes onboarding-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes onboarding-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.onboarding-step-enter {
+  animation: onboarding-fade-up 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.onboarding-logo-enter {
+  animation: onboarding-scale-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.onboarding-title-enter {
+  animation: onboarding-fade-up 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.08s both;
+}
+
+.onboarding-subtitle-enter {
+  animation: onboarding-fade-up 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.14s both;
+}
+
+.onboarding-options-enter {
+  animation: onboarding-fade-up 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.2s both;
+}
+
+.onboarding-option-card {
+  animation: onboarding-fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.onboarding-option-card-delay {
+  animation-delay: 0.08s;
+}
+
+.onboarding-profile-card {
+  animation: onboarding-fade-up 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.roadmap-milestone-enter {
+  animation: fade-in-up 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
 }

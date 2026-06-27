@@ -1,17 +1,19 @@
-export function HealthScoreCard() {
-  return (
-    <div className="rounded-2xl border border-white/[0.06] bg-[#111827]/80 p-5 backdrop-blur-sm sm:p-6">
-      <div className="mb-5">
-        <h2 className="text-base font-semibold tracking-tight text-white">
-          Financial Health Score
-        </h2>
-        <p className="mt-1 text-sm text-white/40">
-          Based on savings, debt, and cash flow
-        </p>
-      </div>
+"use client";
 
-      <div className="flex items-center gap-6">
-        <div className="relative flex h-28 w-28 shrink-0 items-center justify-center">
+import { Card, CardContent, CardHeader } from "@/components/ui";
+import { useFinance } from "@/context/FinanceContext";
+import { healthScoreToneClasses } from "@/lib/finance/format";
+
+export function HealthScoreCard() {
+  const { dashboard } = useFinance();
+  const { financialHealthScore } = dashboard;
+
+  return (
+    <Card padding="lg">
+      <CardHeader title="Financial health" />
+
+      <CardContent className="flex items-center gap-8">
+        <div className="relative flex h-32 w-32 shrink-0 items-center justify-center">
           <svg
             className="h-full w-full -rotate-90"
             viewBox="0 0 100 100"
@@ -22,7 +24,7 @@ export function HealthScoreCard() {
               cy="50"
               r="42"
               fill="none"
-              stroke="rgba(255,255,255,0.06)"
+              stroke="rgba(255,255,255,0.04)"
               strokeWidth="8"
             />
             <circle
@@ -33,27 +35,32 @@ export function HealthScoreCard() {
               stroke="#0077ed"
               strokeWidth="8"
               strokeLinecap="round"
-              strokeDasharray="264"
-              strokeDashoffset="47"
+              strokeDasharray={financialHealthScore.strokeDasharray}
+              strokeDashoffset={financialHealthScore.strokeDashoffset}
+              className="transition-all duration-500 ease-out"
             />
           </svg>
-          <span className="absolute text-2xl font-semibold tabular-nums">82</span>
+          <span className="absolute text-3xl font-semibold tabular-nums">
+            {financialHealthScore.score}
+          </span>
         </div>
-        <div className="space-y-3 text-sm">
-          <div className="flex items-center justify-between gap-8">
-            <span className="text-white/45">Savings rate</span>
-            <span className="font-medium text-emerald-400">Strong</span>
-          </div>
-          <div className="flex items-center justify-between gap-8">
-            <span className="text-white/45">Debt load</span>
-            <span className="font-medium text-amber-400">Moderate</span>
-          </div>
-          <div className="flex items-center justify-between gap-8">
-            <span className="text-white/45">Emergency fund</span>
-            <span className="font-medium text-emerald-400">On track</span>
-          </div>
+
+        <div className="space-y-4 text-base">
+          {financialHealthScore.metrics.map((metric) => (
+            <div
+              key={metric.label}
+              className="flex items-center justify-between gap-8"
+            >
+              <span className="text-white/38">{metric.label}</span>
+              <span
+                className={`font-medium ${healthScoreToneClasses[metric.tone]}`}
+              >
+                {metric.value}
+              </span>
+            </div>
+          ))}
         </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }

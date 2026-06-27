@@ -1,41 +1,113 @@
-export function MoneyFlowCard() {
+"use client";
+
+import { useState } from "react";
+import { AnimatedNumber, Card, CardContent, CardHeader } from "@/components/ui";
+import { useFinance } from "@/context/FinanceContext";
+import { formatCurrency } from "@/lib/finance/format";
+import type { MoneyFlowStageData } from "@/lib/finance/types";
+import { cn } from "@/components/ui/cn";
+
+function formatFlowAmount(amount: number, isOutflow: boolean): string {
+  if (isOutflow) {
+    return `-${formatCurrency(amount)}`;
+  }
+
+  return formatCurrency(amount);
+}
+
+function FlowStageNode({
+  stage,
+  isSelected,
+  onSelect,
+}: {
+  stage: MoneyFlowStageData;
+  isSelected: boolean;
+  onSelect: () => void;
+}) {
   return (
-    <div className="rounded-2xl border border-white/[0.06] bg-[#111827]/80 p-5 backdrop-blur-sm sm:p-6">
-      <div className="mb-5">
-        <h2 className="text-base font-semibold tracking-tight text-white">
-          Money Flow™
-        </h2>
-        <p className="mt-1 text-sm text-white/40">
-          Income vs spending this month
+    <button
+      type="button"
+      onClick={onSelect}
+      className={cn(
+        "group relative w-full rounded-2xl px-5 py-4 text-left transition-all duration-300 ease-out",
+        isSelected
+          ? "bg-white/[0.05]"
+          : "hover:bg-white/[0.03]",
+      )}
+    >
+      <div className="flex items-center gap-4">
+        <div
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-xl"
+          style={{ backgroundColor: `${stage.color}14` }}
+        >
+          {stage.icon}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <p className="text-sm text-white/40">{stage.label}</p>
+          <p
+            className="mt-1 text-xl font-semibold tabular-nums text-white sm:text-2xl"
+            style={{ color: isSelected ? stage.color : undefined }}
+          >
+            <AnimatedNumber
+              value={stage.amount}
+              format={(value) =>
+                formatFlowAmount(Math.round(value), stage.isOutflow)
+              }
+            />
+          </p>
+        </div>
+
+        <p
+          className="shrink-0 text-base font-medium tabular-nums text-white/50"
+          style={{ color: isSelected ? stage.color : undefined }}
+        >
+          <AnimatedNumber
+            value={stage.percentOfIncome}
+            format={(value) => `${Math.round(value)}%`}
+          />
         </p>
       </div>
+    </button>
+  );
+}
 
-      <div className="space-y-5">
-        <div>
-          <div className="mb-2 flex items-center justify-between text-sm">
-            <span className="text-white/50">Income</span>
-            <span className="font-medium tabular-nums text-white">$6,400</span>
-          </div>
-          <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]">
-            <div className="h-full w-[85%] rounded-full bg-[#0077ed]" />
-          </div>
+export function MoneyFlowCard() {
+  const { dashboard } = useFinance();
+  const { moneyFlow } = dashboard;
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const stages = moneyFlow.stages;
+
+  return (
+    <Card padding="lg" className="money-flow-enter">
+      <CardHeader title="Money flow" />
+
+      <CardContent>
+        <div className="space-y-1">
+          {stages.map((stage) => (
+            <FlowStageNode
+              key={stage.id}
+              stage={stage}
+              isSelected={selectedId === stage.id}
+              onSelect={() =>
+                setSelectedId((current) =>
+                  current === stage.id ? null : stage.id,
+                )
+              }
+            />
+          ))}
         </div>
-        <div>
-          <div className="mb-2 flex items-center justify-between text-sm">
-            <span className="text-white/50">Spending</span>
-            <span className="font-medium tabular-nums text-white">$4,180</span>
-          </div>
-          <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]">
-            <div className="h-full w-[55%] rounded-full bg-white/30" />
-          </div>
+
+        <div className="mt-8 border-t border-white/[0.04] pt-7">
+          <p className="text-sm text-white/38">Safe to spend</p>
+          <p className="mt-2 text-2xl font-semibold tabular-nums text-emerald-400/90 sm:text-3xl">
+            <AnimatedNumber
+              value={moneyFlow.safeToSpend}
+              format={(value) => formatCurrency(Math.round(value))}
+            />
+          </p>
         </div>
-        <div className="flex items-center justify-between rounded-xl bg-white/[0.04] px-4 py-3">
-          <span className="text-sm text-white/50">Net flow</span>
-          <span className="text-sm font-semibold tabular-nums text-emerald-400">
-            +$2,220
-          </span>
-        </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }
