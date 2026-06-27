@@ -6,6 +6,7 @@ import {
   applyDebtPaymentToData,
   applyGoalContributionToData,
 } from "@/lib/finance/balanceEffects";
+import { isUserInDemoMode } from "@/lib/finance/demoData";
 import { emptyFinanceData } from "@/lib/finance/emptyFinanceData";
 import { getGoalTypeMeta } from "@/lib/finance/goalTypes";
 import { buildUpdatedIncomeSource } from "@/lib/finance/income";
@@ -138,13 +139,41 @@ export class FinanceService {
     await this.profiles.saveOnboardingState(userId, state);
   }
 
+  async exitDemoMode(userId: string): Promise<{
+    data: FinanceData;
+    onboarding: OnboardingState;
+  }> {
+    const freshState = {
+      complete: true,
+      mode: "fresh" as const,
+      demoProfileId: null,
+    };
+
+    await this.profiles.saveOnboardingState(userId, freshState);
+    await this.replaceFinanceData(userId, emptyFinanceData);
+    const [verifiedData, verifiedOnboarding] = await Promise.all([
+      this.loadFinanceData(userId),
+      this.profiles.loadOnboardingState(userId),
+    ]);
+
+    if (isUserInDemoMode(verifiedOnboarding.mode, verifiedData)) {
+      throw new Error(
+        "Demo mode is still active after exit. Reload the page and try again.",
+      );
+    }
+
+    return {
+      data: verifiedData,
+      onboarding: verifiedOnboarding,
+    };
+  }
+
   async replaceFinanceData(userId: string, data: FinanceData): Promise<FinanceData> {
     const deleteResults = await Promise.all([
       this.supabase.from("accounts").delete().eq("user_id", userId),
       this.supabase.from("bills").delete().eq("user_id", userId),
       this.supabase.from("goals").delete().eq("user_id", userId),
       this.supabase.from("transactions").delete().eq("user_id", userId),
-      this.supabase.from("investments").delete().eq("user_id", userId),
       this.supabase.from("notifications").delete().eq("user_id", userId),
       this.supabase.from("recurring_items").delete().eq("user_id", userId),
     ]);
@@ -153,6 +182,18 @@ export class FinanceService {
 
     if (deleteError) {
       throw deleteError;
+    }
+
+    const investmentsDelete = await this.supabase
+      .from("investments")
+      .delete()
+      .eq("user_id", userId);
+
+    if (
+      investmentsDelete.error &&
+      !investmentsDelete.error.message.includes("investments")
+    ) {
+      throw investmentsDelete.error;
     }
 
     await seedFinanceData(this.supabase, userId, data);

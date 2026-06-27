@@ -10,6 +10,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useFinance } from "@/context/FinanceContext";
 import { useToast } from "@/context/ToastContext";
 import { DEMO_PROFILES, getDemoProfile } from "@/lib/demo/profiles";
+import { formatBuildLabel, getBuildInfo } from "@/lib/buildInfo";
 import type { DemoProfileId } from "@/lib/onboarding/types";
 
 export function SettingsContent() {
@@ -28,6 +29,8 @@ export function SettingsContent() {
   const [switchingId, setSwitchingId] = useState<DemoProfileId | null>(null);
   const [isExitingDemo, setIsExitingDemo] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const buildInfo = getBuildInfo();
+  const buildLabel = formatBuildLabel(buildInfo);
 
   async function handleSwitchProfile(profileId: DemoProfileId) {
     if (profileId === demoProfileId) {
@@ -203,6 +206,16 @@ export function SettingsContent() {
             : "Your finance data syncs to Supabase and is protected by Row Level Security."
           : "Connect Supabase to sync your finance data across devices."}
       </p>
+
+      <div className="rounded-2xl border border-amber-400/20 bg-amber-400/5 px-4 py-3">
+        <p className="text-xs font-medium uppercase tracking-wide text-amber-200/70">
+          Build (temporary)
+        </p>
+        <p className="mt-1 font-mono text-sm text-amber-100/90">{buildLabel}</p>
+        <p className="mt-1 font-mono text-xs text-amber-100/50">
+          {buildInfo.commit} · {buildInfo.builtAt}
+        </p>
+      </div>
     </div>
   );
 }

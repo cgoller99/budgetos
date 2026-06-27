@@ -64,8 +64,8 @@ import type { DemoProfileId, OnboardingMode, OnboardingState } from "@/lib/onboa
 import {
   createDemoOnboardingState,
   createFreshOnboardingState,
-  isDemoMode as checkIsDemoMode,
 } from "@/lib/onboarding/demoMode";
+import { isUserInDemoMode } from "@/lib/finance/demoData";
 import {
   applyActivityToData,
   applyAllActivitiesToData,
@@ -460,7 +460,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
         throw new Error(message);
       }
 
-      if (!checkIsDemoMode(onboardingMode)) {
+      if (!isUserInDemoMode(onboardingMode, dataRef.current)) {
         showToast({
           title: "Demo mode is off",
           subtitle: "Choose Explore a Demo during onboarding to try sample data.",
@@ -504,18 +504,16 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
       throw new Error(message);
     }
 
-    if (!checkIsDemoMode(onboardingMode)) {
+    if (!isUserInDemoMode(onboardingMode, dataRef.current)) {
       return;
     }
-
-    const onboardingState = createFreshOnboardingState();
 
     setIsSyncing(true);
 
     try {
-      const next = await repository.replaceFinanceData(userId, emptyFinanceData);
-      await repository.saveOnboardingState(userId, onboardingState);
-      setData(coerceFinanceData(next));
+      const { data: nextData, onboarding: onboardingState } =
+        await repository.exitDemoMode(userId);
+      setData(coerceFinanceData(nextData));
       applyOnboardingState(onboardingState, {
         setOnboardingComplete,
         setOnboardingMode,
@@ -1085,7 +1083,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
   );
 
   const hub = useMemo(() => computeFinanceHub(data), [data]);
-  const isDemoMode = checkIsDemoMode(onboardingMode);
+  const isDemoMode = isUserInDemoMode(onboardingMode, data);
 
   const value = useMemo<FinanceContextValue>(
     () => ({

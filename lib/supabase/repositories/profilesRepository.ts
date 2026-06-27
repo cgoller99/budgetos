@@ -34,19 +34,42 @@ export class ProfilesRepository {
   async saveOnboardingState(
     userId: string,
     state: OnboardingState,
-  ): Promise<void> {
-    const { error } = await this.supabase
+  ): Promise<OnboardingState> {
+    const timestamp = new Date().toISOString();
+    const payload = {
+      id: userId,
+      onboarding_complete: state.complete,
+      onboarding_mode: state.mode,
+      demo_profile_id: state.demoProfileId,
+      updated_at: timestamp,
+    };
+
+    const { data, error } = await this.supabase
       .from("profiles")
-      .update({
-        onboarding_complete: state.complete,
-        onboarding_mode: state.mode,
-        demo_profile_id: state.demoProfileId,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", userId);
+      .upsert(payload, { onConflict: "id" })
+      .select("onboarding_complete, onboarding_mode, demo_profile_id")
+      .single();
 
     if (error) {
       throw error;
     }
+
+    const persisted: OnboardingState = {
+      complete: data.onboarding_complete ?? false,
+      mode: (data.onboarding_mode as OnboardingMode | null) ?? null,
+      demoProfileId: (data.demo_profile_id as DemoProfileId | null) ?? null,
+    };
+
+    if (
+      persisted.complete !== state.complete ||
+      persisted.mode !== state.mode ||
+      persisted.demoProfileId !== state.demoProfileId
+    ) {
+      throw new Error(
+        "Onboarding state did not persist. Check Supabase profile permissions and migrations.",
+      );
+    }
+
+    return persisted;
   }
 }
