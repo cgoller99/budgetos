@@ -58,6 +58,7 @@ export type AccountRow = RecurringColumns & {
   original_balance: number | null;
   monthly_contribution: number | null;
   contribution_frequency: string | null;
+  household_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -81,6 +82,7 @@ export type AccountInsert = {
   next_occurrence?: string | null;
   last_processed_date?: string | null;
   recurring_status?: string | null;
+  household_id?: string | null;
   created_at?: string;
   updated_at?: string;
 };
@@ -141,6 +143,7 @@ export type GoalRow = RecurringColumns & {
   target_amount: number;
   contribution_amount: number | null;
   contribution_frequency: string | null;
+  household_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -159,6 +162,7 @@ export type GoalInsert = {
   next_occurrence?: string | null;
   last_processed_date?: string | null;
   recurring_status?: string | null;
+  household_id?: string | null;
   created_at?: string;
   updated_at?: string;
 };
@@ -179,6 +183,7 @@ export type TransactionRow = RecurringColumns & {
   transfer_to_account_id: string | null;
   notes: string | null;
   transaction_date: string;
+  household_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -201,6 +206,7 @@ export type TransactionInsert = {
   next_occurrence?: string | null;
   last_processed_date?: string | null;
   recurring_status?: string | null;
+  household_id?: string | null;
   created_at?: string;
   updated_at?: string;
 };
@@ -216,6 +222,7 @@ export type InvestmentRow = RecurringColumns & {
   monthly_change: number;
   monthly_contribution: number | null;
   contribution_frequency: string | null;
+  household_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -233,6 +240,7 @@ export type InvestmentInsert = {
   next_occurrence?: string | null;
   last_processed_date?: string | null;
   recurring_status?: string | null;
+  household_id?: string | null;
   created_at?: string;
   updated_at?: string;
 };
@@ -460,7 +468,16 @@ export type Database = {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      accept_household_invite: {
+        Args: { p_invite_id: string };
+        Returns: string;
+      };
+      user_household_ids: {
+        Args: Record<string, never>;
+        Returns: string[];
+      };
+    };
     Enums: {
       account_record_kind: AccountRecordKind;
       transaction_type: TransactionType;

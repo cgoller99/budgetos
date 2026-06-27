@@ -18,6 +18,7 @@ export {
   getSupabaseBrowserClient,
   resetSupabaseBrowserClient,
 } from "./browser";
+export { getErrorMessage } from "./errors";
 export type {
   AccountRow,
   BillRow,
@@ -33,7 +34,6 @@ export {
   FinanceService,
   FinanceRepository,
   emptyFinanceData,
-  getErrorMessage,
 } from "./services/financeService";
 export { HouseholdService } from "./services/householdService";
 export { mapFinanceData } from "./mappers";

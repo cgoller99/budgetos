@@ -27,6 +27,7 @@ type HouseholdContextValue = {
   household: Household | null;
   members: HouseholdMember[];
   invites: HouseholdInvite[];
+  incomingInvites: HouseholdInvite[];
   role: HouseholdRole | null;
   isLoading: boolean;
   isSyncing: boolean;
@@ -34,6 +35,7 @@ type HouseholdContextValue = {
   refreshHousehold: () => Promise<void>;
   createHousehold: (name: string) => Promise<void>;
   inviteMember: (email: string) => Promise<void>;
+  acceptInvite: (inviteId: string) => Promise<void>;
 };
 
 const HouseholdContext = createContext<HouseholdContextValue | null>(null);
@@ -43,6 +45,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
   const [household, setHousehold] = useState<Household | null>(null);
   const [members, setMembers] = useState<HouseholdMember[]>([]);
   const [invites, setInvites] = useState<HouseholdInvite[]>([]);
+  const [incomingInvites, setIncomingInvites] = useState<HouseholdInvite[]>([]);
   const [role, setRole] = useState<HouseholdRole | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -56,11 +59,23 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
     return new HouseholdService(getSupabaseClient());
   }, [isConfigured]);
 
+  const applySnapshot = useCallback(
+    (snapshot: Awaited<ReturnType<HouseholdService["loadHousehold"]>>) => {
+      setHousehold(snapshot.household);
+      setMembers(snapshot.members);
+      setInvites(snapshot.invites);
+      setIncomingInvites(snapshot.incomingInvites);
+      setRole(snapshot.role);
+    },
+    [],
+  );
+
   const refreshHousehold = useCallback(async () => {
     if (!service || !user) {
       setHousehold(null);
       setMembers([]);
       setInvites([]);
+      setIncomingInvites([]);
       setRole(null);
       setIsLoading(false);
       return;
@@ -70,16 +85,13 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
 
     try {
       const snapshot = await service.loadHousehold(user.id);
-      setHousehold(snapshot.household);
-      setMembers(snapshot.members);
-      setInvites(snapshot.invites);
-      setRole(snapshot.role);
+      applySnapshot(snapshot);
     } catch (loadError) {
       setError(getErrorMessage(loadError));
     } finally {
       setIsLoading(false);
     }
-  }, [service, user]);
+  }, [applySnapshot, service, user]);
 
   useEffect(() => {
     void refreshHousehold();
@@ -96,10 +108,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
 
       try {
         const snapshot = await service.createHousehold(user.id, name);
-        setHousehold(snapshot.household);
-        setMembers(snapshot.members);
-        setInvites(snapshot.invites);
-        setRole(snapshot.role);
+        applySnapshot(snapshot);
       } catch (mutationError) {
         setError(getErrorMessage(mutationError));
         throw mutationError;
@@ -107,7 +116,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
         setIsSyncing(false);
       }
     },
-    [service, user],
+    [applySnapshot, service, user],
   );
 
   const inviteMember = useCallback(
@@ -121,10 +130,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
 
       try {
         const snapshot = await service.inviteMember(user.id, email);
-        setHousehold(snapshot.household);
-        setMembers(snapshot.members);
-        setInvites(snapshot.invites);
-        setRole(snapshot.role);
+        applySnapshot(snapshot);
       } catch (mutationError) {
         setError(getErrorMessage(mutationError));
         throw mutationError;
@@ -132,7 +138,29 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
         setIsSyncing(false);
       }
     },
-    [service, user],
+    [applySnapshot, service, user],
+  );
+
+  const acceptInvite = useCallback(
+    async (inviteId: string) => {
+      if (!service || !user) {
+        return;
+      }
+
+      setIsSyncing(true);
+      setError(null);
+
+      try {
+        const snapshot = await service.acceptInvite(user.id, inviteId);
+        applySnapshot(snapshot);
+      } catch (mutationError) {
+        setError(getErrorMessage(mutationError));
+        throw mutationError;
+      } finally {
+        setIsSyncing(false);
+      }
+    },
+    [applySnapshot, service, user],
   );
 
   const value = useMemo(
@@ -140,6 +168,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       household,
       members,
       invites,
+      incomingInvites,
       role,
       isLoading,
       isSyncing,
@@ -147,11 +176,13 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       refreshHousehold,
       createHousehold,
       inviteMember,
+      acceptInvite,
     }),
     [
       household,
       members,
       invites,
+      incomingInvites,
       role,
       isLoading,
       isSyncing,
@@ -159,6 +190,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       refreshHousehold,
       createHousehold,
       inviteMember,
+      acceptInvite,
     ],
   );
 

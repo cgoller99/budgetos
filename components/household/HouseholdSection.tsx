@@ -11,6 +11,7 @@ import {
   FormField,
   Input,
 } from "@/components/ui";
+import { useFinance } from "@/context/FinanceContext";
 import { useHousehold } from "@/context/HouseholdContext";
 import { useToast } from "@/context/ToastContext";
 
@@ -19,24 +20,29 @@ export function HouseholdSection() {
     household,
     members,
     invites,
+    incomingInvites,
     role,
     isLoading,
     isSyncing,
     error,
     createHousehold,
     inviteMember,
+    acceptInvite,
   } = useHousehold();
+  const { refreshFinance } = useFinance();
   const { showToast } = useToast();
   const [householdName, setHouseholdName] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
+  const [acceptingInviteId, setAcceptingInviteId] = useState<string | null>(null);
 
   async function handleCreateHousehold() {
     try {
       await createHousehold(householdName);
+      await refreshFinance();
       setHouseholdName("");
       showToast({
         title: "Household created",
-        subtitle: "You can now invite a spouse or partner.",
+        subtitle: "Your existing data is now shared with this household.",
       });
     } catch {
       // Error surfaced in context
@@ -49,10 +55,27 @@ export function HouseholdSection() {
       setInviteEmail("");
       showToast({
         title: "Invite sent",
-        subtitle: "Your household member will receive an email invite.",
+        subtitle: "Your partner can accept the invite from their Settings page.",
       });
     } catch {
       // Error surfaced in context
+    }
+  }
+
+  async function handleAcceptInvite(inviteId: string) {
+    setAcceptingInviteId(inviteId);
+
+    try {
+      await acceptInvite(inviteId);
+      await refreshFinance();
+      showToast({
+        title: "Invite accepted",
+        subtitle: "You now share this household's finances.",
+      });
+    } catch {
+      // Error surfaced in context
+    } finally {
+      setAcceptingInviteId(null);
     }
   }
 
@@ -72,6 +95,35 @@ export function HouseholdSection() {
       <Card padding="lg">
         <CardHeader title="Shared household" />
         <CardContent className="space-y-4">
+          {incomingInvites.length > 0 && (
+            <div className="space-y-3 rounded-2xl border border-[#0077ed]/20 bg-[#0077ed]/5 p-4">
+              <p className="text-sm font-medium text-white">
+                You have a pending household invite
+              </p>
+              {incomingInvites.map((invite) => (
+                <div
+                  key={invite.id}
+                  className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div>
+                    <p className="text-sm text-white/70">{invite.email}</p>
+                    <p className="mt-1 text-xs text-white/40">
+                      Accept to share accounts, bills, goals, and dashboard data.
+                    </p>
+                  </div>
+                  <Button
+                    onClick={() => void handleAcceptInvite(invite.id)}
+                    disabled={isSyncing || acceptingInviteId === invite.id}
+                  >
+                    {acceptingInviteId === invite.id
+                      ? "Joining..."
+                      : "Accept invite"}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+
           <p className="text-sm text-white/55">
             Create a household to share accounts, bills, goals, debts, and your
             dashboard with a spouse or partner.

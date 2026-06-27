@@ -49,15 +49,12 @@ import { NotificationsRepository } from "@/lib/supabase/repositories/notificatio
 import { ProfilesRepository } from "@/lib/supabase/repositories/profilesRepository";
 import { RecurringItemsRepository } from "@/lib/supabase/repositories/recurringItemsRepository";
 import { seedFinanceData } from "@/lib/supabase/seed";
+import { getErrorMessage } from "@/lib/supabase/errors";
+import {
+  householdFinanceOrFilter,
+  resolveUserHouseholdId,
+} from "@/lib/supabase/householdFinance";
 import type { OnboardingState } from "@/lib/onboarding/types";
-
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return "Something went wrong while syncing with Supabase.";
-}
 
 export class FinanceService {
   private readonly notifications: NotificationsRepository;
@@ -74,7 +71,71 @@ export class FinanceService {
     return requireAuthenticatedUser(this.supabase);
   }
 
+  async getHouseholdId(userId: string): Promise<string | null> {
+    return resolveUserHouseholdId(this.supabase, userId);
+  }
+
+  private withHouseholdId<T extends Record<string, unknown>>(
+    row: T,
+    householdId: string | null,
+  ): T {
+    if (!householdId) {
+      return row;
+    }
+
+    return { ...row, household_id: householdId };
+  }
+
+  private applyOwnedOrHouseholdFilter<
+    T extends {
+      eq: (column: string, value: string) => T;
+      or: (filters: string) => T;
+    },
+  >(query: T, userId: string, householdId: string | null): T {
+    const filter = householdFinanceOrFilter(userId, householdId);
+
+    if (filter) {
+      return query.or(filter);
+    }
+
+    return query.eq("user_id", userId);
+  }
+
+  private async insertTransaction(
+    userId: string,
+    transaction: Transaction,
+  ): Promise<void> {
+    const householdId = await resolveUserHouseholdId(this.supabase, userId);
+    const { error } = await this.supabase
+      .from("transactions")
+      .insert(
+        this.withHouseholdId(
+          buildTransactionInsert(userId, transaction),
+          householdId,
+        ),
+      );
+
+    if (error) {
+      throw error;
+    }
+  }
+
   async loadFinanceData(userId: string): Promise<FinanceData> {
+    const householdId = await resolveUserHouseholdId(this.supabase, userId);
+    const scopeFilter = householdFinanceOrFilter(userId, householdId);
+
+    const scopedSelect = (table: string) => {
+      let query = this.supabase.from(table).select("*");
+
+      if (scopeFilter) {
+        query = query.or(scopeFilter);
+      } else {
+        query = query.eq("user_id", userId);
+      }
+
+      return query;
+    };
+
     const [
       accountsResult,
       billsResult,
@@ -83,11 +144,11 @@ export class FinanceService {
       investmentsResult,
       events,
     ] = await Promise.all([
-      this.supabase.from("accounts").select("*").eq("user_id", userId),
-      this.supabase.from("bills").select("*").eq("user_id", userId),
-      this.supabase.from("goals").select("*").eq("user_id", userId),
-      this.supabase.from("transactions").select("*").eq("user_id", userId),
-      this.supabase.from("investments").select("*").eq("user_id", userId),
+      scopedSelect("accounts"),
+      scopedSelect("bills"),
+      scopedSelect("goals"),
+      scopedSelect("transactions"),
+      scopedSelect("investments"),
       this.notifications.loadEvents(userId),
     ]);
 
@@ -205,19 +266,25 @@ export class FinanceService {
     input: AddAccountInput,
     id?: string,
   ): Promise<FinanceData> {
-    const { error } = await this.supabase.from("accounts").insert({
-      ...(id ? { id } : {}),
-      user_id: userId,
-      record_kind: "account",
-      name: input.name.trim(),
-      institution: input.institution.trim(),
-      type: input.type,
-      balance: input.balance,
-      monthly_change: 0,
-      interest_rate: null,
-      minimum_payment: null,
-      monthly_contribution: null,
-    });
+    const householdId = await resolveUserHouseholdId(this.supabase, userId);
+    const { error } = await this.supabase.from("accounts").insert(
+      this.withHouseholdId(
+        {
+          ...(id ? { id } : {}),
+          user_id: userId,
+          record_kind: "account" as const,
+          name: input.name.trim(),
+          institution: input.institution.trim(),
+          type: input.type,
+          balance: input.balance,
+          monthly_change: 0,
+          interest_rate: null,
+          minimum_payment: null,
+          monthly_contribution: null,
+        },
+        householdId,
+      ),
+    );
 
     if (error) throw error;
     return this.loadFinanceData(userId);
@@ -228,22 +295,28 @@ export class FinanceService {
     input: AddIncomeInput,
     id?: string,
   ): Promise<FinanceData> {
+    const householdId = await resolveUserHouseholdId(this.supabase, userId);
     const frequency = normalizeIncomeFrequency(input.frequency);
     const referenceDate = new Date();
     const startDate = new Date(referenceDate);
     startDate.setDate(startDate.getDate() - 120);
     const schedule = createSchedule(startDate, frequency, referenceDate);
 
-    const { error } = await this.supabase.from("transactions").insert({
-      ...(id ? { id } : {}),
-      user_id: userId,
-      transaction_type: "income",
-      name: input.name.trim(),
-      amount: input.amount,
-      frequency,
-      category: input.category.trim(),
-      ...serializeSchedule(schedule),
-    });
+    const { error } = await this.supabase.from("transactions").insert(
+      this.withHouseholdId(
+        {
+          ...(id ? { id } : {}),
+          user_id: userId,
+          transaction_type: "income" as const,
+          name: input.name.trim(),
+          amount: input.amount,
+          frequency,
+          category: input.category.trim(),
+          ...serializeSchedule(schedule),
+        },
+        householdId,
+      ),
+    );
 
     if (error) throw error;
     return this.loadFinanceData(userId);
@@ -335,6 +408,7 @@ export class FinanceService {
     input: AddDebtInput,
     id?: string,
   ): Promise<FinanceData> {
+    const householdId = await resolveUserHouseholdId(this.supabase, userId);
     const debtId = id ?? crypto.randomUUID();
     const debt = {
       id: debtId,
@@ -350,7 +424,9 @@ export class FinanceService {
 
     const { error } = await this.supabase
       .from("accounts")
-      .insert(buildDebtInsert(userId, debt));
+      .insert(
+        this.withHouseholdId(buildDebtInsert(userId, debt), householdId),
+      );
 
     if (error) throw error;
     return this.loadFinanceData(userId);
@@ -430,31 +506,33 @@ export class FinanceService {
     }
 
     if (newTransaction) {
-      const { error: transactionError } = await this.supabase
-        .from("transactions")
-        .insert(buildTransactionInsert(userId, newTransaction));
-
-      if (transactionError) throw transactionError;
+      await this.insertTransaction(userId, newTransaction);
     }
 
     return this.persistAccountBalances(userId, next);
   }
 
   async createBill(userId: string, input: AddBillInput, id?: string): Promise<FinanceData> {
-    const { error } = await this.supabase.from("bills").insert({
-      ...(id ? { id } : {}),
-      user_id: userId,
-      name: input.name.trim(),
-      amount: input.amount,
-      due_day: input.dueDay,
+    const householdId = await resolveUserHouseholdId(this.supabase, userId);
+    const { error } = await this.supabase.from("bills").insert(
+      this.withHouseholdId(
+        {
+          ...(id ? { id } : {}),
+          user_id: userId,
+          name: input.name.trim(),
+          amount: input.amount,
+          due_day: input.dueDay,
       autopay: input.autopay,
-      recurring: input.recurring,
-      category: normalizeBillCategory(input.category),
-      paid_month: null,
-      paycheck_assignment: input.paycheckAssignment ?? "first_paycheck",
-      custom_pay_day: input.customPayDay ?? null,
-      payment_account_id: input.paymentAccountId ?? null,
-    });
+          recurring: input.recurring,
+          category: normalizeBillCategory(input.category),
+          paid_month: null,
+          paycheck_assignment: input.paycheckAssignment ?? "first_paycheck",
+          custom_pay_day: input.customPayDay ?? null,
+          payment_account_id: input.paymentAccountId ?? null,
+        },
+        householdId,
+      ),
+    );
 
     if (error) throw error;
     return this.loadFinanceData(userId);
@@ -524,11 +602,7 @@ export class FinanceService {
     if (billError) throw billError;
 
     if (newTransaction) {
-      const { error: transactionError } = await this.supabase
-        .from("transactions")
-        .insert(buildTransactionInsert(userId, newTransaction));
-
-      if (transactionError) throw transactionError;
+      await this.insertTransaction(userId, newTransaction);
     }
 
     return this.persistAccountBalances(userId, next);
@@ -539,17 +613,23 @@ export class FinanceService {
     input: CreateGoalInput,
     id?: string,
   ): Promise<FinanceData> {
+    const householdId = await resolveUserHouseholdId(this.supabase, userId);
     const meta = getGoalTypeMeta(input.type);
 
-    const { error } = await this.supabase.from("goals").insert({
-      ...(id ? { id } : {}),
-      user_id: userId,
-      name: input.name.trim(),
-      goal_type: input.type,
-      icon: meta.icon,
-      current_amount: input.current,
-      target_amount: input.target,
-    });
+    const { error } = await this.supabase.from("goals").insert(
+      this.withHouseholdId(
+        {
+          ...(id ? { id } : {}),
+          user_id: userId,
+          name: input.name.trim(),
+          goal_type: input.type,
+          icon: meta.icon,
+          current_amount: input.current,
+          target_amount: input.target,
+        },
+        householdId,
+      ),
+    );
 
     if (error) throw error;
     return this.loadFinanceData(userId);
@@ -609,11 +689,7 @@ export class FinanceService {
     }
 
     if (newTransaction) {
-      const { error: transactionError } = await this.supabase
-        .from("transactions")
-        .insert(buildTransactionInsert(userId, newTransaction));
-
-      if (transactionError) throw transactionError;
+      await this.insertTransaction(userId, newTransaction);
     }
 
     return this.persistAccountBalances(userId, next);
@@ -692,11 +768,7 @@ export class FinanceService {
     data: FinanceData,
     transaction: Transaction,
   ): Promise<FinanceData> {
-    const { error: insertError } = await this.supabase
-      .from("transactions")
-      .insert(buildTransactionInsert(userId, transaction));
-
-    if (insertError) throw insertError;
+    await this.insertTransaction(userId, transaction);
 
     return this.persistAccountBalances(userId, data);
   }
@@ -738,26 +810,37 @@ export class FinanceService {
     userId: string,
     data: FinanceData,
   ): Promise<FinanceData> {
+    const householdId = await resolveUserHouseholdId(this.supabase, userId);
     const timestamp = new Date().toISOString();
 
-    const accountUpdates = data.accounts.map((account) =>
-      this.supabase
+    const accountUpdates = data.accounts.map((account) => {
+      let query = this.supabase
         .from("accounts")
         .update({
           balance: account.balance,
           updated_at: timestamp,
         })
-        .eq("id", account.id)
-        .eq("user_id", userId),
-    );
+        .eq("id", account.id);
 
-    const goalUpdates = data.savingsGoals.map((goal) =>
-      this.supabase
+      if (!householdId) {
+        query = query.eq("user_id", userId);
+      }
+
+      return query;
+    });
+
+    const goalUpdates = data.savingsGoals.map((goal) => {
+      let query = this.supabase
         .from("goals")
         .update(buildGoalUpdate(goal))
-        .eq("id", goal.id)
-        .eq("user_id", userId),
-    );
+        .eq("id", goal.id);
+
+      if (!householdId) {
+        query = query.eq("user_id", userId);
+      }
+
+      return query;
+    });
 
     const results = await Promise.all([...accountUpdates, ...goalUpdates]);
     const failed = results.find((result) => result.error);
@@ -770,7 +853,7 @@ export class FinanceService {
   }
 }
 
-export { emptyFinanceData, getErrorMessage };
+export { emptyFinanceData };
 
 /** Backward-compatible alias for existing imports. */
 export { FinanceService as FinanceRepository };

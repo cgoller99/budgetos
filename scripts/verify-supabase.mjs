@@ -20,7 +20,12 @@ const REQUIRED_TABLES = [
   "investments",
   "recurring_items",
   "notifications",
+  "households",
+  "household_members",
+  "household_invites",
 ];
+
+const REQUIRED_PROFILE_COLUMNS = ["household_id"];
 
 const MIGRATION_FILES = [
   "supabase/schema.sql",
@@ -29,6 +34,8 @@ const MIGRATION_FILES = [
   "supabase/migrations/20260627_recurring_engine.sql",
   "supabase/migrations/20260627_transaction_engine.sql",
   "supabase/migrations/20260627_profiles_onboarding.sql",
+  "supabase/migrations/20260627_feature_expansion.sql",
+  "supabase/migrations/20260628_household_complete.sql",
 ];
 
 function loadEnvFile(filePath) {
@@ -233,6 +240,26 @@ async function main() {
     console.log("  1. Open Supabase SQL Editor");
     console.log("  2. Run supabase/schema.sql");
     console.log("  3. Run migrations in supabase/migrations/ (oldest first)");
+    console.log("  4. Household sharing: open supabase/migrations/20260628_household_complete.sql in your repo, copy ALL SQL, paste into SQL Editor, Run");
+    console.log("     (Do not paste the file path — paste the SQL file contents)");
+  }
+
+  console.log("\nProfile column checks:");
+  for (const column of REQUIRED_PROFILE_COLUMNS) {
+    const response = await fetch(
+      `${restBase}/profiles?select=${column}&limit=0`,
+      { method: "GET", headers: restHeaders },
+    );
+
+    if (response.status === 400) {
+      const body = await response.text();
+      allOk =
+        report(`  profiles.${column}`, false, body.includes("42703") ? "missing" : body.slice(0, 120)) &&
+        allOk;
+      continue;
+    }
+
+    allOk = report(`  profiles.${column}`, response.ok, response.ok ? "exists" : `HTTP ${response.status}`) && allOk;
   }
 
   console.log(`\n${allOk ? "All checks passed." : "Some checks failed."}`);

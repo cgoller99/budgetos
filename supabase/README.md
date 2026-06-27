@@ -9,8 +9,13 @@ Production backend for BudgetOS. All finance data, notifications, and onboarding
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 3. Apply schema (choose one):
-   - **SQL editor:** run `schema.sql`
+   - **SQL editor:** run `schema.sql`, then run every file in `migrations/` oldest first
    - **CLI:** `supabase link` then `supabase db push`
+4. **Household sharing requires** the SQL **contents** of `migrations/20260628_household_complete.sql`:
+   - Open that file in your repo, copy **all** of it, paste into Supabase Dashboard → **SQL Editor** → **New query**, then click **Run**
+   - Do **not** paste the filename/path (e.g. `supabase/migrations/...`) — that is not SQL
+   - Or use CLI: `supabase link` then `supabase db push`
+5. Verify: `npm run verify:supabase`
 
 ## Structure
 
@@ -34,5 +39,8 @@ supabase/
 | `investments` | Investment holdings |
 | `recurring_items` | Recurring schedule metadata |
 | `notifications` | Activity / notification events |
+| `households` | Shared household container |
+| `household_members` | Household membership |
+| `household_invites` | Pending partner invites |
 
-All tables use RLS policies scoped to `auth.uid() = user_id`.
+All tables use RLS policies scoped to `auth.uid() = user_id`. Household finance rows also allow access when `household_id` matches a household the user belongs to.

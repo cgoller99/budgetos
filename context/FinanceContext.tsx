@@ -12,6 +12,7 @@ import {
 } from "react";
 import { useToast } from "@/context/ToastContext";
 import { useAuth } from "@/context/AuthContext";
+import { useHousehold } from "@/context/HouseholdContext";
 import { getDemoFinanceData } from "@/lib/demo/data";
 import { computeFinanceHub } from "@/lib/finance/computeFinanceHub";
 import { coerceFinanceData, emptyFinanceData } from "@/lib/finance/emptyFinanceData";
@@ -237,6 +238,47 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
     const next = await repository.loadFinanceData(userId);
     setData(coerceFinanceData(next));
   }, []);
+
+  const { household } = useHousehold();
+
+  useEffect(() => {
+    const householdId = household?.id;
+
+    if (!householdId || !getSupabaseConfig().isConfigured) {
+      return;
+    }
+
+    const supabase = getSupabaseClient();
+    const channel = supabase.channel(`household-finance-${householdId}`);
+    const tables = [
+      "accounts",
+      "bills",
+      "goals",
+      "transactions",
+      "investments",
+    ] as const;
+
+    for (const table of tables) {
+      channel.on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table,
+          filter: `household_id=eq.${householdId}`,
+        },
+        () => {
+          void refreshFinance();
+        },
+      );
+    }
+
+    channel.subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [household?.id, refreshFinance]);
 
   useEffect(() => {
     let cancelled = false;

@@ -9,7 +9,9 @@ import type {
   HouseholdInviteRow,
   HouseholdMemberRow,
   HouseholdRow,
+  ProfileRow,
 } from "@/lib/supabase/database.types";
+import { backfillHouseholdFinanceRows } from "@/lib/supabase/householdFinance";
 
 function mapHousehold(row: HouseholdRow): Household {
   return {
@@ -20,12 +22,16 @@ function mapHousehold(row: HouseholdRow): Household {
   };
 }
 
-function mapMember(row: HouseholdMemberRow): HouseholdMember {
+function mapMember(
+  row: HouseholdMemberRow,
+  profile?: Pick<ProfileRow, "email"> | null,
+): HouseholdMember {
   return {
     householdId: row.household_id,
     userId: row.user_id,
     role: row.role as HouseholdRole,
     joinedAt: row.joined_at,
+    email: profile?.email ?? null,
   };
 }
 
@@ -46,12 +52,13 @@ export type HouseholdSnapshot = {
   members: HouseholdMember[];
   invites: HouseholdInvite[];
   role: HouseholdRole | null;
+  incomingInvites: HouseholdInvite[];
 };
 
 export class HouseholdService {
   constructor(private readonly supabase: BudgetOsSupabaseClient) {}
 
-  async loadHousehold(userId: string): Promise<HouseholdSnapshot> {
+  private async resolveHouseholdId(userId: string): Promise<string | null> {
     const { data: profile, error: profileError } = await this.supabase
       .from("profiles")
       .select("household_id")
@@ -62,27 +69,112 @@ export class HouseholdService {
       throw profileError;
     }
 
-    if (!profile?.household_id) {
+    if (profile?.household_id) {
+      return profile.household_id;
+    }
+
+    const { data: membership, error: membershipError } = await this.supabase
+      .from("household_members")
+      .select("household_id")
+      .eq("user_id", userId)
+      .limit(1)
+      .maybeSingle();
+
+    if (membershipError) {
+      throw membershipError;
+    }
+
+    return membership?.household_id ?? null;
+  }
+
+  private async loadIncomingInvites(userId: string): Promise<HouseholdInvite[]> {
+    const { data: profile, error: profileError } = await this.supabase
+      .from("profiles")
+      .select("email")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (profileError) {
+      throw profileError;
+    }
+
+    const email = profile?.email?.trim().toLowerCase();
+
+    if (!email) {
+      return [];
+    }
+
+    const { data, error } = await this.supabase
+      .from("household_invites")
+      .select("*")
+      .eq("status", "pending")
+      .ilike("email", email);
+
+    if (error) {
+      throw error;
+    }
+
+    return (data ?? []).map(mapInvite);
+  }
+
+  private async loadMembersWithProfiles(
+    householdId: string,
+  ): Promise<HouseholdMember[]> {
+    const { data: members, error: membersError } = await this.supabase
+      .from("household_members")
+      .select("*")
+      .eq("household_id", householdId);
+
+    if (membersError) {
+      throw membersError;
+    }
+
+    const memberRows = members ?? [];
+
+    if (memberRows.length === 0) {
+      return [];
+    }
+
+    const userIds = memberRows.map((member) => member.user_id);
+    const { data: profiles, error: profilesError } = await this.supabase
+      .from("profiles")
+      .select("id, email")
+      .in("id", userIds);
+
+    if (profilesError) {
+      throw profilesError;
+    }
+
+    const profileById = new Map(
+      (profiles ?? []).map((profile) => [profile.id, profile]),
+    );
+
+    return memberRows.map((member) =>
+      mapMember(member, profileById.get(member.user_id)),
+    );
+  }
+
+  async loadHousehold(userId: string): Promise<HouseholdSnapshot> {
+    const incomingInvites = await this.loadIncomingInvites(userId);
+    const householdId = await this.resolveHouseholdId(userId);
+
+    if (!householdId) {
       return {
         household: null,
         members: [],
         invites: [],
         role: null,
+        incomingInvites,
       };
     }
 
-    const householdId = profile.household_id;
-
-    const [householdResult, membersResult, invitesResult] = await Promise.all([
+    const [householdResult, members, invitesResult] = await Promise.all([
       this.supabase
         .from("households")
         .select("*")
         .eq("id", householdId)
         .maybeSingle(),
-      this.supabase
-        .from("household_members")
-        .select("*")
-        .eq("household_id", householdId),
+      this.loadMembersWithProfiles(householdId),
       this.supabase
         .from("household_invites")
         .select("*")
@@ -91,10 +183,8 @@ export class HouseholdService {
     ]);
 
     if (householdResult.error) throw householdResult.error;
-    if (membersResult.error) throw membersResult.error;
     if (invitesResult.error) throw invitesResult.error;
 
-    const members = (membersResult.data ?? []).map(mapMember);
     const role =
       members.find((member) => member.userId === userId)?.role ??
       (householdResult.data?.owner_id === userId ? "owner" : null);
@@ -104,6 +194,7 @@ export class HouseholdService {
       members,
       invites: (invitesResult.data ?? []).map(mapInvite),
       role,
+      incomingInvites,
     };
   }
 
@@ -142,6 +233,8 @@ export class HouseholdService {
 
     if (profileError) throw profileError;
 
+    await backfillHouseholdFinanceRows(this.supabase, userId, household.id);
+
     return this.loadHousehold(userId);
   }
 
@@ -170,6 +263,22 @@ export class HouseholdService {
     });
 
     if (error) throw error;
+
+    return this.loadHousehold(userId);
+  }
+
+  async acceptInvite(userId: string, inviteId: string): Promise<HouseholdSnapshot> {
+    const { data, error } = await this.supabase.rpc("accept_household_invite", {
+      p_invite_id: inviteId,
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data) {
+      throw new Error("Invite acceptance did not return a household id.");
+    }
 
     return this.loadHousehold(userId);
   }
