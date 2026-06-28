@@ -27,7 +27,7 @@ function getConfigurationError(apiKey: string | undefined): string | null {
 export function getEmailConfig(): EmailConfig {
   const apiKey = process.env.RESEND_API_KEY?.trim();
   const fromEmail =
-    process.env.RESEND_FROM_EMAIL?.trim() || "noreply@buxme.com";
+    process.env.RESEND_FROM_EMAIL?.trim() || "noreply@buxme.co";
   const fromName = process.env.RESEND_FROM_NAME?.trim() || "Buxme";
   const configurationError = getConfigurationError(apiKey);
 

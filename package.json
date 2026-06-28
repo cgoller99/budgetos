@@ -2,7 +2,7 @@
   "name": "buxme",
   "version": "0.1.0",
   "description": "Everything about your money.",
-  "homepage": "https://buxme.com",
+  "homepage": "https://buxme.co",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

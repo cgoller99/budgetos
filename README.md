@@ -4,7 +4,7 @@
 
 Buxme is a personal finance web app for tracking accounts, income, bills, transactions, savings goals, debt, and reports — built with Next.js and Supabase.
 
-Production: [https://buxme.com](https://buxme.com)
+Production: [https://buxme.co](https://buxme.co)
 
 ## Getting started
 
@@ -20,9 +20,9 @@ npm install
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_DB_URL=
-NEXT_PUBLIC_SITE_URL=https://buxme.com
+NEXT_PUBLIC_SITE_URL=https://buxme.co
 RESEND_API_KEY=
-RESEND_FROM_EMAIL=noreply@buxme.com
+RESEND_FROM_EMAIL=noreply@buxme.co
 RESEND_FROM_NAME=Buxme
 ```
 

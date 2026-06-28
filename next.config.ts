@@ -10,6 +10,28 @@ const nextConfig: NextConfig = {
       "local-dev",
     NEXT_PUBLIC_BUILD_TIME: new Date().toISOString(),
   },
+  async redirects() {
+    return [
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "budgetos.co" }],
+        destination: "https://buxme.co/:path*",
+        permanent: true,
+      },
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "www.budgetos.co" }],
+        destination: "https://buxme.co/:path*",
+        permanent: true,
+      },
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "budgetos-one.vercel.app" }],
+        destination: "https://buxme.co/:path*",
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;
