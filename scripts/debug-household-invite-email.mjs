@@ -65,7 +65,7 @@ step("1. Env file keys present", {
 
 const apiKey = env.RESEND_API_KEY?.trim();
 const fromEmail = env.RESEND_FROM_EMAIL?.trim() || "onboarding@resend.dev";
-const fromName = env.RESEND_FROM_NAME?.trim() || "BudgetOS";
+const fromName = env.RESEND_FROM_NAME?.trim() || "Buxme";
 const siteUrl = env.NEXT_PUBLIC_SITE_URL?.trim() || "http://localhost:3000";
 
 step("3. RESEND_API_KEY loaded", {
@@ -137,7 +137,7 @@ if (configurationError) {
   process.exit(1);
 }
 
-const testSubject = "BudgetOS invite email debug test";
+const testSubject = "Buxme invite email debug test";
 const testHtml = "<p>Debug test from scripts/debug-household-invite-email.mjs</p>";
 const testText = "Debug test";
 

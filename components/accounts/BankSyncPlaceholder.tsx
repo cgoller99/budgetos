@@ -16,7 +16,7 @@ export function BankSyncPlaceholder() {
         </p>
         <ul className="space-y-2 text-sm text-white/45">
           <li>Automatically import account balances</li>
-          <li>Sync transactions into BudgetOS</li>
+          <li>Sync transactions into Buxme</li>
           <li>Keep manual entry available at any time</li>
         </ul>
         <Button variant="secondary" disabled>

@@ -1,4 +1,4 @@
--- Transaction Engine columns for BudgetOS
+-- Transaction Engine columns for Buxme
 
 alter type public.transaction_type add value if not exists 'transfer';
 

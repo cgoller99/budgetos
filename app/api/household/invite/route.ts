@@ -176,7 +176,7 @@ export async function POST(request: Request) {
     const inviterLabel =
       profile?.email?.trim() ||
       user.email?.trim() ||
-      "A BudgetOS user";
+      "A Buxme user";
 
     console.info("[household-invite] Sending email", {
       to: normalizedEmail,

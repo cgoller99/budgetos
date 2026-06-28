@@ -1,4 +1,4 @@
--- BudgetOS feature expansion: paycheck split, household sharing, bank sync placeholder
+-- Buxme feature expansion: paycheck split, household sharing, bank sync placeholder
 
 -- Paycheck bill assignment
 alter table public.bills

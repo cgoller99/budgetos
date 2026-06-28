@@ -6,7 +6,7 @@ export type NotificationCategory =
 
 export type NotificationPreferences = Record<NotificationCategory, boolean>;
 
-const STORAGE_KEY = "budgetos-notification-preferences";
+const STORAGE_KEY = "buxme-notification-preferences";
 
 export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   bills: true,

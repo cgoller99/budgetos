@@ -1,4 +1,4 @@
--- BudgetOS Auth + RLS preparation
+-- Buxme Auth + RLS preparation
 -- Run after schema.sql when enabling email/password authentication.
 
 -- Ensure profiles sync with auth.users (trigger already in schema.sql).

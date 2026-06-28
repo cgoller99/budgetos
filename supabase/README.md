@@ -1,6 +1,6 @@
-# BudgetOS Supabase
+# Buxme Supabase
 
-Production backend for BudgetOS. All finance data, notifications, and onboarding state live in Supabase with Row Level Security enabled.
+Production backend for Buxme. All finance data, notifications, and onboarding state live in Supabase with Row Level Security enabled.
 
 ## Setup
 

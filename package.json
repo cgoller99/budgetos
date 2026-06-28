@@ -1,7 +1,8 @@
 {
-  "name": "budgetos",
+  "name": "buxme",
   "version": "0.1.0",
-  "private": true,
+  "description": "Everything about your money.",
+  "homepage": "https://buxme.com",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

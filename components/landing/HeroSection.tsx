@@ -10,21 +10,20 @@ export function HeroSection() {
 
       <div className="relative mx-auto max-w-4xl text-center">
         <p className="onboarding-title-enter text-sm font-medium tracking-wide text-[#4da3ff] uppercase">
-          Personal finance, refined
+          Buxme
         </p>
 
         <h1 className="onboarding-subtitle-enter mt-5 text-4xl font-semibold tracking-tight text-white sm:text-5xl lg:text-[3.5rem] lg:leading-[1.08]">
-          Your complete financial
-          <span className="block text-white/90">command center</span>
+          Everything about your money.
         </h1>
 
         <p className="onboarding-options-enter mx-auto mt-6 max-w-2xl text-base leading-relaxed text-white/45 sm:text-lg">
-          Track accounts, cash flow, bills, goals, and debt in one calm,
-          beautifully designed workspace. Built for clarity — not clutter.
+          Buxme brings your accounts, bills, credit, goals, investments, and
+          financial future together in one secure place.
         </p>
 
         <div className="onboarding-options-enter mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <PrimaryLink href="/register">Start for free</PrimaryLink>
+          <PrimaryLink href="/register">Get Started</PrimaryLink>
           <SecondaryLink href="/login">Log in</SecondaryLink>
         </div>
 

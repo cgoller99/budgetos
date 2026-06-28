@@ -235,7 +235,7 @@ export function SettingsContent() {
 
   async function handleExitDemoMode() {
     const confirmed = window.confirm(
-      "Exit demo mode? Sample accounts, bills, and goals will be removed. You'll start with your own empty BudgetOS workspace.",
+      "Exit demo mode? Sample accounts, bills, and goals will be removed. You'll start with your own empty Buxme workspace.",
     );
 
     if (!confirmed) {
@@ -248,7 +248,7 @@ export function SettingsContent() {
       await exitDemoMode();
       showToast({
         title: "Demo mode exited",
-        subtitle: "You're now viewing your own BudgetOS data.",
+        subtitle: "You're now viewing your own Buxme data.",
       });
       router.push("/dashboard");
     } finally {
@@ -449,7 +449,7 @@ export function SettingsContent() {
               {isDemoMode && demoProfileId
                 ? `Exploring ${getDemoProfile(demoProfileId).name}'s sample finances.`
                 : onboardingMode === "fresh"
-                  ? "Using your own BudgetOS data. Add accounts, bills, and goals to get started."
+                  ? "Using your own Buxme data. Add accounts, bills, and goals to get started."
                   : "Complete onboarding to get started."}
             </p>
           </div>

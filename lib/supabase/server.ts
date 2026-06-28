@@ -1,7 +1,7 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { Database } from "@/lib/supabase/database.types";
-import type { BudgetOsSupabaseClient } from "@/lib/supabase/client";
+import type { BuxmeSupabaseClient } from "@/lib/supabase/client";
 import { getSupabaseConfig } from "@/lib/supabase/config";
 
 type CookieToSet = {
@@ -10,7 +10,7 @@ type CookieToSet = {
   options: CookieOptions;
 };
 
-export async function createSupabaseServerClient(): Promise<BudgetOsSupabaseClient> {
+export async function createSupabaseServerClient(): Promise<BuxmeSupabaseClient> {
   const { url, anonKey, isConfigured } = getSupabaseConfig();
 
   if (!isConfigured || !url || !anonKey) {
@@ -36,5 +36,5 @@ export async function createSupabaseServerClient(): Promise<BudgetOsSupabaseClie
         }
       },
     },
-  }) as unknown as BudgetOsSupabaseClient;
+  }) as unknown as BuxmeSupabaseClient;
 }

@@ -1,4 +1,4 @@
-import type { BudgetOsSupabaseClient } from "@/lib/supabase/client";
+import type { BuxmeSupabaseClient } from "@/lib/supabase/client";
 
 export class AuthError extends Error {
   constructor(message: string) {
@@ -8,7 +8,7 @@ export class AuthError extends Error {
 }
 
 export async function ensureProfile(
-  supabase: BudgetOsSupabaseClient,
+  supabase: BuxmeSupabaseClient,
   userId: string,
   email?: string | null,
   fullName?: string | null,
@@ -28,7 +28,7 @@ export async function ensureProfile(
 }
 
 export async function getAuthenticatedUserId(
-  supabase: BudgetOsSupabaseClient,
+  supabase: BuxmeSupabaseClient,
 ): Promise<string | null> {
   const {
     data: { session },
@@ -54,7 +54,7 @@ export async function getAuthenticatedUserId(
 }
 
 export async function requireAuthenticatedUser(
-  supabase: BudgetOsSupabaseClient,
+  supabase: BuxmeSupabaseClient,
 ): Promise<string> {
   const userId = await getAuthenticatedUserId(supabase);
 
@@ -67,7 +67,7 @@ export async function requireAuthenticatedUser(
 
 /** @deprecated Use requireAuthenticatedUser instead. */
 export async function ensureAuthenticatedUser(
-  supabase: BudgetOsSupabaseClient,
+  supabase: BuxmeSupabaseClient,
 ): Promise<string> {
   return requireAuthenticatedUser(supabase);
 }

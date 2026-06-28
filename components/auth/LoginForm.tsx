@@ -72,7 +72,7 @@ export function LoginForm() {
   return (
     <AuthShell
       title="Sign in"
-      subtitle="Welcome back to BudgetOS"
+      subtitle="Welcome back to Buxme"
       footer={
         <>
           Don&apos;t have an account?{" "}

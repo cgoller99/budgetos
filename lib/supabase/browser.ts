@@ -3,11 +3,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 import { getSupabaseConfig } from "@/lib/supabase/config";
 
-export type BudgetOsSupabaseClient = SupabaseClient<Database>;
+export type BuxmeSupabaseClient = SupabaseClient<Database>;
 
-let browserClient: BudgetOsSupabaseClient | null = null;
+let browserClient: BuxmeSupabaseClient | null = null;
 
-export function createSupabaseBrowserClient(): BudgetOsSupabaseClient {
+export function createSupabaseBrowserClient(): BuxmeSupabaseClient {
   const { url, anonKey, isConfigured } = getSupabaseConfig();
 
   if (!isConfigured || !url || !anonKey) {
@@ -16,10 +16,10 @@ export function createSupabaseBrowserClient(): BudgetOsSupabaseClient {
     );
   }
 
-  return createBrowserClient<Database>(url, anonKey) as unknown as BudgetOsSupabaseClient;
+  return createBrowserClient<Database>(url, anonKey) as unknown as BuxmeSupabaseClient;
 }
 
-export function getSupabaseBrowserClient(): BudgetOsSupabaseClient {
+export function getSupabaseBrowserClient(): BuxmeSupabaseClient {
   if (!browserClient) {
     browserClient = createSupabaseBrowserClient();
   }

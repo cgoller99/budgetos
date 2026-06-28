@@ -85,7 +85,7 @@ function report(title, ok, detail = "") {
 }
 
 async function main() {
-  console.log("BudgetOS Supabase verification\n");
+  console.log("Buxme Supabase verification\n");
 
   let allOk = true;
 

@@ -1,4 +1,4 @@
--- BudgetOS Supabase schema
+-- Buxme Supabase schema
 -- Run in the Supabase SQL editor or via Supabase CLI.
 
 create extension if not exists "pgcrypto";

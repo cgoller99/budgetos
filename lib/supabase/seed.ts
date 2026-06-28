@@ -1,6 +1,6 @@
 import type { FinanceData, SavingsGoal } from "@/lib/finance/types";
 import type { AutoContribution } from "@/lib/recurring/types";
-import type { BudgetOsSupabaseClient } from "@/lib/supabase/client";
+import type { BuxmeSupabaseClient } from "@/lib/supabase/client";
 import {
   normalizeRecurringFinanceData,
   serializeSchedule,
@@ -45,7 +45,7 @@ function withDemoGoalContributions(
 }
 
 export async function seedFinanceData(
-  supabase: BudgetOsSupabaseClient,
+  supabase: BuxmeSupabaseClient,
   userId: string,
   seedData: FinanceData,
 ): Promise<void> {
@@ -196,7 +196,7 @@ export async function seedFinanceData(
 
 /** @deprecated Use seedFinanceData with explicit data instead. */
 export async function seedFinanceDataIfEmpty(
-  supabase: BudgetOsSupabaseClient,
+  supabase: BuxmeSupabaseClient,
   userId: string,
   seedData?: FinanceData,
 ): Promise<void> {

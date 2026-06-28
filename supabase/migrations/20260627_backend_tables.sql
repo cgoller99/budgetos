@@ -1,4 +1,4 @@
--- BudgetOS permanent backend: investments, recurring_items, notifications
+-- Buxme permanent backend: investments, recurring_items, notifications
 -- Run after schema.sql and prior migrations.
 
 create type public.recurring_entity_type as enum (

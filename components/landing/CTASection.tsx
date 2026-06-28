@@ -14,11 +14,11 @@ export function CTASection() {
             Ready to take control?
           </h2>
           <p className="mx-auto mt-4 max-w-lg text-base leading-relaxed text-white/45">
-            Join BudgetOS and bring your accounts, bills, and goals into one
+            Join Buxme and bring your accounts, bills, and goals into one
             calm, focused workspace.
           </p>
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <PrimaryLink href="/register">Create your account</PrimaryLink>
+            <PrimaryLink href="/register">Get Started</PrimaryLink>
             <SecondaryLink href="/login">Log in</SecondaryLink>
           </div>
         </div>

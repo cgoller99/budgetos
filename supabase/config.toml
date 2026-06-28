@@ -1,7 +1,7 @@
-# BudgetOS Supabase local development configuration.
+# Buxme Supabase local development configuration.
 # See https://supabase.com/docs/guides/cli/config
 
-project_id = "budgetos"
+project_id = "buxme"
 
 [api]
 enabled = true

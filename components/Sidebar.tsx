@@ -23,7 +23,7 @@ export function Sidebar({ className = "", activeHref = "/dashboard" }: SidebarPr
       <div className="mb-10 px-3">
         <Link href="/dashboard" className="group block">
           <p className="text-xl font-semibold tracking-tight text-white transition-colors group-hover:text-[#4da3ff]">
-            BudgetOS
+            Buxme
           </p>
           <p className="mt-1 text-xs font-medium tracking-wide text-white/28">
             Personal finance

@@ -5,6 +5,8 @@ import { getSiteUrl } from "@/lib/supabase/authUrls";
 import "./globals.css";
 
 const siteUrl = getSiteUrl();
+const title = "Buxme";
+const description = "Everything about your money.";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -18,14 +20,25 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  title: "BudgetOS",
-  description: "Your premium personal finance command center.",
+  title,
+  description,
+  applicationName: title,
+  appleWebApp: {
+    capable: true,
+    title,
+    statusBarStyle: "black-translucent",
+  },
   openGraph: {
     type: "website",
     url: siteUrl,
-    siteName: "BudgetOS",
-    title: "BudgetOS",
-    description: "Your premium personal finance command center.",
+    siteName: title,
+    title,
+    description,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title,
+    description,
   },
   alternates: {
     canonical: siteUrl,

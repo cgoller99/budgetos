@@ -1,7 +1,7 @@
-import type { BudgetOsSupabaseClient } from "@/lib/supabase/client";
+import type { BuxmeSupabaseClient } from "@/lib/supabase/client";
 
 export async function resolveUserHouseholdId(
-  supabase: BudgetOsSupabaseClient,
+  supabase: BuxmeSupabaseClient,
   userId: string,
 ): Promise<string | null> {
   const { data: profile, error: profileError } = await supabase
@@ -44,7 +44,7 @@ export function householdFinanceOrFilter(
 }
 
 export async function backfillHouseholdFinanceRows(
-  supabase: BudgetOsSupabaseClient,
+  supabase: BuxmeSupabaseClient,
   userId: string,
   householdId: string,
 ): Promise<void> {

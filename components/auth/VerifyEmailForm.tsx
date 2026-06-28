@@ -124,7 +124,7 @@ export function VerifyEmailForm() {
         <p className="text-center text-sm text-white/45">
           {redirect.startsWith("/household/invite/")
             ? "After confirming, you'll return to your household invite."
-            : "After confirming, you'll continue into BudgetOS automatically."}
+            : "After confirming, you'll continue into Buxme automatically."}
         </p>
 
         <p className="text-center text-xs text-white/30">

@@ -20,7 +20,7 @@ if (!fs.existsSync(migrationPath)) {
 
 const sql = fs.readFileSync(migrationPath, "utf8");
 
-console.log("BudgetOS household migration\n");
+console.log("Buxme household migration\n");
 console.log(`File: ${migrationPath}`);
 console.log(`Lines: ${sql.split("\n").length}`);
 console.log("\nNext steps:");

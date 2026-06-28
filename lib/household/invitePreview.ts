@@ -1,4 +1,4 @@
-import type { BudgetOsSupabaseClient } from "@/lib/supabase/client";
+import type { BuxmeSupabaseClient } from "@/lib/supabase/client";
 
 export type HouseholdInvitePreview = {
   id: string;
@@ -8,7 +8,7 @@ export type HouseholdInvitePreview = {
 };
 
 export async function loadHouseholdInvitePreview(
-  supabase: BudgetOsSupabaseClient,
+  supabase: BuxmeSupabaseClient,
   token: string,
 ): Promise<HouseholdInvitePreview | null> {
   const { data, error } = await supabase.rpc("get_household_invite_by_token", {

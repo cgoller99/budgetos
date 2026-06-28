@@ -37,7 +37,7 @@ import {
 } from "@/lib/recurring/normalize";
 import { createSchedule, parseDateString } from "@/lib/recurring/schedule";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
-import type { BudgetOsSupabaseClient } from "@/lib/supabase/client";
+import type { BuxmeSupabaseClient } from "@/lib/supabase/client";
 import {
   buildBillSplitInsert,
   buildBillSplitUpdate,
@@ -67,7 +67,7 @@ export class FinanceService {
   private readonly profiles: ProfilesRepository;
   private readonly recurringItems: RecurringItemsRepository;
 
-  constructor(private readonly supabase: BudgetOsSupabaseClient) {
+  constructor(private readonly supabase: BuxmeSupabaseClient) {
     this.notifications = new NotificationsRepository(supabase);
     this.profiles = new ProfilesRepository(supabase);
     this.recurringItems = new RecurringItemsRepository(supabase);

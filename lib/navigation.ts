@@ -85,7 +85,7 @@ export const NAV_ROUTES = [
     href: "/settings",
     eyebrow: "System",
     subtitle:
-      "Configure preferences, security, notifications, and integrations for your BudgetOS workspace.",
+      "Configure preferences, security, notifications, and integrations for your Buxme workspace.",
   },
 ] as const;
 

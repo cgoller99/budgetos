@@ -61,7 +61,7 @@ export function OnboardingExperience() {
             </div>
 
             <h1 className="onboarding-title-enter text-4xl font-semibold tracking-tight text-white sm:text-5xl">
-              Welcome to BudgetOS
+              Welcome to Buxme
             </h1>
             <p className="onboarding-subtitle-enter mx-auto mt-4 max-w-md text-base text-white/50 sm:text-lg">
               Let&apos;s get your financial life organized.
@@ -99,7 +99,7 @@ export function OnboardingExperience() {
                   Explore a Demo
                 </h2>
                 <p className="mt-2 text-sm leading-relaxed text-white/45">
-                  Try BudgetOS with realistic profiles — perfect for exploring
+                  Try Buxme with realistic profiles — perfect for exploring
                   every feature.
                 </p>
               </button>

@@ -3,12 +3,19 @@ import { getSiteUrl } from "@/lib/supabase/authUrls";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "BudgetOS",
-    short_name: "BudgetOS",
-    description: "Your premium personal finance command center.",
-    start_url: getSiteUrl(),
+    name: "Buxme",
+    short_name: "Buxme",
+    description: "Everything about your money.",
+    start_url: "/",
     display: "standalone",
-    background_color: "#0a0f1a",
+    background_color: "#090b10",
     theme_color: "#0077ed",
+    icons: [
+      {
+        src: "/favicon.ico",
+        sizes: "any",
+        type: "image/x-icon",
+      },
+    ],
   };
 }

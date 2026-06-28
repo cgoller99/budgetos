@@ -3,7 +3,7 @@ import type {
   RecurringItemInsert,
   RecurringEntityType,
 } from "@/lib/supabase/database.types";
-import type { BudgetOsSupabaseClient } from "@/lib/supabase/client";
+import type { BuxmeSupabaseClient } from "@/lib/supabase/client";
 import { serializeSchedule } from "@/lib/recurring/normalize";
 import type { RecurringSchedule } from "@/lib/recurring/types";
 
@@ -109,7 +109,7 @@ export function extractRecurringItems(
 }
 
 export class RecurringItemsRepository {
-  constructor(private readonly supabase: BudgetOsSupabaseClient) {}
+  constructor(private readonly supabase: BuxmeSupabaseClient) {}
 
   async syncFromFinanceData(userId: string, data: FinanceData): Promise<void> {
     const items = extractRecurringItems(userId, data);

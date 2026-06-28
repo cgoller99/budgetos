@@ -24,10 +24,10 @@ export async function sendHouseholdInviteEmail(
   const inviterLabel = escapeHtml(input.inviterLabel);
   const inviteEmail = escapeHtml(input.to);
 
-  const subject = `You're invited to join ${input.householdName} on BudgetOS`;
+  const subject = `You're invited to join ${input.householdName} on Buxme`;
 
   const text = [
-    `${input.inviterLabel} invited you to join "${input.householdName}" on BudgetOS.`,
+    `${input.inviterLabel} invited you to join "${input.householdName}" on Buxme.`,
     "",
     "Open this link to sign in or create an account, then accept the invite:",
     inviteUrl,
@@ -44,10 +44,10 @@ export async function sendHouseholdInviteEmail(
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#111827;border:1px solid rgba(255,255,255,0.08);border-radius:24px;padding:32px;">
             <tr>
               <td>
-                <p style="margin:0 0 8px;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;color:#0077ed;">BudgetOS</p>
+                <p style="margin:0 0 8px;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;color:#0077ed;">Buxme</p>
                 <h1 style="margin:0 0 16px;font-size:28px;line-height:1.2;color:#ffffff;">You're invited to a shared household</h1>
                 <p style="margin:0 0 16px;font-size:16px;line-height:1.6;color:rgba(255,255,255,0.72);">
-                  ${inviterLabel} invited you to join <strong style="color:#ffffff;">${householdName}</strong> on BudgetOS.
+                  ${inviterLabel} invited you to join <strong style="color:#ffffff;">${householdName}</strong> on Buxme.
                 </p>
                 <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:rgba(255,255,255,0.55);">
                   Accept the invite to share accounts, bills, goals, debts, and dashboard data with your partner.

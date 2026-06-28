@@ -1,6 +1,6 @@
 export type ThemePreference = "dark" | "light";
 
-const STORAGE_KEY = "budgetos-theme";
+const STORAGE_KEY = "buxme-theme";
 
 export function getStoredTheme(): ThemePreference {
   if (typeof window === "undefined") {

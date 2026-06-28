@@ -1,4 +1,4 @@
--- Recurring Financial Engine columns for BudgetOS
+-- Recurring Financial Engine columns for Buxme
 
 alter table public.accounts
   add column if not exists contribution_frequency text,

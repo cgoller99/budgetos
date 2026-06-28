@@ -4,7 +4,7 @@ import type {
   HouseholdMember,
   HouseholdRole,
 } from "@/lib/finance/types";
-import type { BudgetOsSupabaseClient } from "@/lib/supabase/client";
+import type { BuxmeSupabaseClient } from "@/lib/supabase/client";
 import type {
   HouseholdInviteRow,
   HouseholdMemberRow,
@@ -57,7 +57,7 @@ export type HouseholdSnapshot = {
 };
 
 export class HouseholdService {
-  constructor(private readonly supabase: BudgetOsSupabaseClient) {}
+  constructor(private readonly supabase: BuxmeSupabaseClient) {}
 
   private async resolveHouseholdId(userId: string): Promise<string | null> {
     const { data: profile, error: profileError } = await this.supabase

@@ -5,19 +5,19 @@ import {
   createSupabaseBrowserClient,
   getSupabaseBrowserClient,
   resetSupabaseBrowserClient,
-  type BudgetOsSupabaseClient,
+  type BuxmeSupabaseClient,
 } from "@/lib/supabase/browser";
 
-export type { BudgetOsSupabaseClient } from "@/lib/supabase/browser";
+export type { BuxmeSupabaseClient } from "@/lib/supabase/browser";
 export { getSupabaseConfig } from "@/lib/supabase/config";
 
 /** @deprecated Use getSupabaseBrowserClient instead. */
-export function createSupabaseClient(): BudgetOsSupabaseClient {
+export function createSupabaseClient(): BuxmeSupabaseClient {
   return getSupabaseBrowserClient();
 }
 
 /** @deprecated Use getSupabaseBrowserClient instead. */
-export function getSupabaseClient(): BudgetOsSupabaseClient {
+export function getSupabaseClient(): BuxmeSupabaseClient {
   return getSupabaseBrowserClient();
 }
 

@@ -81,7 +81,7 @@ export function HouseholdInviteAccept({
     return (
       <AuthShell
         title="You're invited"
-        subtitle={`Join ${preview.householdName} on BudgetOS`}
+        subtitle={`Join ${preview.householdName} on Buxme`}
         footer={
           <>
             Already have an account?{" "}

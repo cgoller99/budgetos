@@ -7,19 +7,19 @@ import { SectionHeading } from "./shared";
 
 const FAQ_ITEMS = [
   {
-    question: "What is BudgetOS?",
+    question: "What is Buxme?",
     answer:
-      "BudgetOS is a personal finance workspace for tracking accounts, income, bills, transactions, savings goals, debt, and reports — all in one unified dashboard.",
+      "Buxme is a personal finance workspace for tracking accounts, income, bills, transactions, savings goals, debt, and reports — all in one unified dashboard.",
   },
   {
-    question: "Is BudgetOS free?",
+    question: "Is Buxme free?",
     answer:
       "You can create an account and start organizing your finances at no cost. Paid plans are coming soon with additional features for power users and households.",
   },
   {
     question: "Do I need to connect my bank?",
     answer:
-      "No. BudgetOS is designed for manual tracking with full control over your data. You record income, expenses, and account balances on your terms.",
+      "No. Buxme is designed for manual tracking with full control over your data. You record income, expenses, and account balances on your terms.",
   },
   {
     question: "Can I share finances with a partner?",
@@ -34,7 +34,7 @@ const FAQ_ITEMS = [
   {
     question: "Can I try it before committing?",
     answer:
-      "Demo mode lets you explore BudgetOS with realistic sample data — perfect for seeing how the dashboard, bills, and goals work before adding your own numbers.",
+      "Demo mode lets you explore Buxme with realistic sample data — perfect for seeing how the dashboard, bills, and goals work before adding your own numbers.",
   },
 ] as const;
 

@@ -24,7 +24,7 @@ const SECURITY_POINTS = [
   {
     title: "Privacy by design",
     description:
-      "We don't sell your financial data. BudgetOS is built to help you — not to monetize your information.",
+      "We don't sell your financial data. Buxme is built to help you — not to monetize your information.",
     icon: "◎",
   },
 ] as const;

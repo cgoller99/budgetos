@@ -23,7 +23,7 @@ export function DemoModeBanner() {
 
   async function handleExitDemoMode() {
     const confirmed = window.confirm(
-      "Exit demo mode? Sample accounts, bills, and goals will be removed. You'll start with your own empty BudgetOS workspace.",
+      "Exit demo mode? Sample accounts, bills, and goals will be removed. You'll start with your own empty Buxme workspace.",
     );
 
     if (!confirmed) {
@@ -36,7 +36,7 @@ export function DemoModeBanner() {
       await exitDemoMode();
       showToast({
         title: "Demo mode exited",
-        subtitle: "You're now viewing your own BudgetOS data.",
+        subtitle: "You're now viewing your own Buxme data.",
       });
       router.push("/dashboard");
     } catch {

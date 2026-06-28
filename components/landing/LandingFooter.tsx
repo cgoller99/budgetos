@@ -19,7 +19,7 @@ export function LandingFooter() {
             <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/[0.06] bg-white/[0.03] text-sm">
               💰
             </span>
-            <span className="text-sm font-semibold text-white">BudgetOS</span>
+            <span className="text-sm font-semibold text-white">Buxme</span>
           </Link>
           <p className="mt-4 max-w-xs text-sm leading-relaxed text-white/35">
             Your premium personal finance command center.
@@ -53,7 +53,7 @@ export function LandingFooter() {
 
       <div className="mx-auto mt-10 max-w-6xl border-t border-white/[0.04] pt-8">
         <p className="text-sm text-white/28">
-          © {year} BudgetOS. All rights reserved.
+          © {year} Buxme. All rights reserved.
         </p>
       </div>
     </footer>

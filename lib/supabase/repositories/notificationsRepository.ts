@@ -4,7 +4,7 @@ import type {
   NotificationInsert,
   NotificationRow,
 } from "@/lib/supabase/database.types";
-import type { BudgetOsSupabaseClient } from "@/lib/supabase/client";
+import type { BuxmeSupabaseClient } from "@/lib/supabase/client";
 
 function mapNotificationRow(row: NotificationRow): FinanceEvent {
   return {
@@ -45,7 +45,7 @@ function buildNotificationInsert(
 }
 
 export class NotificationsRepository {
-  constructor(private readonly supabase: BudgetOsSupabaseClient) {}
+  constructor(private readonly supabase: BuxmeSupabaseClient) {}
 
   async loadEvents(userId: string): Promise<FinanceEvent[]> {
     const { data, error } = await this.supabase

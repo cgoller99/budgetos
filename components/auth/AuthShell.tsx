@@ -18,7 +18,7 @@ export function AuthShell({ title, subtitle, children, footer }: AuthShellProps)
               💰
             </span>
             <span className="mt-5 text-xl font-semibold tracking-tight text-white">
-              BudgetOS
+              Buxme
             </span>
           </Link>
         </div>

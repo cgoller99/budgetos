@@ -31,11 +31,11 @@ const env = { ...loadEnvFile(path.join(ROOT, ".env.local")), ...process.env };
 const to = process.argv[2] || "christiangoller99@gmail.com";
 const apiKey = env.RESEND_API_KEY?.trim();
 const fromEmail = env.RESEND_FROM_EMAIL?.trim() || "onboarding@resend.dev";
-const fromName = env.RESEND_FROM_NAME?.trim() || "BudgetOS";
+const fromName = env.RESEND_FROM_NAME?.trim() || "Buxme";
 const siteUrl = (env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, "");
 const token = "test-token-site-template";
 const inviteUrl = `${siteUrl}/household/invite/${token}`;
-const subject = `You're invited to join babe on BudgetOS`;
+const subject = `You're invited to join babe on Buxme`;
 const html = `<!doctype html><html><body><p>Site template test</p><a href="${inviteUrl}">View invite</a></body></html>`;
 const text = `Open: ${inviteUrl}`;
 

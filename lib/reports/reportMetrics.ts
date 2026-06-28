@@ -135,7 +135,7 @@ export function downloadTransactionsCsv(data: FinanceData, filename?: string): v
   const dateStamp = new Date().toISOString().slice(0, 10);
 
   link.href = url;
-  link.download = filename ?? `budgetos-transactions-${dateStamp}.csv`;
+  link.download = filename ?? `buxme-transactions-${dateStamp}.csv`;
   link.click();
   URL.revokeObjectURL(url);
 }

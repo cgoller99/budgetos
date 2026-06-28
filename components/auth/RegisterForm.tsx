@@ -52,7 +52,7 @@ export function RegisterForm() {
 
       showToast({
         title: "Account created",
-        subtitle: "Welcome to BudgetOS",
+        subtitle: "Welcome to Buxme",
       });
       router.push(redirect);
     } catch (submitError) {

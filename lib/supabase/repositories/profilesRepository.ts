@@ -4,10 +4,10 @@ import type {
   OnboardingState,
 } from "@/lib/onboarding/types";
 import { DEFAULT_ONBOARDING_STATE } from "@/lib/onboarding/types";
-import type { BudgetOsSupabaseClient } from "@/lib/supabase/client";
+import type { BuxmeSupabaseClient } from "@/lib/supabase/client";
 
 export class ProfilesRepository {
-  constructor(private readonly supabase: BudgetOsSupabaseClient) {}
+  constructor(private readonly supabase: BuxmeSupabaseClient) {}
 
   async loadOnboardingState(userId: string): Promise<OnboardingState> {
     const { data, error } = await this.supabase
