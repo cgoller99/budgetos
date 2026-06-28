@@ -1,14 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { DashboardAtAGlance } from "@/components/dashboard/DashboardAtAGlance";
-import { DashboardHero } from "@/components/dashboard/DashboardHero";
-import { ThisWeeksPlanCard } from "@/components/dashboard/ThisWeeksPlanCard";
-import { TodaysActivityCard } from "@/components/dashboard/TodaysActivityCard";
+import { useMemo } from "react";
+import { HealthScoreCard } from "@/components/HealthScoreCard";
 import { MoneyFlowCard } from "@/components/MoneyFlowCard";
-import { PaycheckSplitPanel } from "@/components/paycheck/PaycheckSplitPanel";
-import { Button, SkeletonGrid } from "@/components/ui";
-import { pageContainerWideClassName } from "@/components/ui/tokens";
+import { NextGoalCard } from "@/components/dashboard/NextGoalCard";
+import { UpcomingBillsCard } from "@/components/dashboard/UpcomingBillsCard";
+import { UpcomingIncomeCard } from "@/components/dashboard/UpcomingIncomeCard";
+import { DashboardHero } from "@/components/dashboard/DashboardHero";
+import { SmartInsights } from "@/components/SmartInsights";
+import { SkeletonGrid } from "@/components/ui";
+import {
+  dashboardSectionClassName,
+  pageContainerWideClassName,
+} from "@/components/ui/tokens";
 import { useFinance } from "@/context/FinanceContext";
 import { cn } from "@/components/ui/cn";
 
@@ -23,27 +28,20 @@ export function DashboardContent() {
     <div className={cn(pageContainerWideClassName)}>
       <DashboardHero />
 
-      <TodaysActivityCard />
-
-      <MoneyFlowCard />
-
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-sm text-white/45">Upcoming bills</p>
-          <h3 className="text-xl font-semibold tracking-tight text-white">
-            Paycheck split & calendar
-          </h3>
-        </div>
-        <Link href="/calendar">
-          <Button variant="secondary">Open calendar</Button>
-        </Link>
+      <div className={dashboardSectionClassName}>
+        <MoneyFlowCard />
+        <HealthScoreCard />
       </div>
 
-      <PaycheckSplitPanel compact />
+      <div className={dashboardSectionClassName}>
+        <UpcomingBillsCard />
+        <UpcomingIncomeCard />
+      </div>
 
-      <DashboardAtAGlance />
-
-      <ThisWeeksPlanCard />
+      <div className={dashboardSectionClassName}>
+        <NextGoalCard />
+        <SmartInsights />
+      </div>
     </div>
   );
 }

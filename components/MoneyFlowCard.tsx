@@ -31,7 +31,7 @@ function FlowStageNode({
       className={cn(
         "group relative w-full rounded-2xl px-5 py-4 text-left transition-all duration-300 ease-out",
         isSelected
-          ? "bg-white/[0.05]"
+          ? "bg-[#0077ed]/8 ring-1 ring-[#0077ed]/20"
           : "hover:bg-white/[0.03]",
       )}
     >
@@ -79,7 +79,7 @@ export function MoneyFlowCard() {
   const stages = moneyFlow.stages;
 
   return (
-    <Card padding="lg" className="money-flow-enter">
+    <Card padding="lg" hover className="money-flow-enter">
       <CardHeader title="Money flow" />
 
       <CardContent>
@@ -100,7 +100,7 @@ export function MoneyFlowCard() {
 
         <div className="mt-8 border-t border-white/[0.04] pt-7">
           <p className="text-sm text-white/38">Safe to spend</p>
-          <p className="mt-2 text-2xl font-semibold tabular-nums text-emerald-400/90 sm:text-3xl">
+          <p className="mt-2 text-2xl font-semibold tabular-nums text-[#4da3ff] sm:text-3xl">
             <AnimatedNumber
               value={moneyFlow.safeToSpend}
               format={(value) => formatCurrency(Math.round(value))}

@@ -7,6 +7,7 @@ import { AuthShell } from "@/components/auth/AuthShell";
 import { Button, FormField, Input, PasswordInput } from "@/components/ui";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
+import { getSafeRedirectPath } from "@/lib/supabase/authUrls";
 
 export function LoginForm() {
   const router = useRouter();
@@ -18,6 +19,10 @@ export function LoginForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const passwordInputId = useId();
+  const redirect = getSafeRedirectPath(searchParams.get("redirect"), "/dashboard");
+  const registerHref = `/register?redirect=${encodeURIComponent(redirect)}${
+    email.trim() ? `&email=${encodeURIComponent(email.trim())}` : ""
+  }`;
 
   useEffect(() => {
         if (searchParams.get("error") === "auth_callback_failed") {
@@ -37,15 +42,7 @@ export function LoginForm() {
     try {
       await signIn(email, password);
       showToast({ title: "Welcome back", subtitle: "Signed in successfully" });
-
-      const redirect = searchParams.get("redirect");
-
-      if (redirect && redirect.startsWith("/") && !redirect.startsWith("/login")) {
-        router.push(redirect);
-        return;
-      }
-
-      router.push("/dashboard");
+      router.push(redirect);
     } catch (submitError) {
       setError(
         submitError instanceof Error
@@ -79,7 +76,7 @@ export function LoginForm() {
       footer={
         <>
           Don&apos;t have an account?{" "}
-          <Link href="/register" className="text-[#0077ed] hover:underline">
+          <Link href={registerHref} className="text-[#0077ed] hover:underline">
             Create one
           </Link>
         </>

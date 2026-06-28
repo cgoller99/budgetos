@@ -17,7 +17,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const activeRoute = getNavRoute(pathname) ?? NAV_ROUTES[0];
 
   return (
-    <div className="flex min-h-full flex-1 bg-[#090b10] font-sans text-white">
+    <div className="app-shell flex min-h-full flex-1 font-sans text-white">
       <Sidebar className="hidden lg:flex" activeHref={pathname} />
 
       <div className="flex min-w-0 flex-1 flex-col">

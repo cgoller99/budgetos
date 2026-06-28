@@ -9,7 +9,10 @@
     "lint": "eslint",
     "verify:supabase": "node scripts/verify-supabase.mjs",
     "household:migration": "node scripts/print-household-migration.mjs",
-    "apply:household-migration": "node scripts/apply-household-migration.mjs"
+    "apply:household-migration": "node scripts/apply-household-migration.mjs",
+    "apply:household-invite-migration": "node scripts/apply-household-invite-migration.mjs",
+    "apply:household-invite-dedupe": "node scripts/apply-household-invite-dedupe.mjs",
+    "debug:household-invite-email": "node --env-file=.env.local scripts/debug-household-invite-email.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.6.1",

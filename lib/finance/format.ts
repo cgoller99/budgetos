@@ -20,13 +20,13 @@ export function getKPIDisplay(metric: KPIMetric) {
 
 export const insightToneClasses = {
   blue: "bg-[#0077ed]",
-  emerald: "bg-emerald-400",
-  amber: "bg-amber-400",
+  emerald: "bg-[#4da3ff]",
+  amber: "bg-[#2563eb]",
 } as const;
 
 export const healthScoreToneClasses = {
-  emerald: "text-emerald-400",
-  amber: "text-amber-400",
+  emerald: "text-[#4da3ff]",
+  amber: "text-[#60a5fa]",
 } as const;
 
 export const planPriorityClasses = {

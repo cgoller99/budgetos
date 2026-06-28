@@ -1,6 +1,7 @@
 export const NAV_ROUTES = [
   {
     label: "Dashboard",
+    icon: "dashboard",
     href: "/dashboard",
     eyebrow: "Overview",
     subtitle:
@@ -8,6 +9,7 @@ export const NAV_ROUTES = [
   },
   {
     label: "Accounts",
+    icon: "accounts",
     href: "/accounts",
     eyebrow: "Finance",
     subtitle:
@@ -15,6 +17,7 @@ export const NAV_ROUTES = [
   },
   {
     label: "Income",
+    icon: "income",
     href: "/income",
     eyebrow: "Cash Flow",
     subtitle:
@@ -22,6 +25,7 @@ export const NAV_ROUTES = [
   },
   {
     label: "Bills",
+    icon: "bills",
     href: "/bills",
     eyebrow: "Cash Flow",
     subtitle:
@@ -29,6 +33,7 @@ export const NAV_ROUTES = [
   },
   {
     label: "Calendar",
+    icon: "calendar",
     href: "/calendar",
     eyebrow: "Cash Flow",
     subtitle:
@@ -36,6 +41,7 @@ export const NAV_ROUTES = [
   },
   {
     label: "Transactions",
+    icon: "transactions",
     href: "/transactions",
     eyebrow: "Cash Flow",
     subtitle:
@@ -43,6 +49,7 @@ export const NAV_ROUTES = [
   },
   {
     label: "Savings",
+    icon: "savings",
     href: "/savings",
     eyebrow: "Goals",
     subtitle:
@@ -50,6 +57,7 @@ export const NAV_ROUTES = [
   },
   {
     label: "Roadmap",
+    icon: "roadmap",
     href: "/roadmap",
     eyebrow: "Goals",
     subtitle:
@@ -57,6 +65,7 @@ export const NAV_ROUTES = [
   },
   {
     label: "Debt",
+    icon: "debt",
     href: "/debt",
     eyebrow: "Liabilities",
     subtitle:
@@ -64,6 +73,7 @@ export const NAV_ROUTES = [
   },
   {
     label: "Reports",
+    icon: "reports",
     href: "/reports",
     eyebrow: "Analytics",
     subtitle:
@@ -71,6 +81,7 @@ export const NAV_ROUTES = [
   },
   {
     label: "Settings",
+    icon: "settings",
     href: "/settings",
     eyebrow: "System",
     subtitle:

@@ -1,5 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { cn } from "./cn";
+import { buttonPrimaryClassName } from "./tokens";
 
 type ButtonVariant = "primary" | "secondary" | "ghost";
 type ButtonSize = "sm" | "md" | "lg";
@@ -12,10 +13,9 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 const variantClasses: Record<ButtonVariant, string> = {
-  primary:
-    "bg-[#0077ed] text-white hover:bg-[#0066d6] active:scale-[0.98]",
+  primary: buttonPrimaryClassName,
   secondary:
-    "border border-white/[0.05] bg-white/[0.02] text-white/70 hover:bg-white/[0.05] hover:text-white",
+    "border border-white/[0.06] bg-white/[0.025] text-white/75 hover:border-white/[0.1] hover:bg-white/[0.05] hover:text-white active:scale-[0.98]",
   ghost:
     "border border-transparent bg-transparent text-white/65 hover:bg-white/[0.04] hover:text-white active:scale-[0.98]",
 };

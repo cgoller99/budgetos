@@ -35,12 +35,13 @@ export type AuthContextValue = {
     email: string,
     password: string,
     fullName?: string,
+    nextPath?: string,
   ) => Promise<SignUpResult>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
-  resendVerificationEmail: (email: string) => Promise<void>;
+  resendVerificationEmail: (email: string, nextPath?: string) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -139,7 +140,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [isConfigured]);
 
   const signUp = useCallback(
-    async (email: string, password: string, fullName?: string) => {
+    async (
+      email: string,
+      password: string,
+      fullName?: string,
+      nextPath?: string,
+    ) => {
       if (!isConfigured) {
         throw new Error("Supabase is not configured.");
       }
@@ -153,7 +159,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           data: {
             full_name: fullName?.trim() ?? "",
           },
-          emailRedirectTo: getAuthCallbackUrl("/onboarding"),
+          emailRedirectTo: getAuthCallbackUrl(nextPath ?? "/onboarding"),
         },
       });
 
@@ -277,7 +283,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   );
 
   const resendVerificationEmail = useCallback(
-    async (email: string) => {
+    async (email: string, nextPath?: string) => {
       if (!isConfigured) {
         throw new Error("Supabase is not configured.");
       }
@@ -287,7 +293,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         type: "signup",
         email: email.trim(),
         options: {
-          emailRedirectTo: getAuthCallbackUrl("/onboarding"),
+          emailRedirectTo: getAuthCallbackUrl(nextPath ?? "/onboarding"),
         },
       });
 

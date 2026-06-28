@@ -64,7 +64,7 @@ export function UpcomingBillsCard({ embedded = false }: UpcomingBillsCardProps) 
           </h2>
           <Link
             href="/bills"
-            className="text-sm text-white/40 transition-colors hover:text-white/70"
+            className="text-sm text-white/40 transition-colors hover:text-[#4da3ff]"
           >
             View all
           </Link>
@@ -81,7 +81,7 @@ export function UpcomingBillsCard({ embedded = false }: UpcomingBillsCardProps) 
         action={
           <Link
             href="/bills"
-            className="text-sm text-white/40 transition-colors hover:text-white/70"
+            className="text-sm text-white/40 transition-colors hover:text-[#4da3ff]"
           >
             View all
           </Link>

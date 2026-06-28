@@ -44,6 +44,7 @@ function mapInvite(row: HouseholdInviteRow): HouseholdInvite {
     status: row.status as HouseholdInvite["status"],
     expiresAt: row.expires_at,
     createdAt: row.created_at,
+    token: row.token,
   };
 }
 

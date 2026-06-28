@@ -9,7 +9,7 @@ export function HealthScoreCard() {
   const { financialHealthScore } = dashboard;
 
   return (
-    <Card padding="lg">
+    <Card padding="lg" hover>
       <CardHeader title="Financial health" />
 
       <CardContent className="flex items-center gap-8">

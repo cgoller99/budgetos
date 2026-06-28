@@ -11,28 +11,55 @@ import { pageContainerWideClassName } from "@/components/ui/tokens";
 import { useFinance } from "@/context/FinanceContext";
 import { useToast } from "@/context/ToastContext";
 import {
+  getBillProgressList,
   getMonthlyBills,
   getPaidBills,
   getUpcomingBills,
 } from "@/lib/finance/bills";
 import { formatCurrency } from "@/lib/finance/format";
-import type { Bill } from "@/lib/finance/types";
+import type { Bill, BillProgress } from "@/lib/finance/types";
 import { cn } from "@/components/ui/cn";
+
+type BillGroup = {
+  bill: Bill;
+  splits: BillProgress[];
+};
+
+function groupBillProgress(progress: BillProgress[], bills: Bill[]): BillGroup[] {
+  const billById = new Map(bills.map((bill) => [bill.id, bill]));
+  const groups = new Map<string, BillProgress[]>();
+
+  for (const entry of progress) {
+    const existing = groups.get(entry.billId) ?? [];
+    existing.push(entry);
+    groups.set(entry.billId, existing);
+  }
+
+  return Array.from(groups.entries()).flatMap(([billId, splits]) => {
+    const bill = billById.get(billId);
+
+    if (!bill) {
+      return [];
+    }
+
+    return [{ bill, splits }];
+  });
+}
 
 function BillSection({
   title,
-  bills,
+  groups,
   onEdit,
   onDelete,
-  onMarkPaid,
+  onMarkSplitPaid,
 }: {
   title: string;
-  bills: ReturnType<typeof getUpcomingBills>;
-  onEdit: (id: string) => void;
-  onDelete: (id: string) => void;
-  onMarkPaid: (id: string) => void;
+  groups: BillGroup[];
+  onEdit: (billId: string) => void;
+  onDelete: (billId: string) => void;
+  onMarkSplitPaid: (billId: string, splitId: string) => void;
 }) {
-  if (bills.length === 0) {
+  if (groups.length === 0) {
     return null;
   }
 
@@ -40,13 +67,14 @@ function BillSection({
     <section className="space-y-6">
       <h3 className="text-xl font-semibold tracking-tight text-white">{title}</h3>
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-        {bills.map((bill) => (
+        {groups.map(({ bill, splits }) => (
           <BillCard
             key={bill.id}
             bill={bill}
+            splits={splits}
             onEdit={() => onEdit(bill.id)}
             onDelete={() => onDelete(bill.id)}
-            onMarkPaid={() => onMarkPaid(bill.id)}
+            onMarkSplitPaid={(splitId) => onMarkSplitPaid(bill.id, splitId)}
           />
         ))}
       </div>
@@ -56,15 +84,24 @@ function BillSection({
 
 export function BillsContent() {
   const finance = useFinance();
-  const { markBillPaid, isLoading } = finance;
+  const { markBillSplitPaid, isLoading } = finance;
   const { showToast } = useToast();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editBillId, setEditBillId] = useState<string | null>(null);
   const [deleteBillId, setDeleteBillId] = useState<string | null>(null);
 
-  const monthlyBills = useMemo(() => getMonthlyBills(finance), [finance]);
-  const upcomingBills = useMemo(() => getUpcomingBills(finance), [finance]);
-  const paidBills = useMemo(() => getPaidBills(finance), [finance]);
+  const monthlyGroups = useMemo(
+    () => groupBillProgress(getMonthlyBills(finance), finance.bills),
+    [finance],
+  );
+  const upcomingGroups = useMemo(
+    () => groupBillProgress(getUpcomingBills(finance), finance.bills),
+    [finance],
+  );
+  const paidGroups = useMemo(
+    () => groupBillProgress(getPaidBills(finance), finance.bills),
+    [finance],
+  );
   const summary = finance.dashboard.billsSummary;
 
   if (isLoading) {
@@ -75,18 +112,21 @@ export function BillsContent() {
     return finance.bills.find((bill) => bill.id === id) ?? null;
   }
 
-  async function handleMarkPaid(id: string) {
-    const bill = findBill(id);
+  async function handleMarkSplitPaid(billId: string, splitId: string) {
+    const bill = findBill(billId);
+    const split = getBillProgressList(finance).find(
+      (entry) => entry.billId === billId && entry.splitId === splitId,
+    );
 
-    if (!bill) {
+    if (!bill || !split) {
       return;
     }
 
     try {
-      await markBillPaid(id);
+      await markBillSplitPaid(billId, splitId);
 
       showToast({
-        title: `✓ ${bill.name} Marked Paid`,
+        title: `✓ ${split.name} Marked Paid`,
         subtitle: "✓ Dashboard Updated",
       });
     } catch {
@@ -133,24 +173,24 @@ export function BillsContent() {
         <div className="space-y-[3.25rem] lg:space-y-[4.5rem]">
           <BillSection
             title="Monthly"
-            bills={monthlyBills}
+            groups={monthlyGroups}
             onEdit={setEditBillId}
             onDelete={setDeleteBillId}
-            onMarkPaid={handleMarkPaid}
+            onMarkSplitPaid={handleMarkSplitPaid}
           />
           <BillSection
             title="Upcoming"
-            bills={upcomingBills}
+            groups={upcomingGroups}
             onEdit={setEditBillId}
             onDelete={setDeleteBillId}
-            onMarkPaid={handleMarkPaid}
+            onMarkSplitPaid={handleMarkSplitPaid}
           />
           <BillSection
             title="Paid"
-            bills={paidBills}
+            groups={paidGroups}
             onEdit={setEditBillId}
             onDelete={setDeleteBillId}
-            onMarkPaid={handleMarkPaid}
+            onMarkSplitPaid={handleMarkSplitPaid}
           />
         </div>
       )}

@@ -34,7 +34,9 @@ type HouseholdContextValue = {
   error: string | null;
   refreshHousehold: () => Promise<void>;
   createHousehold: (name: string) => Promise<void>;
-  inviteMember: (email: string) => Promise<void>;
+  inviteMember: (
+    email: string,
+  ) => Promise<{ inviteUrl: string | null; resendId: string | null }>;
   acceptInvite: (inviteId: string) => Promise<void>;
 };
 
@@ -121,16 +123,49 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
 
   const inviteMember = useCallback(
     async (email: string) => {
-      if (!service || !user) {
-        return;
+      if (!user) {
+        return { inviteUrl: null, resendId: null };
       }
 
       setIsSyncing(true);
       setError(null);
 
       try {
-        const snapshot = await service.inviteMember(user.id, email);
-        applySnapshot(snapshot);
+        const response = await fetch("/api/household/invite", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ email }),
+        });
+
+        const payload = (await response.json()) as {
+          error?: string;
+          code?: string;
+          emailAttempted?: boolean;
+          inviteUrl?: string;
+          resent?: boolean;
+          resendId?: string;
+        };
+
+        if (!response.ok) {
+          throw new Error(
+            payload.error ??
+              (response.status === 503
+                ? "Email is not configured. Set RESEND_API_KEY and RESEND_FROM_EMAIL in your environment."
+                : "Unable to send household invite."),
+          );
+        }
+
+        if (service) {
+          const snapshot = await service.loadHousehold(user.id);
+          applySnapshot(snapshot);
+        }
+
+        return {
+          inviteUrl: payload.inviteUrl ?? null,
+          resendId: payload.resendId ?? null,
+        };
       } catch (mutationError) {
         setError(getErrorMessage(mutationError));
         throw mutationError;

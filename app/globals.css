@@ -23,6 +23,13 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+.app-shell {
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(0, 119, 237, 0.12), transparent),
+    radial-gradient(ellipse 50% 40% at 100% 0%, rgba(0, 119, 237, 0.06), transparent),
+    var(--background);
+}
+
 @keyframes fade-in-up {
   from {
     opacity: 0;

@@ -1,15 +1,17 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { Button, FormField, Input, PasswordInput } from "@/components/ui";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
+import { getSafeRedirectPath } from "@/lib/supabase/authUrls";
 
 export function RegisterForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { signUp, isConfigured } = useAuth();
   const { showToast } = useToast();
   const [fullName, setFullName] = useState("");
@@ -18,6 +20,16 @@ export function RegisterForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const passwordInputId = useId();
+  const redirect = getSafeRedirectPath(searchParams.get("redirect"), "/onboarding");
+  const loginHref = `/login?redirect=${encodeURIComponent(redirect)}`;
+
+  useEffect(() => {
+    const prefillEmail = searchParams.get("email")?.trim();
+
+    if (prefillEmail) {
+      setEmail(prefillEmail);
+    }
+  }, [searchParams]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -25,14 +37,16 @@ export function RegisterForm() {
     setIsSubmitting(true);
 
     try {
-      const result = await signUp(email, password, fullName);
+      const result = await signUp(email, password, fullName, redirect);
 
       if (result.needsEmailVerification) {
         showToast({
           title: "Check your email",
           subtitle: "Confirm your address to finish creating your account",
         });
-        router.push(`/verify-email?email=${encodeURIComponent(email.trim())}`);
+        router.push(
+          `/verify-email?email=${encodeURIComponent(email.trim())}&redirect=${encodeURIComponent(redirect)}`,
+        );
         return;
       }
 
@@ -40,7 +54,7 @@ export function RegisterForm() {
         title: "Account created",
         subtitle: "Welcome to BudgetOS",
       });
-      router.push("/onboarding");
+      router.push(redirect);
     } catch (submitError) {
       setError(
         submitError instanceof Error
@@ -73,7 +87,7 @@ export function RegisterForm() {
       footer={
         <>
           Already have an account?{" "}
-          <Link href="/login" className="text-[#0077ed] hover:underline">
+          <Link href={loginHref} className="text-[#0077ed] hover:underline">
             Sign in
           </Link>
         </>

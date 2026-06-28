@@ -1,10 +1,17 @@
 /** Sanitize post-auth redirect paths from email links. */
 export function sanitizeAuthNextPath(next: string | null): string {
+  return getSafeRedirectPath(next, "/onboarding");
+}
+
+export function getSafeRedirectPath(
+  next: string | null | undefined,
+  fallback: string,
+): string {
   if (next && next.startsWith("/") && !next.startsWith("//")) {
     return next;
   }
 
-  return "/onboarding";
+  return fallback;
 }
 
 /** Site origin for Supabase email redirect links. */

@@ -17,7 +17,7 @@ import { getDemoFinanceData } from "@/lib/demo/data";
 import { computeFinanceHub } from "@/lib/finance/computeFinanceHub";
 import { coerceFinanceData, emptyFinanceData } from "@/lib/finance/emptyFinanceData";
 import {
-  applyBillPaymentToData,
+  applyBillSplitPaymentByIdToData,
   applyDebtPaymentToData,
   applyGoalContributionToData,
 } from "@/lib/finance/balanceEffects";
@@ -139,6 +139,7 @@ export type FinanceContextValue = FinanceData & {
   editBill: (billId: string, input: EditBillInput) => Promise<void>;
   deleteBill: (billId: string) => Promise<void>;
   markBillPaid: (billId: string) => Promise<void>;
+  markBillSplitPaid: (billId: string, splitId: string) => Promise<void>;
   createGoal: (input: CreateGoalInput) => Promise<void>;
   addSavingsGoal: (input: AddSavingsGoalInput) => Promise<void>;
   editGoal: (goalId: string, input: EditGoalInput) => Promise<void>;
@@ -870,6 +871,20 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
               ),
               customPayDay: input.customPayDay ?? null,
               paymentAccountId: input.paymentAccountId ?? null,
+              splits:
+                input.splits?.map((split, index) => ({
+                  id: crypto.randomUUID(),
+                  billId,
+                  amount: split.amount,
+                  dueDay: split.dueDay,
+                  paycheckAssignment: normalizePaycheckAssignment(
+                    split.paycheckAssignment,
+                  ),
+                  customPayDay: split.customPayDay ?? null,
+                  paymentAccountId: split.paymentAccountId ?? null,
+                  paidMonth: null,
+                  sortOrder: split.sortOrder ?? index,
+                })) ?? [],
             },
           ],
         },
@@ -919,6 +934,41 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
     [data, runMutation],
   );
 
+  const markBillSplitPaid = useCallback(
+    async (billId: string, splitId: string) => {
+      const bill = data.bills.find((item) => item.id === billId);
+
+      if (!bill) {
+        return;
+      }
+
+      const next = applyBillSplitPaymentByIdToData(data, billId, splitId);
+      const split = next.bills
+        .find((item) => item.id === billId)
+        ?.splits?.find((item) => item.id === splitId);
+      const progressName =
+        (bill.splits?.length ?? 0) > 1 && split
+          ? `${bill.name} · due ${split.dueDay}`
+          : bill.name;
+
+      await runMutation(
+        next,
+        (repository, userId) =>
+          repository.markBillSplitPaid(userId, billId, splitId),
+        {
+          events: [
+            buildBillPaidEvent(
+              progressName,
+              split?.amount ?? bill.amount,
+              bill.id,
+            ),
+          ],
+        },
+      );
+    },
+    [data, runMutation],
+  );
+
   const markBillPaid = useCallback(
     async (billId: string) => {
       const bill = data.bills.find((item) => item.id === billId);
@@ -927,17 +977,13 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
         return;
       }
 
-      const next = applyBillPaymentToData(data, bill);
+      const splitId =
+        bill.splits?.[0]?.id ??
+        `${billId}-legacy`;
 
-      await runMutation(
-        next,
-        (repository, userId) => repository.markBillPaid(userId, billId),
-        {
-          events: [buildBillPaidEvent(bill.name, bill.amount, bill.id)],
-        },
-      );
+      await markBillSplitPaid(billId, splitId);
     },
-    [data, runMutation],
+    [markBillSplitPaid, data.bills],
   );
 
   const createGoal = useCallback(
@@ -1154,6 +1200,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
       editBill,
       deleteBill,
       markBillPaid,
+      markBillSplitPaid,
       createGoal,
       addSavingsGoal: createGoal,
       editGoal,
@@ -1199,6 +1246,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
       isDemoMode,
       markAllNotificationsRead,
       markBillPaid,
+      markBillSplitPaid,
       markIncomeReceived,
       makeDebtPayment,
       markNotificationRead,

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui";
 import { useAuth } from "@/context/AuthContext";
 import { useFinance } from "@/context/FinanceContext";
 import { useToast } from "@/context/ToastContext";
+import { getSafeRedirectPath } from "@/lib/supabase/authUrls";
 
 export function VerifyEmailForm() {
   const router = useRouter();
@@ -29,15 +30,23 @@ export function VerifyEmailForm() {
     searchParams.get("email")?.trim() ||
     user?.email ||
     "";
+  const redirect = getSafeRedirectPath(searchParams.get("redirect"), "/onboarding");
+  const loginHref = `/login?redirect=${encodeURIComponent(redirect)}`;
 
   useEffect(() => {
     if (isAuthenticated && !needsEmailVerification) {
-      router.replace(onboardingComplete ? "/dashboard" : "/onboarding");
+      if (redirect.startsWith("/household/invite/")) {
+        router.replace(redirect);
+        return;
+      }
+
+      router.replace(onboardingComplete ? "/dashboard" : redirect);
     }
   }, [
     isAuthenticated,
     needsEmailVerification,
     onboardingComplete,
+    redirect,
     router,
   ]);
 
@@ -51,7 +60,7 @@ export function VerifyEmailForm() {
     setIsSubmitting(true);
 
     try {
-      await resendVerificationEmail(email);
+      await resendVerificationEmail(email, redirect);
       showToast({
         title: "Verification email sent",
         subtitle: "Check your inbox to confirm your account",
@@ -105,7 +114,7 @@ export function VerifyEmailForm() {
       footer={
         <>
           Already verified?{" "}
-          <Link href="/login" className="text-[#0077ed] hover:underline">
+          <Link href={loginHref} className="text-[#0077ed] hover:underline">
             Sign in
           </Link>
         </>
@@ -113,7 +122,9 @@ export function VerifyEmailForm() {
     >
       <div className="space-y-4">
         <p className="text-center text-sm text-white/45">
-          After confirming, you will be redirected to onboarding automatically.
+          {redirect.startsWith("/household/invite/")
+            ? "After confirming, you'll return to your household invite."
+            : "After confirming, you'll continue into BudgetOS automatically."}
         </p>
 
         <p className="text-center text-xs text-white/30">

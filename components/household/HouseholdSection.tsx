@@ -14,6 +14,16 @@ import {
 import { useFinance } from "@/context/FinanceContext";
 import { useHousehold } from "@/context/HouseholdContext";
 import { useToast } from "@/context/ToastContext";
+import { getHouseholdInviteUrl } from "@/lib/household/inviteUrls";
+
+async function copyText(value: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export function HouseholdSection() {
   const {
@@ -51,15 +61,36 @@ export function HouseholdSection() {
 
   async function handleInviteMember() {
     try {
-      await inviteMember(inviteEmail);
+      const result = await inviteMember(inviteEmail);
+      const sentTo = inviteEmail.trim();
       setInviteEmail("");
       showToast({
         title: "Invite sent",
-        subtitle: "Your partner can accept the invite from their Settings page.",
+        subtitle: result.resendId
+          ? `Resend id ${result.resendId}. Check spam for ${sentTo}.`
+          : result.inviteUrl
+            ? `Check spam for ${sentTo}.`
+            : `We emailed ${sentTo}. Check spam and promotions.`,
       });
-    } catch {
-      // Error surfaced in context
+    } catch (inviteError) {
+      showToast({
+        title: "Invite failed",
+        subtitle:
+          inviteError instanceof Error
+            ? inviteError.message
+            : "Unable to send household invite.",
+      });
     }
+  }
+
+  async function handleCopyInviteLink(token: string, email: string) {
+    const inviteUrl = getHouseholdInviteUrl(token);
+    const copied = await copyText(inviteUrl);
+
+    showToast({
+      title: copied ? "Invite link copied" : "Copy this invite link",
+      subtitle: copied ? `Share it with ${email}.` : inviteUrl,
+    });
   }
 
   async function handleAcceptInvite(inviteId: string) {
@@ -208,6 +239,10 @@ export function HouseholdSection() {
                 placeholder="partner@example.com"
               />
             </FormField>
+            <p className="text-xs leading-relaxed text-white/38">
+              Using Resend sandbox? Only your Resend account email receives messages
+              until you verify a domain. You can always copy the invite link below.
+            </p>
             <Button
               variant="secondary"
               onClick={() => void handleInviteMember()}
@@ -227,10 +262,25 @@ export function HouseholdSection() {
               {invites.map((invite) => (
                 <li
                   key={invite.id}
-                  className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-white/[0.02] px-3.5 py-3"
+                  className="flex flex-col gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between"
                 >
-                  <span className="text-sm text-white/70">{invite.email}</span>
-                  <Badge variant="warning">Pending</Badge>
+                  <div className="min-w-0">
+                    <span className="text-sm text-white/70">{invite.email}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {invite.token && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          void handleCopyInviteLink(invite.token!, invite.email)
+                        }
+                      >
+                        Copy link
+                      </Button>
+                    )}
+                    <Badge variant="warning">Pending</Badge>
+                  </div>
                 </li>
               ))}
             </ul>

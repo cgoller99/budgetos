@@ -1,7 +1,6 @@
 import {
-  enrichBill,
+  getBillProgressList,
   getBillStatusVariant,
-  getDueDateForMonth,
   startOfDay,
 } from "@/lib/finance/bills";
 import type {
@@ -32,15 +31,13 @@ function billsForDate(
   date: Date,
   referenceDate: Date,
 ): BillProgress[] {
-  return (data.bills ?? [])
-    .map((bill) => enrichBill(bill, referenceDate))
-    .filter((bill) => {
-      if (!bill.dueDate) {
-        return false;
-      }
+  return getBillProgressList(data, referenceDate).filter((bill) => {
+    if (!bill.dueDate) {
+      return false;
+    }
 
-      return toDateKey(bill.dueDate) === toDateKey(date);
-    });
+    return toDateKey(bill.dueDate) === toDateKey(date);
+  });
 }
 
 export function getCalendarMonthDays(
@@ -56,7 +53,9 @@ export function getCalendarMonthDays(
     const date = new Date(year, month, day);
     const bills = billsForDate(data, date, referenceDate);
     const entries: CalendarBillEntry[] = bills.map((bill) => ({
-      id: bill.id,
+      id: bill.splitId,
+      billId: bill.billId,
+      splitId: bill.splitId,
       name: bill.name,
       amount: bill.amount,
       status: bill.status,

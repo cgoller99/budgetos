@@ -175,6 +175,45 @@ export function getNextPaycheck(
   };
 }
 
+export function getUpcomingIncome(
+  data: FinanceData,
+  referenceDate = new Date(),
+): Array<{
+  id: string;
+  name: string;
+  amount: number;
+  formattedDate: string;
+  daysUntil: number;
+}> {
+  const normalized = normalizeRecurringFinanceData(data, referenceDate);
+  const today = startOfDay(referenceDate);
+
+  return (normalized.income ?? [])
+    .flatMap((source) => {
+      if (!source.schedule || source.schedule.status !== "active") {
+        return [];
+      }
+
+      const nextDate = parseDateString(source.schedule.nextOccurrence);
+
+      return [
+        {
+          id: source.id,
+          name: source.name,
+          amount: source.amount,
+          formattedDate: nextDate.toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+          }),
+          daysUntil: daysUntil(nextDate, today),
+          sortKey: nextDate.getTime(),
+        },
+      ];
+    })
+    .sort((left, right) => left.sortKey - right.sortKey)
+    .map(({ sortKey: _sortKey, ...item }) => item);
+}
+
 export function getIncomeDashboardSummary(
   data: FinanceData,
   referenceDate = new Date(),

@@ -9,8 +9,8 @@ export function SmartInsights() {
   const { smartInsights } = dashboard;
 
   return (
-    <Card padding="lg">
-      <CardHeader title="Insights" />
+    <Card padding="lg" hover>
+      <CardHeader title="Smart insights" />
 
       <CardContent>
         <ul className="space-y-5">
@@ -22,10 +22,10 @@ export function SmartInsights() {
               <span
                 className={`mt-2.5 h-2 w-2 shrink-0 rounded-full ${insightToneClasses[insight.tone]}`}
               />
-              <p className="text-base leading-relaxed text-white/60">
+              <p className="text-base leading-relaxed text-white/58">
                 {insight.before}
                 {insight.highlight && (
-                  <span className="font-medium text-white">
+                  <span className="font-medium text-[#4da3ff]">
                     {insight.highlight}
                   </span>
                 )}

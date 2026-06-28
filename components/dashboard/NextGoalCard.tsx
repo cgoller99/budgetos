@@ -13,7 +13,7 @@ export function NextGoalCard() {
     return (
       <Card>
         <CardHeader
-          title="Next Goal"
+          title="Goals"
           description="Your closest milestone"
         />
         <CardContent>
@@ -30,7 +30,7 @@ export function NextGoalCard() {
 
   return (
     <Card hover>
-      <CardHeader title="Next Goal" description="Your closest milestone" />
+      <CardHeader title="Goals" description="Your closest milestone" />
 
       <CardContent>
         <div className="flex items-center gap-5">
@@ -56,7 +56,7 @@ export function NextGoalCard() {
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div>
                 <p className="text-white/40">Complete</p>
-                <p className="mt-1 font-medium tabular-nums text-emerald-400">
+                <p className="mt-1 font-medium tabular-nums text-[#4da3ff]">
                   {nextGoal.percentComplete}%
                 </p>
               </div>

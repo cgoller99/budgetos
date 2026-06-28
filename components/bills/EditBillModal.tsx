@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import {
   BillFormFields,
   billToFormState,
+  initialBillFormState,
   parseBillForm,
 } from "@/components/bills/BillFormFields";
 import { Button, Modal } from "@/components/ui";
@@ -20,17 +21,7 @@ export function EditBillModal({ bill, onClose }: EditBillModalProps) {
   const { editBill } = useFinance();
   const { showToast } = useToast();
   const [form, setForm] = useState(() =>
-    bill ? billToFormState(bill) : billToFormState({
-      name: "",
-      amount: 0,
-      dueDay: 1,
-      autopay: true,
-      recurring: true,
-      category: "",
-      paycheckAssignment: "first_paycheck",
-      customPayDay: 15,
-      paymentAccountId: null,
-    }),
+    bill ? billToFormState(bill) : initialBillFormState,
   );
 
   useEffect(() => {

@@ -10,6 +10,7 @@ type StatCardProps = {
   value: string;
   change: string;
   positive?: boolean;
+  mutedChange?: boolean;
   variant?: "card" | "inline";
 };
 
@@ -18,6 +19,7 @@ export function StatCard({
   value,
   change,
   positive = true,
+  mutedChange = false,
   variant = "card",
 }: StatCardProps) {
   const previousValue = useRef(value);
@@ -53,7 +55,11 @@ export function StatCard({
         <p
           className={cn(
             "mt-3 text-sm tabular-nums",
-            positive ? "text-emerald-400/90" : "text-rose-400/90",
+            mutedChange
+              ? "text-white/38"
+              : positive
+                ? "text-[#4da3ff]/90"
+                : "text-rose-400/90",
           )}
         >
           {change}
@@ -68,9 +74,10 @@ export function StatCard({
 
   return (
     <Card
+      hover
       variant="subtle"
       className={cn(
-        isAnimating && "border-[#0077ed]/20",
+        isAnimating && "border-[#0077ed]/25 shadow-[0_2px_4px_rgba(0,0,0,0.32),0_16px_40px_rgba(0,119,237,0.12)]",
       )}
     >
       {content}

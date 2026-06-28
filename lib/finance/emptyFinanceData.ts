@@ -46,6 +46,7 @@ function normalizeBill(bill: Bill): Bill {
     paycheckAssignment: bill.paycheckAssignment ?? "first_paycheck",
     customPayDay: bill.customPayDay ?? null,
     paymentAccountId: bill.paymentAccountId ?? null,
+    splits: bill.splits ?? [],
   };
 }
 

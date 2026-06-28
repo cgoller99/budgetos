@@ -1,6 +1,7 @@
 import type {
   AccountRow,
   BillRow,
+  BillSplitRow,
   GoalRow,
   InvestmentRow,
   TransactionRow,
@@ -11,6 +12,8 @@ import type {
   AccountType,
   Bill,
   BillFrequency,
+  BillSplit,
+  BillSplitInput,
   Debt,
   DebtAccountType,
   FinanceData,
@@ -228,7 +231,21 @@ export function mapLegacyInvestmentRow(row: AccountRow): Investment {
   };
 }
 
-export function mapBillRow(row: BillRow): Bill {
+export function mapBillSplitRow(row: BillSplitRow): BillSplit {
+  return {
+    id: row.id,
+    billId: row.bill_id,
+    amount: toNumber(row.amount),
+    dueDay: row.due_day,
+    paycheckAssignment: normalizePaycheckAssignment(row.paycheck_assignment),
+    customPayDay: row.custom_pay_day ?? null,
+    paymentAccountId: row.payment_account_id ?? null,
+    paidMonth: row.paid_month,
+    sortOrder: row.sort_order,
+  };
+}
+
+export function mapBillRow(row: BillRow, splits: BillSplit[] = []): Bill {
   return {
     id: row.id,
     name: row.name,
@@ -243,6 +260,7 @@ export function mapBillRow(row: BillRow): Bill {
     paycheckAssignment: normalizePaycheckAssignment(row.paycheck_assignment),
     customPayDay: row.custom_pay_day ?? null,
     paymentAccountId: row.payment_account_id ?? null,
+    splits,
   };
 }
 
@@ -310,9 +328,18 @@ export function mapFinanceData(
   transactionRows: TransactionRow[],
   investmentRows: InvestmentRow[] = [],
   events: FinanceEvent[] = [],
+  billSplitRows: BillSplitRow[] = [],
 ): FinanceData {
   const recurringIncomeRows = transactionRows.filter(isRecurringIncomeRow);
   const ledgerRows = transactionRows.filter(isLedgerTransactionRow);
+  const splitsByBillId = new Map<string, BillSplit[]>();
+
+  for (const row of billSplitRows) {
+    const mapped = mapBillSplitRow(row);
+    const existing = splitsByBillId.get(row.bill_id) ?? [];
+    existing.push(mapped);
+    splitsByBillId.set(row.bill_id, existing);
+  }
 
   const legacyInvestments = accountRows
     .filter((row) => row.record_kind === "investment")
@@ -329,7 +356,9 @@ export function mapFinanceData(
       investmentRows.length > 0
         ? investmentRows.map(mapInvestmentRow)
         : legacyInvestments,
-    bills: billRows.map(mapBillRow),
+    bills: billRows.map((row) =>
+      mapBillRow(row, splitsByBillId.get(row.id) ?? []),
+    ),
     savingsGoals: goalRows.map(mapGoalRow),
     income: recurringIncomeRows.map(mapIncomeRow),
     transactions: ledgerRows.map(mapTransactionRow),
@@ -337,6 +366,42 @@ export function mapFinanceData(
   };
 
   return normalizeRecurringFinanceData(mapped);
+}
+
+export function buildBillSplitInsert(
+  userId: string,
+  billId: string,
+  householdId: string | null,
+  split: BillSplitInput & { id?: string; paidMonth?: string | null },
+  sortOrder: number,
+) {
+  return {
+    ...(split.id ? { id: split.id } : {}),
+    bill_id: billId,
+    user_id: userId,
+    household_id: householdId,
+    amount: split.amount,
+    due_day: split.dueDay,
+    paycheck_assignment: split.paycheckAssignment ?? "first_paycheck",
+    custom_pay_day: split.customPayDay ?? null,
+    payment_account_id: split.paymentAccountId ?? null,
+    paid_month: split.paidMonth ?? null,
+    sort_order: split.sortOrder ?? sortOrder,
+    updated_at: new Date().toISOString(),
+  };
+}
+
+export function buildBillSplitUpdate(split: BillSplit) {
+  return {
+    amount: split.amount,
+    due_day: split.dueDay,
+    paycheck_assignment: split.paycheckAssignment,
+    custom_pay_day: split.customPayDay,
+    payment_account_id: split.paymentAccountId,
+    paid_month: split.paidMonth,
+    sort_order: split.sortOrder,
+    updated_at: new Date().toISOString(),
+  };
 }
 
 export function buildAccountUpdate(row: Account, investment?: Investment) {

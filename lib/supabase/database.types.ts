@@ -133,6 +133,40 @@ export type BillInsert = {
 
 export type BillUpdate = Partial<BillInsert>;
 
+export type BillSplitRow = {
+  id: string;
+  bill_id: string;
+  user_id: string;
+  household_id: string | null;
+  amount: number;
+  due_day: number;
+  paycheck_assignment: string | null;
+  custom_pay_day: number | null;
+  payment_account_id: string | null;
+  paid_month: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type BillSplitInsert = {
+  id?: string;
+  bill_id: string;
+  user_id: string;
+  household_id?: string | null;
+  amount: number;
+  due_day: number;
+  paycheck_assignment?: string | null;
+  custom_pay_day?: number | null;
+  payment_account_id?: string | null;
+  paid_month?: string | null;
+  sort_order?: number;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type BillSplitUpdate = Partial<BillSplitInsert>;
+
 export type GoalRow = RecurringColumns & {
   id: string;
   user_id: string;
@@ -412,6 +446,12 @@ export type Database = {
         Update: BillUpdate;
         Relationships: [];
       };
+      bill_splits: {
+        Row: BillSplitRow;
+        Insert: BillSplitInsert;
+        Update: BillSplitUpdate;
+        Relationships: [];
+      };
       goals: {
         Row: GoalRow;
         Insert: GoalInsert;
@@ -472,6 +512,10 @@ export type Database = {
       accept_household_invite: {
         Args: { p_invite_id: string };
         Returns: string;
+      };
+      get_household_invite_by_token: {
+        Args: { p_token: string };
+        Returns: Record<string, unknown> | null;
       };
       user_household_ids: {
         Args: Record<string, never>;

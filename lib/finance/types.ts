@@ -91,6 +91,17 @@ export type PaycheckAssignment =
   | "biweekly"
   | "custom";
 
+export type BillSplitInput = {
+  id?: string;
+  amount: number;
+  dueDay: number;
+  paycheckAssignment?: PaycheckAssignment;
+  customPayDay?: number | null;
+  paymentAccountId?: string | null;
+  paidMonth?: string | null;
+  sortOrder?: number;
+};
+
 export type AddBillInput = {
   name: string;
   amount: number;
@@ -103,6 +114,7 @@ export type AddBillInput = {
   paycheckAssignment?: PaycheckAssignment;
   customPayDay?: number | null;
   paymentAccountId?: string | null;
+  splits?: BillSplitInput[];
 };
 
 export type EditBillInput = {
@@ -117,6 +129,7 @@ export type EditBillInput = {
   paycheckAssignment?: PaycheckAssignment;
   customPayDay?: number | null;
   paymentAccountId?: string | null;
+  splits?: BillSplitInput[];
 };
 
 export type GoalType =
@@ -148,6 +161,18 @@ export type AddMoneyToGoalInput = {
   amount: number;
 };
 
+export type BillSplit = {
+  id: string;
+  billId: string;
+  amount: number;
+  dueDay: number;
+  paycheckAssignment: PaycheckAssignment;
+  customPayDay?: number | null;
+  paymentAccountId?: string | null;
+  paidMonth: string | null;
+  sortOrder: number;
+};
+
 export type Bill = {
   id: string;
   name: string;
@@ -162,10 +187,13 @@ export type Bill = {
   paycheckAssignment?: PaycheckAssignment;
   customPayDay?: number | null;
   paymentAccountId?: string | null;
+  splits?: BillSplit[];
 };
 
 export type BillProgress = {
   id: string;
+  billId: string;
+  splitId: string;
   name: string;
   category: string;
   amount: number;
@@ -177,6 +205,8 @@ export type BillProgress = {
   status: BillStatus;
   statusLabel: string;
   paycheckAssignment: PaycheckAssignment;
+  paymentAccountId?: string | null;
+  splitCount: number;
 };
 
 export type NextBillSummary = {
@@ -199,6 +229,8 @@ export type BillsDashboardSummary = {
 
 export type CalendarBillEntry = {
   id: string;
+  billId: string;
+  splitId: string;
   name: string;
   amount: number;
   status: BillStatus;
@@ -257,6 +289,7 @@ export type HouseholdInvite = {
   status: "pending" | "accepted" | "revoked" | "expired";
   expiresAt: string;
   createdAt: string;
+  token?: string;
 };
 
 export type BankConnectionStatus =

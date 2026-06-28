@@ -1,10 +1,17 @@
 import { toMonthlyAmount } from "@/lib/calculations/monthlyAmount";
 import { calculateMonthlyIncome, calculateMonthlySpending } from "@/lib/calculations/cashFlow";
 import { isCashAccountType } from "@/lib/finance/accountTypes";
+import {
+  getEffectiveBillSplits,
+  getSplitDisplayName,
+  getSplitDueDate,
+  getSplitStatus,
+} from "@/lib/finance/billSplits";
 import type {
   Bill,
   BillProgress,
   BillsDashboardSummary,
+  BillSplit,
   BillStatus,
   EditBillInput,
   FinanceData,
@@ -67,6 +74,15 @@ function getBillDueDate(
     return parseDateString(bill.schedule.nextOccurrence);
   }
 
+  const splits = getEffectiveBillSplits(bill);
+  const unpaidSplit = splits.find(
+    (split) => getSplitStatus(split, referenceDate) !== "paid",
+  );
+
+  if (unpaidSplit) {
+    return getSplitDueDate(unpaidSplit, referenceDate);
+  }
+
   return getDueDateForMonth(bill.dueDay, referenceDate);
 }
 
@@ -74,6 +90,30 @@ export function getBillStatus(
   bill: Bill,
   referenceDate = new Date(),
 ): BillStatus {
+  const splits = getEffectiveBillSplits(bill);
+
+  if (splits.length > 1 || (bill.splits ?? []).length > 0) {
+    const statuses = splits.map((split) => getSplitStatus(split, referenceDate));
+
+    if (statuses.every((status) => status === "paid")) {
+      return "paid";
+    }
+
+    if (statuses.includes("overdue")) {
+      return "overdue";
+    }
+
+    if (statuses.includes("due_today")) {
+      return "due_today";
+    }
+
+    if (statuses.includes("due_soon")) {
+      return "due_soon";
+    }
+
+    return "upcoming";
+  }
+
   if (bill.schedule) {
     if (bill.schedule.status === "paused") {
       return "upcoming";
@@ -111,40 +151,7 @@ export function getBillStatus(
     return "upcoming";
   }
 
-  const currentMonth = getCurrentYearMonth(referenceDate);
-
-  if (bill.paidMonth === currentMonth) {
-    return "paid";
-  }
-
-  if (bill.dueDay <= 0) {
-    return "upcoming";
-  }
-
-  const dueDate = getDueDateForMonth(bill.dueDay, referenceDate);
-
-  if (!dueDate) {
-    return "upcoming";
-  }
-
-  const today = startOfDay(referenceDate);
-  const due = startOfDay(dueDate);
-
-  if (today.getTime() === due.getTime()) {
-    return "due_today";
-  }
-
-  if (today > due) {
-    return "overdue";
-  }
-
-  const daysUntilDue = Math.ceil((due.getTime() - today.getTime()) / MS_PER_DAY);
-
-  if (daysUntilDue <= DUE_SOON_DAYS) {
-    return "due_soon";
-  }
-
-  return "upcoming";
+  return getSplitStatus(splits[0], referenceDate);
 }
 
 export function formatBillDueDate(
@@ -165,27 +172,42 @@ export function formatBillDueDate(
   });
 }
 
-export function enrichBill(
+export function enrichBillSplit(
   bill: Bill,
+  split: BillSplit,
   referenceDate = new Date(),
 ): BillProgress {
-  const dueDate = getBillDueDate(bill, referenceDate);
-  const status = getBillStatus(bill, referenceDate);
+  const splits = getEffectiveBillSplits(bill);
+  const dueDate = getSplitDueDate(split, referenceDate);
+  const status = getSplitStatus(split, referenceDate);
+  const displayName = getSplitDisplayName(bill.name, split, splits.length);
 
   return {
-    id: bill.id,
-    name: bill.name,
+    id: split.id,
+    billId: bill.id,
+    splitId: split.id,
+    name: displayName,
     category: bill.category,
-    amount: bill.amount,
-    dueDay: bill.dueDay,
+    amount: split.amount,
+    dueDay: split.dueDay,
     dueDate,
-    formattedDueDate: formatBillDueDate(dueDate, bill.dueDay),
+    formattedDueDate: formatBillDueDate(dueDate, split.dueDay),
     autopay: bill.autopay,
     recurring: bill.recurring,
     status,
     statusLabel: STATUS_LABELS[status],
-    paycheckAssignment: bill.paycheckAssignment ?? "first_paycheck",
+    paycheckAssignment: split.paycheckAssignment,
+    paymentAccountId: split.paymentAccountId,
+    splitCount: splits.length,
   };
+}
+
+export function enrichBill(
+  bill: Bill,
+  referenceDate = new Date(),
+): BillProgress {
+  const split = getEffectiveBillSplits(bill)[0];
+  return enrichBillSplit(bill, split, referenceDate);
 }
 
 function billStartDateFromDueDay(dueDay: number, referenceDate: Date): Date {
@@ -209,11 +231,13 @@ export function buildUpdatedBill(
     input.frequency ?? existing.frequency ?? "monthly",
   );
   const status = input.recurring ? ("active" as const) : ("paused" as const);
+  const primarySplit = input.splits?.[0];
+  const dueDay = primarySplit?.dueDay ?? input.dueDay;
   const startDate = input.startDate
     ? parseDateString(input.startDate)
     : existing.schedule
       ? parseDateString(existing.schedule.startDate)
-      : billStartDateFromDueDay(input.dueDay, referenceDate);
+      : billStartDateFromDueDay(dueDay, referenceDate);
 
   let schedule = existing.schedule;
 
@@ -236,15 +260,33 @@ export function buildUpdatedBill(
     ...existing,
     name: input.name.trim(),
     amount: input.amount,
-    dueDay: input.dueDay,
+    dueDay,
     autopay: input.autopay,
     recurring: input.recurring,
     category: input.category.trim(),
     frequency,
     schedule,
-    paycheckAssignment: input.paycheckAssignment ?? "first_paycheck",
-    customPayDay: input.customPayDay ?? null,
-    paymentAccountId: input.paymentAccountId ?? null,
+    paycheckAssignment:
+      primarySplit?.paycheckAssignment ??
+      input.paycheckAssignment ??
+      "first_paycheck",
+    customPayDay: primarySplit?.customPayDay ?? input.customPayDay ?? null,
+    paymentAccountId:
+      primarySplit?.paymentAccountId ?? input.paymentAccountId ?? null,
+    splits:
+      input.splits?.map((split, index) => ({
+        id: split.id ?? crypto.randomUUID(),
+        billId: existing.id,
+        amount: split.amount,
+        dueDay: split.dueDay,
+        paycheckAssignment: split.paycheckAssignment ?? "first_paycheck",
+        customPayDay: split.customPayDay ?? null,
+        paymentAccountId: split.paymentAccountId ?? null,
+        paidMonth:
+          (existing.splits ?? []).find((item) => item.id === split.id)?.paidMonth ??
+          null,
+        sortOrder: split.sortOrder ?? index,
+      })) ?? (existing.splits ?? []),
   };
 }
 
@@ -252,14 +294,20 @@ export function getBillProgressList(
   data: FinanceData,
   referenceDate = new Date(),
 ): BillProgress[] {
-  return (data.bills ?? []).map((bill) => enrichBill(bill, referenceDate));
+  return (data.bills ?? []).flatMap((bill) =>
+    getEffectiveBillSplits(bill).map((split) =>
+      enrichBillSplit(bill, split, referenceDate),
+    ),
+  );
 }
 
 export function getMonthlyBills(
   data: FinanceData,
   referenceDate = new Date(),
 ): BillProgress[] {
-  return getBillProgressList(data, referenceDate).filter((bill) => bill.recurring);
+  return getBillProgressList(data, referenceDate).filter(
+    (bill) => bill.recurring,
+  );
 }
 
 export function getUpcomingBills(
@@ -396,7 +444,7 @@ export function getBillsDashboardSummary(
     totalMonthlyBills,
     nextBill: nextBill
       ? {
-          id: nextBill.id,
+          id: nextBill.splitId,
           name: nextBill.name,
           amount: nextBill.amount,
           dueDate: nextBill.formattedDueDate,
@@ -431,4 +479,24 @@ export function getBillStatusVariant(
     default:
       return "default";
   }
+}
+
+export function findBillSplit(
+  data: FinanceData,
+  billId: string,
+  splitId: string,
+): { bill: Bill; split: BillSplit } | null {
+  const bill = data.bills.find((item) => item.id === billId);
+
+  if (!bill) {
+    return null;
+  }
+
+  const split = getEffectiveBillSplits(bill).find((item) => item.id === splitId);
+
+  if (!split) {
+    return null;
+  }
+
+  return { bill, split };
 }

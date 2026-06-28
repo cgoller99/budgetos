@@ -1,11 +1,15 @@
 import type { FinanceEvent } from "@/lib/events/types";
 import { normalizeBillCategory } from "@/lib/finance/billCategories";
-import { buildUpdatedBill, getCurrentYearMonth } from "@/lib/finance/bills";
 import {
-  applyBillPaymentToData,
+  applyBillSplitPaymentByIdToData,
   applyDebtPaymentToData,
   applyGoalContributionToData,
 } from "@/lib/finance/balanceEffects";
+import {
+  billAmountFromSplits,
+  normalizeBillSplitInputs,
+} from "@/lib/finance/billSplits";
+import { buildUpdatedBill, findBillSplit, getCurrentYearMonth } from "@/lib/finance/bills";
 import { isUserInDemoMode } from "@/lib/finance/demoData";
 import { emptyFinanceData } from "@/lib/finance/emptyFinanceData";
 import { getGoalTypeMeta } from "@/lib/finance/goalTypes";
@@ -35,6 +39,8 @@ import { createSchedule, parseDateString } from "@/lib/recurring/schedule";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import type { BudgetOsSupabaseClient } from "@/lib/supabase/client";
 import {
+  buildBillSplitInsert,
+  buildBillSplitUpdate,
   buildBillUpdate,
   buildDebtInsert,
   buildDebtUpdate,
@@ -139,6 +145,7 @@ export class FinanceService {
     const [
       accountsResult,
       billsResult,
+      billSplitsResult,
       goalsResult,
       transactionsResult,
       investmentsResult,
@@ -146,6 +153,7 @@ export class FinanceService {
     ] = await Promise.all([
       scopedSelect("accounts"),
       scopedSelect("bills"),
+      scopedSelect("bill_splits"),
       scopedSelect("goals"),
       scopedSelect("transactions"),
       scopedSelect("investments"),
@@ -156,6 +164,15 @@ export class FinanceService {
     if (billsResult.error) throw billsResult.error;
     if (goalsResult.error) throw goalsResult.error;
     if (transactionsResult.error) throw transactionsResult.error;
+
+    let billSplitRows = billSplitsResult.data ?? [];
+
+    if (billSplitsResult.error) {
+      if (!billSplitsResult.error.message.includes("bill_splits")) {
+        throw billSplitsResult.error;
+      }
+      billSplitRows = [];
+    }
 
     if (investmentsResult.error) {
       // Table may not exist until migration runs — fall back to legacy accounts rows.
@@ -171,6 +188,7 @@ export class FinanceService {
       transactionsResult.data ?? [],
       investmentsResult.data ?? [],
       events,
+      billSplitRows,
     );
   }
 
@@ -518,16 +536,64 @@ export class FinanceService {
     return this.persistAccountBalances(userId, next);
   }
 
+  private async replaceBillSplits(
+    userId: string,
+    billId: string,
+    householdId: string | null,
+    splits: AddBillInput["splits"] | undefined,
+    fallback: AddBillInput,
+  ): Promise<void> {
+    const normalized = normalizeBillSplitInputs(splits, {
+      amount: fallback.amount,
+      dueDay: fallback.dueDay,
+      paycheckAssignment: fallback.paycheckAssignment,
+      customPayDay: fallback.customPayDay,
+      paymentAccountId: fallback.paymentAccountId,
+    });
+
+    const { error: deleteError } = await this.supabase
+      .from("bill_splits")
+      .delete()
+      .eq("bill_id", billId)
+      .eq("user_id", userId);
+
+    if (deleteError) throw deleteError;
+
+    if (normalized.length === 0) {
+      return;
+    }
+
+    const { error: insertError } = await this.supabase.from("bill_splits").insert(
+      normalized.map((split, index) =>
+        buildBillSplitInsert(userId, billId, householdId, split, index),
+      ),
+    );
+
+    if (insertError) throw insertError;
+  }
+
   async createBill(userId: string, input: AddBillInput, id?: string): Promise<FinanceData> {
     const householdId = await resolveUserHouseholdId(this.supabase, userId);
     const frequency = normalizeBillFrequency(input.frequency ?? "monthly");
     const referenceDate = new Date();
+    const normalizedSplits = normalizeBillSplitInputs(input.splits, {
+      amount: input.amount,
+      dueDay: input.dueDay,
+      paycheckAssignment: input.paycheckAssignment,
+      customPayDay: input.customPayDay,
+      paymentAccountId: input.paymentAccountId,
+    });
+    const primarySplit = normalizedSplits[0];
+    const totalAmount = billAmountFromSplits(normalizedSplits);
     const startDate = input.startDate
       ? parseDateString(input.startDate)
       : new Date(
           referenceDate.getFullYear(),
           referenceDate.getMonth(),
-          Math.min(input.dueDay > 0 ? input.dueDay : referenceDate.getDate(), 28),
+          Math.min(
+            primarySplit.dueDay > 0 ? primarySplit.dueDay : referenceDate.getDate(),
+            28,
+          ),
         );
     const schedule = createSchedule(
       startDate,
@@ -535,23 +601,24 @@ export class FinanceService {
       referenceDate,
       input.recurring ? "active" : "paused",
     );
+    const billId = id ?? crypto.randomUUID();
 
     const { error } = await this.supabase.from("bills").insert(
       this.withHouseholdId(
         {
-          ...(id ? { id } : {}),
+          id: billId,
           user_id: userId,
           name: input.name.trim(),
-          amount: input.amount,
-          due_day: input.dueDay,
+          amount: totalAmount,
+          due_day: primarySplit.dueDay,
           autopay: input.autopay,
           recurring: input.recurring,
           category: normalizeBillCategory(input.category),
           paid_month: null,
           bill_frequency: frequency,
-          paycheck_assignment: input.paycheckAssignment ?? "first_paycheck",
-          custom_pay_day: input.customPayDay ?? null,
-          payment_account_id: input.paymentAccountId ?? null,
+          paycheck_assignment: primarySplit.paycheckAssignment ?? "first_paycheck",
+          custom_pay_day: primarySplit.customPayDay ?? null,
+          payment_account_id: primarySplit.paymentAccountId ?? null,
           ...serializeSchedule(schedule),
         },
         householdId,
@@ -559,6 +626,15 @@ export class FinanceService {
     );
 
     if (error) throw error;
+
+    await this.replaceBillSplits(
+      userId,
+      billId,
+      householdId,
+      normalizedSplits,
+      { ...input, amount: totalAmount, dueDay: primarySplit.dueDay },
+    );
+
     return this.loadFinanceData(userId);
   }
 
@@ -583,6 +659,29 @@ export class FinanceService {
       .eq("user_id", userId);
 
     if (error) throw error;
+
+    const householdId = await resolveUserHouseholdId(this.supabase, userId);
+    await this.replaceBillSplits(
+      userId,
+      billId,
+      householdId,
+      (updated.splits ?? []).map((split) => ({
+        id: split.id,
+        amount: split.amount,
+        dueDay: split.dueDay,
+        paycheckAssignment: split.paycheckAssignment,
+        customPayDay: split.customPayDay,
+        paymentAccountId: split.paymentAccountId,
+        paidMonth: split.paidMonth,
+        sortOrder: split.sortOrder,
+      })),
+      {
+        ...input,
+        amount: updated.amount,
+        dueDay: updated.dueDay,
+      },
+    );
+
     return this.loadFinanceData(userId);
   }
 
@@ -597,6 +696,61 @@ export class FinanceService {
     return this.loadFinanceData(userId);
   }
 
+  async markBillSplitPaid(
+    userId: string,
+    billId: string,
+    splitId: string,
+  ): Promise<FinanceData> {
+    const current = await this.loadFinanceData(userId);
+    const match = findBillSplit(current, billId, splitId);
+
+    if (!match) {
+      throw new Error("Bill split not found.");
+    }
+
+    const next = applyBillSplitPaymentByIdToData(current, billId, splitId);
+    const updatedBill = next.bills.find((item) => item.id === billId);
+
+    if (!updatedBill) {
+      throw new Error("Bill not found.");
+    }
+
+    const split = (updatedBill.splits ?? []).find((item) => item.id === splitId);
+
+    if ((updatedBill.splits ?? []).length > 0 && split) {
+      const { error: splitError } = await this.supabase
+        .from("bill_splits")
+        .update(buildBillSplitUpdate(split))
+        .eq("id", splitId)
+        .eq("user_id", userId);
+
+      if (splitError) throw splitError;
+    }
+
+    const { error: billError } = await this.supabase
+      .from("bills")
+      .update({
+        paid_month: updatedBill.paidMonth,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", billId)
+      .eq("user_id", userId);
+
+    if (billError) throw billError;
+
+    const newTransaction = next.transactions.find(
+      (transaction) =>
+        transaction.billId === billId &&
+        !current.transactions.some((item) => item.id === transaction.id),
+    );
+
+    if (newTransaction) {
+      await this.insertTransaction(userId, newTransaction);
+    }
+
+    return this.persistAccountBalances(userId, next);
+  }
+
   async markBillPaid(userId: string, billId: string): Promise<FinanceData> {
     const current = await this.loadFinanceData(userId);
     const bill = current.bills.find((item) => item.id === billId);
@@ -605,29 +759,9 @@ export class FinanceService {
       throw new Error("Bill not found.");
     }
 
-    const next = applyBillPaymentToData(current, bill);
-    const newTransaction = next.transactions.find(
-      (transaction) =>
-        transaction.billId === billId &&
-        !current.transactions.some((item) => item.id === transaction.id),
-    );
-
-    const { error: billError } = await this.supabase
-      .from("bills")
-      .update({
-        paid_month: getCurrentYearMonth(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", billId)
-      .eq("user_id", userId);
-
-    if (billError) throw billError;
-
-    if (newTransaction) {
-      await this.insertTransaction(userId, newTransaction);
-    }
-
-    return this.persistAccountBalances(userId, next);
+    const split = bill.splits?.[0];
+    const splitId = split?.id ?? `${billId}-legacy`;
+    return this.markBillSplitPaid(userId, billId, splitId);
   }
 
   async createGoal(
