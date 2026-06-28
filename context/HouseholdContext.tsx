@@ -38,6 +38,10 @@ type HouseholdContextValue = {
     email: string,
   ) => Promise<{ inviteUrl: string | null; resendId: string | null }>;
   acceptInvite: (inviteId: string) => Promise<void>;
+  leaveHousehold: () => Promise<void>;
+  removeMember: (memberUserId: string) => Promise<void>;
+  transferOwnership: (newOwnerUserId: string) => Promise<void>;
+  revokeInvite: (inviteId: string) => Promise<void>;
 };
 
 const HouseholdContext = createContext<HouseholdContextValue | null>(null);
@@ -198,6 +202,91 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
     [applySnapshot, service, user],
   );
 
+  const leaveHousehold = useCallback(async () => {
+    if (!service || !user) {
+      return;
+    }
+
+    setIsSyncing(true);
+    setError(null);
+
+    try {
+      const snapshot = await service.leaveHousehold(user.id);
+      applySnapshot(snapshot);
+    } catch (mutationError) {
+      setError(getErrorMessage(mutationError));
+      throw mutationError;
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [applySnapshot, service, user]);
+
+  const removeMember = useCallback(
+    async (memberUserId: string) => {
+      if (!service || !user) {
+        return;
+      }
+
+      setIsSyncing(true);
+      setError(null);
+
+      try {
+        const snapshot = await service.removeMember(user.id, memberUserId);
+        applySnapshot(snapshot);
+      } catch (mutationError) {
+        setError(getErrorMessage(mutationError));
+        throw mutationError;
+      } finally {
+        setIsSyncing(false);
+      }
+    },
+    [applySnapshot, service, user],
+  );
+
+  const transferOwnership = useCallback(
+    async (newOwnerUserId: string) => {
+      if (!service || !user) {
+        return;
+      }
+
+      setIsSyncing(true);
+      setError(null);
+
+      try {
+        const snapshot = await service.transferOwnership(user.id, newOwnerUserId);
+        applySnapshot(snapshot);
+      } catch (mutationError) {
+        setError(getErrorMessage(mutationError));
+        throw mutationError;
+      } finally {
+        setIsSyncing(false);
+      }
+    },
+    [applySnapshot, service, user],
+  );
+
+  const revokeInvite = useCallback(
+    async (inviteId: string) => {
+      if (!service || !user) {
+        return;
+      }
+
+      setIsSyncing(true);
+      setError(null);
+
+      try {
+        const snapshot = await service.revokeInvite(user.id, inviteId);
+        applySnapshot(snapshot);
+      } catch (mutationError) {
+        setError(getErrorMessage(mutationError));
+        throw mutationError;
+      } finally {
+        setIsSyncing(false);
+      }
+    },
+    [applySnapshot, service, user],
+  );
+
   const value = useMemo(
     () => ({
       household,
@@ -212,6 +301,10 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       createHousehold,
       inviteMember,
       acceptInvite,
+      leaveHousehold,
+      removeMember,
+      transferOwnership,
+      revokeInvite,
     }),
     [
       household,
@@ -226,6 +319,10 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       createHousehold,
       inviteMember,
       acceptInvite,
+      leaveHousehold,
+      removeMember,
+      transferOwnership,
+      revokeInvite,
     ],
   );
 

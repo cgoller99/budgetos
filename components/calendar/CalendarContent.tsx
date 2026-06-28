@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { PayBillSplitModal } from "@/components/bills/PayBillSplitModal";
 import {
   Badge,
   Button,
@@ -14,14 +15,16 @@ import {
 import { pageContainerWideClassName } from "@/components/ui/tokens";
 import { cn } from "@/components/ui/cn";
 import { useFinance } from "@/context/FinanceContext";
+import { useToast } from "@/context/ToastContext";
 import {
   formatCalendarMonthLabel,
   getBillsForCalendarDate,
   getCalendarMonthDays,
   getCalendarStatusVariant,
 } from "@/lib/finance/calendar";
+import { getBillProgressList } from "@/lib/finance/bills";
 import { formatCurrency } from "@/lib/finance/format";
-import type { CalendarDaySummary } from "@/lib/finance/types";
+import type { BillProgress, CalendarDaySummary } from "@/lib/finance/types";
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -80,6 +83,8 @@ function CalendarDayCell({
 
 export function CalendarContent() {
   const finance = useFinance();
+  const { markBillSplitPaid } = finance;
+  const { showToast } = useToast();
   const today = new Date();
   const [viewDate, setViewDate] = useState(
     () => new Date(today.getFullYear(), today.getMonth(), 1),
@@ -87,6 +92,7 @@ export function CalendarContent() {
   const [selectedDate, setSelectedDate] = useState<string | null>(
     `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`,
   );
+  const [paySplit, setPaySplit] = useState<BillProgress | null>(null);
 
   const monthDays = useMemo(
     () =>
@@ -117,6 +123,25 @@ export function CalendarContent() {
       (current) =>
         new Date(current.getFullYear(), current.getMonth() + offset, 1),
     );
+  }
+
+  function findSplitProgress(billId: string, splitId: string) {
+    return getBillProgressList(finance).find(
+      (entry) => entry.billId === billId && entry.splitId === splitId,
+    );
+  }
+
+  async function handleConfirmPayment(amount: number) {
+    if (!paySplit) {
+      return;
+    }
+
+    await markBillSplitPaid(paySplit.billId, paySplit.splitId, amount);
+    showToast({
+      title: "Payment recorded",
+      subtitle: paySplit.name,
+    });
+    setPaySplit(null);
   }
 
   if (finance.isLoading) {
@@ -220,30 +245,53 @@ export function CalendarContent() {
               />
             ) : (
               <ul className="space-y-3">
-                {selectedBills.map((bill) => (
-                  <li
-                    key={bill.id}
-                    className="flex items-center justify-between gap-4 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-4 py-3"
-                  >
-                    <div>
-                      <p className="font-medium text-white">{bill.name}</p>
-                      <p className="text-sm text-white/45">{bill.category}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-medium text-white">
-                        {formatCurrency(bill.amount)}
-                      </p>
-                      <Badge variant={getCalendarStatusVariant(bill.status)}>
-                        {bill.statusLabel}
-                      </Badge>
-                    </div>
-                  </li>
-                ))}
+                {selectedBills.map((bill) => {
+                  const progress = findSplitProgress(bill.billId, bill.splitId);
+                  const canPay = bill.status !== "paid" && progress;
+
+                  return (
+                    <li
+                      key={bill.id}
+                      className="flex items-center justify-between gap-4 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-4 py-3"
+                    >
+                      <div>
+                        <p className="font-medium text-white">{bill.name}</p>
+                        <p className="text-sm text-white/45">{bill.category}</p>
+                      </div>
+                      <div className="flex items-center gap-3 text-right">
+                        <div>
+                          <p className="font-medium text-white">
+                            {formatCurrency(bill.amount)}
+                          </p>
+                          <Badge variant={getCalendarStatusVariant(bill.status)}>
+                            {bill.statusLabel}
+                          </Badge>
+                        </div>
+                        {canPay && progress && (
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => setPaySplit(progress)}
+                          >
+                            Pay
+                          </Button>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </CardContent>
         </Card>
       </div>
+
+      <PayBillSplitModal
+        split={paySplit}
+        isOpen={paySplit !== null}
+        onClose={() => setPaySplit(null)}
+        onConfirm={handleConfirmPayment}
+      />
     </div>
   );
 }

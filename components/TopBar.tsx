@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { GlobalSearch } from "@/components/search/GlobalSearch";
 import { cn } from "@/components/ui/cn";
 import { sidebarActiveClassName, sidebarInactiveClassName } from "@/components/ui/tokens";
 import { NAV_ROUTES } from "@/lib/navigation";
@@ -21,7 +22,10 @@ export function TopBar({
         <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
           {title}
         </h1>
-        <div className="flex items-center gap-4">{notificationCenter}</div>
+        <div className="flex items-center gap-3 sm:gap-4">
+          <GlobalSearch />
+          {notificationCenter}
+        </div>
       </header>
 
       <nav className="flex gap-2 overflow-x-auto border-b border-white/[0.04] px-6 py-4 lg:hidden">

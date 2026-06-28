@@ -1,5 +1,5 @@
-import { HomeRedirect } from "@/components/onboarding/HomeRedirect";
+import { HomeGate } from "@/components/landing/HomeGate";
 
 export default function Home() {
-  return <HomeRedirect />;
+  return <HomeGate />;
 }

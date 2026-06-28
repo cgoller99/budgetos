@@ -3,6 +3,10 @@ import {
   areAllSplitsPaid,
   getEffectiveBillSplits,
 } from "@/lib/finance/billSplits";
+import {
+  getSplitPaidAmount,
+  getSplitRemainingAmount,
+} from "@/lib/finance/billPayments";
 import { getPrimaryCashAccount } from "@/lib/finance/cashAccount";
 import type { Bill, BillSplit, FinanceData, Transaction } from "@/lib/finance/types";
 import {
@@ -30,17 +34,36 @@ export function applyBillSplitPaymentToData(
   data: FinanceData,
   bill: Bill,
   split: BillSplit,
+  paymentAmount?: number,
   referenceDate = new Date(),
 ): FinanceData {
   const accountId = resolvePaymentAccountId(data, split.paymentAccountId);
   const hasStoredSplits = (bill.splits ?? []).length > 0;
   const paidMonth = getCurrentYearMonth(referenceDate);
+  const remaining = getSplitRemainingAmount(split, referenceDate);
+  const amountToPay = Math.min(
+    Math.max(paymentAmount ?? remaining, 0),
+    remaining,
+  );
+
+  if (amountToPay <= 0) {
+    return data;
+  }
+
+  const newPaidAmount = getSplitPaidAmount(split, referenceDate) + amountToPay;
+  const fullyPaid = newPaidAmount >= split.amount;
 
   let updatedBill: Bill;
 
   if (hasStoredSplits) {
     const updatedSplits = (bill.splits ?? []).map((item) =>
-      item.id === split.id ? { ...item, paidMonth } : item,
+      item.id === split.id
+        ? {
+            ...item,
+            paidMonth,
+            paidAmount: newPaidAmount,
+          }
+        : item,
     );
 
     updatedBill = {
@@ -56,11 +79,11 @@ export function applyBillSplitPaymentToData(
   } else {
     updatedBill = {
       ...bill,
-      paidMonth,
+      paidMonth: fullyPaid ? paidMonth : null,
     };
   }
 
-  if (!accountId) {
+  if (!accountId || amountToPay <= 0) {
     return {
       ...data,
       bills: data.bills.map((item) =>
@@ -71,13 +94,15 @@ export function applyBillSplitPaymentToData(
 
   const transaction: Transaction = {
     id: crypto.randomUUID(),
-    amount: split.amount,
+    amount: amountToPay,
     type: "expense",
     category: bill.category,
     accountId,
     transferAccountId: null,
     date: referenceDate.toISOString().split("T")[0] ?? referenceDate.toISOString(),
-    notes: `${bill.name} bill payment`,
+    notes: fullyPaid
+      ? `${bill.name} bill payment`
+      : `${bill.name} partial payment`,
     billId: bill.id,
   };
 
@@ -95,16 +120,24 @@ export function applyBillSplitPaymentToData(
 export function applyBillPaymentToData(
   data: FinanceData,
   bill: Bill,
+  paymentAmount?: number,
   referenceDate = new Date(),
 ): FinanceData {
   const split = getEffectiveBillSplits(bill)[0];
-  return applyBillSplitPaymentToData(data, bill, split, referenceDate);
+  return applyBillSplitPaymentToData(
+    data,
+    bill,
+    split,
+    paymentAmount,
+    referenceDate,
+  );
 }
 
 export function applyBillSplitPaymentByIdToData(
   data: FinanceData,
   billId: string,
   splitId: string,
+  paymentAmount?: number,
   referenceDate = new Date(),
 ): FinanceData {
   const match = findBillSplit(data, billId, splitId);
@@ -117,6 +150,7 @@ export function applyBillSplitPaymentByIdToData(
     data,
     match.bill,
     match.split,
+    paymentAmount,
     referenceDate,
   );
 }

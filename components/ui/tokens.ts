@@ -22,6 +22,9 @@ export const cardBaseClassName =
 export const cardHoverClassName =
   "hover:-translate-y-0.5 hover:border-white/[0.08] hover:bg-white/[0.035] hover:shadow-[0_2px_4px_rgba(0,0,0,0.32),0_16px_40px_rgba(0,119,237,0.08)]";
 
+export const cardSubtleHoverClassName =
+  "hover:-translate-y-0.5 hover:border-white/[0.07] hover:bg-white/[0.03] hover:shadow-[0_2px_4px_rgba(0,0,0,0.28),0_12px_32px_rgba(0,119,237,0.06)]";
+
 export const cardPaddingClassName = "p-7 sm:p-8";
 
 export const cardPaddingLgClassName = "p-8 sm:p-10";
@@ -50,10 +53,10 @@ export const dashboardSectionClassName = "grid grid-cols-1 gap-5 lg:grid-cols-2 
 export const sectionTitleClassName =
   "text-xl font-semibold tracking-tight text-white sm:text-2xl";
 
-export const metricLabelClassName = "text-sm font-medium text-white/42";
+export const metricLabelClassName = "text-sm font-medium tracking-wide text-white/45";
 
 export const metricValueClassName =
-  "text-3xl font-semibold tracking-tight tabular-nums text-white sm:text-4xl lg:text-[2.75rem] lg:leading-none";
+  "text-3xl font-semibold tracking-tight tabular-nums text-white sm:text-[2.125rem] lg:text-[2.65rem] lg:leading-none";
 
 export const sidebarActiveClassName =
   "border border-[#0077ed]/25 bg-[#0077ed]/10 text-white shadow-[inset_0_1px_0_rgba(0,119,237,0.12)]";

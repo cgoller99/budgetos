@@ -48,7 +48,7 @@ export function DashboardHero() {
   }, [dashboard]);
 
   return (
-    <section className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+    <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 xl:grid-cols-4 xl:gap-6">
       {metrics.map((metric) => (
         <StatCard
           key={metric.label}
@@ -57,6 +57,7 @@ export function DashboardHero() {
           change={metric.change}
           positive={metric.positive}
           mutedChange={"mutedChange" in metric ? metric.mutedChange : false}
+          className="h-full"
         />
       ))}
     </section>

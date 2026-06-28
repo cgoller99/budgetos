@@ -12,6 +12,7 @@ type StatCardProps = {
   positive?: boolean;
   mutedChange?: boolean;
   variant?: "card" | "inline";
+  className?: string;
 };
 
 export function StatCard({
@@ -21,6 +22,7 @@ export function StatCard({
   positive = true,
   mutedChange = false,
   variant = "card",
+  className,
 }: StatCardProps) {
   const previousValue = useRef(value);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -54,7 +56,7 @@ export function StatCard({
       {change && (
         <p
           className={cn(
-            "mt-3 text-sm tabular-nums",
+            "mt-2.5 text-sm leading-snug tabular-nums",
             mutedChange
               ? "text-white/38"
               : positive
@@ -77,7 +79,9 @@ export function StatCard({
       hover
       variant="subtle"
       className={cn(
+        "h-full",
         isAnimating && "border-[#0077ed]/25 shadow-[0_2px_4px_rgba(0,0,0,0.32),0_16px_40px_rgba(0,119,237,0.12)]",
+        className,
       )}
     >
       {content}

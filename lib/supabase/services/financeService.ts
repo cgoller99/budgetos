@@ -700,6 +700,7 @@ export class FinanceService {
     userId: string,
     billId: string,
     splitId: string,
+    paymentAmount?: number,
   ): Promise<FinanceData> {
     const current = await this.loadFinanceData(userId);
     const match = findBillSplit(current, billId, splitId);
@@ -708,7 +709,12 @@ export class FinanceService {
       throw new Error("Bill split not found.");
     }
 
-    const next = applyBillSplitPaymentByIdToData(current, billId, splitId);
+    const next = applyBillSplitPaymentByIdToData(
+      current,
+      billId,
+      splitId,
+      paymentAmount,
+    );
     const updatedBill = next.bills.find((item) => item.id === billId);
 
     if (!updatedBill) {

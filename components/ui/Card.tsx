@@ -5,6 +5,7 @@ import {
   cardHoverClassName,
   cardPaddingClassName,
   cardPaddingLgClassName,
+  cardSubtleHoverClassName,
   panelDescriptionClassName,
   panelTitleClassName,
 } from "./tokens";
@@ -47,6 +48,7 @@ export function Card({
         variantClasses[variant],
         paddingClasses[padding],
         hover && variant === "default" && cardHoverClassName,
+        hover && variant === "subtle" && cardSubtleHoverClassName,
         className,
       )}
       {...props}

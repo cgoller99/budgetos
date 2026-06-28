@@ -2,6 +2,10 @@ import { toMonthlyAmount } from "@/lib/calculations/monthlyAmount";
 import { calculateMonthlyIncome, calculateMonthlySpending } from "@/lib/calculations/cashFlow";
 import { isCashAccountType } from "@/lib/finance/accountTypes";
 import {
+  getSplitPaidAmount,
+  getSplitRemainingAmount,
+} from "@/lib/finance/billPayments";
+import {
   getEffectiveBillSplits,
   getSplitDisplayName,
   getSplitDueDate,
@@ -32,6 +36,7 @@ export const CALENDAR_STATUS_LABELS: Record<BillStatus, string> = {
   due_soon: "Due Soon",
   due_today: "Due Today",
   overdue: "Overdue",
+  partial: "Partial",
   paid: "Paid",
 };
 
@@ -181,6 +186,8 @@ export function enrichBillSplit(
   const dueDate = getSplitDueDate(split, referenceDate);
   const status = getSplitStatus(split, referenceDate);
   const displayName = getSplitDisplayName(bill.name, split, splits.length);
+  const paidAmount = getSplitPaidAmount(split, referenceDate);
+  const remainingAmount = getSplitRemainingAmount(split, referenceDate);
 
   return {
     id: split.id,
@@ -189,6 +196,8 @@ export function enrichBillSplit(
     name: displayName,
     category: bill.category,
     amount: split.amount,
+    paidAmount,
+    remainingAmount,
     dueDay: split.dueDay,
     dueDate,
     formattedDueDate: formatBillDueDate(dueDate, split.dueDay),
@@ -285,6 +294,9 @@ export function buildUpdatedBill(
         paidMonth:
           (existing.splits ?? []).find((item) => item.id === split.id)?.paidMonth ??
           null,
+        paidAmount:
+          (existing.splits ?? []).find((item) => item.id === split.id)?.paidAmount ??
+          0,
         sortOrder: split.sortOrder ?? index,
       })) ?? (existing.splits ?? []),
   };
@@ -321,6 +333,7 @@ export function getUpcomingBills(
         overdue: 0,
         due_today: 1,
         due_soon: 2,
+        partial: 2,
         upcoming: 3,
         paid: 4,
       };
@@ -370,6 +383,19 @@ export function getBillsDueThisWeek(
 
     const days = daysUntil(bill.dueDate, referenceDate);
     return days >= 0 && days <= 7;
+  });
+}
+
+export function getBillsDueTomorrow(
+  data: FinanceData,
+  referenceDate = new Date(),
+): BillProgress[] {
+  return getBillProgressList(data, referenceDate).filter((bill) => {
+    if (bill.status === "paid" || !bill.dueDate) {
+      return false;
+    }
+
+    return daysUntil(bill.dueDate, referenceDate) === 1;
   });
 }
 
@@ -434,7 +460,7 @@ export function getBillsDashboardSummary(
   const nextBill = getNextBillDue(data, referenceDate);
   const totalMonthlyBills = getTotalMonthlyBills(data);
   const dueThisWeekAmount = dueThisWeek.reduce(
-    (total, bill) => total + bill.amount,
+    (total, bill) => total + bill.remainingAmount,
     0,
   );
 
@@ -468,6 +494,8 @@ export function getBillStatusVariant(
   status: BillStatus,
 ): "default" | "accent" | "success" | "warning" | "danger" {
   switch (status) {
+    case "partial":
+      return "warning";
     case "paid":
       return "success";
     case "due_today":

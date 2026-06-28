@@ -241,6 +241,7 @@ export function mapBillSplitRow(row: BillSplitRow): BillSplit {
     customPayDay: row.custom_pay_day ?? null,
     paymentAccountId: row.payment_account_id ?? null,
     paidMonth: row.paid_month,
+    paidAmount: toNumber(row.paid_amount ?? 0),
     sortOrder: row.sort_order,
   };
 }
@@ -386,6 +387,7 @@ export function buildBillSplitInsert(
     custom_pay_day: split.customPayDay ?? null,
     payment_account_id: split.paymentAccountId ?? null,
     paid_month: split.paidMonth ?? null,
+    paid_amount: split.paidAmount ?? 0,
     sort_order: split.sortOrder ?? sortOrder,
     updated_at: new Date().toISOString(),
   };
@@ -399,6 +401,7 @@ export function buildBillSplitUpdate(split: BillSplit) {
     custom_pay_day: split.customPayDay,
     payment_account_id: split.paymentAccountId,
     paid_month: split.paidMonth,
+    paid_amount: split.paidAmount,
     sort_order: split.sortOrder,
     updated_at: new Date().toISOString(),
   };

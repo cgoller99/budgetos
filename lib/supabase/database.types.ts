@@ -144,6 +144,7 @@ export type BillSplitRow = {
   custom_pay_day: number | null;
   payment_account_id: string | null;
   paid_month: string | null;
+  paid_amount: number;
   sort_order: number;
   created_at: string;
   updated_at: string;
@@ -160,6 +161,7 @@ export type BillSplitInsert = {
   custom_pay_day?: number | null;
   payment_account_id?: string | null;
   paid_month?: string | null;
+  paid_amount?: number;
   sort_order?: number;
   created_at?: string;
   updated_at?: string;
@@ -516,6 +518,22 @@ export type Database = {
       get_household_invite_by_token: {
         Args: { p_token: string };
         Returns: Record<string, unknown> | null;
+      };
+      leave_household: {
+        Args: Record<string, never>;
+        Returns: undefined;
+      };
+      remove_household_member: {
+        Args: { p_user_id: string };
+        Returns: undefined;
+      };
+      transfer_household_ownership: {
+        Args: { p_new_owner_id: string };
+        Returns: undefined;
+      };
+      revoke_household_invite: {
+        Args: { p_invite_id: string };
+        Returns: undefined;
       };
       user_household_ids: {
         Args: Record<string, never>;

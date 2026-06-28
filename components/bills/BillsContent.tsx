@@ -17,7 +17,7 @@ import {
   getUpcomingBills,
 } from "@/lib/finance/bills";
 import { formatCurrency } from "@/lib/finance/format";
-import type { Bill, BillProgress } from "@/lib/finance/types";
+import type { Bill, BillProgress, FinanceData } from "@/lib/finance/types";
 import { cn } from "@/components/ui/cn";
 
 type BillGroup = {
@@ -49,15 +49,21 @@ function groupBillProgress(progress: BillProgress[], bills: Bill[]): BillGroup[]
 function BillSection({
   title,
   groups,
+  financeData,
   onEdit,
   onDelete,
   onMarkSplitPaid,
 }: {
   title: string;
   groups: BillGroup[];
+  financeData: FinanceData;
   onEdit: (billId: string) => void;
   onDelete: (billId: string) => void;
-  onMarkSplitPaid: (billId: string, splitId: string) => void;
+  onMarkSplitPaid: (
+    billId: string,
+    splitId: string,
+    amount?: number,
+  ) => Promise<void>;
 }) {
   if (groups.length === 0) {
     return null;
@@ -72,9 +78,12 @@ function BillSection({
             key={bill.id}
             bill={bill}
             splits={splits}
+            financeData={financeData}
             onEdit={() => onEdit(bill.id)}
             onDelete={() => onDelete(bill.id)}
-            onMarkSplitPaid={(splitId) => onMarkSplitPaid(bill.id, splitId)}
+            onMarkSplitPaid={(splitId, amount) =>
+              onMarkSplitPaid(bill.id, splitId, amount)
+            }
           />
         ))}
       </div>
@@ -112,7 +121,11 @@ export function BillsContent() {
     return finance.bills.find((bill) => bill.id === id) ?? null;
   }
 
-  async function handleMarkSplitPaid(billId: string, splitId: string) {
+  async function handleMarkSplitPaid(
+    billId: string,
+    splitId: string,
+    amount?: number,
+  ) {
     const bill = findBill(billId);
     const split = getBillProgressList(finance).find(
       (entry) => entry.billId === billId && entry.splitId === splitId,
@@ -123,11 +136,14 @@ export function BillsContent() {
     }
 
     try {
-      await markBillSplitPaid(billId, splitId);
+      await markBillSplitPaid(billId, splitId, amount);
 
       showToast({
-        title: `✓ ${split.name} Marked Paid`,
-        subtitle: "✓ Dashboard Updated",
+        title:
+          amount !== undefined && amount < split.remainingAmount
+            ? `✓ ${formatCurrency(amount)} recorded`
+            : `✓ ${split.name} marked paid`,
+        subtitle: "✓ Dashboard updated",
       });
     } catch {
       // Error toast handled by FinanceContext
@@ -174,6 +190,7 @@ export function BillsContent() {
           <BillSection
             title="Monthly"
             groups={monthlyGroups}
+            financeData={finance}
             onEdit={setEditBillId}
             onDelete={setDeleteBillId}
             onMarkSplitPaid={handleMarkSplitPaid}
@@ -181,6 +198,7 @@ export function BillsContent() {
           <BillSection
             title="Upcoming"
             groups={upcomingGroups}
+            financeData={finance}
             onEdit={setEditBillId}
             onDelete={setDeleteBillId}
             onMarkSplitPaid={handleMarkSplitPaid}
@@ -188,6 +206,7 @@ export function BillsContent() {
           <BillSection
             title="Paid"
             groups={paidGroups}
+            financeData={finance}
             onEdit={setEditBillId}
             onDelete={setDeleteBillId}
             onMarkSplitPaid={handleMarkSplitPaid}

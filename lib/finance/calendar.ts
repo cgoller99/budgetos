@@ -15,6 +15,7 @@ const STATUS_PRIORITY: Record<BillStatus, number> = {
   overdue: 0,
   due_today: 1,
   due_soon: 2,
+  partial: 2,
   upcoming: 3,
   paid: 4,
 };

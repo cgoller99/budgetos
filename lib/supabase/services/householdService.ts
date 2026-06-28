@@ -283,4 +283,59 @@ export class HouseholdService {
 
     return this.loadHousehold(userId);
   }
+
+  async leaveHousehold(userId: string): Promise<HouseholdSnapshot> {
+    const { error } = await this.supabase.rpc("leave_household");
+
+    if (error) {
+      throw error;
+    }
+
+    return this.loadHousehold(userId);
+  }
+
+  async removeMember(
+    userId: string,
+    memberUserId: string,
+  ): Promise<HouseholdSnapshot> {
+    const { error } = await this.supabase.rpc("remove_household_member", {
+      p_user_id: memberUserId,
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    return this.loadHousehold(userId);
+  }
+
+  async transferOwnership(
+    userId: string,
+    newOwnerUserId: string,
+  ): Promise<HouseholdSnapshot> {
+    const { error } = await this.supabase.rpc("transfer_household_ownership", {
+      p_new_owner_id: newOwnerUserId,
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    return this.loadHousehold(userId);
+  }
+
+  async revokeInvite(
+    userId: string,
+    inviteId: string,
+  ): Promise<HouseholdSnapshot> {
+    const { error } = await this.supabase.rpc("revoke_household_invite", {
+      p_invite_id: inviteId,
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    return this.loadHousehold(userId);
+  }
 }

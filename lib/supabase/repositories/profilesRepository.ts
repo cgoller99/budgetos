@@ -72,4 +72,45 @@ export class ProfilesRepository {
 
     return persisted;
   }
+
+  async loadProfile(userId: string): Promise<{
+    fullName: string | null;
+    email: string | null;
+  }> {
+    const { data, error } = await this.supabase
+      .from("profiles")
+      .select("full_name, email")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+
+    return {
+      fullName: data?.full_name ?? null,
+      email: data?.email ?? null,
+    };
+  }
+
+  async updateFullName(userId: string, fullName: string): Promise<string> {
+    const trimmed = fullName.trim();
+    const timestamp = new Date().toISOString();
+
+    const { data, error } = await this.supabase
+      .from("profiles")
+      .update({
+        full_name: trimmed || null,
+        updated_at: timestamp,
+      })
+      .eq("id", userId)
+      .select("full_name")
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    return data.full_name ?? "";
+  }
 }

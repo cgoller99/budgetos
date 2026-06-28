@@ -82,6 +82,7 @@ export type BillStatus =
   | "due_soon"
   | "due_today"
   | "overdue"
+  | "partial"
   | "paid";
 
 export type PaycheckAssignment =
@@ -99,6 +100,7 @@ export type BillSplitInput = {
   customPayDay?: number | null;
   paymentAccountId?: string | null;
   paidMonth?: string | null;
+  paidAmount?: number;
   sortOrder?: number;
 };
 
@@ -170,6 +172,7 @@ export type BillSplit = {
   customPayDay?: number | null;
   paymentAccountId?: string | null;
   paidMonth: string | null;
+  paidAmount: number;
   sortOrder: number;
 };
 
@@ -197,6 +200,8 @@ export type BillProgress = {
   name: string;
   category: string;
   amount: number;
+  paidAmount: number;
+  remainingAmount: number;
   dueDay: number;
   dueDate: Date | null;
   formattedDueDate: string;

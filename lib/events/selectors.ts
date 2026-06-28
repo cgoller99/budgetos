@@ -1,4 +1,8 @@
-import { deriveWeeklySummaryEvent } from "@/lib/events/eventStore";
+import {
+  deriveBillDueTomorrowEvents,
+  deriveGoalReachedEvents,
+  deriveWeeklySummaryEvent,
+} from "@/lib/events/eventStore";
 import type {
   ActivityItem,
   FinanceEvent,
@@ -6,9 +10,46 @@ import type {
   NotificationItem,
 } from "@/lib/events/types";
 import type { FinanceData } from "@/lib/finance/types";
+import {
+  getNotificationPreferences,
+  type NotificationCategory,
+} from "@/lib/notifications/preferences";
 
 function hasSurface(event: FinanceEvent, surface: FinanceEventSurface): boolean {
   return Array.isArray(event.surfaces) && event.surfaces.includes(surface);
+}
+
+function getEventCategory(event: FinanceEvent): NotificationCategory | null {
+  switch (event.type) {
+    case "bill_due_tomorrow":
+    case "bill_paid":
+    case "bill_added":
+      return "bills";
+    case "goal_completed":
+    case "goal_contribution":
+    case "goal_created":
+      return "goals";
+    case "household_invite_accepted":
+      return "household";
+    case "weekly_summary_ready":
+      return "weeklySummary";
+    default:
+      return null;
+  }
+}
+
+function isCategoryEnabled(event: FinanceEvent): boolean {
+  if (typeof window === "undefined") {
+    return true;
+  }
+
+  const category = getEventCategory(event);
+
+  if (!category) {
+    return true;
+  }
+
+  return getNotificationPreferences()[category];
 }
 
 function toActivityItem(event: FinanceEvent): ActivityItem {
@@ -39,24 +80,37 @@ function toNotificationItem(event: FinanceEvent): NotificationItem {
 }
 
 function getVirtualNotifications(data: FinanceData): NotificationItem[] {
-  const weeklySummary = deriveWeeklySummaryEvent(data);
+  const virtualEvents: FinanceEvent[] = [];
 
-  if (!weeklySummary) {
-    return [];
+  const weeklySummary = deriveWeeklySummaryEvent(data);
+  if (weeklySummary) {
+    virtualEvents.push({ ...weeklySummary, read: false });
   }
 
-  return [toNotificationItem({ ...weeklySummary, read: false })];
+  virtualEvents.push(...deriveBillDueTomorrowEvents(data));
+  virtualEvents.push(...deriveGoalReachedEvents(data));
+
+  return virtualEvents
+    .filter((event) => isCategoryEnabled(event))
+    .map((event) => toNotificationItem(event));
 }
 
 export function getNotifications(data: FinanceData): NotificationItem[] {
   const events = data.events ?? [];
   const stored = events
-    .filter((event) => hasSurface(event, "notification"))
+    .filter(
+      (event) => hasSurface(event, "notification") && isCategoryEnabled(event),
+    )
     .slice(0, 20)
     .map(toNotificationItem);
 
   const virtual = getVirtualNotifications(data).filter(
-    (_item) => !stored.some((storedItem) => storedItem.title.includes("Weekly Summary")),
+    (item) =>
+      !stored.some(
+        (storedItem) =>
+          storedItem.title.includes("Weekly Summary") &&
+          item.title.includes("Weekly Summary"),
+      ),
   );
 
   return [...virtual, ...stored];
@@ -65,7 +119,10 @@ export function getNotifications(data: FinanceData): NotificationItem[] {
 export function getUnreadNotificationCount(data: FinanceData): number {
   const events = data.events ?? [];
   const storedUnread = events.filter(
-    (event) => hasSurface(event, "notification") && !event.read,
+    (event) =>
+      hasSurface(event, "notification") &&
+      !event.read &&
+      isCategoryEnabled(event),
   ).length;
 
   const virtualUnread = getVirtualNotifications(data).length;

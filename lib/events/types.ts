@@ -4,6 +4,7 @@ export type FinanceEventType =
   | "bill_updated"
   | "bill_deleted"
   | "bill_paid"
+  | "bill_due_tomorrow"
   | "income_added"
   | "goal_created"
   | "goal_updated"
@@ -17,7 +18,8 @@ export type FinanceEventType =
   | "paycheck_processed"
   | "activity_applied"
   | "net_worth_milestone"
-  | "weekly_summary_ready";
+  | "weekly_summary_ready"
+  | "household_invite_accepted";
 
 export type FinanceEventTone = "positive" | "negative" | "neutral" | "accent";
 

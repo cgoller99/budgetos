@@ -1,5 +1,6 @@
 import { calculateNetWorth } from "@/lib/calculations/netWorth";
 import { formatCurrency } from "@/lib/finance/format";
+import { getBillsDueTomorrow } from "@/lib/finance/bills";
 import type { FinanceData } from "@/lib/finance/types";
 import { generateWeeklyPlan } from "@/lib/intelligence";
 import type {
@@ -251,6 +252,42 @@ export function buildWeeklySummaryEvent(
   });
 }
 
+export function buildBillDueTomorrowEvent(
+  name: string,
+  amount: number,
+  entityId: string,
+): FinanceEvent {
+  return createEvent({
+    type: "bill_due_tomorrow",
+    label: `${name} due tomorrow`,
+    description: `${formatCurrency(amount)} due tomorrow — plan ahead in Bills.`,
+    icon: "📋",
+    tone: "accent",
+    amount,
+    entityId,
+    entityType: "bill",
+    surfaces: ["notification"],
+    read: false,
+  });
+}
+
+export function buildGoalReachedVirtualEvent(
+  name: string,
+  entityId: string,
+): FinanceEvent {
+  return createEvent({
+    type: "goal_completed",
+    label: `✓ ${name} Goal Reached`,
+    description: "You've hit your savings target.",
+    icon: "🏆",
+    tone: "accent",
+    entityId,
+    entityType: "goal",
+    surfaces: ["notification"],
+    read: false,
+  });
+}
+
 function getNextRoundThreshold(current: number): number {
   const thresholds = [
     1_000, 5_000, 10_000, 25_000, 50_000, 100_000, 250_000, 500_000, 1_000_000,
@@ -323,6 +360,58 @@ export function deriveWeeklySummaryEvent(data: FinanceData): FinanceEvent | null
   }
 
   return buildWeeklySummaryEvent(plan.length);
+}
+
+function hasStoredNotificationForEntity(
+  events: FinanceEvent[],
+  entityId: string,
+  types: FinanceEventType[],
+): boolean {
+  return events.some(
+    (event) =>
+      types.includes(event.type) &&
+      event.entityId === entityId &&
+      Array.isArray(event.surfaces) &&
+      event.surfaces.includes("notification"),
+  );
+}
+
+export function deriveBillDueTomorrowEvents(data: FinanceData): FinanceEvent[] {
+  const referenceDate = new Date();
+  const dueTomorrow = getBillsDueTomorrow(data, referenceDate);
+  const events = data.events ?? [];
+
+  return dueTomorrow
+    .filter((bill) =>
+      !hasStoredNotificationForEntity(events, bill.splitId, [
+        "bill_due_tomorrow",
+        "bill_paid",
+      ])
+    )
+    .map((bill) => ({
+      ...buildBillDueTomorrowEvent(bill.name, bill.remainingAmount, bill.splitId),
+      id: `virtual-bill-due-${bill.splitId}`,
+      timestamp: referenceDate.toISOString(),
+    }));
+}
+
+export function deriveGoalReachedEvents(data: FinanceData): FinanceEvent[] {
+  const goals = data.savingsGoals ?? [];
+  const events = data.events ?? [];
+  const referenceDate = new Date();
+
+  return goals
+    .filter(
+      (goal) =>
+        goal.target > 0 &&
+        goal.current >= goal.target &&
+        !hasStoredNotificationForEntity(events, goal.id, ["goal_completed"]),
+    )
+    .map((goal) => ({
+      ...buildGoalReachedVirtualEvent(goal.name, goal.id),
+      id: `virtual-goal-reached-${goal.id}`,
+      timestamp: referenceDate.toISOString(),
+    }));
 }
 
 export function appendEvents(

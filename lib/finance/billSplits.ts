@@ -1,4 +1,9 @@
 import { getCurrentYearMonth, getDueDateForMonth, startOfDay } from "@/lib/finance/bills";
+import {
+  getSplitPaidAmount,
+  getSplitRemainingAmount,
+  isSplitFullyPaid,
+} from "@/lib/finance/billPayments";
 import type { Bill, BillSplit, BillSplitInput, BillStatus } from "@/lib/finance/types";
 import { normalizePaycheckAssignment } from "@/lib/finance/paycheckSplit";
 
@@ -15,6 +20,7 @@ export function createSyntheticBillSplit(bill: Bill): BillSplit {
     customPayDay: bill.customPayDay ?? null,
     paymentAccountId: bill.paymentAccountId ?? null,
     paidMonth: bill.paidMonth,
+    paidAmount: bill.paidMonth ? bill.amount : 0,
     sortOrder: 0,
   };
 }
@@ -44,9 +50,15 @@ export function getSplitStatus(
   referenceDate = new Date(),
 ): BillStatus {
   const currentMonth = getCurrentYearMonth(referenceDate);
+  const paidAmount = getSplitPaidAmount(split, referenceDate);
+  const remaining = getSplitRemainingAmount(split, referenceDate);
 
-  if (split.paidMonth === currentMonth) {
+  if (split.paidMonth === currentMonth && remaining <= 0) {
     return "paid";
+  }
+
+  if (split.paidMonth === currentMonth && paidAmount > 0 && remaining > 0) {
+    return "partial";
   }
 
   if (split.dueDay <= 0) {
@@ -83,9 +95,8 @@ export function areAllSplitsPaid(
   bill: Bill,
   referenceDate = new Date(),
 ): boolean {
-  const currentMonth = getCurrentYearMonth(referenceDate);
-  return getEffectiveBillSplits(bill).every(
-    (split) => split.paidMonth === currentMonth,
+  return getEffectiveBillSplits(bill).every((split) =>
+    isSplitFullyPaid(split, referenceDate),
   );
 }
 

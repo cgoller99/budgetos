@@ -139,7 +139,11 @@ export type FinanceContextValue = FinanceData & {
   editBill: (billId: string, input: EditBillInput) => Promise<void>;
   deleteBill: (billId: string) => Promise<void>;
   markBillPaid: (billId: string) => Promise<void>;
-  markBillSplitPaid: (billId: string, splitId: string) => Promise<void>;
+  markBillSplitPaid: (
+    billId: string,
+    splitId: string,
+    paymentAmount?: number,
+  ) => Promise<void>;
   createGoal: (input: CreateGoalInput) => Promise<void>;
   addSavingsGoal: (input: AddSavingsGoalInput) => Promise<void>;
   editGoal: (goalId: string, input: EditGoalInput) => Promise<void>;
@@ -883,6 +887,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
                   customPayDay: split.customPayDay ?? null,
                   paymentAccountId: split.paymentAccountId ?? null,
                   paidMonth: null,
+                  paidAmount: 0,
                   sortOrder: split.sortOrder ?? index,
                 })) ?? [],
             },
@@ -935,14 +940,19 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
   );
 
   const markBillSplitPaid = useCallback(
-    async (billId: string, splitId: string) => {
+    async (billId: string, splitId: string, paymentAmount?: number) => {
       const bill = data.bills.find((item) => item.id === billId);
 
       if (!bill) {
         return;
       }
 
-      const next = applyBillSplitPaymentByIdToData(data, billId, splitId);
+      const next = applyBillSplitPaymentByIdToData(
+        data,
+        billId,
+        splitId,
+        paymentAmount,
+      );
       const split = next.bills
         .find((item) => item.id === billId)
         ?.splits?.find((item) => item.id === splitId);
@@ -950,18 +960,25 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
         (bill.splits?.length ?? 0) > 1 && split
           ? `${bill.name} · due ${split.dueDay}`
           : bill.name;
+      const paidAmount =
+        paymentAmount ??
+        next.transactions.find((transaction) => transaction.billId === billId)
+          ?.amount ??
+        split?.amount ??
+        bill.amount;
 
       await runMutation(
         next,
         (repository, userId) =>
-          repository.markBillSplitPaid(userId, billId, splitId),
+          repository.markBillSplitPaid(
+            userId,
+            billId,
+            splitId,
+            paymentAmount,
+          ),
         {
           events: [
-            buildBillPaidEvent(
-              progressName,
-              split?.amount ?? bill.amount,
-              bill.id,
-            ),
+            buildBillPaidEvent(progressName, paidAmount, bill.id),
           ],
         },
       );
