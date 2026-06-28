@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AppProviders } from "@/components/providers/AppProviders";
+import { getSiteUrl } from "@/lib/supabase/authUrls";
 import "./globals.css";
+
+const siteUrl = getSiteUrl();
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,8 +17,19 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: "BudgetOS",
   description: "Your premium personal finance command center.",
+  openGraph: {
+    type: "website",
+    url: siteUrl,
+    siteName: "BudgetOS",
+    title: "BudgetOS",
+    description: "Your premium personal finance command center.",
+  },
+  alternates: {
+    canonical: siteUrl,
+  },
 };
 
 export default function RootLayout({

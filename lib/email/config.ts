@@ -26,6 +26,7 @@ function getConfigurationError(apiKey: string | undefined): string | null {
 
 export function getEmailConfig(): EmailConfig {
   const apiKey = process.env.RESEND_API_KEY?.trim();
+  // TODO: After verifying budgetos.co at resend.com/domains, set RESEND_FROM_EMAIL=noreply@budgetos.co
   const fromEmail =
     process.env.RESEND_FROM_EMAIL?.trim() || "onboarding@resend.dev";
   const fromName = process.env.RESEND_FROM_NAME?.trim() || "BudgetOS";
