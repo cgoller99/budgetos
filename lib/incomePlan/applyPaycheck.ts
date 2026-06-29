@@ -4,6 +4,7 @@ import { advancePayDate, computeNextPayDate } from "@/lib/incomePlan/payDates";
 import { resolveAllocationAmounts } from "@/lib/incomePlan/allocations";
 import type {
   IncomePlan,
+  IncomePlanAllocation,
   IncomePlanPaycheckEvent,
   MarkPaycheckReceivedInput,
 } from "@/lib/incomePlan/types";
@@ -28,6 +29,69 @@ function createTransaction(
     billId: partial.billId ?? null,
     debtId: partial.debtId ?? null,
   };
+}
+
+function moveAllocationAmount(
+  data: FinanceData,
+  params: {
+    allocation: IncomePlanAllocation;
+    amount: number;
+    depositAccountId: string;
+    date: string;
+  },
+): { data: FinanceData; transactionId: string | null } {
+  const { allocation, amount, depositAccountId, date } = params;
+
+  if (amount <= 0) {
+    return { data, transactionId: null };
+  }
+
+  if (allocation.goalId) {
+    const goal = data.savingsGoals.find((item) => item.id === allocation.goalId);
+    const transaction = createTransaction({
+      amount,
+      type: "expense",
+      category: "Goal Contribution",
+      accountId: depositAccountId,
+      transferAccountId: null,
+      date,
+      notes: goal
+        ? `Income Plan → ${goal.name}`
+        : `Income Plan → ${allocation.name}`,
+      goalId: allocation.goalId,
+    });
+
+    let next: FinanceData = {
+      ...data,
+      transactions: [transaction, ...data.transactions],
+    };
+    next = applyTransactionEffect(next, transaction);
+    next = applyGoalContributionEffect(next, transaction);
+
+    return { data: next, transactionId: transaction.id };
+  }
+
+  if (allocation.accountId && allocation.accountId !== depositAccountId) {
+    const transaction = createTransaction({
+      amount,
+      type: "transfer",
+      category: allocation.name,
+      accountId: depositAccountId,
+      transferAccountId: allocation.accountId,
+      date,
+      notes: `Income Plan → ${allocation.name}`,
+    });
+
+    let next: FinanceData = {
+      ...data,
+      transactions: [transaction, ...data.transactions],
+    };
+    next = applyTransactionEffect(next, transaction);
+
+    return { data: next, transactionId: transaction.id };
+  }
+
+  return { data, transactionId: null };
 }
 
 export function applyIncomePlanPaycheckToData(
@@ -77,91 +141,20 @@ export function applyIncomePlanPaycheckToData(
   const allocationEvents: IncomePlanPaycheckEvent["allocationEvents"] = [];
 
   for (const { allocation, amount } of resolved) {
-    if (amount <= 0) {
-      allocationEvents.push({
-        id: crypto.randomUUID(),
-        allocationId: allocation.id,
-        amount: 0,
-        transactionId: null,
-      });
-      continue;
-    }
+    const moved = moveAllocationAmount(next, {
+      allocation,
+      amount,
+      depositAccountId,
+      date,
+    });
 
-    if (allocation.isRemainingBalance) {
-      allocationEvents.push({
-        id: crypto.randomUUID(),
-        allocationId: allocation.id,
-        amount,
-        transactionId: null,
-      });
-      continue;
-    }
-
-    if (allocation.goalId) {
-      const goal = data.savingsGoals.find((item) => item.id === allocation.goalId);
-      const transaction = createTransaction({
-        amount,
-        type: "expense",
-        category: "Goal Contribution",
-        accountId: depositAccountId,
-        transferAccountId: null,
-        date,
-        notes: goal
-          ? `Income Plan → ${goal.name}`
-          : `Income Plan → ${allocation.name}`,
-        goalId: allocation.goalId,
-      });
-
-      next = {
-        ...next,
-        transactions: [transaction, ...next.transactions],
-      };
-      next = applyTransactionEffect(next, transaction);
-      next = applyGoalContributionEffect(next, transaction);
-
-      allocationEvents.push({
-        id: crypto.randomUUID(),
-        allocationId: allocation.id,
-        amount,
-        transactionId: transaction.id,
-      });
-      continue;
-    }
-
-    if (
-      allocation.accountId &&
-      allocation.accountId !== depositAccountId
-    ) {
-      const transaction = createTransaction({
-        amount,
-        type: "transfer",
-        category: allocation.name,
-        accountId: depositAccountId,
-        transferAccountId: allocation.accountId,
-        date,
-        notes: `Income Plan → ${allocation.name}`,
-      });
-
-      next = {
-        ...next,
-        transactions: [transaction, ...next.transactions],
-      };
-      next = applyTransactionEffect(next, transaction);
-
-      allocationEvents.push({
-        id: crypto.randomUUID(),
-        allocationId: allocation.id,
-        amount,
-        transactionId: transaction.id,
-      });
-      continue;
-    }
+    next = moved.data;
 
     allocationEvents.push({
       id: crypto.randomUUID(),
       allocationId: allocation.id,
       amount,
-      transactionId: null,
+      transactionId: moved.transactionId,
     });
   }
 

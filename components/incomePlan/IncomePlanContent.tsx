@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Badge,
   Button,
@@ -23,6 +23,7 @@ import {
   parseAllocationAmountInput,
   suggestAllocationIcons,
   validateAllocations,
+  resolveAllocationAmounts,
 } from "@/lib/incomePlan/allocations";
 import { describePaySchedule } from "@/lib/incomePlan/payDates";
 import {
@@ -52,6 +53,36 @@ type AllocationDraft = Omit<IncomePlanAllocation, "id"> & { id?: string };
 function defaultAllocations(): AllocationDraft[] {
   return [
     {
+      name: "House Savings",
+      icon: "🏠",
+      amount: null,
+      isRemainingBalance: false,
+      accountId: null,
+      goalId: null,
+      monthlyTarget: null,
+      sortOrder: 0,
+    },
+    {
+      name: "Vacation",
+      icon: "✈️",
+      amount: null,
+      isRemainingBalance: false,
+      accountId: null,
+      goalId: null,
+      monthlyTarget: null,
+      sortOrder: 1,
+    },
+    {
+      name: "Bills",
+      icon: "💳",
+      amount: null,
+      isRemainingBalance: false,
+      accountId: null,
+      goalId: null,
+      monthlyTarget: null,
+      sortOrder: 2,
+    },
+    {
       name: "Spending",
       icon: "🛍️",
       amount: null,
@@ -59,7 +90,7 @@ function defaultAllocations(): AllocationDraft[] {
       accountId: null,
       goalId: null,
       monthlyTarget: null,
-      sortOrder: 0,
+      sortOrder: 3,
     },
   ];
 }
@@ -125,6 +156,32 @@ export function IncomePlanContent() {
     () => getAllocationSummary(paycheckAmountValue, parsedAllocations),
     [parsedAllocations, paycheckAmountValue],
   );
+
+  const resolvedExisting = useMemo(
+    () => (existing ? resolveAllocationAmounts(existing) : []),
+    [existing],
+  );
+
+  useEffect(() => {
+    if (!showSettings || !existing) {
+      return;
+    }
+
+    setPaySchedule(existing.paySchedule);
+    setPaycheckAmount(String(existing.paycheckAmount));
+    setAnchorDate(existing.anchorDate);
+    setWeeklyDayOfWeek(existing.weeklyDayOfWeek ?? new Date().getDay());
+    setMonthlyDays(existing.monthlyDays);
+    setCustomIntervalDays(String(existing.customIntervalDays ?? 14));
+    setDepositAccountId(existing.depositAccountId);
+    setAllocations(existing.allocations);
+    setAmountInputs(
+      existing.allocations.map((item) =>
+        item.isRemainingBalance ? "" : formatAllocationAmountInput(item.amount),
+      ),
+    );
+    setStep(1);
+  }, [existing, showSettings]);
 
   const previewPlan = useMemo(
     () =>
@@ -242,15 +299,11 @@ export function IncomePlanContent() {
 
   function addAllocation() {
     setAllocations((previous) => [
-      ...previous.map((item) =>
-        item.isRemainingBalance
-          ? { ...item, isRemainingBalance: false, amount: item.amount ?? 0 }
-          : item,
-      ),
+      ...previous,
       {
         name: "New category",
         icon: "💵",
-        amount: 0,
+        amount: null,
         isRemainingBalance: false,
         accountId: null,
         goalId: null,
@@ -279,7 +332,10 @@ export function IncomePlanContent() {
       previous.map((item, itemIndex) => ({
         ...item,
         isRemainingBalance: itemIndex === index,
-        amount: itemIndex === index ? null : item.amount ?? 0,
+        amount:
+          itemIndex === index
+            ? null
+            : parseAllocationAmountInput(amountInputs[itemIndex] ?? ""),
       })),
     );
     setAmountInputs((previous) =>
@@ -312,7 +368,7 @@ export function IncomePlanContent() {
         <Card padding="lg">
           <CardHeader title="Allocation rules" />
           <CardContent className="space-y-3">
-            {existing.allocations.map((allocation) => (
+            {resolvedExisting.map(({ allocation, amount }) => (
               <div
                 key={allocation.id}
                 className="flex items-center justify-between gap-3 rounded-xl border border-[var(--surface-border)] bg-[var(--surface-subtle)] px-4 py-3"
@@ -326,13 +382,18 @@ export function IncomePlanContent() {
                     <p className="text-sm text-[var(--text-muted)]">
                       {allocation.isRemainingBalance
                         ? "Remaining balance"
-                        : formatCurrency(allocation.amount ?? 0)}
+                        : "Fixed amount"}
                     </p>
                   </div>
                 </div>
-                {allocation.isRemainingBalance && (
-                  <Badge variant="accent">Remaining</Badge>
-                )}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold tabular-nums text-[var(--foreground)]">
+                    {formatCurrency(amount)}
+                  </span>
+                  {allocation.isRemainingBalance && (
+                    <Badge variant="accent">Remaining</Badge>
+                  )}
+                </div>
               </div>
             ))}
           </CardContent>
@@ -567,7 +628,7 @@ export function IncomePlanContent() {
         <Card padding="lg">
           <CardHeader
             title="Where should each paycheck go?"
-            description="Type dollar amounts for each category. One category catches whatever is left."
+            description="Enter a fixed dollar amount for each category, then mark one as Remaining Balance for what's left."
           />
           <CardContent className="space-y-3">
             <div className="rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-subtle)] px-4 py-3">
@@ -622,67 +683,67 @@ export function IncomePlanContent() {
                       </span>
                     </div>
                   ) : (
-                    <div className="relative w-full sm:w-36">
-                      <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">
-                        $
+                    <div className="flex shrink-0 flex-col gap-1 sm:min-w-[9rem] sm:items-end">
+                      <span className="text-xs font-medium text-[var(--text-muted)]">
+                        Fixed amount
                       </span>
-                      <input
-                        inputMode="decimal"
-                        value={amountInputs[index] ?? ""}
-                        onChange={(event) =>
-                          updateAmountInput(index, event.target.value)
-                        }
-                        placeholder="0"
-                        aria-label={`Amount for ${allocation.name}`}
-                        className="w-full rounded-xl border border-[var(--surface-border)] bg-[var(--background)] py-3 pl-8 pr-4 text-right tabular-nums text-[var(--foreground)] outline-none focus:border-[#0077ed]"
-                      />
+                      <div className="relative w-full sm:w-36">
+                        <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">
+                          $
+                        </span>
+                        <input
+                          inputMode="decimal"
+                          value={amountInputs[index] ?? ""}
+                          onChange={(event) =>
+                            updateAmountInput(index, event.target.value)
+                          }
+                          placeholder="0"
+                          aria-label={`Fixed amount for ${allocation.name}`}
+                          className="w-full rounded-xl border border-[var(--surface-border)] bg-[var(--background)] py-3 pl-8 pr-4 text-right tabular-nums text-[var(--foreground)] outline-none focus:border-[#0077ed]"
+                        />
+                      </div>
                     </div>
                   )}
                 </div>
 
-                <details className="mt-3">
-                  <summary className="cursor-pointer text-sm text-[var(--text-muted)] hover:text-[var(--foreground)]">
-                    Optional links
-                  </summary>
-                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                    <FormField label="Account">
-                      <select
-                        value={allocation.accountId ?? ""}
-                        onChange={(event) =>
-                          updateAllocation(index, {
-                            accountId: event.target.value || null,
-                          })
-                        }
-                        className="w-full rounded-xl border border-[var(--surface-border)] bg-[var(--background)] px-4 py-3"
-                      >
-                        <option value="">None</option>
-                        {finance.accounts.map((account) => (
-                          <option key={account.id} value={account.id}>
-                            {account.name}
-                          </option>
-                        ))}
-                      </select>
-                    </FormField>
-                    <FormField label="Goal">
-                      <select
-                        value={allocation.goalId ?? ""}
-                        onChange={(event) =>
-                          updateAllocation(index, {
-                            goalId: event.target.value || null,
-                          })
-                        }
-                        className="w-full rounded-xl border border-[var(--surface-border)] bg-[var(--background)] px-4 py-3"
-                      >
-                        <option value="">None</option>
-                        {finance.savingsGoals.map((goal) => (
-                          <option key={goal.id} value={goal.id}>
-                            {goal.icon} {goal.name}
-                          </option>
-                        ))}
-                      </select>
-                    </FormField>
-                  </div>
-                </details>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <FormField label="Account">
+                    <select
+                      value={allocation.accountId ?? ""}
+                      onChange={(event) =>
+                        updateAllocation(index, {
+                          accountId: event.target.value || null,
+                        })
+                      }
+                      className="w-full rounded-xl border border-[var(--surface-border)] bg-[var(--background)] px-4 py-3"
+                    >
+                      <option value="">None</option>
+                      {finance.accounts.map((account) => (
+                        <option key={account.id} value={account.id}>
+                          {account.name}
+                        </option>
+                      ))}
+                    </select>
+                  </FormField>
+                  <FormField label="Goal">
+                    <select
+                      value={allocation.goalId ?? ""}
+                      onChange={(event) =>
+                        updateAllocation(index, {
+                          goalId: event.target.value || null,
+                        })
+                      }
+                      className="w-full rounded-xl border border-[var(--surface-border)] bg-[var(--background)] px-4 py-3"
+                    >
+                      <option value="">None</option>
+                      {finance.savingsGoals.map((goal) => (
+                        <option key={goal.id} value={goal.id}>
+                          {goal.icon} {goal.name}
+                        </option>
+                      ))}
+                    </select>
+                  </FormField>
+                </div>
 
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Button
@@ -738,6 +799,7 @@ export function IncomePlanContent() {
               isSaving ||
               finance.isSyncing ||
               allocationSummary.isOverAllocated ||
+              allocationSummary.remainingBalanceCount !== 1 ||
               paycheckAmountValue <= 0
             }
             onClick={() => void handleSave()}

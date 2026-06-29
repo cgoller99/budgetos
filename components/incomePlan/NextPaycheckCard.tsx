@@ -137,8 +137,12 @@ export function NextPaycheckCard() {
                 </span>
                 <span className="truncate text-sm font-medium text-[var(--foreground)]">
                   {allocation.name}
-                  {allocation.isRemainingBalance ? " (remaining)" : ""}
                 </span>
+                {allocation.isRemainingBalance && (
+                  <Badge variant="accent" className="shrink-0">
+                    Remaining
+                  </Badge>
+                )}
               </div>
               <span className="shrink-0 text-sm font-semibold tabular-nums text-[var(--foreground)]">
                 {formatCurrency(amount)}

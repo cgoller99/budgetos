@@ -38,6 +38,7 @@ export function getAllocationSummary(
   >[],
 ): {
   paycheckAmount: number;
+  fixedAllocated: number;
   allocated: number;
   remaining: number;
   isOverAllocated: boolean;
@@ -59,6 +60,7 @@ export function getAllocationSummary(
 
   return {
     paycheckAmount: roundCurrency(paycheckAmount),
+    fixedAllocated: allocated,
     allocated,
     remaining,
     isOverAllocated,
@@ -129,13 +131,24 @@ export function resolveAllocationAmounts(
 export function getDefaultMonthlyTarget(
   allocation: IncomePlanAllocation,
   paychecksPerMonth: number,
+  plan?: Pick<IncomePlan, "paycheckAmount" | "allocations">,
 ): number {
   if (allocation.monthlyTarget !== null) {
     return allocation.monthlyTarget;
   }
 
   if (allocation.isRemainingBalance) {
-    return 0;
+    if (!plan) {
+      return 0;
+    }
+
+    const fixedTotal = plan.allocations
+      .filter((item) => !item.isRemainingBalance)
+      .reduce((total, item) => total + (item.amount ?? 0), 0);
+
+    return roundCurrency(
+      Math.max(plan.paycheckAmount - fixedTotal, 0) * paychecksPerMonth,
+    );
   }
 
   return roundCurrency((allocation.amount ?? 0) * paychecksPerMonth);
@@ -173,7 +186,7 @@ export function getAllocationProgress(
       name: allocation.name,
       icon: allocation.icon,
       receivedThisMonth: roundCurrency(receivedThisMonth),
-      monthlyTarget: getDefaultMonthlyTarget(allocation, paychecksPerMonth),
+      monthlyTarget: getDefaultMonthlyTarget(allocation, paychecksPerMonth, plan),
     };
   });
 }

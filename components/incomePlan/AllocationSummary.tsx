@@ -26,7 +26,7 @@ export function AllocationSummary({
       <dl className="grid gap-4 sm:grid-cols-3">
         <div>
           <dt className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
-            Paycheck
+            Paycheck amount
           </dt>
           <dd className="mt-1 text-lg font-semibold tabular-nums text-[var(--foreground)]">
             {formatCurrency(summary.paycheckAmount)}
@@ -34,15 +34,15 @@ export function AllocationSummary({
         </div>
         <div>
           <dt className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
-            Allocated
+            Fixed allocated amount
           </dt>
           <dd className="mt-1 text-lg font-semibold tabular-nums text-[var(--foreground)]">
-            {formatCurrency(summary.allocated)}
+            {formatCurrency(summary.fixedAllocated)}
           </dd>
         </div>
         <div>
           <dt className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
-            Remaining
+            Remaining amount
           </dt>
           <dd
             className={cn(
