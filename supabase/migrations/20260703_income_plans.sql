@@ -160,28 +160,10 @@ create policy "Income plan paycheck events manageable by owner or household"
 drop policy if exists "Income plan allocation events readable by owner or household" on public.income_plan_allocation_events;
 create policy "Income plan allocation events readable by owner or household"
   on public.income_plan_allocation_events for select
-  using (
-    auth.uid() = user_id
-    or (
-      household_id is not null
-      and household_id in (select public.user_household_ids())
-    )
-  );
+  using (auth.uid() = user_id);
 
 drop policy if exists "Income plan allocation events manageable by owner or household" on public.income_plan_allocation_events;
 create policy "Income plan allocation events manageable by owner or household"
   on public.income_plan_allocation_events for all
-  using (
-    auth.uid() = user_id
-    or (
-      household_id is not null
-      and household_id in (select public.user_household_ids())
-    )
-  )
-  with check (
-    auth.uid() = user_id
-    or (
-      household_id is not null
-      and household_id in (select public.user_household_ids())
-    )
-  );
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
