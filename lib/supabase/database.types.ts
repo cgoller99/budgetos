@@ -427,6 +427,63 @@ export type BankConnectionInsert = {
   updated_at?: string;
 };
 
+export type IncomePlanRow = {
+  id: string;
+  user_id: string;
+  household_id: string | null;
+  pay_schedule: string;
+  paycheck_amount: number;
+  anchor_date: string;
+  weekly_day_of_week: number | null;
+  monthly_days: number[];
+  custom_interval_days: number | null;
+  deposit_account_id: string | null;
+  next_pay_date: string;
+  last_processed_date: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type IncomePlanAllocationRow = {
+  id: string;
+  income_plan_id: string;
+  user_id: string;
+  household_id: string | null;
+  name: string;
+  icon: string;
+  amount: number | null;
+  is_remaining_balance: boolean;
+  account_id: string | null;
+  goal_id: string | null;
+  monthly_target: number | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type IncomePlanPaycheckEventRow = {
+  id: string;
+  income_plan_id: string;
+  user_id: string;
+  household_id: string | null;
+  pay_date: string;
+  gross_amount: number;
+  is_extra_paycheck: boolean;
+  income_transaction_id: string | null;
+  created_at: string;
+};
+
+export type IncomePlanAllocationEventRow = {
+  id: string;
+  paycheck_event_id: string;
+  allocation_id: string;
+  user_id: string;
+  amount: number;
+  transaction_id: string | null;
+  created_at: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -506,6 +563,30 @@ export type Database = {
         Row: BankConnectionRow;
         Insert: BankConnectionInsert;
         Update: Partial<BankConnectionInsert>;
+        Relationships: [];
+      };
+      income_plans: {
+        Row: IncomePlanRow;
+        Insert: Record<string, unknown>;
+        Update: Record<string, unknown>;
+        Relationships: [];
+      };
+      income_plan_allocations: {
+        Row: IncomePlanAllocationRow;
+        Insert: Record<string, unknown>;
+        Update: Record<string, unknown>;
+        Relationships: [];
+      };
+      income_plan_paycheck_events: {
+        Row: IncomePlanPaycheckEventRow;
+        Insert: Record<string, unknown>;
+        Update: Record<string, unknown>;
+        Relationships: [];
+      };
+      income_plan_allocation_events: {
+        Row: IncomePlanAllocationEventRow;
+        Insert: Record<string, unknown>;
+        Update: Record<string, unknown>;
         Relationships: [];
       };
     };

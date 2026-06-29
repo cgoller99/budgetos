@@ -41,6 +41,8 @@ import type {
   EditIncomeInput,
   EditTransactionInput,
   FinanceData,
+  MarkPaycheckReceivedInput,
+  SaveIncomePlanInput,
 } from "@/lib/finance/types";
 import type { ActivityItem, FinanceEvent, NotificationItem } from "@/lib/events/types";
 import {
@@ -61,6 +63,7 @@ import {
   markEventRead,
 } from "@/lib/events";
 import { normalizePaycheckAssignment } from "@/lib/finance/paycheckSplit";
+import { applyIncomePlanPaycheckToData } from "@/lib/incomePlan/applyPaycheck";
 import { normalizeBillCategory } from "@/lib/finance/billCategories";
 import type { DemoProfileId, OnboardingMode, OnboardingState } from "@/lib/onboarding/types";
 import {
@@ -156,6 +159,10 @@ export type FinanceContextValue = FinanceData & {
     input: EditTransactionInput,
   ) => Promise<void>;
   deleteTransaction: (transactionId: string) => Promise<void>;
+  saveIncomePlan: (input: SaveIncomePlanInput) => Promise<void>;
+  markIncomePlanPaycheckReceived: (
+    input?: MarkPaycheckReceivedInput,
+  ) => Promise<void>;
   markNotificationRead: (notificationId: string) => void;
   markAllNotificationsRead: () => void;
 };
@@ -262,6 +269,8 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
       "goals",
       "transactions",
       "investments",
+      "income_plans",
+      "income_plan_paycheck_events",
     ] as const;
 
     for (const table of tables) {
@@ -1181,6 +1190,59 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
     [data, runMutation],
   );
 
+  const saveIncomePlan = useCallback(
+    async (input: SaveIncomePlanInput) => {
+      await runMutation(
+        {
+          ...data,
+          incomePlan: data.incomePlan
+            ? {
+                ...data.incomePlan,
+                paySchedule: input.paySchedule,
+                paycheckAmount: input.paycheckAmount,
+                anchorDate: input.anchorDate,
+                weeklyDayOfWeek: input.weeklyDayOfWeek,
+                monthlyDays: input.monthlyDays,
+                customIntervalDays: input.customIntervalDays,
+                depositAccountId: input.depositAccountId,
+                allocations: input.allocations.map((allocation, index) => ({
+                  ...allocation,
+                  id: crypto.randomUUID(),
+                  sortOrder: allocation.sortOrder ?? index,
+                })),
+              }
+            : null,
+        },
+        (repository, userId) => repository.saveIncomePlan(userId, input),
+      );
+    },
+    [data, runMutation],
+  );
+
+  const markIncomePlanPaycheckReceived = useCallback(
+    async (input: MarkPaycheckReceivedInput = {}) => {
+      const plan = data.incomePlan;
+
+      if (!plan) {
+        return;
+      }
+
+      const { data: next } = applyIncomePlanPaycheckToData(data, plan, input);
+
+      await runMutation(
+        next,
+        (repository, userId) =>
+          repository.markIncomePlanPaycheckReceived(userId, input),
+        {
+          events: [
+            buildPaycheckProcessedEvent("Income Plan", plan.paycheckAmount),
+          ],
+        },
+      );
+    },
+    [data, runMutation],
+  );
+
   const hub = useMemo(() => computeFinanceHub(data), [data]);
   const isDemoMode = isUserInDemoMode(onboardingMode, data);
 
@@ -1227,6 +1289,8 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
       addTransaction,
       editTransaction,
       deleteTransaction,
+      saveIncomePlan,
+      markIncomePlanPaycheckReceived,
       markNotificationRead,
       markAllNotificationsRead,
     }),
@@ -1246,6 +1310,8 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
       deleteDebt,
       deleteIncome,
       deleteTransaction,
+      saveIncomePlan,
+      markIncomePlanPaycheckReceived,
       demoProfileId,
       editBill,
       editDebt,

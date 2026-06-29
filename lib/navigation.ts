@@ -21,6 +21,13 @@ export const NAV_ROUTES = [
     subtitle: "Track paychecks and other money coming in.",
   },
   {
+    label: "Income Plan",
+    icon: "income",
+    href: "/income/plan",
+    eyebrow: "Cash Flow",
+    subtitle: "Decide where every paycheck goes.",
+  },
+  {
     label: "Bills",
     icon: "bills",
     href: "/bills",

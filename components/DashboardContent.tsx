@@ -4,6 +4,7 @@ import { RecommendedSteps } from "@/components/guidance/RecommendedSteps";
 import { WelcomeChecklist } from "@/components/guidance/WelcomeChecklist";
 import { HealthScoreCard } from "@/components/HealthScoreCard";
 import { MoneyFlowCard } from "@/components/MoneyFlowCard";
+import { NextPaycheckCard } from "@/components/incomePlan/NextPaycheckCard";
 import { NextGoalCard } from "@/components/dashboard/NextGoalCard";
 import { UpcomingBillsCard } from "@/components/dashboard/UpcomingBillsCard";
 import { UpcomingIncomeCard } from "@/components/dashboard/UpcomingIncomeCard";
@@ -38,12 +39,16 @@ export function DashboardContent() {
       </div>
 
       <div className={dashboardSectionClassName}>
-        <UpcomingBillsCard />
+        <NextPaycheckCard />
         <UpcomingIncomeCard />
       </div>
 
       <div className={dashboardSectionClassName}>
+        <UpcomingBillsCard />
         <NextGoalCard />
+      </div>
+
+      <div className={dashboardSectionClassName}>
         <SmartInsights />
       </div>
     </div>

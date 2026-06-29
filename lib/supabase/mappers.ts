@@ -364,6 +364,8 @@ export function mapFinanceData(
     income: recurringIncomeRows.map(mapIncomeRow),
     transactions: ledgerRows.map(mapTransactionRow),
     events,
+    incomePlan: null,
+    incomePlanPaychecks: [],
   };
 
   return normalizeRecurringFinanceData(mapped);

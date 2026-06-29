@@ -121,4 +121,6 @@ export const collegeStudentDemoData: FinanceData = {
   ],
   transactions: [],
   events: [],
+  incomePlan: null,
+  incomePlanPaychecks: [],
 };

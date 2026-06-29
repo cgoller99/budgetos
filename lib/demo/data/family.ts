@@ -225,4 +225,6 @@ export const familyDemoData: FinanceData = {
   ],
   transactions: [],
   events: [],
+  incomePlan: null,
+  incomePlanPaychecks: [],
 };

@@ -29,6 +29,12 @@ import type {
   FinanceData,
   Transaction,
 } from "@/lib/finance/types";
+import type { MarkPaycheckReceivedInput, SaveIncomePlanInput } from "@/lib/incomePlan/types";
+import { applyIncomePlanPaycheckToData } from "@/lib/incomePlan/applyPaycheck";
+import {
+  getPaycheckIndexInMonth,
+  isExtraPaycheckMonth,
+} from "@/lib/incomePlan/payDates";
 import { applyActivityToData } from "@/lib/recurring/applyActivity";
 import { normalizeBillFrequency, normalizeIncomeFrequency } from "@/lib/recurring/frequencies";
 import {
@@ -52,6 +58,7 @@ import {
   mapFinanceData,
 } from "@/lib/supabase/mappers";
 import { NotificationsRepository } from "@/lib/supabase/repositories/notificationsRepository";
+import { IncomePlanRepository } from "@/lib/supabase/repositories/incomePlanRepository";
 import { ProfilesRepository } from "@/lib/supabase/repositories/profilesRepository";
 import { RecurringItemsRepository } from "@/lib/supabase/repositories/recurringItemsRepository";
 import { seedFinanceData } from "@/lib/supabase/seed";
@@ -64,11 +71,13 @@ import type { OnboardingState } from "@/lib/onboarding/types";
 
 export class FinanceService {
   private readonly notifications: NotificationsRepository;
+  private readonly incomePlans: IncomePlanRepository;
   private readonly profiles: ProfilesRepository;
   private readonly recurringItems: RecurringItemsRepository;
 
   constructor(private readonly supabase: BuxmeSupabaseClient) {
     this.notifications = new NotificationsRepository(supabase);
+    this.incomePlans = new IncomePlanRepository(supabase);
     this.profiles = new ProfilesRepository(supabase);
     this.recurringItems = new RecurringItemsRepository(supabase);
   }
@@ -181,7 +190,9 @@ export class FinanceService {
       }
     }
 
-    return mapFinanceData(
+    const incomePlanData = await this.incomePlans.loadIncomePlanData(userId);
+
+    const mapped = mapFinanceData(
       accountsResult.data ?? [],
       billsResult.data ?? [],
       goalsResult.data ?? [],
@@ -190,6 +201,12 @@ export class FinanceService {
       events,
       billSplitRows,
     );
+
+    return {
+      ...mapped,
+      incomePlan: incomePlanData.incomePlan,
+      incomePlanPaychecks: incomePlanData.incomePlanPaychecks,
+    };
   }
 
   async saveEvents(userId: string, events: FinanceEvent[]): Promise<void> {
@@ -977,6 +994,54 @@ export class FinanceService {
     if (error) throw error;
 
     return this.persistAccountBalances(userId, data);
+  }
+
+  async saveIncomePlan(
+    userId: string,
+    input: SaveIncomePlanInput,
+  ): Promise<FinanceData> {
+    const current = await this.loadFinanceData(userId);
+    await this.incomePlans.saveIncomePlan(
+      userId,
+      input,
+      current.incomePlan?.id ?? null,
+    );
+    return this.loadFinanceData(userId);
+  }
+
+  async markIncomePlanPaycheckReceived(
+    userId: string,
+    input: MarkPaycheckReceivedInput = {},
+  ): Promise<FinanceData> {
+    const current = await this.loadFinanceData(userId);
+    const plan = current.incomePlan;
+
+    if (!plan) {
+      throw new Error("Set up your Income Plan first.");
+    }
+
+    const isExtra =
+      input.isExtraPaycheck ??
+      (isExtraPaycheckMonth(plan) &&
+        getPaycheckIndexInMonth(plan, plan.nextPayDate) >= 3);
+
+    const { data: next, paycheckEvent } = applyIncomePlanPaycheckToData(
+      current,
+      plan,
+      { ...input, isExtraPaycheck: isExtra },
+    );
+
+    await this.saveRecurringState(userId, next);
+
+    if (next.incomePlan) {
+      await this.incomePlans.persistPaycheckReceived(
+        userId,
+        next.incomePlan,
+        paycheckEvent,
+      );
+    }
+
+    return this.loadFinanceData(userId);
   }
 
   private async persistAccountBalances(

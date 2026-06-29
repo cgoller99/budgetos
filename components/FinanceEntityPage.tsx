@@ -36,7 +36,7 @@ function getFinancePageAttributes(
 ) {
   const entityData = getFinanceEntity(finance, href);
 
-  if (entityData) {
+  if (entityData && Array.isArray(entityData)) {
     return {
       "data-finance-entity": href,
       "data-finance-count": entityData.length,

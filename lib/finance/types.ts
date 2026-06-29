@@ -7,6 +7,12 @@ import type {
   TodayActivitySummary,
 } from "@/lib/recurring/types";
 import type { MilestoneCategory } from "@/lib/roadmap/types";
+import type {
+  IncomePlan,
+  IncomePlanPaycheckEvent,
+  SaveIncomePlanInput,
+  MarkPaycheckReceivedInput,
+} from "@/lib/incomePlan/types";
 
 export type {
   AutoContribution,
@@ -462,7 +468,11 @@ export type FinanceData = {
   investments: Investment[];
   transactions: Transaction[];
   events: FinanceEvent[];
+  incomePlan: IncomePlan | null;
+  incomePlanPaychecks: IncomePlanPaycheckEvent[];
 };
+
+export type { IncomePlan, IncomePlanPaycheckEvent, SaveIncomePlanInput, MarkPaycheckReceivedInput };
 
 export type KPIMetric = {
   label: string;

@@ -171,4 +171,6 @@ export const youngProfessionalDemoData: FinanceData = {
   ],
   transactions: [],
   events: [],
+  incomePlan: null,
+  incomePlanPaychecks: [],
 };

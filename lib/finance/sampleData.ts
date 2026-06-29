@@ -198,4 +198,6 @@ export const sampleFinanceData: FinanceData = {
   ],
   transactions: [],
   events: [],
+  incomePlan: null,
+  incomePlanPaychecks: [],
 };

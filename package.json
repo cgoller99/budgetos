@@ -13,6 +13,7 @@
     "apply:household-migration": "node scripts/apply-household-migration.mjs",
     "apply:household-invite-migration": "node scripts/apply-household-invite-migration.mjs",
     "apply:household-invite-dedupe": "node scripts/apply-household-invite-dedupe.mjs",
+    "apply:income-plans-migration": "node scripts/apply-income-plans-migration.mjs",
     "debug:household-invite-email": "node --env-file=.env.local scripts/debug-household-invite-email.mjs",
     "configure:supabase-auth-urls": "node --env-file=.env.local scripts/configure-supabase-auth-urls.mjs",
     "import:finance-spreadsheet": "node --env-file=.env.local scripts/import-finance-spreadsheet.mjs"
