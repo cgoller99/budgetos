@@ -11,6 +11,62 @@ function roundCurrency(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
+export function parseAllocationAmountInput(value: string): number {
+  const trimmed = value.trim().replace(/[$,\s]/g, "");
+
+  if (!trimmed || trimmed === "." || trimmed === "-") {
+    return 0;
+  }
+
+  const parsed = Number.parseFloat(trimmed);
+  return Number.isFinite(parsed) ? roundCurrency(Math.max(parsed, 0)) : 0;
+}
+
+export function formatAllocationAmountInput(amount: number | null | undefined): string {
+  if (amount === null || amount === undefined) {
+    return "";
+  }
+
+  return amount === 0 ? "" : String(amount);
+}
+
+export function getAllocationSummary(
+  paycheckAmount: number,
+  allocations: Pick<
+    IncomePlanAllocation,
+    "amount" | "isRemainingBalance"
+  >[],
+): {
+  paycheckAmount: number;
+  allocated: number;
+  remaining: number;
+  isOverAllocated: boolean;
+  overBy: number;
+  remainingBalanceCount: number;
+} {
+  const remainingBalanceCount = allocations.filter(
+    (item) => item.isRemainingBalance,
+  ).length;
+
+  const allocated = roundCurrency(
+    allocations
+      .filter((item) => !item.isRemainingBalance)
+      .reduce((total, item) => total + (item.amount ?? 0), 0),
+  );
+
+  const remaining = roundCurrency(paycheckAmount - allocated);
+  const isOverAllocated = remaining < 0;
+
+  return {
+    paycheckAmount: roundCurrency(paycheckAmount),
+    allocated,
+    remaining,
+    isOverAllocated,
+    overBy: isOverAllocated ? roundCurrency(Math.abs(remaining)) : 0,
+    remainingBalanceCount,
+  };
+}
+
 export function validateAllocations(
   paycheckAmount: number,
   allocations: Pick<
@@ -18,24 +74,18 @@ export function validateAllocations(
     "amount" | "isRemainingBalance"
   >[],
 ): string | null {
-  const remainingCount = allocations.filter(
-    (item) => item.isRemainingBalance,
-  ).length;
+  const summary = getAllocationSummary(paycheckAmount, allocations);
 
-  if (remainingCount > 1) {
+  if (summary.remainingBalanceCount > 1) {
     return "Only one category can be Remaining Balance.";
   }
 
-  const fixedTotal = allocations
-    .filter((item) => !item.isRemainingBalance)
-    .reduce((total, item) => total + (item.amount ?? 0), 0);
-
-  if (fixedTotal > paycheckAmount) {
-    return "Fixed allocations cannot exceed your paycheck amount.";
+  if (summary.remainingBalanceCount === 0) {
+    return "Choose one category as Remaining Balance.";
   }
 
-  if (remainingCount === 0 && fixedTotal < paycheckAmount) {
-    return "Add a Remaining Balance category or allocate the full paycheck.";
+  if (summary.isOverAllocated) {
+    return `Your allocations exceed this paycheck by $${summary.overBy.toFixed(2)}.`;
   }
 
   return null;
