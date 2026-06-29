@@ -23,8 +23,8 @@ import type { DemoProfileId } from "@/lib/onboarding/types";
 import { getSupabaseClient, getSupabaseConfig } from "@/lib/supabase";
 import { ProfilesRepository } from "@/lib/supabase/repositories/profilesRepository";
 import {
-  getStoredTheme,
-  setStoredTheme,
+  getStoredThemePreference,
+  setStoredThemePreference,
   type ThemePreference,
 } from "@/lib/theme/preferences";
 
@@ -49,6 +49,28 @@ const NOTIFICATION_LABELS: Record<
     description: "Your weekly financial plan and recommendations.",
   },
 };
+
+const THEME_OPTIONS: Array<{
+  value: ThemePreference;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: "dark",
+    label: "Dark",
+    description: "Low-glow look for focused planning.",
+  },
+  {
+    value: "light",
+    label: "Light",
+    description: "Brighter surfaces for daytime use.",
+  },
+  {
+    value: "system",
+    label: "System",
+    description: "Follow this device automatically.",
+  },
+];
 
 function getInitials(fullName: string | null, email: string | null): string {
   const source = fullName?.trim() || email?.trim() || "?";
@@ -154,7 +176,7 @@ export function SettingsContent() {
   }, [isConfigured]);
 
   useEffect(() => {
-    setTheme(getStoredTheme());
+    setTheme(getStoredThemePreference());
     setNotificationPrefs(getNotificationPreferences());
   }, []);
 
@@ -202,7 +224,7 @@ export function SettingsContent() {
 
   function handleThemeChange(nextTheme: ThemePreference) {
     setTheme(nextTheme);
-    setStoredTheme(nextTheme);
+    setStoredThemePreference(nextTheme);
   }
 
   function handleNotificationPrefChange(
@@ -318,28 +340,33 @@ export function SettingsContent() {
       )}
 
       <Card padding="lg">
-        <CardHeader title="Theme" />
+        <CardHeader
+          title="Theme"
+          description="Choose the look that feels best right now. Dark remains the default for new sessions."
+        />
         <CardContent>
-          <div className="flex flex-wrap gap-3">
-            {(["dark", "light"] as const).map((option) => (
+          <div className="grid gap-3 sm:grid-cols-3">
+            {THEME_OPTIONS.map((option) => (
               <button
-                key={option}
+                key={option.value}
                 type="button"
-                onClick={() => handleThemeChange(option)}
+                onClick={() => handleThemeChange(option.value)}
                 className={cn(
-                  "rounded-2xl border px-5 py-3 text-sm font-medium capitalize transition-all duration-200 ease-out",
-                  theme === option
-                    ? "border-[#0077ed]/30 bg-[#0077ed]/10 text-white"
-                    : "border-white/[0.06] bg-white/[0.02] text-white/55 hover:border-white/[0.1] hover:text-white/80",
+                  "rounded-2xl border px-5 py-4 text-left transition-all duration-200 ease-out",
+                  theme === option.value
+                    ? "border-[#0077ed]/30 bg-[#0077ed]/10 text-[var(--foreground)]"
+                    : "border-[var(--surface-border)] bg-[var(--surface-subtle)] text-[var(--text-muted)] hover:border-[var(--surface-border-strong)] hover:text-[var(--foreground)]",
                 )}
               >
-                {option}
+                <span className="block text-sm font-semibold">{option.label}</span>
+                <span className="mt-1 block text-xs leading-relaxed text-[var(--text-muted)]">
+                  {option.description}
+                </span>
               </button>
             ))}
           </div>
-          <p className="mt-3 text-xs text-white/32">
-            Theme preference is stored locally and applied via{" "}
-            <code className="text-white/45">data-theme</code> on the page root.
+          <p className="mt-3 text-xs text-[var(--text-subtle)]">
+            Your choice is saved on this device and applied before the page appears.
           </p>
         </CardContent>
       </Card>

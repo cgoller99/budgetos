@@ -1,14 +1,24 @@
 "use client";
 
 import { useMemo } from "react";
+import { InfoTooltip } from "@/components/guidance/InfoTooltip";
 import { StatCard } from "@/components/ui";
 import { useFinance } from "@/context/FinanceContext";
 import { formatCurrency, formatMonthlyChange } from "@/lib/finance/format";
 
+type DashboardMetric = {
+  label: string;
+  value: string;
+  change: string;
+  positive: boolean;
+  mutedChange?: boolean;
+  tooltip?: string;
+};
+
 export function DashboardHero() {
   const { dashboard } = useFinance();
 
-  const metrics = useMemo(() => {
+  const metrics = useMemo<DashboardMetric[]>(() => {
     const netWorth = dashboard.kpiMetrics.find(
       (metric) => metric.label === "Net Worth",
     );
@@ -36,6 +46,8 @@ export function DashboardHero() {
             ? `${bills.dueThisWeekCount} bill${bills.dueThisWeekCount === 1 ? "" : "s"} due this week`
             : "After upcoming bills",
         positive: bills.safeToSpendAfterUpcomingBills > 0,
+        tooltip:
+          "What is left after upcoming bills, so you can spend with fewer surprises.",
       },
       {
         label: "Credit Score",
@@ -56,7 +68,10 @@ export function DashboardHero() {
           value={metric.value}
           change={metric.change}
           positive={metric.positive}
-          mutedChange={"mutedChange" in metric ? metric.mutedChange : false}
+          mutedChange={metric.mutedChange ?? false}
+          tooltip={
+            metric.tooltip ? <InfoTooltip label={metric.tooltip} /> : undefined
+          }
           className="h-full"
         />
       ))}

@@ -1,5 +1,6 @@
 "use client";
 
+import { InfoTooltip } from "@/components/guidance/InfoTooltip";
 import { Card, CardContent, CardHeader } from "@/components/ui";
 import { useFinance } from "@/context/FinanceContext";
 import { healthScoreToneClasses } from "@/lib/finance/format";
@@ -10,7 +11,12 @@ export function HealthScoreCard() {
 
   return (
     <Card padding="lg" hover>
-      <CardHeader title="Financial health" />
+      <CardHeader
+        title="Financial health"
+        action={
+          <InfoTooltip label="A quick score based on cash flow, bills, goals, and debt signals." />
+        }
+      />
 
       <CardContent className="flex items-center gap-8">
         <div className="relative flex h-32 w-32 shrink-0 items-center justify-center">
@@ -24,7 +30,7 @@ export function HealthScoreCard() {
               cy="50"
               r="42"
               fill="none"
-              stroke="rgba(255,255,255,0.04)"
+              stroke="var(--surface-border)"
               strokeWidth="8"
             />
             <circle
@@ -40,7 +46,7 @@ export function HealthScoreCard() {
               className="transition-all duration-500 ease-out"
             />
           </svg>
-          <span className="absolute text-3xl font-semibold tabular-nums">
+          <span className="absolute text-3xl font-semibold tabular-nums text-[var(--foreground)]">
             {financialHealthScore.score}
           </span>
         </div>
@@ -51,7 +57,7 @@ export function HealthScoreCard() {
               key={metric.label}
               className="flex items-center justify-between gap-8"
             >
-              <span className="text-white/38">{metric.label}</span>
+              <span className="text-[var(--text-muted)]">{metric.label}</span>
               <span
                 className={`font-medium ${healthScoreToneClasses[metric.tone]}`}
               >

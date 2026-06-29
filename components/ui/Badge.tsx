@@ -8,7 +8,7 @@ type BadgeProps = HTMLAttributes<HTMLSpanElement> & {
 };
 
 const variantClasses: Record<BadgeVariant, string> = {
-  default: "bg-white/[0.05] text-white/55",
+  default: "bg-[var(--surface-hover)] text-[var(--text-secondary)]",
   accent: "bg-[#0077ed]/12 text-[#0077ed]",
   success: "bg-emerald-400/10 text-emerald-400/90",
   warning: "bg-amber-400/10 text-amber-400/90",

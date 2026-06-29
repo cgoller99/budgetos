@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { useMemo } from "react";
+import { RecommendedSteps } from "@/components/guidance/RecommendedSteps";
+import { WelcomeChecklist } from "@/components/guidance/WelcomeChecklist";
 import { HealthScoreCard } from "@/components/HealthScoreCard";
 import { MoneyFlowCard } from "@/components/MoneyFlowCard";
 import { NextGoalCard } from "@/components/dashboard/NextGoalCard";
@@ -27,6 +27,10 @@ export function DashboardContent() {
   return (
     <div className={cn(pageContainerWideClassName)}>
       <DashboardHero />
+      <div className="grid gap-4">
+        <WelcomeChecklist />
+        <RecommendedSteps />
+      </div>
 
       <div className={dashboardSectionClassName}>
         <MoneyFlowCard />

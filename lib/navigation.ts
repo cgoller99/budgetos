@@ -4,88 +4,77 @@ export const NAV_ROUTES = [
     icon: "dashboard",
     href: "/dashboard",
     eyebrow: "Overview",
-    subtitle:
-      "Your complete financial snapshot, updated in real time across accounts, cash flow, and goals.",
+    subtitle: "Your money at a glance.",
   },
   {
     label: "Accounts",
     icon: "accounts",
     href: "/accounts",
     eyebrow: "Finance",
-    subtitle:
-      "Connect and manage bank accounts, credit cards, and investment portfolios in one secure view.",
+    subtitle: "Add balances and see what you have.",
   },
   {
     label: "Income",
     icon: "income",
     href: "/income",
     eyebrow: "Cash Flow",
-    subtitle:
-      "Track salary, freelance earnings, dividends, and other income streams with clear monthly trends.",
+    subtitle: "Track paychecks and other money coming in.",
   },
   {
     label: "Bills",
     icon: "bills",
     href: "/bills",
     eyebrow: "Cash Flow",
-    subtitle:
-      "Monitor recurring expenses, due dates, and autopay status so nothing catches you off guard.",
+    subtitle: "Keep upcoming payments easy to see.",
   },
   {
     label: "Calendar",
     icon: "calendar",
     href: "/calendar",
     eyebrow: "Cash Flow",
-    subtitle:
-      "See upcoming bills by due date in a monthly calendar with paid, due soon, and overdue states.",
+    subtitle: "View bills by date.",
   },
   {
     label: "Transactions",
     icon: "transactions",
     href: "/transactions",
     eyebrow: "Cash Flow",
-    subtitle:
-      "Record income, expenses, and transfers — every change flows through to your dashboard instantly.",
+    subtitle: "Review the activity behind your numbers.",
   },
   {
     label: "Savings",
     icon: "savings",
     href: "/savings",
     eyebrow: "Goals",
-    subtitle:
-      "Turn your dreams into a plan. Track milestones and watch your progress grow.",
+    subtitle: "Set goals and watch progress grow.",
   },
   {
     label: "Roadmap",
     icon: "roadmap",
     href: "/roadmap",
     eyebrow: "Goals",
-    subtitle:
-      "See your full financial timeline — savings goals, debt payoff, investments, and net worth milestones.",
+    subtitle: "See your next money milestones.",
   },
   {
     label: "Debt",
     icon: "debt",
     href: "/debt",
     eyebrow: "Liabilities",
-    subtitle:
-      "View balances, interest rates, and payoff strategies across loans, cards, and other obligations.",
+    subtitle: "Plan balances and payoff progress.",
   },
   {
     label: "Reports",
     icon: "reports",
     href: "/reports",
     eyebrow: "Analytics",
-    subtitle:
-      "Generate monthly summaries, category breakdowns, and exportable reports for smarter decisions.",
+    subtitle: "Understand trends over time.",
   },
   {
     label: "Settings",
     icon: "settings",
     href: "/settings",
     eyebrow: "System",
-    subtitle:
-      "Configure preferences, security, notifications, and integrations for your Buxme workspace.",
+    subtitle: "Manage preferences and household access.",
   },
 ] as const;
 

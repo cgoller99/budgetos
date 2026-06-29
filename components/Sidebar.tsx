@@ -16,16 +16,16 @@ export function Sidebar({ className = "", activeHref = "/dashboard" }: SidebarPr
   return (
     <aside
       className={cn(
-        "flex w-64 shrink-0 flex-col border-r border-white/[0.04] bg-[#07090d] px-4 py-8",
+        "flex w-64 shrink-0 flex-col border-r border-[var(--surface-border)] bg-[var(--sidebar-bg)] px-4 py-8",
         className,
       )}
     >
       <div className="mb-10 px-3">
         <Link href="/dashboard" className="group block">
-          <p className="text-xl font-semibold tracking-tight text-white transition-colors group-hover:text-[#4da3ff]">
+          <p className="text-xl font-semibold tracking-tight text-[var(--foreground)] transition-colors group-hover:text-[#4da3ff]">
             Buxme
           </p>
-          <p className="mt-1 text-xs font-medium tracking-wide text-white/28">
+          <p className="mt-1 text-xs font-medium tracking-wide text-[var(--text-subtle)]">
             Personal finance
           </p>
         </Link>
@@ -49,7 +49,7 @@ export function Sidebar({ className = "", activeHref = "/dashboard" }: SidebarPr
                   "flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition-all duration-200",
                   isActive
                     ? "bg-[#0077ed]/20 text-[#4da3ff]"
-                    : "bg-white/[0.03] text-white/40 group-hover:text-white/70",
+                    : "bg-[var(--surface-subtle)] text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]",
                 )}
               >
                 <NavIcon name={route.icon} />

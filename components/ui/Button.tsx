@@ -15,9 +15,9 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 const variantClasses: Record<ButtonVariant, string> = {
   primary: buttonPrimaryClassName,
   secondary:
-    "border border-white/[0.06] bg-white/[0.025] text-white/75 hover:border-white/[0.1] hover:bg-white/[0.05] hover:text-white active:scale-[0.98]",
+    "border border-[var(--surface-border)] bg-[var(--surface-subtle)] text-[var(--text-secondary)] hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)] active:scale-[0.98]",
   ghost:
-    "border border-transparent bg-transparent text-white/65 hover:bg-white/[0.04] hover:text-white active:scale-[0.98]",
+    "border border-transparent bg-transparent text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)] active:scale-[0.98]",
 };
 
 const sizeClasses: Record<ButtonSize, string> = {

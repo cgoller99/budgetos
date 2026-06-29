@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { InfoTooltip } from "@/components/guidance/InfoTooltip";
 import { useAuth } from "@/context/AuthContext";
 import {
   Badge,
@@ -235,7 +236,12 @@ export function HouseholdSection() {
   if (isLoading) {
     return (
       <Card padding="lg">
-        <CardHeader title="Shared household" />
+        <CardHeader
+          title="Shared household"
+          action={
+            <InfoTooltip label="Share the same finance workspace with a partner or household member." />
+          }
+        />
         <CardContent>
           <div className="h-24 animate-pulse rounded-2xl bg-white/[0.04]" />
         </CardContent>
@@ -246,7 +252,12 @@ export function HouseholdSection() {
   if (!household) {
     return (
       <Card padding="lg">
-        <CardHeader title="Shared household" />
+        <CardHeader
+          title="Shared household"
+          action={
+            <InfoTooltip label="Share the same finance workspace with a partner or household member." />
+          }
+        />
         <CardContent className="space-y-4">
           {incomingInvites.length > 0 && (
             <div className="space-y-3 rounded-2xl border border-[#0077ed]/20 bg-[#0077ed]/5 p-4">
@@ -310,11 +321,14 @@ export function HouseholdSection() {
       <CardHeader
         title="Shared household"
         action={
-          role ? (
-            <Badge variant={role === "owner" ? "accent" : "default"}>
-              {role === "owner" ? "Owner" : "Member"}
-            </Badge>
-          ) : undefined
+          <div className="flex items-center gap-2">
+            <InfoTooltip label="Share the same finance workspace with a partner or household member." />
+            {role ? (
+              <Badge variant={role === "owner" ? "accent" : "default"}>
+                {role === "owner" ? "Owner" : "Member"}
+              </Badge>
+            ) : null}
+          </div>
         }
       />
       <CardContent className="space-y-6">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { InfoTooltip } from "@/components/guidance/InfoTooltip";
 import { AnimatedNumber, Card, CardContent, CardHeader } from "@/components/ui";
 import { useFinance } from "@/context/FinanceContext";
 import { formatCurrency } from "@/lib/finance/format";
@@ -32,7 +33,7 @@ function FlowStageNode({
         "group relative w-full rounded-2xl px-5 py-4 text-left transition-all duration-300 ease-out",
         isSelected
           ? "bg-[#0077ed]/8 ring-1 ring-[#0077ed]/20"
-          : "hover:bg-white/[0.03]",
+          : "hover:bg-[var(--surface-hover)]",
       )}
     >
       <div className="flex items-center gap-4">
@@ -44,9 +45,9 @@ function FlowStageNode({
         </div>
 
         <div className="min-w-0 flex-1">
-          <p className="text-sm text-white/40">{stage.label}</p>
+          <p className="text-sm text-[var(--text-muted)]">{stage.label}</p>
           <p
-            className="mt-1 text-xl font-semibold tabular-nums text-white sm:text-2xl"
+            className="mt-1 text-xl font-semibold tabular-nums text-[var(--foreground)] sm:text-2xl"
             style={{ color: isSelected ? stage.color : undefined }}
           >
             <AnimatedNumber
@@ -59,7 +60,7 @@ function FlowStageNode({
         </div>
 
         <p
-          className="shrink-0 text-base font-medium tabular-nums text-white/50"
+          className="shrink-0 text-base font-medium tabular-nums text-[var(--text-muted)]"
           style={{ color: isSelected ? stage.color : undefined }}
         >
           <AnimatedNumber
@@ -80,7 +81,12 @@ export function MoneyFlowCard() {
 
   return (
     <Card padding="lg" hover className="money-flow-enter">
-      <CardHeader title="Money flow" />
+      <CardHeader
+        title="Money flow"
+        action={
+          <InfoTooltip label="Shows where monthly income goes after bills, goals, debt, and other outflows." />
+        }
+      />
 
       <CardContent>
         <div className="space-y-1">
@@ -98,8 +104,8 @@ export function MoneyFlowCard() {
           ))}
         </div>
 
-        <div className="mt-8 border-t border-white/[0.04] pt-7">
-          <p className="text-sm text-white/38">Safe to spend</p>
+        <div className="mt-8 border-t border-[var(--surface-border)] pt-7">
+          <p className="text-sm text-[var(--text-muted)]">Safe to spend</p>
           <p className="mt-2 text-2xl font-semibold tabular-nums text-[#4da3ff] sm:text-3xl">
             <AnimatedNumber
               value={moneyFlow.safeToSpend}

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
+import { InfoTooltip } from "@/components/guidance/InfoTooltip";
 import { Badge, Card, CardContent, CardHeader, EmptyState } from "@/components/ui";
 import { useFinance } from "@/context/FinanceContext";
 import { getBillStatusVariant } from "@/lib/finance/bills";
@@ -38,8 +39,13 @@ export function PaycheckSplitPanel({ compact = false }: PaycheckSplitPanelProps)
       {!compact && (
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="text-sm text-white/45">Paycheck bill split</p>
-            <h3 className="text-xl font-semibold tracking-tight text-white">
+            <div className="flex items-center gap-2">
+              <p className="text-sm text-[var(--text-muted)]">
+                Paycheck bill split
+              </p>
+              <InfoTooltip label="Groups bills by pay period so you can see what each paycheck needs to cover." />
+            </div>
+            <h3 className="text-xl font-semibold tracking-tight text-[var(--foreground)]">
               Income vs bills by pay period
             </h3>
           </div>
@@ -79,23 +85,23 @@ export function PaycheckSplitPanel({ compact = false }: PaycheckSplitPanelProps)
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-white/35">
+                    <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">
                       Income
                     </p>
-                    <p className="mt-1 text-lg font-semibold text-white">
+                    <p className="mt-1 text-lg font-semibold text-[var(--foreground)]">
                       {formatCurrency(period.income)}
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-white/35">
+                    <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">
                       Bills
                     </p>
-                    <p className="mt-1 text-lg font-semibold text-white">
+                    <p className="mt-1 text-lg font-semibold text-[var(--foreground)]">
                       {formatCurrency(period.billsTotal)}
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-white/35">
+                    <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">
                       Remaining
                     </p>
                     <p
@@ -115,18 +121,18 @@ export function PaycheckSplitPanel({ compact = false }: PaycheckSplitPanelProps)
                     {period.bills.map((bill) => (
                       <li
                         key={bill.id}
-                        className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5"
+                        className="flex items-center justify-between gap-3 rounded-xl border border-[var(--surface-border)] bg-[var(--surface-subtle)] px-3 py-2.5"
                       >
                         <div>
-                          <p className="text-sm font-medium text-white">
+                          <p className="text-sm font-medium text-[var(--foreground)]">
                             {bill.name}
                           </p>
-                          <p className="text-xs text-white/45">
+                          <p className="text-xs text-[var(--text-muted)]">
                             {bill.formattedDueDate}
                           </p>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm font-medium text-white">
+                          <p className="text-sm font-medium text-[var(--foreground)]">
                             {formatCurrency(bill.amount)}
                           </p>
                           <Badge variant={getBillStatusVariant(bill.status)}>
@@ -137,7 +143,7 @@ export function PaycheckSplitPanel({ compact = false }: PaycheckSplitPanelProps)
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-sm text-white/45">
+                  <p className="text-sm text-[var(--text-muted)]">
                     No bills assigned to this paycheck yet.
                   </p>
                 )}

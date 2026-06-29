@@ -1,9 +1,10 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { PageIntro } from "@/components/guidance/PageIntro";
 import { GlobalSearch } from "@/components/search/GlobalSearch";
 import { cn } from "@/components/ui/cn";
 import { sidebarActiveClassName, sidebarInactiveClassName } from "@/components/ui/tokens";
-import { NAV_ROUTES } from "@/lib/navigation";
+import { getNavRoute, NAV_ROUTES } from "@/lib/navigation";
 
 type TopBarProps = {
   activeHref?: string;
@@ -16,19 +17,24 @@ export function TopBar({
   title = "Dashboard",
   notificationCenter,
 }: TopBarProps) {
+  const activeRoute = getNavRoute(activeHref);
+
   return (
     <>
-      <header className="flex items-center justify-between border-b border-white/[0.04] bg-[#090b10]/40 px-6 py-6 backdrop-blur-sm lg:px-10 lg:py-7">
-        <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
-          {title}
-        </h1>
+      <header className="flex items-start justify-between gap-6 border-b border-[var(--surface-border)] bg-[var(--background)]/40 px-6 py-6 backdrop-blur-sm lg:px-10 lg:py-7">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">
+            {title}
+          </h1>
+          <PageIntro subtitle={activeRoute?.subtitle} />
+        </div>
         <div className="flex items-center gap-3 sm:gap-4">
           <GlobalSearch />
           {notificationCenter}
         </div>
       </header>
 
-      <nav className="flex gap-2 overflow-x-auto border-b border-white/[0.04] px-6 py-4 lg:hidden">
+      <nav className="flex gap-2 overflow-x-auto border-b border-[var(--surface-border)] px-6 py-4 lg:hidden">
         {NAV_ROUTES.map((route) => {
           const isActive = route.href === activeHref;
 

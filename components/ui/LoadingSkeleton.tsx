@@ -16,7 +16,7 @@ export function LoadingSkeleton({
         <div
           key={index}
           className={cn(
-            "h-4 rounded-xl bg-white/[0.04]",
+            "h-4 rounded-xl bg-[var(--surface-hover)]",
             index === 0 && "h-7 w-2/5",
             index === lines - 1 && "w-4/5",
           )}
@@ -34,14 +34,14 @@ export function SkeletonCard({ className }: SkeletonCardProps) {
   return (
     <div
       className={cn(
-        "animate-pulse rounded-3xl border border-white/[0.04] bg-white/[0.015]",
+        "animate-pulse rounded-3xl border border-[var(--surface-border)] bg-[var(--surface-subtle)]",
         cardPaddingClassName,
         className,
       )}
     >
-      <div className="h-4 w-24 rounded-xl bg-white/[0.04]" />
-      <div className="mt-5 h-9 w-36 rounded-xl bg-white/[0.05]" />
-      <div className="mt-5 h-4 w-28 rounded-xl bg-white/[0.04]" />
+      <div className="h-4 w-24 rounded-xl bg-[var(--surface-hover)]" />
+      <div className="mt-5 h-9 w-36 rounded-xl bg-[var(--surface-hover)]" />
+      <div className="mt-5 h-4 w-28 rounded-xl bg-[var(--surface-hover)]" />
     </div>
   );
 }
