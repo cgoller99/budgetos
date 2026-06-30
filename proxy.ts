@@ -1,5 +1,8 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { mapProfileToSubscription } from "@/lib/stripe/subscriptionMapper";
+import { getRequiredPlanForPath } from "@/lib/subscription/plans";
+import { hasMinimumPlan } from "@/lib/subscription/types";
 import { getSupabaseConfig } from "@/lib/supabase/config";
 
 type CookieToSet = {
@@ -36,7 +39,33 @@ export async function proxy(request: NextRequest) {
     },
   });
 
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const pathname = request.nextUrl.pathname;
+  const requiredPlan = getRequiredPlanForPath(pathname);
+  const stripeEnabled = process.env.NEXT_PUBLIC_STRIPE_ENABLED === "true";
+
+  if (user && requiredPlan && stripeEnabled) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select(
+        "subscription_plan, subscription_status, stripe_customer_id, stripe_subscription_id, subscription_current_period_end",
+      )
+      .eq("id", user.id)
+      .maybeSingle();
+
+    const subscription = mapProfileToSubscription(profile);
+
+    if (!hasMinimumPlan(subscription, requiredPlan)) {
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = "/settings";
+      redirectUrl.hash = "billing";
+      redirectUrl.searchParams.set("upgrade", requiredPlan);
+      return NextResponse.redirect(redirectUrl);
+    }
+  }
 
   return supabaseResponse;
 }

@@ -4,6 +4,8 @@ import { sendHouseholdInviteEmail } from "@/lib/email/householdInviteEmail";
 import { getSandboxDeliveryError } from "@/lib/email/sandbox";
 import { EmailNotConfiguredError } from "@/lib/email/sendEmail";
 import { getHouseholdInviteUrl } from "@/lib/household/inviteUrls";
+import { mapProfileToSubscription } from "@/lib/stripe/subscriptionMapper";
+import { hasProAccess } from "@/lib/subscription/types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type InviteRequestBody = {
@@ -71,6 +73,21 @@ export async function POST(request: Request) {
 
     if (profileError) {
       throw profileError;
+    }
+
+    const subscription = mapProfileToSubscription(profile);
+
+    if (
+      process.env.NEXT_PUBLIC_STRIPE_ENABLED === "true" &&
+      !hasProAccess(subscription)
+    ) {
+      return NextResponse.json(
+        {
+          error: "Household collaboration requires Buxme Pro or Pro+.",
+          code: "SUBSCRIPTION_REQUIRED",
+        },
+        { status: 403 },
+      );
     }
 
     let householdId = profile?.household_id ?? null;

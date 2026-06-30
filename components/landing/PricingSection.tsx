@@ -1,40 +1,11 @@
 import { cardBaseClassName } from "@/components/ui/tokens";
 import { cn } from "@/components/ui/cn";
+import { PLAN_DEFINITIONS } from "@/lib/subscription/plans";
 import { PrimaryLink, SectionHeading } from "./shared";
 
-const PLANS = [
-  {
-    name: "Free",
-    price: "$0",
-    period: "forever",
-    description: "Everything you need to take control of your finances.",
-    features: [
-      "Unified dashboard",
-      "Accounts & transactions",
-      "Bills & income tracking",
-      "Savings goals & roadmap",
-      "Debt tracking",
-      "Reports & exports",
-    ],
-    highlighted: true,
-    comingSoon: false,
-  },
-  {
-    name: "Pro",
-    price: "—",
-    period: "coming soon",
-    description: "Advanced tools for households and power users.",
-    features: [
-      "Everything in Free",
-      "Household collaboration",
-      "Advanced reports",
-      "Priority support",
-      "Early access to new features",
-    ],
-    highlighted: false,
-    comingSoon: true,
-  },
-] as const;
+const stripeEnabled =
+  process.env.NEXT_PUBLIC_STRIPE_ENABLED === "true" &&
+  Boolean(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY?.trim());
 
 export function PricingSection() {
   return (
@@ -42,13 +13,13 @@ export function PricingSection() {
       <SectionHeading
         eyebrow="Pricing"
         title="Simple, transparent pricing"
-        description="Start free today. Pro plans for households and advanced features are on the way."
+        description="Start free. Upgrade to Pro or Pro+ when you need household collaboration or advanced reporting."
       />
 
-      <div className="mx-auto mt-14 grid max-w-4xl gap-5 sm:grid-cols-2">
-        {PLANS.map((plan) => (
+      <div className="mx-auto mt-14 grid max-w-5xl gap-5 lg:grid-cols-3">
+        {PLAN_DEFINITIONS.map((plan) => (
           <div
-            key={plan.name}
+            key={plan.id}
             className={cn(
               cardBaseClassName,
               "relative flex flex-col p-8",
@@ -56,18 +27,12 @@ export function PricingSection() {
                 "border-[#0077ed]/20 shadow-[0_16px_48px_rgba(0,119,237,0.12)]",
             )}
           >
-            {plan.comingSoon && (
-              <span className="absolute top-6 right-6 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1 text-xs font-medium text-white/50">
-                Coming soon
-              </span>
-            )}
-
             <p className="text-sm font-medium text-white/45">{plan.name}</p>
             <div className="mt-3 flex items-baseline gap-2">
               <span className="text-4xl font-semibold tracking-tight text-white">
-                {plan.price}
+                {plan.priceLabel}
               </span>
-              <span className="text-sm text-white/35">/ {plan.period}</span>
+              <span className="text-sm text-white/35">/ {plan.periodLabel}</span>
             </div>
             <p className="mt-3 text-sm leading-relaxed text-white/40">
               {plan.description}
@@ -88,9 +53,16 @@ export function PricingSection() {
             </ul>
 
             <div className="mt-8">
-              {plan.highlighted ? (
+              {plan.id === "free" ? (
                 <PrimaryLink href="/register" className="w-full">
                   Get started free
+                </PrimaryLink>
+              ) : stripeEnabled ? (
+                <PrimaryLink
+                  href={`/login?redirect=${encodeURIComponent("/settings#billing")}&plan=${plan.id}`}
+                  className="w-full"
+                >
+                  Subscribe to {plan.name}
                 </PrimaryLink>
               ) : (
                 <div className="flex min-h-12 items-center justify-center rounded-2xl border border-dashed border-white/[0.08] text-sm text-white/30">

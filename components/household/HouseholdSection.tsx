@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { InfoTooltip } from "@/components/guidance/InfoTooltip";
 import { useAuth } from "@/context/AuthContext";
+import { useSubscription } from "@/context/SubscriptionContext";
 import {
   Badge,
   Button,
@@ -16,6 +18,7 @@ import {
 import { useFinance } from "@/context/FinanceContext";
 import { useHousehold } from "@/context/HouseholdContext";
 import { useToast } from "@/context/ToastContext";
+import { isStripeClientEnabled } from "@/lib/stripe/clientConfig";
 import { getHouseholdInviteUrl } from "@/lib/household/inviteUrls";
 import type { HouseholdMember } from "@/lib/finance/types";
 
@@ -63,6 +66,7 @@ export function HouseholdSection() {
     transferOwnership,
     revokeInvite,
   } = useHousehold();
+  const { hasProAccess, isStripeEnabled } = useSubscription();
   const { refreshFinance } = useFinance();
   const { showToast } = useToast();
   const [householdName, setHouseholdName] = useState("");
@@ -244,6 +248,26 @@ export function HouseholdSection() {
         />
         <CardContent>
           <div className="h-24 animate-pulse rounded-2xl bg-white/[0.04]" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (isStripeEnabled && isStripeClientEnabled() && !hasProAccess) {
+    return (
+      <Card padding="lg">
+        <CardHeader
+          title="Shared household"
+          action={<Badge variant="accent">Pro</Badge>}
+        />
+        <CardContent className="space-y-4">
+          <p className="text-sm leading-relaxed text-white/55">
+            Household collaboration is included with Buxme Pro and Pro+. Upgrade
+            your plan to create a shared workspace and invite members.
+          </p>
+          <Link href="/settings#billing">
+            <Button size="md">Upgrade in billing settings</Button>
+          </Link>
         </CardContent>
       </Card>
     );

@@ -15,6 +15,8 @@
     "apply:household-invite-dedupe": "node scripts/apply-household-invite-dedupe.mjs",
     "apply:income-plans-migration": "node scripts/apply-income-plans-migration.mjs",
     "apply:plaid-migration": "node scripts/apply-plaid-migration.mjs",
+    "apply:stripe-migration": "node scripts/apply-stripe-migration.mjs",
+    "create:stripe-prices": "node --env-file=.env.local scripts/create-stripe-prices.mjs",
     "debug:household-invite-email": "node --env-file=.env.local scripts/debug-household-invite-email.mjs",
     "configure:supabase-auth-urls": "node --env-file=.env.local scripts/configure-supabase-auth-urls.mjs",
     "import:finance-spreadsheet": "node --env-file=.env.local scripts/import-finance-spreadsheet.mjs"
@@ -27,7 +29,8 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-plaid-link": "^4.1.1",
-    "server-only": "^0.0.1"
+    "server-only": "^0.0.1",
+    "stripe": "^18.5.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
