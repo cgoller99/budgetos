@@ -3,9 +3,14 @@ import Link from "next/link";
 const FOOTER_LINKS = [
   { label: "Features", href: "#features" },
   { label: "Product", href: "#product" },
-  { label: "Security", href: "#security" },
   { label: "Pricing", href: "#pricing" },
   { label: "FAQ", href: "#faq" },
+] as const;
+
+const LEGAL_LINKS = [
+  { label: "Privacy Policy", href: "/privacy" },
+  { label: "Terms of Service", href: "/terms" },
+  { label: "Security", href: "/security" },
 ] as const;
 
 export function LandingFooter() {
@@ -35,6 +40,15 @@ export function LandingFooter() {
             >
               {link.label}
             </a>
+          ))}
+          {LEGAL_LINKS.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className="text-sm text-white/40 transition-colors hover:text-white/70"
+            >
+              {link.label}
+            </Link>
           ))}
           <Link
             href="/login"

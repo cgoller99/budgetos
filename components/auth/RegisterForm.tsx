@@ -3,6 +3,7 @@
 import { useEffect, useId, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { AuthLegalLinks } from "@/components/legal/AuthLegalLinks";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { Button, FormField, Input, PasswordInput } from "@/components/ui";
 import { useAuth } from "@/context/AuthContext";
@@ -136,6 +137,8 @@ export function RegisterForm() {
         <Button type="submit" fullWidth disabled={isSubmitting}>
           {isSubmitting ? "Creating account..." : "Create account"}
         </Button>
+
+        <AuthLegalLinks />
       </form>
     </AuthShell>
   );
