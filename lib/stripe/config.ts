@@ -4,6 +4,8 @@ export type StripeConfig = {
   webhookSecret: string | undefined;
   proPriceId: string | undefined;
   proPlusPriceId: string | undefined;
+  proProductId: string | undefined;
+  proPlusProductId: string | undefined;
   publishableKey: string | undefined;
   proDisplayPrice: string;
   proPlusDisplayPrice: string;
@@ -26,10 +28,23 @@ function isValidPriceId(value: string | undefined): boolean {
   return Boolean(value && value.startsWith("price_") && !PLACEHOLDER_PRICE_IDS.has(value));
 }
 
+function isValidProductId(value: string | undefined): boolean {
+  return Boolean(value && value.startsWith("prod_"));
+}
+
+function hasPlanReference(
+  priceId: string | undefined,
+  productId: string | undefined,
+): boolean {
+  return isValidPriceId(priceId) || isValidProductId(productId);
+}
+
 function getConfigurationError(
   secretKey: string | undefined,
   proPriceId: string | undefined,
   proPlusPriceId: string | undefined,
+  proProductId: string | undefined,
+  proPlusProductId: string | undefined,
 ): string | null {
   if (!secretKey) {
     return "STRIPE_SECRET_KEY is missing. Add it to .env.local and restart the dev server.";
@@ -43,12 +58,12 @@ function getConfigurationError(
     return "STRIPE_SECRET_KEY looks invalid. Use a test or live secret key from the Stripe Dashboard.";
   }
 
-  if (!isValidPriceId(proPriceId)) {
-    return "STRIPE_PRO_PRICE_ID is missing or invalid. Create a $7.99/month price in Stripe and add its ID.";
+  if (!hasPlanReference(proPriceId, proProductId)) {
+    return "STRIPE_PRO_PRICE_ID or STRIPE_PRO_PRODUCT_ID is missing or invalid.";
   }
 
-  if (!isValidPriceId(proPlusPriceId)) {
-    return "STRIPE_PRO_PLUS_PRICE_ID is missing or invalid. Create a $14.99/month price in Stripe and add its ID.";
+  if (!hasPlanReference(proPlusPriceId, proPlusProductId)) {
+    return "STRIPE_PRO_PLUS_PRICE_ID or STRIPE_PRO_PLUS_PRODUCT_ID is missing or invalid.";
   }
 
   return null;
@@ -59,6 +74,8 @@ export function getStripeConfig(): StripeConfig {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET?.trim();
   const proPriceId = process.env.STRIPE_PRO_PRICE_ID?.trim();
   const proPlusPriceId = process.env.STRIPE_PRO_PLUS_PRICE_ID?.trim();
+  const proProductId = process.env.STRIPE_PRO_PRODUCT_ID?.trim();
+  const proPlusProductId = process.env.STRIPE_PRO_PLUS_PRODUCT_ID?.trim();
   const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY?.trim();
   const proDisplayPrice =
     process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE?.trim() || "$7.99";
@@ -71,6 +88,8 @@ export function getStripeConfig(): StripeConfig {
     secretKey,
     proPriceId,
     proPlusPriceId,
+    proProductId,
+    proPlusProductId,
   );
 
   return {
@@ -79,6 +98,8 @@ export function getStripeConfig(): StripeConfig {
     webhookSecret,
     proPriceId,
     proPlusPriceId,
+    proProductId,
+    proPlusProductId,
     publishableKey,
     proDisplayPrice,
     proPlusDisplayPrice,
@@ -101,24 +122,6 @@ export function isStripeEnabled(): boolean {
 
 export function isStripeTestMode(): boolean {
   return getStripeConfig().secretKey?.startsWith("sk_test_") ?? true;
-}
-
-export function getPriceIdForPlan(plan: "pro" | "pro_plus"): string {
-  const config = getStripeConfig();
-
-  if (plan === "pro_plus") {
-    if (!config.proPlusPriceId) {
-      throw new Error("STRIPE_PRO_PLUS_PRICE_ID is missing.");
-    }
-
-    return config.proPlusPriceId;
-  }
-
-  if (!config.proPriceId) {
-    throw new Error("STRIPE_PRO_PRICE_ID is missing.");
-  }
-
-  return config.proPriceId;
 }
 
 export function resolvePlanFromPriceId(priceId: string | null | undefined): "free" | "pro" | "pro_plus" {

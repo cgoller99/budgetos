@@ -6,7 +6,7 @@ import type {
   UserSubscription,
 } from "@/lib/subscription/types";
 import { FREE_SUBSCRIPTION } from "@/lib/subscription/types";
-import { resolvePlanFromPriceId } from "@/lib/stripe/config";
+import { resolvePlanFromStripePrice } from "@/lib/stripe/priceResolver";
 import type { ProfileRow } from "@/lib/supabase/database.types";
 
 type SubscriptionProfileFields = Pick<
@@ -90,8 +90,9 @@ export function mapStripeSubscriptionToUserSubscription(
   subscription: Stripe.Subscription,
 ): UserSubscription {
   const status = mapStripeSubscriptionStatus(subscription.status);
-  const priceId = getSubscriptionPriceId(subscription);
-  const planFromPrice = resolvePlanFromPriceId(priceId);
+  const price = subscription.items.data[0]?.price ?? null;
+  const priceId = typeof price === "string" ? price : price?.id ?? null;
+  const planFromPrice = resolvePlanFromStripePrice(price);
   const plan: SubscriptionPlan =
     status === "active" ||
     status === "trialing" ||

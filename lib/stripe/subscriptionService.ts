@@ -7,9 +7,9 @@ import type {
 } from "@/lib/subscription/types";
 import {
   assertStripeConfigured,
-  getPriceIdForPlan,
   getStripeConfig,
 } from "@/lib/stripe/config";
+import { resolvePriceIdForPlan } from "@/lib/stripe/priceResolver";
 import {
   getSubscriptionPeriodEndIso,
   mapProfileToSubscription,
@@ -111,7 +111,7 @@ export async function refreshUserSubscriptionFromStripe(
       customer: profile.stripe_customer_id,
       status: "all",
       limit: 1,
-      expand: ["data.items.data.price"],
+      expand: ["data.items.data.price.product"],
     });
     const subscription = subscriptions.data[0];
 
@@ -222,13 +222,15 @@ export async function createCheckoutSession(input: {
     );
   }
 
+  const priceId = await resolvePriceIdForPlan(input.targetPlan);
+
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
     customer: customerId,
     client_reference_id: input.userId,
     line_items: [
       {
-        price: getPriceIdForPlan(input.targetPlan),
+        price: priceId,
         quantity: 1,
       },
     ],
@@ -265,7 +267,7 @@ export async function changeSubscriptionPlan(input: {
   const stripe = getStripeClient();
   const subscription = await stripe.subscriptions.retrieve(
     profile.stripe_subscription_id,
-    { expand: ["items.data.price"] },
+    { expand: ["items.data.price.product"] },
   );
   const itemId = subscription.items.data[0]?.id;
 
@@ -273,11 +275,13 @@ export async function changeSubscriptionPlan(input: {
     throw new Error("Subscription has no billable items.");
   }
 
+  const priceId = await resolvePriceIdForPlan(input.targetPlan);
+
   const updated = await stripe.subscriptions.update(subscription.id, {
     items: [
       {
         id: itemId,
-        price: getPriceIdForPlan(input.targetPlan),
+        price: priceId,
       },
     ],
     proration_behavior: "create_prorations",
@@ -406,7 +410,7 @@ export async function handleCheckoutSessionCompleted(
 
   const stripe = getStripeClient();
   const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
-    expand: ["items.data.price"],
+    expand: ["items.data.price.product"],
   });
   await syncSubscriptionToProfile(subscription);
 

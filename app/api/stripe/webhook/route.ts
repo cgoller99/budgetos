@@ -48,7 +48,7 @@ export async function POST(request: Request) {
         const subscriptionPayload = event.data.object as Stripe.Subscription;
         const subscription = await stripe.subscriptions.retrieve(
           subscriptionPayload.id,
-          { expand: ["items.data.price"] },
+          { expand: ["items.data.price.product"] },
         );
         await syncSubscriptionToProfile(subscription);
         break;
