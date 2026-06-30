@@ -245,100 +245,104 @@ export function BillingSection() {
           </p>
         </div>
 
-        <div className="grid gap-3 lg:grid-cols-3">
-          {PLAN_DEFINITIONS.map((plan) => {
-            const isCurrent = currentPlan === plan.id;
-            const isUpgradeTarget =
-              plan.id !== "free" &&
-              !isCurrent &&
-              (!activePaid ||
-                (plan.id === "pro_plus" && currentPlan === "pro"));
+        {!isFounder && (
+          <div className="grid gap-3 lg:grid-cols-3">
+            {PLAN_DEFINITIONS.map((plan) => {
+              const isCurrent = currentPlan === plan.id;
+              const isUpgradeTarget =
+                plan.id !== "free" &&
+                !isCurrent &&
+                (!activePaid ||
+                  (plan.id === "pro_plus" && currentPlan === "pro"));
 
-            return (
-              <div
-                key={plan.id}
-                className={cn(
-                  "flex flex-col rounded-2xl border px-4 py-4",
-                  isCurrent
-                    ? "border-[#0077ed]/30 bg-[#0077ed]/10"
-                    : "border-white/[0.06] bg-white/[0.02]",
-                )}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-semibold text-white">{plan.name}</p>
-                  {isCurrent && <Badge variant="accent">Current</Badge>}
+              return (
+                <div
+                  key={plan.id}
+                  className={cn(
+                    "flex flex-col rounded-2xl border px-4 py-4",
+                    isCurrent
+                      ? "border-[#0077ed]/30 bg-[#0077ed]/10"
+                      : "border-white/[0.06] bg-white/[0.02]",
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-semibold text-white">{plan.name}</p>
+                    {isCurrent && <Badge variant="accent">Current</Badge>}
+                  </div>
+                  <p className="mt-2 text-lg font-semibold text-white">
+                    {plan.id === "free"
+                      ? plan.priceLabel
+                      : getPlanPriceLabel(plan.id)}
+                  </p>
+                  <p className="mt-2 text-xs leading-relaxed text-white/45">
+                    {plan.description}
+                  </p>
+                  <ul className="mt-4 flex-1 space-y-2">
+                    {plan.features.slice(0, 4).map((feature) => (
+                      <li key={feature} className="text-xs text-white/50">
+                        ✓ {feature}
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="mt-4">
+                    {plan.id === "free" ? (
+                      <p className="text-xs text-white/35">
+                        Included with every account
+                      </p>
+                    ) : isCurrent ? (
+                      <p className="text-xs text-white/35">Your active paid plan</p>
+                    ) : !activePaid ? (
+                      <Button
+                        size="sm"
+                        className="w-full"
+                        disabled={isLoading || pendingAction !== null}
+                        onClick={() =>
+                          void handleCheckout(plan.id as PaidSubscriptionPlan)
+                        }
+                      >
+                        {pendingAction === `checkout-${plan.id}`
+                          ? "Redirecting..."
+                          : `Subscribe to ${plan.name}`}
+                      </Button>
+                    ) : isUpgradeTarget ? (
+                      <Button
+                        size="sm"
+                        className="w-full"
+                        disabled={isLoading || pendingAction !== null}
+                        onClick={() =>
+                          void handleChangePlan(plan.id as PaidSubscriptionPlan)
+                        }
+                      >
+                        {pendingAction === `change-${plan.id}`
+                          ? "Updating..."
+                          : plan.id === "pro_plus"
+                            ? "Upgrade to Pro+"
+                            : "Switch to Pro"}
+                      </Button>
+                    ) : plan.id === "pro" && currentPlan === "pro_plus" ? (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="w-full"
+                        disabled={isLoading || pendingAction !== null}
+                        onClick={() => void handleChangePlan("pro")}
+                      >
+                        {pendingAction === "change-pro"
+                          ? "Updating..."
+                          : "Downgrade to Pro"}
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
-                <p className="mt-2 text-lg font-semibold text-white">
-                  {plan.id === "free"
-                    ? plan.priceLabel
-                    : getPlanPriceLabel(plan.id)}
-                </p>
-                <p className="mt-2 text-xs leading-relaxed text-white/45">
-                  {plan.description}
-                </p>
-                <ul className="mt-4 flex-1 space-y-2">
-                  {plan.features.slice(0, 4).map((feature) => (
-                    <li key={feature} className="text-xs text-white/50">
-                      ✓ {feature}
-                    </li>
-                  ))}
-                </ul>
-                <div className="mt-4">
-                  {plan.id === "free" ? (
-                    <p className="text-xs text-white/35">Included with every account</p>
-                  ) : isCurrent ? (
-                    <p className="text-xs text-white/35">Your active paid plan</p>
-                  ) : !activePaid ? (
-                    <Button
-                      size="sm"
-                      className="w-full"
-                      disabled={isLoading || pendingAction !== null}
-                      onClick={() =>
-                        void handleCheckout(plan.id as PaidSubscriptionPlan)
-                      }
-                    >
-                      {pendingAction === `checkout-${plan.id}`
-                        ? "Redirecting..."
-                        : `Subscribe to ${plan.name}`}
-                    </Button>
-                  ) : isUpgradeTarget ? (
-                    <Button
-                      size="sm"
-                      className="w-full"
-                      disabled={isLoading || pendingAction !== null}
-                      onClick={() =>
-                        void handleChangePlan(plan.id as PaidSubscriptionPlan)
-                      }
-                    >
-                      {pendingAction === `change-${plan.id}`
-                        ? "Updating..."
-                        : plan.id === "pro_plus"
-                          ? "Upgrade to Pro+"
-                          : "Switch to Pro"}
-                    </Button>
-                  ) : plan.id === "pro" && currentPlan === "pro_plus" ? (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      className="w-full"
-                      disabled={isLoading || pendingAction !== null}
-                      onClick={() => void handleChangePlan("pro")}
-                    >
-                      {pendingAction === "change-pro"
-                        ? "Updating..."
-                        : "Downgrade to Pro"}
-                    </Button>
-                  ) : null}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
 
         {error && <p className="text-sm text-amber-300">{error}</p>}
 
         <div className="flex flex-wrap gap-2">
-          {activePaid && (
+          {!isFounder && activePaid && (
             <>
               <Button
                 variant="secondary"
@@ -372,6 +376,30 @@ export function BillingSection() {
               )}
             </>
           )}
+          {isFounder && stripeEnabled && (
+            <>
+              <Button
+                variant="secondary"
+                size="md"
+                disabled={isLoading || pendingAction !== null}
+                onClick={() => void handlePortal()}
+              >
+                {pendingAction === "portal"
+                  ? "Opening..."
+                  : "Test Stripe portal"}
+              </Button>
+              <Button
+                variant="secondary"
+                size="md"
+                disabled={isLoading || pendingAction !== null}
+                onClick={() => void handleCheckout("pro_plus")}
+              >
+                {pendingAction === "checkout-pro_plus"
+                  ? "Redirecting..."
+                  : "Test Stripe checkout"}
+              </Button>
+            </>
+          )}
           <Button
             variant="secondary"
             size="md"
@@ -402,10 +430,19 @@ export function BillingSection() {
           </p>
         )}
 
-        <p className="text-xs text-white/32">
-          Secure billing powered by Stripe Checkout and Customer Portal. Test mode
-          accepts card 4242 4242 4242 4242.
-        </p>
+        {!isFounder && (
+          <p className="text-xs text-white/32">
+            Secure billing powered by Stripe Checkout and Customer Portal. Test
+            mode accepts card 4242 4242 4242 4242.
+          </p>
+        )}
+
+        {isFounder && stripeEnabled && (
+          <p className="text-xs text-white/32">
+            Stripe test tools above are optional and do not affect your Founder
+            access.
+          </p>
+        )}
       </CardContent>
     </Card>
   );
