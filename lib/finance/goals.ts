@@ -1,5 +1,17 @@
 import type { FinanceData, SavingsGoal } from "@/lib/finance/types";
 import { calculateMonthlySavings } from "@/lib/calculations/savingsProgress";
+import {
+  getGoalAccentColor,
+  getGoalContributionBreakdown,
+  getGoalInsights,
+  getGoalSuggestions,
+  getGoalTimeline,
+  getReachedMilestones,
+  type GoalContributionSource,
+  type GoalInsight,
+  type GoalSuggestion,
+  type GoalTimelineMonth,
+} from "@/lib/finance/goalAnalytics";
 
 export type GoalProgress = {
   id: string;
@@ -12,6 +24,15 @@ export type GoalProgress = {
   percentComplete: number;
   estimatedCompletionDate: Date | null;
   isComplete: boolean;
+  weeklyContribution: number;
+  monthlyContribution: number;
+  contributionSource: GoalContributionSource;
+  contributionSourceLabel: string;
+  accentColor: string;
+  insights: GoalInsight[];
+  suggestions: GoalSuggestion[];
+  timeline: GoalTimelineMonth[];
+  reachedMilestones: number[];
 };
 
 const PROGRESS_RING_CIRCUMFERENCE = 264;
@@ -23,8 +44,7 @@ export function getProgressRingOffset(percentComplete: number): number {
 
 export function estimateCompletionDate(
   goal: SavingsGoal,
-  monthlySavings: number,
-  activeGoalCount: number,
+  weeklyContribution: number,
 ): Date | null {
   const remaining = goal.target - goal.current;
 
@@ -32,29 +52,31 @@ export function estimateCompletionDate(
     return new Date();
   }
 
-  const allocation =
-    activeGoalCount > 0 ? monthlySavings / activeGoalCount : monthlySavings;
-
-  if (allocation <= 0) {
+  if (weeklyContribution <= 0) {
     return null;
   }
 
-  const months = Math.ceil(remaining / allocation);
+  const weeks = Math.ceil(remaining / weeklyContribution);
   const date = new Date();
-  date.setMonth(date.getMonth() + months);
+  date.setDate(date.getDate() + weeks * 7);
   return date;
 }
 
-export function enrichGoal(
-  goal: SavingsGoal,
-  monthlySavings: number,
-  activeGoalCount: number,
-): GoalProgress {
+export function enrichGoal(data: FinanceData, goal: SavingsGoal): GoalProgress {
   const remaining = Math.max(goal.target - goal.current, 0);
   const percentComplete =
     goal.target > 0
       ? Math.min(Math.round((goal.current / goal.target) * 100), 100)
       : 0;
+  const contribution = getGoalContributionBreakdown(data, goal);
+  const activeGoalCount = Math.max(
+    (data.savingsGoals ?? []).filter((item) => item.current < item.target).length,
+    1,
+  );
+  const weeklyForEstimate =
+    contribution.weeklyContribution > 0
+      ? contribution.weeklyContribution
+      : calculateMonthlySavings(data) / activeGoalCount / 4.33;
 
   return {
     id: goal.id,
@@ -65,46 +87,45 @@ export function enrichGoal(
     target: goal.target,
     remaining,
     percentComplete,
-    estimatedCompletionDate: estimateCompletionDate(
-      goal,
-      monthlySavings,
-      activeGoalCount,
-    ),
+    estimatedCompletionDate: estimateCompletionDate(goal, weeklyForEstimate),
     isComplete: goal.current >= goal.target,
+    weeklyContribution: contribution.weeklyContribution,
+    monthlyContribution: contribution.monthlyContribution,
+    contributionSource: contribution.source,
+    contributionSourceLabel: contribution.sourceLabel,
+    accentColor: getGoalAccentColor(goal.type),
+    insights: getGoalInsights(goal, remaining, weeklyForEstimate),
+    suggestions: getGoalSuggestions(data, goal, remaining, weeklyForEstimate),
+    timeline: getGoalTimeline(data, goal.id),
+    reachedMilestones: getReachedMilestones(percentComplete),
   };
 }
 
 export function getGoalProgressList(data: FinanceData): GoalProgress[] {
-  const monthlySavings = calculateMonthlySavings(data);
-  const activeGoals = (data.savingsGoals ?? []).filter(
-    (goal) => goal.current < goal.target,
-  );
+  return (data.savingsGoals ?? []).map((goal) => enrichGoal(data, goal));
+}
 
-  return (data.savingsGoals ?? []).map((goal) =>
-    enrichGoal(goal, monthlySavings, activeGoals.length || 1),
-  );
+export function getTopGoals(data: FinanceData, limit = 3): GoalProgress[] {
+  return getGoalProgressList(data)
+    .filter((goal) => !goal.isComplete)
+    .sort((left, right) => {
+      if (right.percentComplete !== left.percentComplete) {
+        return right.percentComplete - left.percentComplete;
+      }
+
+      if (!left.estimatedCompletionDate) return 1;
+      if (!right.estimatedCompletionDate) return -1;
+
+      return (
+        left.estimatedCompletionDate.getTime() -
+        right.estimatedCompletionDate.getTime()
+      );
+    })
+    .slice(0, limit);
 }
 
 export function getNextGoal(data: FinanceData): GoalProgress | null {
-  const goals = getGoalProgressList(data).filter((goal) => !goal.isComplete);
-
-  if (goals.length === 0) {
-    return null;
-  }
-
-  return [...goals].sort((left, right) => {
-    if (right.percentComplete !== left.percentComplete) {
-      return right.percentComplete - left.percentComplete;
-    }
-
-    if (!left.estimatedCompletionDate) return 1;
-    if (!right.estimatedCompletionDate) return -1;
-
-    return (
-      left.estimatedCompletionDate.getTime() -
-      right.estimatedCompletionDate.getTime()
-    );
-  })[0];
+  return getTopGoals(data, 1)[0] ?? null;
 }
 
 export function formatGoalDate(date: Date | null): string {

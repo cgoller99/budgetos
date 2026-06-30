@@ -5,6 +5,7 @@ type ProgressRingProps = {
   value: number;
   size?: number;
   strokeWidth?: number;
+  accentColor?: string;
   className?: string;
   children?: ReactNode;
 };
@@ -16,6 +17,7 @@ export function ProgressRing({
   value,
   size = 112,
   strokeWidth = 8,
+  accentColor = "#0077ed",
   className,
   children,
 }: ProgressRingProps) {
@@ -45,7 +47,7 @@ export function ProgressRing({
           cy="50"
           r={RING_RADIUS}
           fill="none"
-          stroke="#0077ed"
+          stroke={accentColor}
           strokeWidth={strokeWidth}
           strokeLinecap="round"
           strokeDasharray={RING_CIRCUMFERENCE}

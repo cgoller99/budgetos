@@ -141,13 +141,16 @@ export type EditBillInput = {
 };
 
 export type GoalType =
-  | "house"
   | "emergency_fund"
+  | "house"
   | "vacation"
-  | "wedding"
   | "car"
-  | "retirement"
-  | "custom";
+  | "engagement_ring"
+  | "wedding"
+  | "investments"
+  | "debt_payoff"
+  | "custom"
+  | "retirement";
 
 export type CreateGoalInput = {
   name: string;

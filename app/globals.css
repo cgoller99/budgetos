@@ -152,6 +152,22 @@ body {
   animation: fade-in-up 0.4s ease-out;
 }
 
+@keyframes goal-confetti-burst {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(0.6);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--x, 0px)), calc(-50% + var(--y, -48px))) scale(1);
+  }
+}
+
+.goal-confetti-piece {
+  animation: goal-confetti-burst 1.6s ease-out forwards;
+}
+
 .account-card-enter {
   animation: fade-in-up 0.35s ease-out;
 }

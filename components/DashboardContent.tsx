@@ -6,7 +6,7 @@ import { WelcomeChecklist } from "@/components/guidance/WelcomeChecklist";
 import { HealthScoreCard } from "@/components/HealthScoreCard";
 import { MoneyFlowCard } from "@/components/MoneyFlowCard";
 import { NextPaycheckCard } from "@/components/incomePlan/NextPaycheckCard";
-import { NextGoalCard } from "@/components/dashboard/NextGoalCard";
+import { TopGoalsCard } from "@/components/dashboard/TopGoalsCard";
 import { UpcomingBillsCard } from "@/components/dashboard/UpcomingBillsCard";
 import { UpcomingIncomeCard } from "@/components/dashboard/UpcomingIncomeCard";
 import { DashboardHero } from "@/components/dashboard/DashboardHero";
@@ -50,7 +50,7 @@ export function DashboardContent() {
       </div>
 
       <div className={dashboardSectionClassName}>
-        <NextGoalCard />
+        <TopGoalsCard />
       </div>
 
       <div className={dashboardSectionClassName}>
