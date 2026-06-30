@@ -13,6 +13,7 @@ export type AutomationActionType =
   | "apply_paycheck"
   | "navigate"
   | "dismiss"
+  | "dismiss_permanently"
   | "skip";
 
 export type AutomationAction = {
@@ -36,6 +37,7 @@ export type AutomationSuggestion = {
   entityType?: string;
   primaryAction: AutomationAction;
   secondaryAction?: AutomationAction;
+  tertiaryAction?: AutomationAction;
   detailHref?: string;
 };
 

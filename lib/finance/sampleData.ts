@@ -200,4 +200,6 @@ export const sampleFinanceData: FinanceData = {
   events: [],
   incomePlan: null,
   incomePlanPaychecks: [],
+  bankConnections: [],
+  plaidRecurringDismissals: [],
 };

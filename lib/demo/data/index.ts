@@ -14,7 +14,13 @@ const DEMO_DATA: Record<DemoProfileId, FinanceData> = {
 };
 
 export function getDemoFinanceData(profileId: DemoProfileId): FinanceData {
-  return normalizeRecurringFinanceData(structuredClone(DEMO_DATA[profileId]));
+  return normalizeRecurringFinanceData(
+    structuredClone({
+      ...DEMO_DATA[profileId],
+      bankConnections: DEMO_DATA[profileId].bankConnections ?? [],
+      plaidRecurringDismissals: DEMO_DATA[profileId].plaidRecurringDismissals ?? [],
+    }),
+  );
 }
 
 export {

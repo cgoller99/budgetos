@@ -173,4 +173,6 @@ export const youngProfessionalDemoData: FinanceData = {
   events: [],
   incomePlan: null,
   incomePlanPaychecks: [],
+  bankConnections: [],
+  plaidRecurringDismissals: [],
 };

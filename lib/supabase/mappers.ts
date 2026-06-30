@@ -125,6 +125,14 @@ export function mapAccountRow(row: AccountRow): Account {
     type: row.type as AccountType,
     balance: toNumber(row.balance),
     monthlyChange: toNumber(row.monthly_change),
+    institutionLogoUrl: row.institution_logo_url,
+    availableBalance:
+      row.available_balance === null ? null : toNumber(row.available_balance),
+    lastFour: row.last_four,
+    lastSyncedAt: row.last_synced_at,
+    bankConnectionId: row.bank_connection_id,
+    externalAccountId: row.external_account_id,
+    isPlaidLinked: Boolean(row.bank_connection_id),
   };
 }
 
@@ -319,6 +327,7 @@ export function mapTransactionRow(row: TransactionRow): Transaction {
     goalId: row.goal_id,
     billId: row.bill_id,
     debtId: null,
+    externalTransactionId: row.external_transaction_id,
   };
 }
 
@@ -366,6 +375,8 @@ export function mapFinanceData(
     events,
     incomePlan: null,
     incomePlanPaychecks: [],
+    bankConnections: [],
+    plaidRecurringDismissals: [],
   };
 
   return normalizeRecurringFinanceData(mapped);

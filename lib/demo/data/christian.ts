@@ -158,4 +158,6 @@ export const christianDemoData: FinanceData = {
   events: [],
   incomePlan: null,
   incomePlanPaychecks: [],
+  bankConnections: [],
+  plaidRecurringDismissals: [],
 };

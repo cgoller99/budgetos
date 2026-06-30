@@ -9,6 +9,7 @@ type AutomationSuggestionActionsProps = {
   suggestion: AutomationSuggestion;
   onPrimary: (suggestion: AutomationSuggestion) => void;
   onSecondary?: (suggestion: AutomationSuggestion) => void;
+  onTertiary?: (suggestion: AutomationSuggestion) => void;
   compact?: boolean;
   className?: string;
 };
@@ -17,6 +18,7 @@ export function AutomationSuggestionActions({
   suggestion,
   onPrimary,
   onSecondary,
+  onTertiary,
   compact = false,
   className,
 }: AutomationSuggestionActionsProps) {
@@ -37,6 +39,15 @@ export function AutomationSuggestionActions({
           onClick={() => onSecondary?.(suggestion)}
         >
           {suggestion.secondaryAction.label}
+        </Button>
+      )}
+      {suggestion.tertiaryAction && (
+        <Button
+          size={compact ? "sm" : "md"}
+          variant="secondary"
+          onClick={() => onTertiary?.(suggestion)}
+        >
+          {suggestion.tertiaryAction.label}
         </Button>
       )}
       {detailHref && (

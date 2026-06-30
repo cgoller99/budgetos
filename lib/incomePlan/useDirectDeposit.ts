@@ -3,9 +3,11 @@
 import { useCallback, useMemo } from "react";
 import type { DirectDepositMatch } from "@/lib/incomePlan/plaidTypes";
 import { incomePlanPlaidService } from "@/lib/incomePlan/plaidService";
+import { isPlaidClientEnabled } from "@/lib/plaid/clientConfig";
 
 export function useIncomePlanDirectDeposit() {
   const service = useMemo(() => incomePlanPlaidService, []);
+  const plaidEnabled = useMemo(() => isPlaidClientEnabled(), []);
 
   const checkDeposit = useCallback(
     async (amount: number, postedDate: string) => {
@@ -23,6 +25,6 @@ export function useIncomePlanDirectDeposit() {
   return {
     checkDeposit,
     createPrompt,
-    isPlaidEnabled: false,
+    isPlaidEnabled: plaidEnabled,
   };
 }

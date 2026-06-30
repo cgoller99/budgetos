@@ -9,6 +9,7 @@ export function SmartSuggestionsCard() {
   const {
     automationSuggestions,
     dismissAutomationSuggestion,
+    dismissAutomationSuggestionPermanently,
     completeAutomationSuggestion,
   } = useFinance();
 
@@ -56,6 +57,9 @@ export function SmartSuggestionsCard() {
                   className="mt-4"
                   onPrimary={(item) => void completeAutomationSuggestion(item)}
                   onSecondary={(item) => dismissAutomationSuggestion(item.id)}
+                  onTertiary={(item) =>
+                    void dismissAutomationSuggestionPermanently(item)
+                  }
                 />
               </div>
             </div>

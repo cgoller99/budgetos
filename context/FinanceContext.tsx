@@ -73,6 +73,13 @@ import { mergeAutomationNotifications } from "@/lib/automation/notifications";
 import type { AutomationSuggestion } from "@/lib/automation/types";
 import { registerAutomationProvider } from "@/lib/automation/registry";
 import { plaidAutomationProvider } from "@/lib/automation/providers/plaidAutomationProvider";
+import { configureIncomePlanPlaidDataAccessor } from "@/lib/incomePlan/plaidService";
+import {
+  disconnectPlaidBank,
+  dismissPlaidRecurringSuggestion,
+  fetchPlaidLinkToken,
+  syncPlaidBank,
+} from "@/lib/plaid/clientApi";
 import { normalizeBillCategory } from "@/lib/finance/billCategories";
 import type { DemoProfileId, OnboardingMode, OnboardingState } from "@/lib/onboarding/types";
 import {
@@ -174,9 +181,16 @@ export type FinanceContextValue = FinanceData & {
   ) => Promise<void>;
   automationSuggestions: AutomationSuggestion[];
   dismissAutomationSuggestion: (suggestionId: string) => void;
+  dismissAutomationSuggestionPermanently: (
+    suggestion: AutomationSuggestion,
+  ) => Promise<void>;
   completeAutomationSuggestion: (
     suggestion: AutomationSuggestion,
   ) => Promise<void>;
+  connectBank: () => Promise<string>;
+  reconnectBank: (connectionId: string) => Promise<string>;
+  syncBank: (connectionId?: string) => Promise<void>;
+  disconnectBank: (connectionId: string) => Promise<void>;
   markNotificationRead: (notificationId: string) => void;
   markAllNotificationsRead: () => void;
 };
@@ -257,6 +271,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
 
   useEffect(() => {
     registerAutomationProvider(plaidAutomationProvider);
+    configureIncomePlanPlaidDataAccessor(() => dataRef.current);
   }, []);
 
   const dismissedAutomationIds = useMemo(() => {
@@ -300,6 +315,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
       "investments",
       "income_plans",
       "income_plan_paycheck_events",
+      "bank_connections",
     ] as const;
 
     for (const table of tables) {
@@ -1277,6 +1293,66 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
     setAutomationDismissRevision((value) => value + 1);
   }, []);
 
+  const dismissAutomationSuggestionPermanently = useCallback(
+    async (suggestion: AutomationSuggestion) => {
+      const merchantKey = String(
+        suggestion.tertiaryAction?.payload?.merchantKey ??
+          suggestion.entityId ??
+          "",
+      ).trim();
+
+      if (merchantKey) {
+        await dismissPlaidRecurringSuggestion(merchantKey);
+        setData((current) => ({
+          ...current,
+          plaidRecurringDismissals: [
+            ...new Set([...(current.plaidRecurringDismissals ?? []), merchantKey]),
+          ],
+        }));
+      }
+
+      persistDismissedAutomationSuggestion(suggestion.id);
+      setAutomationDismissRevision((value) => value + 1);
+    },
+    [],
+  );
+
+  const connectBank = useCallback(async () => {
+    return fetchPlaidLinkToken({ mode: "create" });
+  }, []);
+
+  const reconnectBank = useCallback(async (connectionId: string) => {
+    return fetchPlaidLinkToken({ connectionId, mode: "update" });
+  }, []);
+
+  const syncBank = useCallback(
+    async (connectionId?: string) => {
+      setIsSyncing(true);
+
+      try {
+        await syncPlaidBank(connectionId);
+        await refreshFinance();
+      } finally {
+        setIsSyncing(false);
+      }
+    },
+    [refreshFinance],
+  );
+
+  const disconnectBank = useCallback(
+    async (connectionId: string) => {
+      setIsSyncing(true);
+
+      try {
+        await disconnectPlaidBank(connectionId);
+        await refreshFinance();
+      } finally {
+        setIsSyncing(false);
+      }
+    },
+    [refreshFinance],
+  );
+
   const completeAutomationSuggestion = useCallback(
     async (suggestion: AutomationSuggestion) => {
       try {
@@ -1378,7 +1454,12 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
       saveIncomePlan,
       markIncomePlanPaycheckReceived,
       dismissAutomationSuggestion: dismissAutomationSuggestionHandler,
+      dismissAutomationSuggestionPermanently,
       completeAutomationSuggestion,
+      connectBank,
+      reconnectBank,
+      syncBank,
+      disconnectBank,
       markNotificationRead,
       markAllNotificationsRead,
     }),
@@ -1394,9 +1475,14 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
       completeOnboarding,
       createGoal,
       completeAutomationSuggestion,
+      connectBank,
+      reconnectBank,
+      syncBank,
+      disconnectBank,
       data,
       deleteBill,
       dismissAutomationSuggestionHandler,
+      dismissAutomationSuggestionPermanently,
       deleteDebt,
       deleteIncome,
       deleteTransaction,

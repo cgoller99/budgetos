@@ -13,6 +13,8 @@ export const emptyFinanceData: FinanceData = {
   events: [],
   incomePlan: null,
   incomePlanPaychecks: [],
+  bankConnections: [],
+  plaidRecurringDismissals: [],
 };
 
 const DEFAULT_EVENT_SURFACES: FinanceEventSurface[] = ["activity"];
@@ -83,5 +85,7 @@ export function coerceFinanceData(
     events,
     incomePlan: data.incomePlan ?? null,
     incomePlanPaychecks: data.incomePlanPaychecks ?? [],
+    bankConnections: data.bankConnections ?? [],
+    plaidRecurringDismissals: data.plaidRecurringDismissals ?? [],
   };
 }

@@ -123,4 +123,6 @@ export const collegeStudentDemoData: FinanceData = {
   events: [],
   incomePlan: null,
   incomePlanPaychecks: [],
+  bankConnections: [],
+  plaidRecurringDismissals: [],
 };

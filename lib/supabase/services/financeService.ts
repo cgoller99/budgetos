@@ -61,6 +61,10 @@ import { NotificationsRepository } from "@/lib/supabase/repositories/notificatio
 import { IncomePlanRepository } from "@/lib/supabase/repositories/incomePlanRepository";
 import { ProfilesRepository } from "@/lib/supabase/repositories/profilesRepository";
 import { RecurringItemsRepository } from "@/lib/supabase/repositories/recurringItemsRepository";
+import {
+  BankConnectionsRepository,
+  mapBankConnectionRow,
+} from "@/lib/supabase/repositories/bankConnectionsRepository";
 import { seedFinanceData } from "@/lib/supabase/seed";
 import { getErrorMessage } from "@/lib/supabase/errors";
 import {
@@ -74,12 +78,14 @@ export class FinanceService {
   private readonly incomePlans: IncomePlanRepository;
   private readonly profiles: ProfilesRepository;
   private readonly recurringItems: RecurringItemsRepository;
+  private readonly bankConnections: BankConnectionsRepository;
 
   constructor(private readonly supabase: BuxmeSupabaseClient) {
     this.notifications = new NotificationsRepository(supabase);
     this.incomePlans = new IncomePlanRepository(supabase);
     this.profiles = new ProfilesRepository(supabase);
     this.recurringItems = new RecurringItemsRepository(supabase);
+    this.bankConnections = new BankConnectionsRepository(supabase);
   }
 
   async getUserId(): Promise<string> {
@@ -191,6 +197,10 @@ export class FinanceService {
     }
 
     const incomePlanData = await this.incomePlans.loadIncomePlanData(userId);
+    const [connectionRows, recurringDismissals] = await Promise.all([
+      this.bankConnections.listConnections(userId),
+      this.bankConnections.listRecurringDismissals(userId),
+    ]);
 
     const mapped = mapFinanceData(
       accountsResult.data ?? [],
@@ -206,6 +216,8 @@ export class FinanceService {
       ...mapped,
       incomePlan: incomePlanData.incomePlan,
       incomePlanPaychecks: incomePlanData.incomePlanPaychecks,
+      bankConnections: connectionRows.map(mapBankConnectionRow),
+      plaidRecurringDismissals: recurringDismissals,
     };
   }
 

@@ -12,7 +12,9 @@ export type BankSyncProviderAdapter = {
 };
 
 export const bankSyncComingSoonMessage =
-  "Bank syncing is coming soon. This will automatically import balances and transactions while keeping manual entry available.";
+  "Connect your bank to automatically import balances and transactions while keeping manual entry available.";
+
+export { plaidBankSyncAdapter } from "@/lib/integrations/bankSync/plaidAdapter";
 
 export const manualBankSyncAdapter: BankSyncProviderAdapter = {
   provider: "manual",

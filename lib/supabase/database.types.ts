@@ -58,6 +58,13 @@ export type AccountRow = RecurringColumns & {
   original_balance: number | null;
   monthly_contribution: number | null;
   contribution_frequency: string | null;
+  bank_connection_id: string | null;
+  external_account_id: string | null;
+  external_item_id: string | null;
+  institution_logo_url: string | null;
+  available_balance: number | null;
+  last_four: string | null;
+  last_synced_at: string | null;
   household_id: string | null;
   created_at: string;
   updated_at: string;
@@ -78,6 +85,13 @@ export type AccountInsert = {
   original_balance?: number | null;
   monthly_contribution?: number | null;
   contribution_frequency?: string | null;
+  bank_connection_id?: string | null;
+  external_account_id?: string | null;
+  external_item_id?: string | null;
+  institution_logo_url?: string | null;
+  available_balance?: number | null;
+  last_four?: string | null;
+  last_synced_at?: string | null;
   start_date?: string | null;
   next_occurrence?: string | null;
   last_processed_date?: string | null;
@@ -219,6 +233,7 @@ export type TransactionRow = RecurringColumns & {
   transfer_to_account_id: string | null;
   notes: string | null;
   transaction_date: string;
+  external_transaction_id: string | null;
   household_id: string | null;
   created_at: string;
   updated_at: string;
@@ -238,6 +253,7 @@ export type TransactionInsert = {
   transfer_to_account_id?: string | null;
   notes?: string | null;
   transaction_date?: string;
+  external_transaction_id?: string | null;
   start_date?: string | null;
   next_occurrence?: string | null;
   last_processed_date?: string | null;
@@ -258,6 +274,13 @@ export type InvestmentRow = RecurringColumns & {
   monthly_change: number;
   monthly_contribution: number | null;
   contribution_frequency: string | null;
+  bank_connection_id: string | null;
+  external_account_id: string | null;
+  external_item_id: string | null;
+  institution_logo_url: string | null;
+  available_balance: number | null;
+  last_four: string | null;
+  last_synced_at: string | null;
   household_id: string | null;
   created_at: string;
   updated_at: string;
@@ -272,6 +295,13 @@ export type InvestmentInsert = {
   monthly_change?: number;
   monthly_contribution?: number | null;
   contribution_frequency?: string | null;
+  bank_connection_id?: string | null;
+  external_account_id?: string | null;
+  external_item_id?: string | null;
+  institution_logo_url?: string | null;
+  available_balance?: number | null;
+  last_four?: string | null;
+  last_synced_at?: string | null;
   start_date?: string | null;
   next_occurrence?: string | null;
   last_processed_date?: string | null;
@@ -408,7 +438,16 @@ export type BankConnectionRow = {
   provider: string;
   status: string;
   institution_name: string | null;
+  institution_id: string | null;
+  institution_logo_url: string | null;
   external_item_id: string | null;
+  access_token_encrypted: string | null;
+  access_token_iv: string | null;
+  access_token_tag: string | null;
+  transactions_cursor: string | null;
+  investments_cursor: string | null;
+  error_code: string | null;
+  error_message: string | null;
   last_synced_at: string | null;
   created_at: string;
   updated_at: string;
@@ -421,10 +460,35 @@ export type BankConnectionInsert = {
   provider?: string;
   status?: string;
   institution_name?: string | null;
+  institution_id?: string | null;
+  institution_logo_url?: string | null;
   external_item_id?: string | null;
+  access_token_encrypted?: string | null;
+  access_token_iv?: string | null;
+  access_token_tag?: string | null;
+  transactions_cursor?: string | null;
+  investments_cursor?: string | null;
+  error_code?: string | null;
+  error_message?: string | null;
   last_synced_at?: string | null;
   created_at?: string;
   updated_at?: string;
+};
+
+export type PlaidRecurringDismissalRow = {
+  id: string;
+  user_id: string;
+  household_id: string | null;
+  merchant_key: string;
+  created_at: string;
+};
+
+export type PlaidRecurringDismissalInsert = {
+  id?: string;
+  user_id: string;
+  household_id?: string | null;
+  merchant_key: string;
+  created_at?: string;
 };
 
 export type IncomePlanRow = {
@@ -563,6 +627,12 @@ export type Database = {
         Row: BankConnectionRow;
         Insert: BankConnectionInsert;
         Update: Partial<BankConnectionInsert>;
+        Relationships: [];
+      };
+      plaid_recurring_dismissals: {
+        Row: PlaidRecurringDismissalRow;
+        Insert: PlaidRecurringDismissalInsert;
+        Update: Partial<PlaidRecurringDismissalInsert>;
         Relationships: [];
       };
       income_plans: {

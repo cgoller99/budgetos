@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { HouseholdSection } from "@/components/household/HouseholdSection";
+import { ConnectedInstitutionsSection } from "@/components/settings/ConnectedInstitutionsSection";
 import { Button, Card, CardContent, CardHeader, FormField, Input } from "@/components/ui";
 import { pageContainerClassName } from "@/components/ui/tokens";
 import { cn } from "@/components/ui/cn";
@@ -458,6 +459,8 @@ export function SettingsContent() {
           </CardContent>
         </Card>
       )}
+
+      {isConfigured && <ConnectedInstitutionsSection />}
 
       {isConfigured && <HouseholdSection />}
 

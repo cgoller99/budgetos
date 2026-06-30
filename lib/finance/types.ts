@@ -37,6 +37,13 @@ export type Account = {
   type: AccountType;
   balance: number;
   monthlyChange: number;
+  institutionLogoUrl?: string | null;
+  availableBalance?: number | null;
+  lastFour?: string | null;
+  lastSyncedAt?: string | null;
+  bankConnectionId?: string | null;
+  externalAccountId?: string | null;
+  isPlaidLinked?: boolean;
 };
 
 export type AddAccountInput = {
@@ -317,7 +324,12 @@ export type BankConnection = {
   provider: string;
   status: BankConnectionStatus;
   institutionName: string | null;
+  institutionLogoUrl?: string | null;
+  institutionId?: string | null;
+  externalItemId?: string | null;
   lastSyncedAt: string | null;
+  errorCode?: string | null;
+  errorMessage?: string | null;
 };
 
 export type IncomeSource = {
@@ -447,6 +459,7 @@ export type Transaction = {
   goalId?: string | null;
   billId?: string | null;
   debtId?: string | null;
+  externalTransactionId?: string | null;
 };
 
 export type AddTransactionInput = {
@@ -473,6 +486,8 @@ export type FinanceData = {
   events: FinanceEvent[];
   incomePlan: IncomePlan | null;
   incomePlanPaychecks: IncomePlanPaycheckEvent[];
+  bankConnections: BankConnection[];
+  plaidRecurringDismissals: string[];
 };
 
 export type { IncomePlan, IncomePlanPaycheckEvent, SaveIncomePlanInput, MarkPaycheckReceivedInput };
