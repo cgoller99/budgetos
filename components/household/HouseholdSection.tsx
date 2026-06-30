@@ -66,7 +66,7 @@ export function HouseholdSection() {
     transferOwnership,
     revokeInvite,
   } = useHousehold();
-  const { hasProAccess, isStripeEnabled } = useSubscription();
+  const { hasProAccess, isFounder } = useSubscription();
   const { refreshFinance } = useFinance();
   const { showToast } = useToast();
   const [householdName, setHouseholdName] = useState("");
@@ -253,7 +253,7 @@ export function HouseholdSection() {
     );
   }
 
-  if (isStripeEnabled && isStripeClientEnabled() && !hasProAccess) {
+  if (isStripeClientEnabled() && !isFounder && !hasProAccess) {
     return (
       <Card padding="lg">
         <CardHeader

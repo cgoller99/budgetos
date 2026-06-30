@@ -12,19 +12,15 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import {
   FREE_SUBSCRIPTION,
-  hasMinimumPlan,
-  hasProAccess,
-  hasProPlusAccess,
   type SubscriptionPlan,
   type UserSubscription,
 } from "@/lib/subscription/types";
-import { fetchUserSubscription } from "@/lib/stripe/clientApi";
-import { isStripeClientEnabled } from "@/lib/stripe/clientConfig";
+import { fetchEntitlements } from "@/lib/subscription/clientApi";
 
 type SubscriptionContextValue = {
   subscription: UserSubscription;
   isLoading: boolean;
-  isStripeEnabled: boolean;
+  isFounder: boolean;
   refreshSubscription: (options?: { refresh?: boolean }) => Promise<void>;
   hasProAccess: boolean;
   hasProPlusAccess: boolean;
@@ -35,15 +31,20 @@ const SubscriptionContext = createContext<SubscriptionContextValue | null>(null)
 
 export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const { user, isConfigured } = useAuth();
-  const stripeEnabled = isStripeClientEnabled();
   const [subscription, setSubscription] =
     useState<UserSubscription>(FREE_SUBSCRIPTION);
-  const [isLoading, setIsLoading] = useState(stripeEnabled);
+  const [isFounder, setIsFounder] = useState(false);
+  const [hasProAccessFlag, setHasProAccessFlag] = useState(false);
+  const [hasProPlusAccessFlag, setHasProPlusAccessFlag] = useState(false);
+  const [isLoading, setIsLoading] = useState(Boolean(user && isConfigured));
 
   const refreshSubscription = useCallback(
     async (options?: { refresh?: boolean }) => {
-      if (!stripeEnabled || !user || !isConfigured) {
+      if (!user || !isConfigured) {
         setSubscription(FREE_SUBSCRIPTION);
+        setIsFounder(false);
+        setHasProAccessFlag(false);
+        setHasProPlusAccessFlag(false);
         setIsLoading(false);
         return;
       }
@@ -51,15 +52,21 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       setIsLoading(true);
 
       try {
-        const next = await fetchUserSubscription(options);
-        setSubscription(next);
+        const entitlements = await fetchEntitlements(options);
+        setSubscription(entitlements.subscription);
+        setIsFounder(entitlements.isFounder);
+        setHasProAccessFlag(entitlements.hasProAccess);
+        setHasProPlusAccessFlag(entitlements.hasProPlusAccess);
       } catch {
         setSubscription(FREE_SUBSCRIPTION);
+        setIsFounder(false);
+        setHasProAccessFlag(false);
+        setHasProPlusAccessFlag(false);
       } finally {
         setIsLoading(false);
       }
     },
-    [isConfigured, stripeEnabled, user],
+    [isConfigured, user],
   );
 
   useEffect(() => {
@@ -70,13 +77,34 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     () => ({
       subscription,
       isLoading,
-      isStripeEnabled: stripeEnabled,
+      isFounder,
       refreshSubscription,
-      hasProAccess: hasProAccess(subscription),
-      hasProPlusAccess: hasProPlusAccess(subscription),
-      hasMinimumPlan: (plan) => hasMinimumPlan(subscription, plan),
+      hasProAccess: hasProAccessFlag,
+      hasProPlusAccess: hasProPlusAccessFlag,
+      hasMinimumPlan: (plan) => {
+        if (isFounder) {
+          return true;
+        }
+
+        if (plan === "pro_plus") {
+          return hasProPlusAccessFlag;
+        }
+
+        if (plan === "pro") {
+          return hasProAccessFlag;
+        }
+
+        return true;
+      },
     }),
-    [isLoading, refreshSubscription, stripeEnabled, subscription],
+    [
+      hasProAccessFlag,
+      hasProPlusAccessFlag,
+      isFounder,
+      isLoading,
+      refreshSubscription,
+      subscription,
+    ],
   );
 
   return (
@@ -93,7 +121,7 @@ export function useSubscription(): SubscriptionContextValue {
     return {
       subscription: FREE_SUBSCRIPTION,
       isLoading: false,
-      isStripeEnabled: false,
+      isFounder: false,
       refreshSubscription: async () => undefined,
       hasProAccess: true,
       hasProPlusAccess: true,

@@ -12,7 +12,6 @@ import {
   getPlanDisplayName,
   getStatusDisplayLabel,
   hasActiveSubscription,
-  hasMinimumPlan,
   type PaidSubscriptionPlan,
   type SubscriptionPlan,
 } from "@/lib/subscription/types";
@@ -67,6 +66,7 @@ export function BillingSection() {
   const {
     subscription,
     isLoading,
+    isFounder,
     refreshSubscription,
     hasProAccess: userHasPro,
     hasProPlusAccess: userHasProPlus,
@@ -164,7 +164,7 @@ export function BillingSection() {
     });
   }
 
-  if (!stripeEnabled) {
+  if (!stripeEnabled && !isFounder) {
     return (
       <Card padding="lg" id="billing">
         <CardHeader
@@ -181,6 +181,23 @@ export function BillingSection() {
     );
   }
 
+  if (!stripeEnabled && isFounder) {
+    return (
+      <Card padding="lg" id="billing">
+        <CardHeader
+          title="Plan & billing"
+          action={<Badge variant="accent">Founder</Badge>}
+        />
+        <CardContent className="space-y-3">
+          <p className="text-sm leading-relaxed text-white/55">
+            Founder access is active. All premium features are unlocked without a
+            Stripe subscription.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   const activePaid = hasActiveSubscription(subscription);
   const currentPlan = subscription.plan;
 
@@ -189,23 +206,42 @@ export function BillingSection() {
       <CardHeader
         title="Plan & billing"
         action={
-          <Badge variant={activePaid ? "accent" : "default"}>
-            {isLoading ? "Loading..." : getStatusDisplayLabel(subscription)}
-          </Badge>
+          <div className="flex items-center gap-2">
+            {isFounder && <Badge variant="accent">Founder</Badge>}
+            <Badge variant={activePaid || isFounder ? "accent" : "default"}>
+              {isLoading
+                ? "Loading..."
+                : isFounder
+                  ? "Pro+ access"
+                  : getStatusDisplayLabel(subscription)}
+            </Badge>
+          </div>
         }
       />
       <CardContent className="space-y-5">
+        {isFounder && (
+          <div className="rounded-2xl border border-[#0077ed]/20 bg-[#0077ed]/10 px-5 py-4">
+            <p className="text-sm font-medium text-[#4da3ff]">Founder access</p>
+            <p className="mt-2 text-sm leading-relaxed text-white/55">
+              All premium features are unlocked on this account. Stripe checkout is
+              optional — use the tools below to test billing flows in Test Mode.
+            </p>
+          </div>
+        )}
+
         <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] px-5 py-4">
           <p className="text-sm font-medium text-white/45">Current plan</p>
           <p className="mt-1 text-xl font-semibold text-white">
-            Buxme {getPlanDisplayName(currentPlan)}
+            Buxme {isFounder ? "Pro+" : getPlanDisplayName(currentPlan)}
           </p>
           <p className="mt-2 text-sm text-white/45">
-            {activePaid
-              ? subscription.cancelAtPeriodEnd
-                ? `Access until ${formatRenewalDate(subscription.currentPeriodEnd)}`
-                : `Renews ${formatRenewalDate(subscription.currentPeriodEnd)}`
-              : "Choose a paid plan to unlock household collaboration and advanced reports."}
+            {isFounder
+              ? "Premium access granted via Founder Mode."
+              : activePaid
+                ? subscription.cancelAtPeriodEnd
+                  ? `Access until ${formatRenewalDate(subscription.currentPeriodEnd)}`
+                  : `Renews ${formatRenewalDate(subscription.currentPeriodEnd)}`
+                : "Choose a paid plan to unlock household collaboration and advanced reports."}
           </p>
         </div>
 
@@ -346,7 +382,7 @@ export function BillingSection() {
           </Button>
         </div>
 
-        {!userHasPro && (
+        {!isFounder && !userHasPro && (
           <p className="text-xs text-white/35">
             Household collaboration requires{" "}
             <Link href="#billing" className="text-[#4da3ff] hover:text-[#0077ed]">
@@ -356,7 +392,7 @@ export function BillingSection() {
           </p>
         )}
 
-        {!userHasProPlus && (
+        {!isFounder && !userHasProPlus && (
           <p className="text-xs text-white/35">
             Advanced reports require{" "}
             <Link href="#billing" className="text-[#4da3ff] hover:text-[#0077ed]">

@@ -1,5 +1,6 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { isFounderEmail } from "@/lib/founder/emails";
 import { mapProfileToSubscription } from "@/lib/stripe/subscriptionMapper";
 import { getRequiredPlanForPath } from "@/lib/subscription/plans";
 import { hasMinimumPlan } from "@/lib/subscription/types";
@@ -45,9 +46,17 @@ export async function proxy(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
   const requiredPlan = getRequiredPlanForPath(pathname);
-  const stripeEnabled = process.env.NEXT_PUBLIC_STRIPE_ENABLED === "true";
+  if (user && requiredPlan) {
+    if (isFounderEmail(user.email)) {
+      return supabaseResponse;
+    }
 
-  if (user && requiredPlan && stripeEnabled) {
+    const stripeEnabled = process.env.NEXT_PUBLIC_STRIPE_ENABLED === "true";
+
+    if (!stripeEnabled) {
+      return supabaseResponse;
+    }
+
     const { data: profile } = await supabase
       .from("profiles")
       .select(

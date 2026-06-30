@@ -4,6 +4,7 @@ import { sendHouseholdInviteEmail } from "@/lib/email/householdInviteEmail";
 import { getSandboxDeliveryError } from "@/lib/email/sandbox";
 import { EmailNotConfiguredError } from "@/lib/email/sendEmail";
 import { getHouseholdInviteUrl } from "@/lib/household/inviteUrls";
+import { isFounderEmail } from "@/lib/founder/emails";
 import { mapProfileToSubscription } from "@/lib/stripe/subscriptionMapper";
 import { hasProAccess } from "@/lib/subscription/types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -79,6 +80,7 @@ export async function POST(request: Request) {
 
     if (
       process.env.NEXT_PUBLIC_STRIPE_ENABLED === "true" &&
+      !isFounderEmail(user.email) &&
       !hasProAccess(subscription)
     ) {
       return NextResponse.json(
