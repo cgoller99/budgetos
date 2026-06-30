@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { Button } from "@/components/ui";
 import { cn } from "@/components/ui/cn";
 import { useFinance } from "@/context/FinanceContext";
 import type { FinanceEventTone } from "@/lib/events/types";
@@ -9,7 +11,7 @@ import { formatEventTimestamp } from "@/lib/events";
 const toneClasses: Record<FinanceEventTone, string> = {
   positive: "text-emerald-400/90",
   negative: "text-rose-300/90",
-  neutral: "text-white/70",
+  neutral: "text-[var(--foreground)]",
   accent: "text-[#0077ed]",
 };
 
@@ -17,8 +19,11 @@ export function NotificationCenter() {
   const {
     notifications,
     unreadNotificationCount,
+    automationSuggestions,
     markNotificationRead,
     markAllNotificationsRead,
+    dismissAutomationSuggestion,
+    completeAutomationSuggestion,
   } = useFinance();
   const [isOpen, setIsOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -51,7 +56,7 @@ export function NotificationCenter() {
       <button
         type="button"
         onClick={handleOpen}
-        className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-white/[0.04] bg-white/[0.02] text-white/60 transition-colors hover:bg-white/[0.04] hover:text-white"
+        className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-subtle)] text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-border)] hover:text-[var(--foreground)]"
         aria-label="Notifications"
       >
         <span className="text-lg">🔔</span>
@@ -63,14 +68,16 @@ export function NotificationCenter() {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-14 z-50 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-3xl border border-white/[0.04] bg-[#0f1419] shadow-2xl shadow-black/40">
-          <div className="flex items-center justify-between border-b border-white/[0.04] px-5 py-4">
-            <p className="text-base font-semibold text-white">Notifications</p>
+        <div className="absolute right-0 top-14 z-50 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-3xl border border-[var(--surface-border)] bg-[var(--background)] shadow-2xl shadow-black/40">
+          <div className="flex items-center justify-between border-b border-[var(--surface-border)] px-5 py-4">
+            <p className="text-base font-semibold text-[var(--foreground)]">
+              Notifications
+            </p>
             {unreadNotificationCount > 0 && (
               <button
                 type="button"
                 onClick={markAllNotificationsRead}
-                className="text-sm text-white/45 transition-colors hover:text-white/70"
+                className="text-sm text-[var(--text-muted)] transition-colors hover:text-[var(--foreground)]"
               >
                 Mark all read
               </button>
@@ -79,18 +86,16 @@ export function NotificationCenter() {
 
           <div className="max-h-80 overflow-y-auto p-3">
             {notifications.length === 0 ? (
-              <p className="px-3 py-8 text-center text-base text-white/38">
+              <p className="px-3 py-8 text-center text-base text-[var(--text-muted)]">
                 You&apos;re all caught up.
               </p>
             ) : (
               <ul className="space-y-1">
                 {notifications.map((notification) => (
                   <li key={notification.id}>
-                    <button
-                      type="button"
-                      onClick={() => markNotificationRead(notification.id)}
+                    <div
                       className={cn(
-                        "w-full rounded-2xl px-4 py-4 text-left transition-colors hover:bg-white/[0.03]",
+                        "rounded-2xl px-4 py-4",
                         !notification.read && "bg-[#0077ed]/10",
                       )}
                     >
@@ -105,15 +110,67 @@ export function NotificationCenter() {
                           >
                             {notification.title}
                           </p>
-                          <p className="mt-1 text-sm text-white/38">
+                          <p className="mt-1 text-sm text-[var(--text-muted)]">
                             {notification.subtitle}
                           </p>
-                          <p className="mt-2 text-sm text-white/28">
+                          <p className="mt-2 text-sm text-[var(--text-muted)]">
                             {formatEventTimestamp(notification.timestamp)}
                           </p>
+
+                          {notification.actions ? (
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  const suggestion = automationSuggestions.find(
+                                    (item) =>
+                                      item.id ===
+                                      (notification.automationSuggestionId ??
+                                        notification.id),
+                                  );
+
+                                  if (suggestion) {
+                                    void completeAutomationSuggestion(suggestion);
+                                  }
+                                }}
+                              >
+                                {notification.actions.primary.label}
+                              </Button>
+                              {notification.actions.secondary && (
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={() =>
+                                    dismissAutomationSuggestion(
+                                      notification.automationSuggestionId ??
+                                        notification.id,
+                                    )
+                                  }
+                                >
+                                  {notification.actions.secondary.label}
+                                </Button>
+                              )}
+                              {notification.detailHref && (
+                                <Link
+                                  href={notification.detailHref}
+                                  className="self-center text-sm text-[#0077ed] hover:underline"
+                                >
+                                  View details
+                                </Link>
+                              )}
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => markNotificationRead(notification.id)}
+                              className="mt-3 text-sm text-[var(--text-muted)] transition-colors hover:text-[var(--foreground)]"
+                            >
+                              Mark read
+                            </button>
+                          )}
                         </div>
                       </div>
-                    </button>
+                    </div>
                   </li>
                 ))}
               </ul>

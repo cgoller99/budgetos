@@ -1,5 +1,6 @@
 "use client";
 
+import { SmartSuggestionsCard } from "@/components/automation/SmartSuggestionsCard";
 import { RecommendedSteps } from "@/components/guidance/RecommendedSteps";
 import { WelcomeChecklist } from "@/components/guidance/WelcomeChecklist";
 import { HealthScoreCard } from "@/components/HealthScoreCard";
@@ -40,11 +41,15 @@ export function DashboardContent() {
 
       <div className={dashboardSectionClassName}>
         <NextPaycheckCard />
-        <UpcomingIncomeCard />
+        <SmartSuggestionsCard />
       </div>
 
       <div className={dashboardSectionClassName}>
+        <UpcomingIncomeCard />
         <UpcomingBillsCard />
+      </div>
+
+      <div className={dashboardSectionClassName}>
         <NextGoalCard />
       </div>
 

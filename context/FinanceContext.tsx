@@ -64,6 +64,15 @@ import {
 } from "@/lib/events";
 import { normalizePaycheckAssignment } from "@/lib/finance/paycheckSplit";
 import { applyIncomePlanPaycheckToData } from "@/lib/incomePlan/applyPaycheck";
+import {
+  computeAutomationSuggestions,
+  dismissAutomationSuggestion as persistDismissedAutomationSuggestion,
+  getDismissedAutomationIds,
+} from "@/lib/automation";
+import { mergeAutomationNotifications } from "@/lib/automation/notifications";
+import type { AutomationSuggestion } from "@/lib/automation/types";
+import { registerAutomationProvider } from "@/lib/automation/registry";
+import { plaidAutomationProvider } from "@/lib/automation/providers/plaidAutomationProvider";
 import { normalizeBillCategory } from "@/lib/finance/billCategories";
 import type { DemoProfileId, OnboardingMode, OnboardingState } from "@/lib/onboarding/types";
 import {
@@ -163,6 +172,11 @@ export type FinanceContextValue = FinanceData & {
   markIncomePlanPaycheckReceived: (
     input?: MarkPaycheckReceivedInput,
   ) => Promise<void>;
+  automationSuggestions: AutomationSuggestion[];
+  dismissAutomationSuggestion: (suggestionId: string) => void;
+  completeAutomationSuggestion: (
+    suggestion: AutomationSuggestion,
+  ) => Promise<void>;
   markNotificationRead: (notificationId: string) => void;
   markAllNotificationsRead: () => void;
 };
@@ -232,6 +246,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
   const [demoProfileId, setDemoProfileId] = useState<DemoProfileId | null>(
     null,
   );
+  const [automationDismissRevision, setAutomationDismissRevision] = useState(0);
   const repositoryRef = useRef<FinanceService | null>(null);
   const userIdRef = useRef<string | null>(null);
   const dataRef = useRef<FinanceData>(emptyFinanceData);
@@ -239,6 +254,20 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
   useEffect(() => {
     dataRef.current = data;
   }, [data]);
+
+  useEffect(() => {
+    registerAutomationProvider(plaidAutomationProvider);
+  }, []);
+
+  const dismissedAutomationIds = useMemo(() => {
+    void automationDismissRevision;
+    return getDismissedAutomationIds();
+  }, [automationDismissRevision]);
+
+  const automationSuggestions = useMemo(
+    () => computeAutomationSuggestions(data, dismissedAutomationIds),
+    [data, dismissedAutomationIds],
+  );
 
   const refreshFinance = useCallback(async () => {
     const repository = repositoryRef.current;
@@ -1243,7 +1272,63 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
     [data, runMutation],
   );
 
+  const dismissAutomationSuggestionHandler = useCallback((suggestionId: string) => {
+    persistDismissedAutomationSuggestion(suggestionId);
+    setAutomationDismissRevision((value) => value + 1);
+  }, []);
+
+  const completeAutomationSuggestion = useCallback(
+    async (suggestion: AutomationSuggestion) => {
+      try {
+        switch (suggestion.primaryAction.type) {
+          case "create_bill": {
+            const payload = suggestion.primaryAction.payload ?? {};
+            await addBill({
+              name: String(payload.name ?? "Bill"),
+              amount: Number(payload.amount ?? 0),
+              dueDay: Number(payload.dueDay ?? 1),
+              autopay: Boolean(payload.autopay),
+              recurring: Boolean(payload.recurring ?? true),
+              category: String(payload.category ?? "Other"),
+            });
+            showToast({
+              title: "Recurring bill created",
+              subtitle: String(payload.name ?? "Your bill"),
+            });
+            break;
+          }
+          case "apply_paycheck":
+            await markIncomePlanPaycheckReceived();
+            showToast({
+              title: "Income Plan applied",
+              subtitle: "Allocations updated across your dashboard.",
+            });
+            break;
+          case "navigate":
+            if (suggestion.primaryAction.href) {
+              window.location.href = suggestion.primaryAction.href;
+            }
+            break;
+          default:
+            break;
+        }
+      } finally {
+        persistDismissedAutomationSuggestion(suggestion.id);
+        setAutomationDismissRevision((value) => value + 1);
+      }
+    },
+    [addBill, markIncomePlanPaycheckReceived, showToast],
+  );
+
   const hub = useMemo(() => computeFinanceHub(data), [data]);
+  const mergedNotifications = useMemo(
+    () => mergeAutomationNotifications(hub.notifications, automationSuggestions),
+    [automationSuggestions, hub.notifications],
+  );
+  const mergedUnreadCount = useMemo(
+    () => hub.unreadNotificationCount + automationSuggestions.length,
+    [automationSuggestions.length, hub.unreadNotificationCount],
+  );
   const isDemoMode = isUserInDemoMode(onboardingMode, data);
 
   const value = useMemo<FinanceContextValue>(
@@ -1251,8 +1336,9 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
       ...data,
       dashboard: hub.dashboard,
       recentActivity: hub.recentActivity,
-      notifications: hub.notifications,
-      unreadNotificationCount: hub.unreadNotificationCount,
+      notifications: mergedNotifications,
+      unreadNotificationCount: mergedUnreadCount,
+      automationSuggestions,
       isLoading,
       isSyncing,
       error,
@@ -1291,6 +1377,8 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
       deleteTransaction,
       saveIncomePlan,
       markIncomePlanPaycheckReceived,
+      dismissAutomationSuggestion: dismissAutomationSuggestionHandler,
+      completeAutomationSuggestion,
       markNotificationRead,
       markAllNotificationsRead,
     }),
@@ -1305,8 +1393,10 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
       applyTodayActivity,
       completeOnboarding,
       createGoal,
+      completeAutomationSuggestion,
       data,
       deleteBill,
+      dismissAutomationSuggestionHandler,
       deleteDebt,
       deleteIncome,
       deleteTransaction,
@@ -1321,9 +1411,10 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
       error,
       exitDemoMode,
       hub.dashboard,
-      hub.notifications,
       hub.recentActivity,
-      hub.unreadNotificationCount,
+      mergedNotifications,
+      mergedUnreadCount,
+      automationSuggestions,
       isLoading,
       isSyncing,
       isDemoMode,

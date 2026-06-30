@@ -61,6 +61,22 @@ export type NotificationItem = {
   tone: FinanceEventTone;
   timestamp: string;
   read: boolean;
+  automationSuggestionId?: string;
+  detailHref?: string;
+  actions?: {
+    primary: {
+      label: string;
+      type: string;
+      href?: string;
+      payload?: Record<string, unknown>;
+    };
+    secondary?: {
+      label: string;
+      type: string;
+      href?: string;
+      payload?: Record<string, unknown>;
+    };
+  };
 };
 
 export const MAX_EVENT_HISTORY = 200;
