@@ -475,6 +475,28 @@ export type AddTransactionInput = {
 
 export type EditTransactionInput = AddTransactionInput;
 
+export type StoredEnvelopeBalance = {
+  id: string;
+  allocationId: string | null;
+  envelopeType: string;
+  entityId: string | null;
+  name: string;
+  icon: string;
+  balance: number;
+  target: number | null;
+  contributionAmount: number | null;
+  contributionFrequency: string | null;
+  progress: number;
+  nextContributionDate: string | null;
+  history: Array<{
+    date: string;
+    amount: number;
+    source: string;
+    ledgerEntryId: string;
+  }>;
+  updatedAt: string;
+};
+
 export type FinanceData = {
   accounts: Account[];
   bills: Bill[];
@@ -486,6 +508,8 @@ export type FinanceData = {
   events: FinanceEvent[];
   incomePlan: IncomePlan | null;
   incomePlanPaychecks: IncomePlanPaycheckEvent[];
+  envelopeBalances: StoredEnvelopeBalance[];
+  allocationLedger: import("@/lib/allocation/types").AllocationLedgerEntry[];
   bankConnections: BankConnection[];
   plaidRecurringDismissals: string[];
 };

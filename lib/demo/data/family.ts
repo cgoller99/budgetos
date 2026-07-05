@@ -227,6 +227,8 @@ export const familyDemoData: FinanceData = {
   events: [],
   incomePlan: null,
   incomePlanPaychecks: [],
+  envelopeBalances: [],
+  allocationLedger: [],
   bankConnections: [],
   plaidRecurringDismissals: [],
 };

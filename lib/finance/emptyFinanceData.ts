@@ -13,6 +13,8 @@ export const emptyFinanceData: FinanceData = {
   events: [],
   incomePlan: null,
   incomePlanPaychecks: [],
+  envelopeBalances: [],
+  allocationLedger: [],
   bankConnections: [],
   plaidRecurringDismissals: [],
 };
@@ -85,6 +87,8 @@ export function coerceFinanceData(
     events,
     incomePlan: data.incomePlan ?? null,
     incomePlanPaychecks: data.incomePlanPaychecks ?? [],
+    envelopeBalances: data.envelopeBalances ?? [],
+    allocationLedger: data.allocationLedger ?? [],
     bankConnections: data.bankConnections ?? [],
     plaidRecurringDismissals: data.plaidRecurringDismissals ?? [],
   };

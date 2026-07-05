@@ -32,11 +32,19 @@ function mapAllocationRow(row: IncomePlanAllocationRow): IncomePlanAllocation {
     name: row.name,
     icon: row.icon,
     amount: row.amount === null ? null : toNumber(row.amount),
+    percentage: row.percentage === null ? null : toNumber(row.percentage),
+    allocationType: (row.allocation_type as IncomePlanAllocation["allocationType"]) ?? null,
     isRemainingBalance: row.is_remaining_balance,
     accountId: row.account_id,
     goalId: row.goal_id,
+    billId: row.bill_id ?? null,
+    debtId: row.debt_id ?? null,
+    investmentId: row.investment_id ?? null,
     monthlyTarget:
       row.monthly_target === null ? null : toNumber(row.monthly_target),
+    contributionFrequency:
+      (row.contribution_frequency as IncomePlanAllocation["contributionFrequency"]) ??
+      null,
     sortOrder: row.sort_order,
   };
 }
@@ -231,10 +239,16 @@ export class IncomePlanRepository {
           name: allocation.name.trim(),
           icon: allocation.icon,
           amount: allocation.isRemainingBalance ? null : allocation.amount,
+          percentage: allocation.percentage,
+          allocation_type: allocation.allocationType ?? (allocation.isRemainingBalance ? "remaining" : allocation.percentage ? "percentage" : "fixed"),
           is_remaining_balance: allocation.isRemainingBalance,
           account_id: allocation.accountId,
           goal_id: allocation.goalId,
+          bill_id: allocation.billId,
+          debt_id: allocation.debtId,
+          investment_id: allocation.investmentId,
           monthly_target: allocation.monthlyTarget,
+          contribution_frequency: allocation.contributionFrequency,
           sort_order: allocation.sortOrder ?? index,
           created_at: timestamp,
           updated_at: timestamp,

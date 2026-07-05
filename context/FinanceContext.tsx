@@ -180,6 +180,7 @@ export type FinanceContextValue = FinanceData & {
   markIncomePlanPaycheckReceived: (
     input?: MarkPaycheckReceivedInput,
   ) => Promise<void>;
+  runIncomePlan: (input?: MarkPaycheckReceivedInput) => Promise<void>;
   automationSuggestions: AutomationSuggestion[];
   dismissAutomationSuggestion: (suggestionId: string) => void;
   dismissAutomationSuggestionPermanently: (
@@ -1475,6 +1476,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
       deleteTransaction,
       saveIncomePlan,
       markIncomePlanPaycheckReceived,
+      runIncomePlan: markIncomePlanPaycheckReceived,
       dismissAutomationSuggestion: dismissAutomationSuggestionHandler,
       dismissAutomationSuggestionPermanently,
       completeAutomationSuggestion,

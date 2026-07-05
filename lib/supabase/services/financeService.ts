@@ -58,6 +58,7 @@ import {
   mapFinanceData,
 } from "@/lib/supabase/mappers";
 import { NotificationsRepository } from "@/lib/supabase/repositories/notificationsRepository";
+import { AllocationRepository } from "@/lib/supabase/repositories/allocationRepository";
 import { IncomePlanRepository } from "@/lib/supabase/repositories/incomePlanRepository";
 import { ProfilesRepository } from "@/lib/supabase/repositories/profilesRepository";
 import { RecurringItemsRepository } from "@/lib/supabase/repositories/recurringItemsRepository";
@@ -76,6 +77,7 @@ import type { OnboardingState } from "@/lib/onboarding/types";
 export class FinanceService {
   private readonly notifications: NotificationsRepository;
   private readonly incomePlans: IncomePlanRepository;
+  private readonly allocations: AllocationRepository;
   private readonly profiles: ProfilesRepository;
   private readonly recurringItems: RecurringItemsRepository;
   private readonly bankConnections: BankConnectionsRepository;
@@ -83,6 +85,7 @@ export class FinanceService {
   constructor(private readonly supabase: BuxmeSupabaseClient) {
     this.notifications = new NotificationsRepository(supabase);
     this.incomePlans = new IncomePlanRepository(supabase);
+    this.allocations = new AllocationRepository(supabase);
     this.profiles = new ProfilesRepository(supabase);
     this.recurringItems = new RecurringItemsRepository(supabase);
     this.bankConnections = new BankConnectionsRepository(supabase);
@@ -197,6 +200,7 @@ export class FinanceService {
     }
 
     const incomePlanData = await this.incomePlans.loadIncomePlanData(userId);
+    const allocationData = await this.allocations.loadAllocationData(userId);
     const [connectionRows, recurringDismissals] = await Promise.all([
       this.bankConnections.listConnections(userId),
       this.bankConnections.listRecurringDismissals(userId),
@@ -216,6 +220,8 @@ export class FinanceService {
       ...mapped,
       incomePlan: incomePlanData.incomePlan,
       incomePlanPaychecks: incomePlanData.incomePlanPaychecks,
+      envelopeBalances: allocationData.envelopeBalances,
+      allocationLedger: allocationData.allocationLedger,
       bankConnections: connectionRows.map(mapBankConnectionRow),
       plaidRecurringDismissals: recurringDismissals,
     };
@@ -1050,6 +1056,19 @@ export class FinanceService {
         userId,
         next.incomePlan,
         paycheckEvent,
+      );
+
+      const newLedgerIds = (next.allocationLedger ?? [])
+        .filter((entry) => entry.paycheckEventId === paycheckEvent.id)
+        .map((entry) => entry.id);
+
+      await this.allocations.persistPaycheckAllocationState(
+        userId,
+        {
+          envelopeBalances: next.envelopeBalances ?? [],
+          allocationLedger: next.allocationLedger ?? [],
+        },
+        newLedgerIds,
       );
     }
 

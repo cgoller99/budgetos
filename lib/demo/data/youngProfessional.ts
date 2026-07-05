@@ -173,6 +173,8 @@ export const youngProfessionalDemoData: FinanceData = {
   events: [],
   incomePlan: null,
   incomePlanPaychecks: [],
+  envelopeBalances: [],
+  allocationLedger: [],
   bankConnections: [],
   plaidRecurringDismissals: [],
 };

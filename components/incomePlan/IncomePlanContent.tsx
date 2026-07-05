@@ -14,7 +14,9 @@ import {
 } from "@/components/ui";
 import { pageContainerWideClassName } from "@/components/ui/tokens";
 import { AllocationSummary } from "@/components/incomePlan/AllocationSummary";
+import { EnvelopeBalancesCard } from "@/components/incomePlan/EnvelopeBalancesCard";
 import { MonthlyAllocationProgress, NextPaycheckCard } from "@/components/incomePlan/NextPaycheckCard";
+import { PaycheckDetectedPromptList } from "@/components/incomePlan/PaycheckDetectedPrompt";
 import { useFinance } from "@/context/FinanceContext";
 import { useToast } from "@/context/ToastContext";
 import {
@@ -56,40 +58,64 @@ function defaultAllocations(): AllocationDraft[] {
       name: "House Savings",
       icon: "🏠",
       amount: null,
+      percentage: null,
+      allocationType: null,
       isRemainingBalance: false,
       accountId: null,
       goalId: null,
+      billId: null,
+      debtId: null,
+      investmentId: null,
       monthlyTarget: null,
+      contributionFrequency: null,
       sortOrder: 0,
     },
     {
       name: "Vacation",
       icon: "✈️",
       amount: null,
+      percentage: null,
+      allocationType: null,
       isRemainingBalance: false,
       accountId: null,
       goalId: null,
+      billId: null,
+      debtId: null,
+      investmentId: null,
       monthlyTarget: null,
+      contributionFrequency: null,
       sortOrder: 1,
     },
     {
       name: "Bills",
       icon: "💳",
       amount: null,
+      percentage: null,
+      allocationType: null,
       isRemainingBalance: false,
       accountId: null,
       goalId: null,
+      billId: null,
+      debtId: null,
+      investmentId: null,
       monthlyTarget: null,
+      contributionFrequency: null,
       sortOrder: 2,
     },
     {
       name: "Spending",
       icon: "🛍️",
       amount: null,
+      percentage: null,
+      allocationType: null,
       isRemainingBalance: true,
       accountId: null,
       goalId: null,
+      billId: null,
+      debtId: null,
+      investmentId: null,
       monthlyTarget: null,
+      contributionFrequency: null,
       sortOrder: 3,
     },
   ];
@@ -101,6 +127,7 @@ export function IncomePlanContent() {
   const [step, setStep] = useState<SetupStep>(1);
   const [isSaving, setIsSaving] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [isRunningPlan, setIsRunningPlan] = useState(false);
 
   const existing = finance.incomePlan;
 
@@ -305,10 +332,16 @@ export function IncomePlanContent() {
         name: "New category",
         icon: "💵",
         amount: null,
+        percentage: null,
+        allocationType: null,
         isRemainingBalance: false,
         accountId: null,
         goalId: null,
+        billId: null,
+        debtId: null,
+        investmentId: null,
         monthlyTarget: null,
+        contributionFrequency: null,
         sortOrder: previous.length,
       },
     ]);
@@ -346,16 +379,42 @@ export function IncomePlanContent() {
     );
   }
 
+  async function handleRunIncomePlan() {
+    setIsRunningPlan(true);
+
+    try {
+      await finance.runIncomePlan();
+      showToast({
+        title: "Income Plan applied",
+        subtitle: "Money moved to your envelopes automatically.",
+      });
+    } catch {
+      // Error toast handled by FinanceContext
+    } finally {
+      setIsRunningPlan(false);
+    }
+  }
+
   if (existing && !showSettings) {
     return (
       <div className={cn(pageContainerWideClassName, "space-y-6")}>
         <PageHeader
           action={
-            <Button variant="secondary" onClick={() => setShowSettings(true)}>
-              Edit plan
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                disabled={isRunningPlan || finance.isSyncing}
+                onClick={() => void handleRunIncomePlan()}
+              >
+                {isRunningPlan ? "Running…" : "Run Income Plan"}
+              </Button>
+              <Button variant="secondary" onClick={() => setShowSettings(true)}>
+                Edit plan
+              </Button>
+            </div>
           }
         />
+
+        <PaycheckDetectedPromptList />
 
         <p className="text-sm text-[var(--text-muted)]">
           {describePaySchedule(existing)} · {formatCurrency(existing.paycheckAmount)} per paycheck
@@ -365,6 +424,8 @@ export function IncomePlanContent() {
           <NextPaycheckCard />
           <MonthlyAllocationProgress />
         </div>
+
+        <EnvelopeBalancesCard />
 
         <Card padding="lg">
           <CardHeader title="Allocation rules" />

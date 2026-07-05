@@ -1,8 +1,14 @@
+import type { ContributionFrequency } from "@/lib/recurring/types";
+
+export type AllocationType = "fixed" | "percentage" | "remaining";
+
 export type IncomePlanSchedule =
   | "weekly"
   | "biweekly"
   | "twice_monthly"
   | "monthly"
+  | "quarterly"
+  | "yearly"
   | "custom";
 
 export type IncomePlanAllocation = {
@@ -10,10 +16,16 @@ export type IncomePlanAllocation = {
   name: string;
   icon: string;
   amount: number | null;
+  percentage?: number | null;
+  allocationType?: AllocationType | null;
   isRemainingBalance: boolean;
   accountId: string | null;
   goalId: string | null;
+  billId?: string | null;
+  debtId?: string | null;
+  investmentId?: string | null;
   monthlyTarget: number | null;
+  contributionFrequency?: ContributionFrequency | IncomePlanSchedule | null;
   sortOrder: number;
 };
 
@@ -90,6 +102,8 @@ export const INCOME_PLAN_SCHEDULE_LABELS: Record<IncomePlanSchedule, string> = {
   biweekly: "Every two weeks",
   twice_monthly: "Twice a month",
   monthly: "Monthly",
+  quarterly: "Quarterly",
+  yearly: "Yearly",
   custom: "Custom schedule",
 };
 

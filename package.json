@@ -14,6 +14,7 @@
     "apply:household-invite-migration": "node scripts/apply-household-invite-migration.mjs",
     "apply:household-invite-dedupe": "node scripts/apply-household-invite-dedupe.mjs",
     "apply:income-plans-migration": "node scripts/apply-income-plans-migration.mjs",
+    "apply:allocation-migration": "node scripts/apply-allocation-migration.mjs",
     "apply:plaid-migration": "node scripts/apply-plaid-migration.mjs",
     "apply:stripe-migration": "node scripts/apply-stripe-migration.mjs",
     "create:stripe-prices": "node --env-file=.env.local scripts/create-stripe-prices.mjs",

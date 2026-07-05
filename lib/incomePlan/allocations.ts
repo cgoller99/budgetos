@@ -5,6 +5,10 @@ import type {
   IncomePlanPaycheckEvent,
   ResolvedAllocation,
 } from "@/lib/incomePlan/types";
+import {
+  resolveAllocations,
+  validateAllocationPlan,
+} from "@/lib/allocation/allocationEngine";
 import { getCurrentYearMonth } from "@/lib/finance/bills";
 
 function roundCurrency(value: number): number {
@@ -73,59 +77,20 @@ export function validateAllocations(
   paycheckAmount: number,
   allocations: Pick<
     IncomePlanAllocation,
-    "amount" | "isRemainingBalance"
+    "amount" | "isRemainingBalance" | "percentage" | "allocationType"
   >[],
 ): string | null {
-  const summary = getAllocationSummary(paycheckAmount, allocations);
-
-  if (summary.remainingBalanceCount > 1) {
-    return "Only one category can be Remaining Balance.";
-  }
-
-  if (summary.remainingBalanceCount === 0) {
-    return "Choose one category as Remaining Balance.";
-  }
-
-  if (summary.isOverAllocated) {
-    return `Your allocations exceed this paycheck by $${summary.overBy.toFixed(2)}.`;
-  }
-
-  return null;
+  return validateAllocationPlan(
+    paycheckAmount,
+    allocations as IncomePlanAllocation[],
+  );
 }
 
 export function resolveAllocationAmounts(
   plan: Pick<IncomePlan, "paycheckAmount" | "allocations">,
   customAmounts?: Record<string, number>,
 ): ResolvedAllocation[] {
-  const sorted = [...plan.allocations].sort(
-    (left, right) => left.sortOrder - right.sortOrder,
-  );
-  const remaining = sorted.find((item) => item.isRemainingBalance);
-  const fixed = sorted.filter((item) => !item.isRemainingBalance);
-
-  const fixedTotal = fixed.reduce((total, item) => {
-    const override = customAmounts?.[item.id];
-    const amount = override ?? item.amount ?? 0;
-    return total + amount;
-  }, 0);
-
-  const remainingAmount = roundCurrency(
-    Math.max(plan.paycheckAmount - fixedTotal, 0),
-  );
-
-  const resolved: ResolvedAllocation[] = fixed.map((allocation) => ({
-    allocation,
-    amount: roundCurrency(customAmounts?.[allocation.id] ?? allocation.amount ?? 0),
-  }));
-
-  if (remaining) {
-    resolved.push({
-      allocation: remaining,
-      amount: remainingAmount,
-    });
-  }
-
-  return resolved;
+  return resolveAllocations(plan, customAmounts);
 }
 
 export function getDefaultMonthlyTarget(

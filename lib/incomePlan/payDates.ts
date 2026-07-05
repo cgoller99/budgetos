@@ -122,6 +122,12 @@ export function computeNextPayDate(
         referenceDate,
       );
       break;
+    case "quarterly":
+      next = nextCustomIntervalDate(anchor, 91, referenceDate);
+      break;
+    case "yearly":
+      next = nextCustomIntervalDate(anchor, 365, referenceDate);
+      break;
     case "custom":
       next = nextCustomIntervalDate(
         anchor,
@@ -216,11 +222,17 @@ export function getPayDatesInMonth(
         break;
       case "biweekly":
       case "custom":
+      case "quarterly":
+      case "yearly":
         cursor = addDays(
           cursor,
           plan.paySchedule === "custom"
             ? Math.max(plan.customIntervalDays ?? 14, 1)
-            : 14,
+            : plan.paySchedule === "quarterly"
+              ? 91
+              : plan.paySchedule === "yearly"
+                ? 365
+                : 14,
         );
         break;
       default:
@@ -324,6 +336,10 @@ export function describePaySchedule(plan: IncomePlan): string {
       if (day === 1) return "1st of each month";
       return `${day}th of each month`;
     }
+    case "quarterly":
+      return "Every 3 months";
+    case "yearly":
+      return "Once a year";
     case "custom":
       return `Every ${plan.customIntervalDays ?? 14} days`;
     default:

@@ -95,6 +95,31 @@ export function applyGoalContributionEffect(
   };
 }
 
+export function applyDebtPaymentEffect(
+  data: FinanceData,
+  transaction: Transaction,
+  direction: 1 | -1 = 1,
+): FinanceData {
+  if (transaction.type !== "expense" || !transaction.debtId) {
+    return data;
+  }
+
+  const payment = transaction.amount * direction;
+
+  return {
+    ...data,
+    debts: data.debts.map((debt) =>
+      debt.id === transaction.debtId
+        ? {
+            ...debt,
+            balance: Math.max(debt.balance - payment, 0),
+            monthlyChange: -payment,
+          }
+        : debt,
+    ),
+  };
+}
+
 export function addTransactionToData(
   data: FinanceData,
   transaction: Transaction,

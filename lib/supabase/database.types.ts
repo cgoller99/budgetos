@@ -539,10 +539,16 @@ export type IncomePlanAllocationRow = {
   name: string;
   icon: string;
   amount: number | null;
+  percentage: number | null;
+  allocation_type: string | null;
   is_remaining_balance: boolean;
   account_id: string | null;
   goal_id: string | null;
+  bill_id: string | null;
+  debt_id: string | null;
+  investment_id: string | null;
   monthly_target: number | null;
+  contribution_frequency: string | null;
   sort_order: number;
   created_at: string;
   updated_at: string;
@@ -567,6 +573,44 @@ export type IncomePlanAllocationEventRow = {
   user_id: string;
   amount: number;
   transaction_id: string | null;
+  created_at: string;
+};
+
+export type EnvelopeBalanceRow = {
+  id: string;
+  user_id: string;
+  household_id: string | null;
+  allocation_id: string | null;
+  envelope_type: string;
+  entity_id: string | null;
+  name: string;
+  icon: string;
+  balance: number;
+  target: number | null;
+  contribution_amount: number | null;
+  contribution_frequency: string | null;
+  progress: number;
+  next_contribution_date: string | null;
+  history: unknown;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AllocationLedgerRow = {
+  id: string;
+  user_id: string;
+  household_id: string | null;
+  paycheck_event_id: string | null;
+  allocation_id: string | null;
+  source_account_id: string | null;
+  destination_type: string;
+  destination_id: string | null;
+  destination_name: string;
+  amount: number;
+  transfer_date: string;
+  frequency: string | null;
+  transaction_id: string | null;
+  entry_type: string;
   created_at: string;
 };
 
@@ -724,6 +768,18 @@ export type Database = {
       };
       income_plan_allocation_events: {
         Row: IncomePlanAllocationEventRow;
+        Insert: Record<string, unknown>;
+        Update: Record<string, unknown>;
+        Relationships: [];
+      };
+      envelope_balances: {
+        Row: EnvelopeBalanceRow;
+        Insert: Record<string, unknown>;
+        Update: Record<string, unknown>;
+        Relationships: [];
+      };
+      allocation_ledger: {
+        Row: AllocationLedgerRow;
         Insert: Record<string, unknown>;
         Update: Record<string, unknown>;
         Relationships: [];

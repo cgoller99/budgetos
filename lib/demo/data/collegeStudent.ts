@@ -123,6 +123,8 @@ export const collegeStudentDemoData: FinanceData = {
   events: [],
   incomePlan: null,
   incomePlanPaychecks: [],
+  envelopeBalances: [],
+  allocationLedger: [],
   bankConnections: [],
   plaidRecurringDismissals: [],
 };

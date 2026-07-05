@@ -375,6 +375,8 @@ export function mapFinanceData(
     events,
     incomePlan: null,
     incomePlanPaychecks: [],
+    envelopeBalances: [],
+    allocationLedger: [],
     bankConnections: [],
     plaidRecurringDismissals: [],
   };
