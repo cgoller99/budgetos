@@ -1,6 +1,7 @@
-import { computeDashboard } from "@/lib/finance/computeDashboard";
+import { computeFinancialEngine } from "@/lib/finance/financialEngine";
 import { coerceFinanceData, emptyFinanceData } from "@/lib/finance/emptyFinanceData";
 import type { DashboardData, FinanceData } from "@/lib/finance/types";
+import type { FinancialSnapshot } from "@/lib/finance/financialEngine";
 import {
   getNotifications,
   getRecentActivity,
@@ -9,6 +10,7 @@ import {
 import type { ActivityItem, NotificationItem } from "@/lib/events/types";
 
 export type FinanceHubData = {
+  snapshot: FinancialSnapshot;
   dashboard: DashboardData;
   recentActivity: ActivityItem[];
   notifications: NotificationItem[];
@@ -19,15 +21,21 @@ export function computeFinanceHub(data: FinanceData): FinanceHubData {
   const safeData = coerceFinanceData(data);
 
   try {
+    const { snapshot, dashboard } = computeFinancialEngine(safeData);
+
     return {
-      dashboard: computeDashboard(safeData),
+      snapshot,
+      dashboard,
       recentActivity: getRecentActivity(safeData),
       notifications: getNotifications(safeData),
       unreadNotificationCount: getUnreadNotificationCount(safeData),
     };
   } catch {
+    const { snapshot, dashboard } = computeFinancialEngine(emptyFinanceData);
+
     return {
-      dashboard: computeDashboard(emptyFinanceData),
+      snapshot,
+      dashboard,
       recentActivity: [],
       notifications: [],
       unreadNotificationCount: 0,

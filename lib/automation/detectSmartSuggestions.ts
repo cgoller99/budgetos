@@ -18,7 +18,7 @@ export function detectSmartSuggestions(
 ): AutomationSuggestion[] {
   const suggestions: AutomationSuggestion[] = [];
   const dashboard = computeDashboard(data);
-  const safeCash = dashboard.billsSummary.safeToSpendAfterUpcomingBills;
+  const safeCash = dashboard.moneyFlow.safeToSpend;
 
   const fundableGoal = data.savingsGoals
     .map((goal) => ({
@@ -70,11 +70,11 @@ export function detectSmartSuggestions(
       priority: 65,
       timestamp: referenceDate.toISOString(),
       provider: "buxme",
-      detailHref: "/income/plan",
+      detailHref: "/income?tab=plan",
       primaryAction: {
         label: "View Income Plan",
         type: "navigate",
-        href: "/income/plan",
+        href: "/income?tab=plan",
       },
       secondaryAction: {
         label: "Dismiss",
@@ -136,11 +136,11 @@ export function detectSmartSuggestions(
         provider: "buxme",
         entityId: allocation.id,
         entityType: "allocation",
-        detailHref: "/income/plan",
+        detailHref: "/income?tab=plan",
         primaryAction: {
           label: "View plan",
           type: "navigate",
-          href: "/income/plan",
+          href: "/income?tab=plan",
         },
         secondaryAction: {
           label: "Dismiss",

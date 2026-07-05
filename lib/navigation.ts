@@ -18,14 +18,7 @@ export const NAV_ROUTES = [
     icon: "income",
     href: "/income",
     eyebrow: "Cash Flow",
-    subtitle: "Track paychecks and other money coming in.",
-  },
-  {
-    label: "Income Plan",
-    icon: "income",
-    href: "/income/plan",
-    eyebrow: "Cash Flow",
-    subtitle: "Decide where every paycheck goes.",
+    subtitle: "Paychecks, your plan, history, and forecasts.",
   },
   {
     label: "Bills",
@@ -39,7 +32,7 @@ export const NAV_ROUTES = [
     icon: "calendar",
     href: "/calendar",
     eyebrow: "Cash Flow",
-    subtitle: "View bills by date.",
+    subtitle: "See bills, income, and contributions by date.",
   },
   {
     label: "Transactions",
@@ -56,18 +49,18 @@ export const NAV_ROUTES = [
     subtitle: "Set goals and watch progress grow.",
   },
   {
-    label: "Roadmap",
-    icon: "roadmap",
-    href: "/roadmap",
-    eyebrow: "Goals",
-    subtitle: "See your next money milestones.",
-  },
-  {
     label: "Debt",
     icon: "debt",
     href: "/debt",
     eyebrow: "Liabilities",
     subtitle: "Plan balances and payoff progress.",
+  },
+  {
+    label: "Investments",
+    icon: "reports",
+    href: "/investments",
+    eyebrow: "Growth",
+    subtitle: "Track portfolios and recurring contributions.",
   },
   {
     label: "Reports",
@@ -85,16 +78,48 @@ export const NAV_ROUTES = [
   },
 ] as const;
 
+/** Secondary routes surfaced in mobile “More” and search. */
+/** Secondary routes (not in main sidebar). */
+export const NAV_SECONDARY_ROUTES = [
+  {
+    label: "What's New",
+    icon: "reports",
+    href: "/whats-new",
+    eyebrow: "Product",
+    subtitle: "Release notes and product updates.",
+  },
+] as const;
+
+export const NAV_MORE_ROUTES = [
+  {
+    label: "Roadmap",
+    icon: "roadmap",
+    href: "/roadmap",
+    eyebrow: "Goals",
+    subtitle: "See your next money milestones.",
+  },
+] as const;
+
 export type NavRoute = (typeof NAV_ROUTES)[number];
+export type NavSecondaryRoute = (typeof NAV_SECONDARY_ROUTES)[number];
+export type NavMoreRoute = (typeof NAV_MORE_ROUTES)[number];
 export type NavItem = NavRoute["label"];
 
 export const NAV_ITEMS: NavItem[] = NAV_ROUTES.map((route) => route.label);
 
-export function getNavRoute(href: string): NavRoute | undefined {
-  return NAV_ROUTES.find((route) => route.href === href);
+export const ALL_NAV_ROUTES = [
+  ...NAV_ROUTES,
+  ...NAV_SECONDARY_ROUTES,
+  ...NAV_MORE_ROUTES,
+] as const;
+
+export function getNavRoute(href: string): NavRoute | NavSecondaryRoute | NavMoreRoute | undefined {
+  return ALL_NAV_ROUTES.find((route) => route.href === href);
 }
 
-export function getRequiredNavRoute(href: NavRoute["href"]): NavRoute {
+export function getRequiredNavRoute(
+  href: (typeof ALL_NAV_ROUTES)[number]["href"],
+): NavRoute | NavSecondaryRoute | NavMoreRoute {
   const route = getNavRoute(href);
 
   if (!route) {
@@ -103,3 +128,6 @@ export function getRequiredNavRoute(href: NavRoute["href"]): NavRoute {
 
   return route;
 }
+
+/** @deprecated Use /income?tab=plan */
+export const INCOME_PLAN_HREF = "/income?tab=plan";

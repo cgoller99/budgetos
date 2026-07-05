@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { href: "/admin#health", label: "System" },
   { href: "/admin#logs", label: "Logs" },
   { href: "/admin#beta", label: "Beta" },
+  { href: "/admin#releases", label: "Releases" },
 ] as const;
 
 export function AdminShell({ children }: { children: React.ReactNode }) {

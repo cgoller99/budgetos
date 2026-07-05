@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { PageIntro } from "@/components/guidance/PageIntro";
+import { ProfileMenu } from "@/components/navigation/ProfileMenu";
 import { GlobalSearch } from "@/components/search/GlobalSearch";
 import { getNavRoute } from "@/lib/navigation";
 
@@ -28,6 +29,7 @@ export function TopBar({
         <div className="flex shrink-0 items-center gap-2 sm:gap-4">
           <GlobalSearch />
           {notificationCenter}
+          <ProfileMenu />
         </div>
       </header>
     </>

@@ -48,6 +48,14 @@ export function setNotificationPreferences(
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(preferences));
 }
 
+/** Hydrate local cache from server-stored profile preferences. */
+export function syncNotificationPreferencesFromServer(
+  preferences: NotificationPreferences,
+): NotificationPreferences {
+  setNotificationPreferences(preferences);
+  return preferences;
+}
+
 export function isNotificationCategoryEnabled(
   category: NotificationCategory,
 ): boolean {

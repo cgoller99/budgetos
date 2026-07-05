@@ -1,5 +1,6 @@
 import { toMonthlyAmount } from "@/lib/calculations/monthlyAmount";
 import { calculateMonthlyIncome, calculateMonthlySpending } from "@/lib/calculations/cashFlow";
+import { getSafeToSpend } from "@/lib/finance/safeToSpend";
 import { isCashAccountType } from "@/lib/finance/accountTypes";
 import {
   getSplitPaidAmount,
@@ -483,10 +484,7 @@ export function getBillsDashboardSummary(
     monthlyCashRemaining:
       calculateMonthlyIncome(data, referenceDate) -
       calculateMonthlySpending(data, referenceDate),
-    safeToSpendAfterUpcomingBills: Math.max(
-      0,
-      getTotalCashBalance(data) - dueThisWeekAmount,
-    ),
+    safeToSpendAfterUpcomingBills: getSafeToSpend(data, referenceDate),
   };
 }
 

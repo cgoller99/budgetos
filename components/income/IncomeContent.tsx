@@ -23,7 +23,7 @@ import {
 import type { IncomeSource } from "@/lib/finance/types";
 import { cn } from "@/components/ui/cn";
 
-export function IncomeContent() {
+export function IncomeContent({ embedded = false }: { embedded?: boolean }) {
   const finance = useFinance();
   const {
     isLoading,
@@ -118,12 +118,18 @@ export function IncomeContent() {
     : "No active income";
 
   return (
-    <div className={cn(pageContainerWideClassName)}>
-      <PageHeader
-        action={
+    <div className={cn(!embedded && pageContainerWideClassName)}>
+      {!embedded ? (
+        <PageHeader
+          action={
+            <Button onClick={() => setIsCreateOpen(true)}>Add income source</Button>
+          }
+        />
+      ) : (
+        <div className="flex justify-end">
           <Button onClick={() => setIsCreateOpen(true)}>Add income source</Button>
-        }
-      />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard

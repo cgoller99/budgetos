@@ -5,7 +5,7 @@ import {
   sidebarActiveClassName,
   sidebarInactiveClassName,
 } from "@/components/ui/tokens";
-import { NAV_ROUTES } from "@/lib/navigation";
+import { NAV_MORE_ROUTES, NAV_ROUTES } from "@/lib/navigation";
 
 type SidebarProps = {
   className?: string;
@@ -54,6 +54,27 @@ export function Sidebar({ className = "", activeHref = "/dashboard" }: SidebarPr
                     : "bg-[var(--surface-subtle)] text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]",
                 )}
               >
+                <NavIcon name={route.icon} />
+              </span>
+              {route.label}
+            </Link>
+          );
+        })}
+        <div className="my-3 border-t border-[var(--surface-border)]" />
+        {NAV_MORE_ROUTES.map((route) => {
+          const isActive = route.href === activeHref;
+
+          return (
+            <Link
+              key={route.href}
+              href={route.href}
+              aria-current={isActive ? "page" : undefined}
+              className={cn(
+                "focus-ring flex min-h-11 items-center gap-3 rounded-2xl px-3.5 py-3 text-[15px] font-medium transition-all duration-200 ease-out",
+                isActive ? sidebarActiveClassName : sidebarInactiveClassName,
+              )}
+            >
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[var(--surface-subtle)] text-[var(--text-muted)]">
                 <NavIcon name={route.icon} />
               </span>
               {route.label}

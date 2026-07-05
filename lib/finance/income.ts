@@ -1,3 +1,4 @@
+import { calculateMonthlyIncome } from "@/lib/calculations/cashFlow";
 import { toMonthlyAmount } from "@/lib/calculations/monthlyAmount";
 import { startOfDay } from "@/lib/finance/bills";
 import type {
@@ -219,7 +220,7 @@ export function getIncomeDashboardSummary(
   referenceDate = new Date(),
 ): IncomeDashboardSummary {
   const normalized = normalizeRecurringFinanceData(data, referenceDate);
-  const monthlyIncome = getRecurringMonthlyIncome(normalized);
+  const monthlyIncome = calculateMonthlyIncome(normalized, referenceDate);
   const sourceCount = normalized.income.length;
   const activeSourceCount = normalized.income.filter(
     (source) => source.schedule?.status !== "paused",

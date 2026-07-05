@@ -13,11 +13,11 @@ import { useAuth } from "@/context/AuthContext";
 import { useFinance } from "@/context/FinanceContext";
 import { useToast } from "@/context/ToastContext";
 import { DEMO_PROFILES, getDemoProfile } from "@/lib/demo/profiles";
-import { formatBuildLabel, getBuildInfo } from "@/lib/buildInfo";
 import {
   DEFAULT_NOTIFICATION_PREFERENCES,
   getNotificationPreferences,
   setNotificationPreferences,
+  syncNotificationPreferencesFromServer,
   type NotificationCategory,
   type NotificationPreferences,
 } from "@/lib/notifications/preferences";
@@ -166,9 +166,6 @@ export function SettingsContent() {
   const [notificationPrefs, setNotificationPrefs] = useState<NotificationPreferences>(
     DEFAULT_NOTIFICATION_PREFERENCES,
   );
-  const buildInfo = getBuildInfo();
-  const buildLabel = formatBuildLabel(buildInfo);
-
   const profileRepository = useMemo(() => {
     if (!isConfigured || !getSupabaseConfig().url) {
       return null;
@@ -195,6 +192,16 @@ export function SettingsContent() {
       })
       .catch(() => {
         setProfileEmail(user.email ?? null);
+      });
+
+    void profileRepository
+      .loadNotificationPreferences(user.id)
+      .then((prefs) => {
+        setNotificationPrefs(prefs);
+        syncNotificationPreferencesFromServer(prefs);
+      })
+      .catch(() => {
+        setNotificationPrefs(getNotificationPreferences());
       });
   }, [profileRepository, user]);
 
@@ -236,6 +243,23 @@ export function SettingsContent() {
     const next = { ...notificationPrefs, [category]: enabled };
     setNotificationPrefs(next);
     setNotificationPreferences(next);
+
+    if (!profileRepository || !user) {
+      return;
+    }
+
+    void profileRepository
+      .saveNotificationPreferences(user.id, next)
+      .then((saved) => {
+        setNotificationPrefs(saved);
+        syncNotificationPreferencesFromServer(saved);
+      })
+      .catch(() => {
+        showToast({
+          title: "Unable to save notification preference",
+          subtitle: "Your change is saved on this device only.",
+        });
+      });
   }
 
   async function handleSwitchProfile(profileId: DemoProfileId) {
@@ -341,6 +365,21 @@ export function SettingsContent() {
         </Card>
       )}
 
+      <Card padding="lg">
+        <CardHeader
+          title="What's New"
+          description="See the latest Buxme improvements, fixes, and features."
+        />
+        <CardContent>
+          <Link
+            href="/whats-new"
+            className="focus-ring inline-flex min-h-11 items-center rounded-xl bg-[#0077ed]/10 px-4 text-sm font-medium text-[#4da3ff] transition-colors hover:bg-[#0077ed]/20"
+          >
+            View release notes
+          </Link>
+        </CardContent>
+      </Card>
+
       {isConfigured && <BillingSection />}
 
       <Card padding="lg">
@@ -403,7 +442,7 @@ export function SettingsContent() {
             },
           )}
           <p className="text-xs text-white/32">
-            Preferences are stored in localStorage for now.
+            Preferences sync to your Buxme account and apply on every device.
           </p>
         </CardContent>
       </Card>
@@ -555,15 +594,6 @@ export function SettingsContent() {
           : "Connect Supabase to sync your finance data across devices."}
       </p>
 
-      <div className="rounded-2xl border border-amber-400/20 bg-amber-400/5 px-4 py-3">
-        <p className="text-xs font-medium uppercase tracking-wide text-amber-200/70">
-          Build (temporary)
-        </p>
-        <p className="mt-1 font-mono text-sm text-amber-100/90">{buildLabel}</p>
-        <p className="mt-1 font-mono text-xs text-amber-100/50">
-          {buildInfo.commit} · {buildInfo.builtAt}
-        </p>
-      </div>
     </div>
   );
 }

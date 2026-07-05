@@ -5,6 +5,8 @@ import Link from "next/link";
 import { Button } from "@/components/ui";
 import { cn } from "@/components/ui/cn";
 import { useFinance } from "@/context/FinanceContext";
+import { useWhatsNewOptional } from "@/context/WhatsNewContext";
+import { markReleaseSeen } from "@/lib/whatsNew/clientApi";
 import type { FinanceEventTone } from "@/lib/events/types";
 import { formatEventTimestamp } from "@/lib/events";
 
@@ -32,6 +34,12 @@ export function NotificationCenter() {
     dismissAutomationSuggestion,
     completeAutomationSuggestion,
   } = useFinance();
+  const whatsNew = useWhatsNewOptional();
+  const mergedNotifications = whatsNew?.releaseNotification
+    ? [whatsNew.releaseNotification, ...notifications]
+    : notifications;
+  const mergedUnreadCount =
+    unreadNotificationCount + (whatsNew?.releaseNotification ? 1 : 0);
   const [isOpen, setIsOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -80,19 +88,19 @@ export function NotificationCenter() {
         type="button"
         onClick={handleOpen}
         className="focus-ring relative flex h-11 w-11 items-center justify-center rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-subtle)] text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-border)] hover:text-[var(--foreground)]"
-        aria-label={`Notifications${unreadNotificationCount > 0 ? `, ${unreadNotificationCount} unread` : ""}`}
+        aria-label={`Notifications${mergedUnreadCount > 0 ? `, ${mergedUnreadCount} unread` : ""}`}
         aria-expanded={isOpen}
         aria-haspopup="dialog"
       >
         <span className="text-lg" aria-hidden>
           🔔
         </span>
-        {unreadNotificationCount > 0 && (
+        {mergedUnreadCount > 0 && (
           <span
             className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#0077ed] px-1 text-[10px] font-semibold text-white"
             aria-hidden
           >
-            {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
+            {mergedUnreadCount > 9 ? "9+" : mergedUnreadCount}
           </span>
         )}
       </button>
@@ -107,7 +115,7 @@ export function NotificationCenter() {
             <p className="text-base font-semibold text-[var(--foreground)]">
               Notifications
             </p>
-            {unreadNotificationCount > 0 && (
+            {mergedUnreadCount > 0 && (
               <button
                 type="button"
                 onClick={markAllNotificationsRead}
@@ -119,7 +127,7 @@ export function NotificationCenter() {
           </div>
 
           <div className="max-h-80 overflow-y-auto p-3">
-            {notifications.length === 0 ? (
+            {mergedNotifications.length === 0 ? (
               <div className="px-3 py-8 text-center">
                 <span className="text-2xl opacity-50" aria-hidden>
                   ✓
@@ -130,7 +138,7 @@ export function NotificationCenter() {
               </div>
             ) : (
               <ul className="space-y-1" role="list">
-                {notifications.map((notification) => (
+                {mergedNotifications.map((notification) => (
                   <li key={notification.id}>
                     <div
                       className={cn(
@@ -200,6 +208,26 @@ export function NotificationCenter() {
                                   View details
                                 </Link>
                               )}
+                            </div>
+                          ) : notification.detailHref ? (
+                            <div className="mt-3">
+                              <Link
+                                href={notification.detailHref}
+                                onClick={() => {
+                                  if (notification.id.startsWith("release-")) {
+                                    const releaseId = notification.id.replace(
+                                      "release-",
+                                      "",
+                                    );
+                                    void markReleaseSeen(releaseId);
+                                    whatsNew?.dismissReleaseNotification();
+                                  }
+                                  setIsOpen(false);
+                                }}
+                                className="text-sm font-medium text-[#0077ed] hover:underline"
+                              >
+                                View release notes
+                              </Link>
                             </div>
                           ) : (
                             !notification.read && (

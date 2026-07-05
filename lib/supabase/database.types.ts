@@ -29,6 +29,7 @@ export type ProfileRow = {
   onboarding_step: number;
   onboarding_progress: Record<string, unknown>;
   beta_status: "pending" | "approved" | "rejected";
+  notification_preferences: Record<string, boolean>;
   created_at: string;
   updated_at: string;
 };
@@ -52,6 +53,7 @@ export type ProfileInsert = {
   onboarding_step?: number;
   onboarding_progress?: Record<string, unknown>;
   beta_status?: "pending" | "approved" | "rejected";
+  notification_preferences?: Record<string, boolean>;
   created_at?: string;
   updated_at?: string;
 };
@@ -661,6 +663,41 @@ export type BetaWaitlistRow = {
   updated_at: string;
 };
 
+export type ReleaseChangeCategoryRow =
+  | "feature"
+  | "improvement"
+  | "bugfix"
+  | "security"
+  | "performance";
+
+export type AppReleaseRow = {
+  id: string;
+  version: string;
+  release_date: string;
+  title: string;
+  summary: string;
+  published: boolean;
+  featured: boolean;
+  created_at: string;
+  updated_at: string;
+  published_at: string | null;
+};
+
+export type AppReleaseChangeRow = {
+  id: string;
+  release_id: string;
+  category: ReleaseChangeCategoryRow;
+  description: string;
+  sort_order: number;
+  created_at: string;
+};
+
+export type UserReleaseViewRow = {
+  user_id: string;
+  release_id: string;
+  viewed_at: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -804,6 +841,24 @@ export type Database = {
       };
       beta_waitlist: {
         Row: BetaWaitlistRow;
+        Insert: Record<string, unknown>;
+        Update: Record<string, unknown>;
+        Relationships: [];
+      };
+      app_releases: {
+        Row: AppReleaseRow;
+        Insert: Record<string, unknown>;
+        Update: Record<string, unknown>;
+        Relationships: [];
+      };
+      app_release_changes: {
+        Row: AppReleaseChangeRow;
+        Insert: Record<string, unknown>;
+        Update: Record<string, unknown>;
+        Relationships: [];
+      };
+      user_release_views: {
+        Row: UserReleaseViewRow;
         Insert: Record<string, unknown>;
         Update: Record<string, unknown>;
         Relationships: [];

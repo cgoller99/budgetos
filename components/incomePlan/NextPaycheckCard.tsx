@@ -43,7 +43,7 @@ export function NextPaycheckCard() {
           title="Next paycheck"
           action={
             <Link
-              href="/income/plan"
+              href="/income?tab=plan"
               className="text-sm text-[#0077ed] transition-colors hover:underline"
             >
               Set up
@@ -54,7 +54,7 @@ export function NextPaycheckCard() {
           <p className="text-base text-[var(--text-muted)]">
             Tell Buxme where each paycheck goes. Setup takes about five minutes.
           </p>
-          <Link href="/income/plan" className="mt-4 inline-block">
+          <Link href="/income?tab=plan" className="mt-4 inline-block">
             <Button size="sm">Create Income Plan</Button>
           </Link>
         </CardContent>
@@ -86,7 +86,7 @@ export function NextPaycheckCard() {
         title="Next paycheck"
         action={
           <Link
-            href="/income/plan"
+            href="/income?tab=plan"
             className="text-sm text-[#0077ed] transition-colors hover:underline"
           >
             Edit plan

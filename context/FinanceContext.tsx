@@ -16,6 +16,12 @@ import { useHousehold } from "@/context/HouseholdContext";
 import { ANALYTICS_EVENTS, trackEvent } from "@/lib/analytics/client";
 import { getDemoFinanceData } from "@/lib/demo/data";
 import { computeFinanceHub } from "@/lib/finance/computeFinanceHub";
+import type { FinancialSnapshot } from "@/lib/finance/financialEngine";
+import {
+  isIncomePlanPaycheckDue,
+  markIncomePlanAutoRun,
+  shouldAutoApplyPlaidPaycheck,
+} from "@/lib/finance/autoScheduler";
 import { coerceFinanceData, emptyFinanceData } from "@/lib/finance/emptyFinanceData";
 import {
   applyBillSplitPaymentByIdToData,
@@ -109,6 +115,8 @@ import {
   getSupabaseClient,
   getSupabaseConfig,
 } from "@/lib/supabase";
+import { syncNotificationPreferencesFromServer } from "@/lib/notifications/preferences";
+import { ProfilesRepository } from "@/lib/supabase/repositories/profilesRepository";
 
 type FinanceRepositoryLike = FinanceService;
 
@@ -126,6 +134,7 @@ function applyOnboardingState(
 }
 
 export type FinanceContextValue = FinanceData & {
+  snapshot: FinancialSnapshot;
   dashboard: DashboardData;
   recentActivity: ActivityItem[];
   notifications: NotificationItem[];
@@ -407,6 +416,11 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
           setDemoProfileId,
         });
         setData(coerceFinanceData(next));
+
+        void new ProfilesRepository(supabase)
+          .loadNotificationPreferences(userId)
+          .then(syncNotificationPreferencesFromServer)
+          .catch(() => undefined);
       } catch (loadError) {
         if (!cancelled) {
           setData(emptyFinanceData);
@@ -1419,6 +1433,47 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
     [addBill, markIncomePlanPaycheckReceived, showToast],
   );
 
+  const autoRunRef = useRef(false);
+
+  useEffect(() => {
+    autoRunRef.current = false;
+  }, [data.incomePlan?.id, data.incomePlan?.nextPayDate]);
+
+  useEffect(() => {
+    if (isLoading || !data.incomePlan || autoRunRef.current) {
+      return;
+    }
+
+    const plan = data.incomePlan;
+    const plaidSuggestion = shouldAutoApplyPlaidPaycheck(automationSuggestions);
+
+    if (!isIncomePlanPaycheckDue(data) && !plaidSuggestion) {
+      return;
+    }
+
+    autoRunRef.current = true;
+
+    void (async () => {
+      try {
+        await markIncomePlanPaycheckReceived();
+        markIncomePlanAutoRun(plan.id, plan.nextPayDate);
+        showToast({
+          title: "Paycheck plan applied",
+          subtitle: "Your allocations updated automatically.",
+          type: "success",
+        });
+      } catch {
+        autoRunRef.current = false;
+      }
+    })();
+  }, [
+    automationSuggestions,
+    data,
+    isLoading,
+    markIncomePlanPaycheckReceived,
+    showToast,
+  ]);
+
   const hub = useMemo(() => computeFinanceHub(data), [data]);
   const mergedNotifications = useMemo(
     () => mergeAutomationNotifications(hub.notifications, automationSuggestions),
@@ -1433,6 +1488,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
   const value = useMemo<FinanceContextValue>(
     () => ({
       ...data,
+      snapshot: hub.snapshot,
       dashboard: hub.dashboard,
       recentActivity: hub.recentActivity,
       notifications: mergedNotifications,
@@ -1521,6 +1577,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
       error,
       exitDemoMode,
       hub.dashboard,
+      hub.snapshot,
       hub.recentActivity,
       mergedNotifications,
       mergedUnreadCount,

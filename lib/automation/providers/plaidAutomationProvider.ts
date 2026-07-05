@@ -100,7 +100,7 @@ export const plaidAutomationProvider: AutomationProvider = {
           provider: "plaid",
           entityId: candidate.transactionId,
           entityType: "transaction",
-          detailHref: "/income/plan",
+          detailHref: "/income?tab=plan",
           primaryAction: {
             label: "Apply",
             type: "apply_paycheck",

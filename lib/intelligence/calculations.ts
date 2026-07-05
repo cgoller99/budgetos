@@ -4,6 +4,7 @@ import { getBillsDueThisWeek } from "@/lib/finance/bills";
 import { formatCurrency } from "@/lib/finance/format";
 import { getNextGoal } from "@/lib/finance/goals";
 import { calculateMoneyFlow } from "@/lib/finance/moneyFlow";
+import { getSafeToSpendWeekly } from "@/lib/finance/safeToSpend";
 import type { Debt, FinanceData, IncomeFrequency } from "@/lib/finance/types";
 
 const WEEKS_PER_MONTH = 4.33;
@@ -75,17 +76,7 @@ export function calculateSafeToSpendBeforePaycheck(
   data: FinanceData,
   referenceDate = new Date(),
 ): number {
-  const moneyFlow = calculateMoneyFlow(data);
-  const daysUntilPaycheck = calculateDaysUntilNextPaycheck(data, referenceDate);
-  const payPeriodDays = getPayPeriodDays(getPrimaryIncomeFrequency(data));
-
-  if (moneyFlow.income <= 0) {
-    return 0;
-  }
-
-  return Math.round(
-    moneyFlow.safeToSpend * (daysUntilPaycheck / payPeriodDays),
-  );
+  return getSafeToSpendWeekly(data, referenceDate);
 }
 
 export function calculateBillsDueThisWeekTotal(

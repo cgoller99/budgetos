@@ -20,8 +20,6 @@ import { useFinance } from "@/context/FinanceContext";
 import { getReportEvents } from "@/lib/events";
 import { formatCurrency } from "@/lib/finance/format";
 import {
-  computeCategoryBreakdown,
-  computeMonthlyTrends,
   computeTotalGoalSavings,
   downloadTransactionsCsv,
   getTrendMaxValue,
@@ -89,21 +87,16 @@ function TrendChart({ points, valueKey, color, emptyMessage }: TrendChartProps) 
 
 export function ReportsContent() {
   const finance = useFinance();
+  const { snapshot, dashboard, isLoading } = finance;
 
-  const monthlyTrends = useMemo(
-    () => computeMonthlyTrends(finance),
-    [finance.transactions],
-  );
-  const categoryBreakdown = useMemo(
-    () => computeCategoryBreakdown(finance),
-    [finance.transactions],
-  );
+  const monthlyTrends = snapshot.monthlyTrends;
+  const categoryBreakdown = snapshot.categoryBreakdown;
   const totalGoalSavings = useMemo(
     () => computeTotalGoalSavings(finance),
     [finance.savingsGoals],
   );
 
-  if (finance.isLoading) {
+  if (isLoading) {
     return <SkeletonGrid count={3} />;
   }
 

@@ -121,13 +121,12 @@ function defaultAllocations(): AllocationDraft[] {
   ];
 }
 
-export function IncomePlanContent() {
+export function IncomePlanContent({ embedded = false }: { embedded?: boolean }) {
   const finance = useFinance();
   const { showToast } = useToast();
   const [step, setStep] = useState<SetupStep>(1);
   const [isSaving, setIsSaving] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [isRunningPlan, setIsRunningPlan] = useState(false);
 
   const existing = finance.incomePlan;
 
@@ -379,40 +378,24 @@ export function IncomePlanContent() {
     );
   }
 
-  async function handleRunIncomePlan() {
-    setIsRunningPlan(true);
-
-    try {
-      await finance.runIncomePlan();
-      showToast({
-        title: "Income Plan applied",
-        subtitle: "Money moved to your envelopes automatically.",
-      });
-    } catch {
-      // Error toast handled by FinanceContext
-    } finally {
-      setIsRunningPlan(false);
-    }
-  }
-
   if (existing && !showSettings) {
     return (
-      <div className={cn(pageContainerWideClassName, "space-y-6")}>
-        <PageHeader
-          action={
-            <div className="flex flex-wrap gap-2">
-              <Button
-                disabled={isRunningPlan || finance.isSyncing}
-                onClick={() => void handleRunIncomePlan()}
-              >
-                {isRunningPlan ? "Running…" : "Run Income Plan"}
-              </Button>
+      <div className={cn(!embedded && pageContainerWideClassName, "space-y-6")}>
+        {!embedded ? (
+          <PageHeader
+            action={
               <Button variant="secondary" onClick={() => setShowSettings(true)}>
                 Edit plan
               </Button>
-            </div>
-          }
-        />
+            }
+          />
+        ) : (
+          <div className="flex justify-end">
+            <Button variant="secondary" onClick={() => setShowSettings(true)}>
+              Edit plan
+            </Button>
+          </div>
+        )}
 
         <PaycheckDetectedPromptList />
 

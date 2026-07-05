@@ -1,5 +1,5 @@
-import { IncomePlanContent } from "@/components/incomePlan/IncomePlanContent";
+import { redirect } from "next/navigation";
 
-export default function IncomePlanPage() {
-  return <IncomePlanContent />;
+export default function IncomePlanRedirectPage() {
+  redirect("/income?tab=plan");
 }

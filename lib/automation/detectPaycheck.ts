@@ -54,7 +54,7 @@ export function detectPaycheckSuggestions(
     provider: "buxme",
     entityId: transaction.id,
     entityType: "transaction",
-    detailHref: "/income/plan",
+    detailHref: "/income?tab=plan",
     primaryAction: {
       label: "Apply",
       type: "apply_paycheck" as const,

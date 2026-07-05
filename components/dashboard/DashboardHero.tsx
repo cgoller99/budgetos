@@ -23,7 +23,7 @@ export function DashboardHero() {
       (metric) => metric.label === "Net Worth",
     );
     const cash = dashboard.kpiMetrics.find((metric) => metric.label === "Cash");
-    const bills = dashboard.billsSummary;
+    const safeToSpend = dashboard.moneyFlow.safeToSpend;
 
     return [
       {
@@ -39,22 +39,21 @@ export function DashboardHero() {
         positive: (cash?.monthlyChange ?? 0) >= 0,
       },
       {
-        label: "Safe to Spend",
-        value: formatCurrency(bills.safeToSpendAfterUpcomingBills),
-        change:
-          bills.dueThisWeekCount > 0
-            ? `${bills.dueThisWeekCount} bill${bills.dueThisWeekCount === 1 ? "" : "s"} due this week`
-            : "After upcoming bills",
-        positive: bills.safeToSpendAfterUpcomingBills > 0,
+        label: "Safe To Spend",
+        value: formatCurrency(safeToSpend),
+        change: "After bills, goals & investments",
+        positive: safeToSpend > 0,
         tooltip:
-          "What is left after upcoming bills, so you can spend with fewer surprises.",
+          "Monthly amount left after planned bills, debt payments, goals, and investments.",
       },
       {
-        label: "Credit Score",
-        value: "—",
-        change: "Connect a bureau to track",
-        positive: true,
-        mutedChange: true,
+        label: "Financial Health",
+        value: String(dashboard.financialHealthScore.score),
+        change: dashboard.financialHealthScore.metrics[0]?.label
+          ? `${dashboard.financialHealthScore.metrics[0].label}: ${dashboard.financialHealthScore.metrics[0].value}`
+          : "Your overall money health",
+        positive: dashboard.financialHealthScore.score >= 60,
+        tooltip: "Composite score from savings, debt, and emergency fund strength.",
       },
     ];
   }, [dashboard]);

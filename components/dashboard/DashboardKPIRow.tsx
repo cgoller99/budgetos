@@ -5,8 +5,6 @@ import { StatCard } from "@/components/ui";
 import { useFinance } from "@/context/FinanceContext";
 import { formatCurrency, formatMonthlyChange } from "@/lib/finance/format";
 
-const WEEKS_PER_MONTH = 4.33;
-
 export function DashboardKPIRow() {
   const { dashboard } = useFinance();
 
@@ -14,9 +12,7 @@ export function DashboardKPIRow() {
     const netWorth = dashboard.kpiMetrics.find(
       (metric) => metric.label === "Net Worth",
     );
-    const weeklySafeToSpend = Math.round(
-      dashboard.moneyFlow.safeToSpend / WEEKS_PER_MONTH,
-    );
+    const safeToSpend = dashboard.moneyFlow.safeToSpend;
     const health = dashboard.financialHealthScore;
     const bills = dashboard.billsSummary;
 
@@ -28,10 +24,10 @@ export function DashboardKPIRow() {
         positive: (netWorth?.monthlyChange ?? 0) >= 0,
       },
       {
-        label: "Safe to Spend This Week",
-        value: formatCurrency(weeklySafeToSpend),
+        label: "Safe To Spend",
+        value: formatCurrency(safeToSpend),
         change: "After bills, goals & investments",
-        positive: weeklySafeToSpend > 0,
+        positive: safeToSpend > 0,
       },
       {
         label: "Financial Health Score",

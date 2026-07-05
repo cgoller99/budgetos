@@ -5,6 +5,10 @@ import type {
 } from "@/lib/onboarding/types";
 import { DEFAULT_ONBOARDING_STATE } from "@/lib/onboarding/types";
 import type { BuxmeSupabaseClient } from "@/lib/supabase/client";
+import {
+  DEFAULT_NOTIFICATION_PREFERENCES,
+  type NotificationPreferences,
+} from "@/lib/notifications/preferences";
 
 export class ProfilesRepository {
   constructor(private readonly supabase: BuxmeSupabaseClient) {}
@@ -112,5 +116,60 @@ export class ProfilesRepository {
     }
 
     return data.full_name ?? "";
+  }
+
+  async loadNotificationPreferences(
+    userId: string,
+  ): Promise<NotificationPreferences> {
+    const { data, error } = await this.supabase
+      .from("profiles")
+      .select("notification_preferences")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (error) {
+      if (error.message.includes("notification_preferences")) {
+        return DEFAULT_NOTIFICATION_PREFERENCES;
+      }
+      throw error;
+    }
+
+    const stored = data?.notification_preferences as
+      | Partial<NotificationPreferences>
+      | null
+      | undefined;
+
+    return {
+      ...DEFAULT_NOTIFICATION_PREFERENCES,
+      ...stored,
+    };
+  }
+
+  async saveNotificationPreferences(
+    userId: string,
+    preferences: NotificationPreferences,
+  ): Promise<NotificationPreferences> {
+    const timestamp = new Date().toISOString();
+    const { data, error } = await this.supabase
+      .from("profiles")
+      .update({
+        notification_preferences: preferences,
+        updated_at: timestamp,
+      })
+      .eq("id", userId)
+      .select("notification_preferences")
+      .single();
+
+    if (error) {
+      if (error.message.includes("notification_preferences")) {
+        return preferences;
+      }
+      throw error;
+    }
+
+    return {
+      ...DEFAULT_NOTIFICATION_PREFERENCES,
+      ...(data.notification_preferences as Partial<NotificationPreferences>),
+    };
   }
 }
