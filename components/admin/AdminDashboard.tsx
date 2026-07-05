@@ -9,6 +9,7 @@ import {
   CardHeader,
   Input,
   Select,
+  SkeletonGrid,
   StatCard,
 } from "@/components/ui";
 import { cn } from "@/components/ui/cn";
@@ -279,11 +280,7 @@ export function AdminDashboard() {
   }
 
   if (loading) {
-    return (
-      <div className="rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-soft)] p-10 text-center text-sm text-[var(--text-muted)]">
-        Loading admin dashboard...
-      </div>
-    );
+    return <SkeletonGrid count={4} className="max-w-5xl" />;
   }
 
   if (error) {

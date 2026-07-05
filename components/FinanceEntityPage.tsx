@@ -1,10 +1,12 @@
 "use client";
 
-import { PagePlaceholder } from "@/components/PagePlaceholder";
-import { Card, LoadingSkeleton } from "@/components/ui";
+import { PageHeaderSkeleton, SkeletonCard, SkeletonGrid } from "@/components/ui";
+import { pageContainerWideClassName } from "@/components/ui/tokens";
 import { useFinance, type FinanceContextValue } from "@/context/FinanceContext";
 import type { FinanceData } from "@/lib/finance/types";
 import { getRequiredNavRoute, type NavRoute } from "@/lib/navigation";
+import { cn } from "@/components/ui/cn";
+import { PagePlaceholder } from "@/components/PagePlaceholder";
 
 type FinanceEntityPageProps = {
   href: NavRoute["href"];
@@ -65,9 +67,11 @@ export function FinanceEntityPage({ href }: FinanceEntityPageProps) {
 
   if (finance.isLoading) {
     return (
-      <Card padding="lg">
-        <LoadingSkeleton lines={4} />
-      </Card>
+      <div className={cn(pageContainerWideClassName)}>
+        <PageHeaderSkeleton />
+        <SkeletonGrid count={3} />
+        <SkeletonCard className="min-h-[200px]" />
+      </div>
     );
   }
 

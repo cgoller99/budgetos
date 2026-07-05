@@ -1,17 +1,16 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { SmartSuggestionsCard } from "@/components/automation/SmartSuggestionsCard";
 import { RecommendedSteps } from "@/components/guidance/RecommendedSteps";
 import { WelcomeChecklist } from "@/components/guidance/WelcomeChecklist";
 import { HealthScoreCard } from "@/components/HealthScoreCard";
-import { MoneyFlowCard } from "@/components/MoneyFlowCard";
 import { NextPaycheckCard } from "@/components/incomePlan/NextPaycheckCard";
 import { TopGoalsCard } from "@/components/dashboard/TopGoalsCard";
 import { UpcomingBillsCard } from "@/components/dashboard/UpcomingBillsCard";
 import { UpcomingIncomeCard } from "@/components/dashboard/UpcomingIncomeCard";
 import { DashboardHero } from "@/components/dashboard/DashboardHero";
-import { SmartInsights } from "@/components/SmartInsights";
-import { SkeletonGrid } from "@/components/ui";
+import { DashboardSkeleton, SkeletonCard } from "@/components/ui";
 import {
   dashboardSectionClassName,
   pageContainerWideClassName,
@@ -19,11 +18,27 @@ import {
 import { useFinance } from "@/context/FinanceContext";
 import { cn } from "@/components/ui/cn";
 
+const MoneyFlowCard = dynamic(
+  () =>
+    import("@/components/MoneyFlowCard").then((module) => ({
+      default: module.MoneyFlowCard,
+    })),
+  { loading: () => <SkeletonCard className="min-h-[220px]" /> },
+);
+
+const SmartInsights = dynamic(
+  () =>
+    import("@/components/SmartInsights").then((module) => ({
+      default: module.SmartInsights,
+    })),
+  { loading: () => <SkeletonCard className="min-h-[180px]" /> },
+);
+
 export function DashboardContent() {
   const { isLoading } = useFinance();
 
   if (isLoading) {
-    return <SkeletonGrid count={3} className="max-w-6xl" />;
+    return <DashboardSkeleton />;
   }
 
   return (

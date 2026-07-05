@@ -18,7 +18,7 @@ export function TopBar({
 
   return (
     <>
-      <header className="flex items-start justify-between gap-4 border-b border-[var(--surface-border)] bg-[var(--background)]/40 px-4 py-5 backdrop-blur-sm sm:gap-6 sm:px-6 sm:py-6 lg:px-10 lg:py-7">
+      <header className="flex items-start justify-between gap-4 border-b border-[var(--surface-border)] bg-[var(--background)]/40 px-4 py-5 pt-[calc(1.25rem+env(safe-area-inset-top))] backdrop-blur-sm sm:gap-6 sm:px-6 sm:py-6 lg:px-10 lg:py-7 lg:pt-7">
         <div className="min-w-0 flex-1">
           <h1 className="text-xl font-semibold tracking-tight text-[var(--foreground)] sm:text-2xl lg:text-3xl">
             {title}

@@ -56,8 +56,8 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
         aria-label="Close modal"
         onClick={onClose}
         className={cn(
-          "absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300 ease-out",
-          isAnimating ? "opacity-100" : "opacity-0",
+          "absolute inset-0 bg-black/50 backdrop-blur-sm",
+          isAnimating ? "modal-backdrop-enter" : "opacity-0",
         )}
       />
       <div
@@ -65,10 +65,8 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
         aria-modal="true"
         aria-labelledby="modal-title"
         className={cn(
-          "relative w-full max-w-md rounded-3xl border border-white/[0.05] bg-[#0f1419] p-8 shadow-2xl transition-all duration-300 ease-out",
-          isAnimating
-            ? "translate-y-0 scale-100 opacity-100"
-            : "translate-y-3 scale-[0.97] opacity-0",
+          "relative w-full max-w-md rounded-3xl border border-[var(--surface-border)] bg-[var(--surface)] p-8 shadow-2xl",
+          isAnimating ? "modal-panel-enter" : "translate-y-3 scale-[0.97] opacity-0",
         )}
       >
         <h2 id="modal-title" className={panelTitleClassName}>

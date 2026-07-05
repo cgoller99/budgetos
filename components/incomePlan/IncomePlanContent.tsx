@@ -273,6 +273,7 @@ export function IncomePlanContent() {
       showToast({
         title: existing ? "Income Plan updated" : "Income Plan ready",
         subtitle: "Your next paycheck is on the dashboard.",
+        type: "success",
       });
       setShowSettings(false);
       setStep(1);
@@ -811,6 +812,7 @@ export function IncomePlanContent() {
 
       {finance.accounts.length === 0 && step >= 2 && (
         <EmptyState
+          icon="🏦"
           title="Add an account first"
           description="Income Plans need a deposit account for paychecks."
           actionLabel="Go to accounts"

@@ -79,6 +79,7 @@ export function TransactionsContent() {
 
       {finance.accounts.length === 0 ? (
         <EmptyState
+          icon="🏦"
           title="Add an account first"
           description="Transactions need at least one account to update balances."
           action={
@@ -89,6 +90,7 @@ export function TransactionsContent() {
         />
       ) : transactions.length === 0 ? (
         <EmptyState
+          icon="💳"
           title="No transactions yet"
           description="Add your first transaction or adjust your search and filters."
           action={

@@ -13,7 +13,7 @@ export const tokens = {
   textMuted: "text-[var(--text-muted)]",
   textSubtle: "text-[var(--text-subtle)]",
   transition: "transition-all duration-200 ease-out",
-  focusRing: "focus:border-[#0077ed]/40 focus:bg-[var(--focus-surface)]",
+  focusRing: "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#0077ed]/55 focus-visible:outline-offset-2",
 } as const;
 
 export const cardBaseClassName =
@@ -33,7 +33,7 @@ export const buttonPrimaryClassName =
   "bg-gradient-to-b from-[#0088ff] to-[#0077ed] text-[#ffffff] shadow-[0_1px_2px_rgba(0,119,237,0.35),0_4px_16px_rgba(0,119,237,0.2)] hover:from-[#0099ff] hover:to-[#0066d6] hover:shadow-[0_4px_24px_rgba(0,119,237,0.38)] hover:scale-[1.02] active:scale-[0.98]";
 
 export const inputBaseClassName =
-  "min-h-11 w-full rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-subtle)] px-4 py-3 text-base text-[var(--foreground)] outline-none transition-all duration-200 ease-out placeholder:text-[var(--text-subtle)] focus:border-[#0077ed]/40 focus:bg-[var(--focus-surface)]";
+  "focus-ring min-h-11 w-full rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-subtle)] px-4 py-3 text-base text-[var(--foreground)] outline-none transition-all duration-200 ease-out placeholder:text-[var(--text-subtle)] focus:border-[#0077ed]/40 focus:bg-[var(--focus-surface)]";
 
 export const labelClassName =
   "mb-2 block text-sm font-medium text-[var(--text-muted)]";

@@ -6,6 +6,7 @@ import { FeedbackCenter } from "@/components/feedback/FeedbackCenter";
 import { FinanceSyncAlert } from "@/components/FinanceSyncAlert";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
+import { PageTransition } from "@/components/PageTransition";
 import { Sidebar } from "@/components/Sidebar";
 import { TopBar } from "@/components/TopBar";
 import { getNavRoute, NAV_ROUTES } from "@/lib/navigation";
@@ -31,7 +32,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         <main className="flex-1 overflow-x-hidden px-4 py-6 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-8 lg:px-10 lg:py-12 lg:pb-12">
           <DemoModeBanner />
           <FinanceSyncAlert />
-          {children}
+          <PageTransition>{children}</PageTransition>
         </main>
         <MobileBottomNav activeHref={pathname} />
         <FeedbackCenter />

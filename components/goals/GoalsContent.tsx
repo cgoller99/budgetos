@@ -41,6 +41,7 @@ export function GoalsContent() {
 
       {goals.length === 0 ? (
         <EmptyState
+          icon="🎯"
           title="No goals yet"
           description="Create your first goal and start building toward what matters."
           actionLabel="Create goal"

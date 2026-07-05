@@ -162,6 +162,7 @@ export function IncomeContent() {
 
       {rows.length === 0 ? (
         <EmptyState
+          icon="💵"
           title="No income sources yet"
           description="Add your paychecks and other recurring income to power Money Flow, Safe To Spend, and your roadmap."
           action={

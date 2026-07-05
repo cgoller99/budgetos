@@ -29,6 +29,7 @@ export function AccountsContent() {
 
       {accounts.length === 0 ? (
         <EmptyState
+          icon="🏦"
           title="No accounts yet"
           description="Add your first account to start tracking your finances."
           actionLabel="Add account"

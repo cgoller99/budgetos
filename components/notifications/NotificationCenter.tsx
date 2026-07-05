@@ -15,6 +15,13 @@ const toneClasses: Record<FinanceEventTone, string> = {
   accent: "text-[#0077ed]",
 };
 
+const toneBorderClasses: Record<FinanceEventTone, string> = {
+  positive: "border-emerald-500/15",
+  negative: "border-rose-500/15",
+  neutral: "border-[var(--surface-border)]",
+  accent: "border-[#0077ed]/20",
+};
+
 export function NotificationCenter() {
   const {
     notifications,
@@ -27,6 +34,7 @@ export function NotificationCenter() {
   } = useFinance();
   const [isOpen, setIsOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -47,6 +55,20 @@ export function NotificationCenter() {
     };
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+        triggerRef.current?.focus();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen]);
+
   function handleOpen() {
     setIsOpen((current) => !current);
   }
@@ -54,21 +76,33 @@ export function NotificationCenter() {
   return (
     <div className="relative" ref={panelRef}>
       <button
+        ref={triggerRef}
         type="button"
         onClick={handleOpen}
-        className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-subtle)] text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-border)] hover:text-[var(--foreground)]"
-        aria-label="Notifications"
+        className="focus-ring relative flex h-11 w-11 items-center justify-center rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-subtle)] text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-border)] hover:text-[var(--foreground)]"
+        aria-label={`Notifications${unreadNotificationCount > 0 ? `, ${unreadNotificationCount} unread` : ""}`}
+        aria-expanded={isOpen}
+        aria-haspopup="dialog"
       >
-        <span className="text-lg">🔔</span>
+        <span className="text-lg" aria-hidden>
+          🔔
+        </span>
         {unreadNotificationCount > 0 && (
-          <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#0077ed] px-1 text-[10px] font-semibold text-white">
+          <span
+            className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#0077ed] px-1 text-[10px] font-semibold text-white"
+            aria-hidden
+          >
             {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
           </span>
         )}
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-14 z-50 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-3xl border border-[var(--surface-border)] bg-[var(--background)] shadow-2xl shadow-black/40">
+        <div
+          role="dialog"
+          aria-label="Notifications"
+          className="notification-panel-enter absolute right-0 top-14 z-50 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-3xl border border-[var(--surface-border)] bg-[var(--background)] shadow-2xl shadow-black/40"
+        >
           <div className="flex items-center justify-between border-b border-[var(--surface-border)] px-5 py-4">
             <p className="text-base font-semibold text-[var(--foreground)]">
               Notifications
@@ -77,7 +111,7 @@ export function NotificationCenter() {
               <button
                 type="button"
                 onClick={markAllNotificationsRead}
-                className="text-sm text-[var(--text-muted)] transition-colors hover:text-[var(--foreground)]"
+                className="focus-ring rounded-lg px-2 py-1 text-sm text-[var(--text-muted)] transition-colors hover:text-[var(--foreground)]"
               >
                 Mark all read
               </button>
@@ -86,21 +120,29 @@ export function NotificationCenter() {
 
           <div className="max-h-80 overflow-y-auto p-3">
             {notifications.length === 0 ? (
-              <p className="px-3 py-8 text-center text-base text-[var(--text-muted)]">
-                You&apos;re all caught up.
-              </p>
+              <div className="px-3 py-8 text-center">
+                <span className="text-2xl opacity-50" aria-hidden>
+                  ✓
+                </span>
+                <p className="mt-3 text-base text-[var(--text-muted)]">
+                  You&apos;re all caught up.
+                </p>
+              </div>
             ) : (
-              <ul className="space-y-1">
+              <ul className="space-y-1" role="list">
                 {notifications.map((notification) => (
                   <li key={notification.id}>
                     <div
                       className={cn(
-                        "rounded-2xl px-4 py-4",
+                        "rounded-2xl border px-4 py-4 transition-colors",
+                        toneBorderClasses[notification.tone],
                         !notification.read && "bg-[#0077ed]/10",
                       )}
                     >
                       <div className="flex items-start gap-4">
-                        <span className="text-xl">{notification.icon}</span>
+                        <span className="text-xl" aria-hidden>
+                          {notification.icon}
+                        </span>
                         <div className="min-w-0 flex-1">
                           <p
                             className={cn(
@@ -160,13 +202,17 @@ export function NotificationCenter() {
                               )}
                             </div>
                           ) : (
-                            <button
-                              type="button"
-                              onClick={() => markNotificationRead(notification.id)}
-                              className="mt-3 text-sm text-[var(--text-muted)] transition-colors hover:text-[var(--foreground)]"
-                            >
-                              Mark read
-                            </button>
+                            !notification.read && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  markNotificationRead(notification.id)
+                                }
+                                className="focus-ring mt-3 rounded-lg px-2 py-1 text-sm text-[var(--text-muted)] transition-colors hover:text-[var(--foreground)]"
+                              >
+                                Mark read
+                              </button>
+                            )
                           )}
                         </div>
                       </div>

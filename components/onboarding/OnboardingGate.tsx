@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { PageLoadingState } from "@/components/ui";
 import { useFinance } from "@/context/FinanceContext";
 
 export function OnboardingGate({ children }: { children: React.ReactNode }) {
@@ -15,7 +16,7 @@ export function OnboardingGate({ children }: { children: React.ReactNode }) {
   }, [isLoading, onboardingComplete, router]);
 
   if (isLoading) {
-    return null;
+    return <PageLoadingState label="Loading your finances" />;
   }
 
   if (!onboardingComplete) {

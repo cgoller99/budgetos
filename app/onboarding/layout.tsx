@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { AuthGate } from "@/components/auth/AuthGate";
+import { PageLoadingState } from "@/components/ui";
 import { useFinance } from "@/context/FinanceContext";
 
 export default function OnboardingLayout({
@@ -22,7 +23,7 @@ export default function OnboardingLayout({
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#0a0f1a]">
-        <div className="h-8 w-8 animate-pulse rounded-full bg-[#0077ed]/30" />
+        <PageLoadingState label="Preparing onboarding" />
       </div>
     );
   }

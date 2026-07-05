@@ -31,18 +31,20 @@ export function Sidebar({ className = "", activeHref = "/dashboard" }: SidebarPr
         </Link>
       </div>
 
-      <nav className="flex flex-1 flex-col gap-1.5">
-        {NAV_ROUTES.map((route) => {
+      <nav className="flex flex-1 flex-col gap-1.5" aria-label="Main">
+        {NAV_ROUTES.map((route, index) => {
           const isActive = route.href === activeHref;
 
           return (
             <Link
               key={route.href}
               href={route.href}
+              aria-current={isActive ? "page" : undefined}
               className={cn(
-                "flex min-h-11 items-center gap-3 rounded-2xl px-3.5 py-3 text-[15px] font-medium transition-all duration-200 ease-out",
+                "sidebar-item-enter focus-ring flex min-h-11 items-center gap-3 rounded-2xl px-3.5 py-3 text-[15px] font-medium transition-all duration-200 ease-out",
                 isActive ? sidebarActiveClassName : sidebarInactiveClassName,
               )}
+              style={{ animationDelay: `${index * 30}ms` }}
             >
               <span
                 className={cn(

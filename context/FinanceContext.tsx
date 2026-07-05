@@ -439,7 +439,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
 
       if (!repository || !userId) {
         const message = error ?? "Finance data is not ready yet.";
-        showToast({ title: "Unable to save", subtitle: message });
+        showToast({ title: "Unable to save", subtitle: message, type: "error" });
         throw new Error(message);
       }
 
@@ -464,7 +464,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
         setData(snapshot);
         const message = getErrorMessage(mutationError);
         setError(message);
-        showToast({ title: "Sync failed", subtitle: message });
+        showToast({ title: "Sync failed", subtitle: message, type: "error" });
         throw mutationError;
       } finally {
         setIsSyncing(false);
@@ -508,7 +508,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
 
       if (!repository || !userId) {
         const message = error ?? "Finance data is not ready yet.";
-        showToast({ title: "Unable to continue", subtitle: message });
+        showToast({ title: "Unable to continue", subtitle: message, type: "error" });
         throw new Error(message);
       }
 
@@ -543,7 +543,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
       } catch (onboardingError) {
         const message = getErrorMessage(onboardingError);
         setError(message);
-        showToast({ title: "Setup failed", subtitle: message });
+        showToast({ title: "Setup failed", subtitle: message, type: "error" });
         throw onboardingError;
       } finally {
         setIsSyncing(false);
@@ -559,7 +559,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
 
       if (!repository || !userId) {
         const message = error ?? "Finance data is not ready yet.";
-        showToast({ title: "Unable to switch profile", subtitle: message });
+        showToast({ title: "Unable to switch profile", subtitle: message, type: "error" });
         throw new Error(message);
       }
 
@@ -588,7 +588,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
       } catch (switchError) {
         const message = getErrorMessage(switchError);
         setError(message);
-        showToast({ title: "Switch failed", subtitle: message });
+        showToast({ title: "Switch failed", subtitle: message, type: "error" });
         throw switchError;
       } finally {
         setIsSyncing(false);
@@ -603,7 +603,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
 
     if (!repository || !userId) {
       const message = error ?? "Finance data is not ready yet.";
-      showToast({ title: "Unable to exit demo mode", subtitle: message });
+      showToast({ title: "Unable to exit demo mode", subtitle: message, type: "error" });
       throw new Error(message);
     }
 
@@ -625,7 +625,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
     } catch (exitError) {
       const message = getErrorMessage(exitError);
       setError(message);
-      showToast({ title: "Could not exit demo mode", subtitle: message });
+      showToast({ title: "Could not exit demo mode", subtitle: message, type: "error" });
       throw exitError;
     } finally {
       setIsSyncing(false);
@@ -1390,6 +1390,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
             showToast({
               title: "Recurring bill created",
               subtitle: String(payload.name ?? "Your bill"),
+              type: "success",
             });
             break;
           }
@@ -1398,6 +1399,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
             showToast({
               title: "Income Plan applied",
               subtitle: "Allocations updated across your dashboard.",
+              type: "success",
             });
             break;
           case "navigate":

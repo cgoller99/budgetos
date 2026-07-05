@@ -41,12 +41,21 @@ function TrendChart({ points, valueKey, color, emptyMessage }: TrendChartProps) 
 
   if (!hasData) {
     return (
-      <p className="py-6 text-center text-sm text-white/35">{emptyMessage}</p>
+      <div className="flex flex-col items-center justify-center gap-2 py-8">
+        <span className="text-2xl opacity-40" aria-hidden>
+          📈
+        </span>
+        <p className="text-center text-sm text-[var(--text-muted)]">{emptyMessage}</p>
+      </div>
     );
   }
 
   return (
-    <div className="flex items-end justify-between gap-2 pt-2">
+    <div
+      className="flex items-end justify-between gap-2 pt-2"
+      role="img"
+      aria-label={`${valueKey} trend chart`}
+    >
       {points.map((point) => {
         const value = point[valueKey];
         const heightPercent = maxValue > 0 ? (value / maxValue) * 100 : 0;
@@ -54,22 +63,23 @@ function TrendChart({ points, valueKey, color, emptyMessage }: TrendChartProps) 
         return (
           <div
             key={point.key}
-            className="flex min-w-0 flex-1 flex-col items-center gap-2"
+            className="group flex min-w-0 flex-1 flex-col items-center gap-2"
           >
-            <span className="text-[11px] tabular-nums text-white/40">
+            <span className="text-[11px] tabular-nums text-[var(--text-muted)] opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
               {value > 0 ? formatCurrency(value) : "—"}
             </span>
             <div className="flex h-28 w-full items-end justify-center">
               <div
-                className="w-full max-w-10 rounded-t-xl transition-all duration-500 ease-out"
+                className="w-full max-w-10 rounded-t-xl bg-gradient-to-t transition-all duration-500 ease-out group-hover:shadow-[0_0_12px_rgba(0,119,237,0.15)]"
                 style={{
                   height: `${Math.max(heightPercent, value > 0 ? 8 : 0)}%`,
-                  backgroundColor: color,
+                  backgroundImage: `linear-gradient(to top, ${color}55, ${color})`,
                   opacity: value > 0 ? 1 : 0.15,
                 }}
+                title={`${point.label}: ${value > 0 ? formatCurrency(value) : "No activity"}`}
               />
             </div>
-            <span className="text-[11px] text-white/35">{point.label}</span>
+            <span className="text-[11px] text-[var(--text-muted)]">{point.label}</span>
           </div>
         );
       })}

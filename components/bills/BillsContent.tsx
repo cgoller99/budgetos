@@ -141,9 +141,10 @@ export function BillsContent() {
       showToast({
         title:
           amount !== undefined && amount < split.remainingAmount
-            ? `✓ ${formatCurrency(amount)} recorded`
-            : `✓ ${split.name} marked paid`,
-        subtitle: "✓ Dashboard updated",
+            ? `${formatCurrency(amount)} recorded`
+            : `${split.name} marked paid`,
+        subtitle: "Dashboard updated",
+        type: "success",
       });
     } catch {
       // Error toast handled by FinanceContext
@@ -180,6 +181,7 @@ export function BillsContent() {
 
       {finance.bills.length === 0 ? (
         <EmptyState
+          icon="📅"
           title="No bills yet"
           description="Add your first bill to track due dates and monthly spending."
           actionLabel="Add bill"

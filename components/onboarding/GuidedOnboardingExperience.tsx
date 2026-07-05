@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { OnboardingConfetti } from "@/components/onboarding/OnboardingConfetti";
 import { Button, Card, Input, Select } from "@/components/ui";
 import { cn } from "@/components/ui/cn";
 import { useAuth } from "@/context/AuthContext";
@@ -14,6 +15,31 @@ import type { IncomePlanSchedule } from "@/lib/incomePlan/types";
 import { INCOME_PLAN_SCHEDULE_LABELS } from "@/lib/incomePlan/types";
 
 const TOTAL_STEPS = 10;
+
+const STEP_TIPS: Record<number, string> = {
+  1: "You can pause anytime — your progress saves automatically.",
+  2: "Your schedule powers paycheck predictions and Safe To Spend.",
+  3: "Use your typical take-home pay, not gross income.",
+  4: "Start with your primary checking account for the best picture.",
+  5: "Recurring bills help forecast your monthly cash flow.",
+  6: "Even a small savings goal keeps you motivated.",
+  7: "Household invites let partners collaborate on shared finances.",
+  8: "Bank sync is optional — you can connect later in Settings.",
+  9: "Your health score improves as you add more financial data.",
+  10: "You're ready to explore your personalized dashboard.",
+};
+
+const CHECKLIST_ITEMS: Array<{
+  key: keyof OnboardingProgress;
+  label: string;
+  fallback?: boolean;
+}> = [
+  { key: "paySchedule", label: "Paycheck schedule set" },
+  { key: "paycheckAmount", label: "Income plan created" },
+  { key: "accountName", label: "Account added" },
+  { key: "billName", label: "Bill tracked" },
+  { key: "goalName", label: "Savings goal created" },
+];
 
 const SCHEDULE_OPTIONS: IncomePlanSchedule[] = [
   "weekly",
@@ -47,13 +73,37 @@ function ProgressBar({ step }: { step: number }) {
         </span>
         <span>{pct}%</span>
       </div>
-      <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.08]">
+      <div
+        className="h-1.5 overflow-hidden rounded-full bg-white/[0.08]"
+        role="progressbar"
+        aria-valuenow={step}
+        aria-valuemin={1}
+        aria-valuemax={TOTAL_STEPS}
+        aria-label={`Onboarding step ${step} of ${TOTAL_STEPS}`}
+      >
         <div
           className="h-full rounded-full bg-gradient-to-r from-[#0077ed] to-[#4da3ff] transition-all duration-500"
           style={{ width: `${pct}%` }}
         />
       </div>
     </div>
+  );
+}
+
+function StepTip({ step }: { step: number }) {
+  const tip = STEP_TIPS[step];
+
+  if (!tip) {
+    return null;
+  }
+
+  return (
+    <p className="mb-6 rounded-2xl border border-[#0077ed]/15 bg-[#0077ed]/5 px-4 py-3 text-sm text-white/55">
+      <span className="mr-1.5" aria-hidden>
+        💡
+      </span>
+      {tip}
+    </p>
   );
 }
 
@@ -226,6 +276,7 @@ export function GuidedOnboardingExperience() {
 
       <div className="relative z-10 mx-auto w-full max-w-xl">
         <ProgressBar step={step} />
+        <StepTip step={step} />
 
         {step === 1 && (
           <div className="onboarding-step-enter text-center">
@@ -507,21 +558,46 @@ export function GuidedOnboardingExperience() {
         )}
 
         {step === 10 && (
-          <Card padding="lg" className="onboarding-step-enter text-center">
-            <div className="mx-auto mb-4 text-4xl">🎉</div>
-            <h2 className="text-2xl font-semibold">You&apos;re all set!</h2>
-            <p className="mx-auto mt-3 max-w-sm text-sm text-white/45">
-              Your Buxme workspace is ready. Explore your dashboard and keep building your plan.
-            </p>
-            <Button
-              className="mt-8"
-              size="md"
-              disabled={isSubmitting}
-              onClick={() => void handleFinish()}
-            >
-              {isSubmitting ? "Finishing..." : "Go to dashboard"}
-            </Button>
-          </Card>
+          <>
+            <OnboardingConfetti />
+            <Card padding="lg" className="onboarding-step-enter text-center">
+              <div className="success-pop mx-auto mb-4 text-4xl">🎉</div>
+              <h2 className="text-2xl font-semibold">You&apos;re all set!</h2>
+              <p className="mx-auto mt-3 max-w-sm text-sm text-white/45">
+                Your Buxme workspace is ready. Explore your dashboard and keep building your plan.
+              </p>
+
+              <ul className="mx-auto mt-6 max-w-xs space-y-2 text-left text-sm">
+                {CHECKLIST_ITEMS.map((item) => {
+                  const isComplete = Boolean(progress[item.key]);
+
+                  return (
+                    <li
+                      key={item.label}
+                      className={cn(
+                        "flex items-center gap-2 rounded-xl px-3 py-2 transition-colors",
+                        isComplete
+                          ? "bg-emerald-500/10 text-emerald-300"
+                          : "bg-white/[0.03] text-white/35",
+                      )}
+                    >
+                      <span aria-hidden>{isComplete ? "✓" : "○"}</span>
+                      <span>{item.label}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+
+              <Button
+                className="mt-8"
+                size="md"
+                disabled={isSubmitting}
+                onClick={() => void handleFinish()}
+              >
+                {isSubmitting ? "Finishing..." : "Go to dashboard"}
+              </Button>
+            </Card>
+          </>
         )}
       </div>
     </div>

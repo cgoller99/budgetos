@@ -7,7 +7,7 @@ export { EmptyState } from "./EmptyState";
 export { FormField } from "./FormField";
 export { Input } from "./Input";
 export { PasswordInput } from "./PasswordInput";
-export { LoadingSkeleton, SkeletonCard, SkeletonGrid } from "./LoadingSkeleton";
+export { LoadingSkeleton, SkeletonCard, SkeletonGrid, DashboardSkeleton, SettingsSkeleton, TableSkeleton, PageHeaderSkeleton, PageLoadingState, StatRowSkeleton } from "./LoadingSkeleton";
 export { Modal } from "./Modal";
 export { ProgressBar } from "./ProgressBar";
 export { ProgressRing } from "./ProgressRing";

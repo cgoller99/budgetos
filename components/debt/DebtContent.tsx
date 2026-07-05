@@ -98,6 +98,7 @@ export function DebtContent() {
 
       {rows.length === 0 ? (
         <EmptyState
+          icon="📉"
           title="No debts tracked yet"
           description="Add your loans and credit cards to build a payoff plan, compare snowball vs avalanche, and sync debt payments with Money Flow."
           action={

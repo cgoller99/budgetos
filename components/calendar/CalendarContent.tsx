@@ -240,6 +240,7 @@ export function CalendarContent() {
           <CardContent>
             {selectedBills.length === 0 ? (
               <EmptyState
+                icon="📅"
                 title="No bills due"
                 description="Nothing is scheduled for this day."
               />

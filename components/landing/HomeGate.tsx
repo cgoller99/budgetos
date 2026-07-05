@@ -4,12 +4,13 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useFinance } from "@/context/FinanceContext";
+import { PageLoadingState } from "@/components/ui";
 import { LandingPage } from "./LandingPage";
 
 function HomeLoading() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#0a0f1a]">
-      <div className="h-8 w-8 animate-pulse rounded-full bg-[#0077ed]/30" />
+      <PageLoadingState label="Loading Buxme" />
     </div>
   );
 }

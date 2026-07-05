@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { HouseholdSection } from "@/components/household/HouseholdSection";
 import { ConnectedInstitutionsSection } from "@/components/settings/ConnectedInstitutionsSection";
 import { BillingSection } from "@/components/settings/BillingSection";
-import { Button, Card, CardContent, CardHeader, FormField, Input } from "@/components/ui";
+import { Button, Card, CardContent, CardHeader, FormField, Input, SettingsSkeleton } from "@/components/ui";
 import { pageContainerClassName } from "@/components/ui/tokens";
 import { cn } from "@/components/ui/cn";
 import { useAuth } from "@/context/AuthContext";
@@ -298,7 +298,7 @@ export function SettingsContent() {
   }
 
   if (isLoading) {
-    return null;
+    return <SettingsSkeleton />;
   }
 
   return (

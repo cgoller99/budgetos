@@ -6,6 +6,7 @@ import { cn } from "./cn";
 type EmptyStateProps = {
   title: string;
   description: string;
+  icon?: string;
   nextSteps?: string[];
   actionLabel?: string;
   onAction?: () => void;
@@ -16,6 +17,7 @@ type EmptyStateProps = {
 export function EmptyState({
   title,
   description,
+  icon = "📋",
   nextSteps,
   actionLabel,
   onAction,
@@ -23,8 +25,18 @@ export function EmptyState({
   className,
 }: EmptyStateProps) {
   return (
-    <Card variant="dashed" padding="lg" className={cn("text-center", className)}>
-      <p className="text-lg font-medium text-[var(--foreground)]">{title}</p>
+    <Card
+      variant="dashed"
+      padding="lg"
+      className={cn("empty-state-enter text-center", className)}
+    >
+      <div
+        className="success-pop mx-auto flex size-14 items-center justify-center rounded-2xl border border-[var(--surface-border)] bg-[#0077ed]/10 text-2xl"
+        aria-hidden
+      >
+        {icon}
+      </div>
+      <p className="mt-5 text-lg font-medium text-[var(--foreground)]">{title}</p>
       <p className="mx-auto mt-3 max-w-md text-base leading-relaxed text-[var(--text-muted)]">
         {description}
       </p>
