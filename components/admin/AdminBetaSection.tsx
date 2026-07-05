@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button, Card, CardContent, CardHeader, Input, StatCard } from "@/components/ui";
 import { AdminChart } from "@/components/admin/AdminChart";
+import { scheduleAdminHashScroll } from "@/components/admin/adminHashScroll";
 import type { BetaDashboardMetrics, BetaSettings, BetaUserStatus, BetaWaitlistEntry } from "@/lib/beta/types";
 
 type BetaProfileRow = {
@@ -66,6 +67,8 @@ export function AdminBetaSection() {
       const payload = await waitlistRes.json();
       setWaitlist(payload.waitlist ?? []);
     }
+
+    scheduleAdminHashScroll();
   }, []);
 
   useEffect(() => {

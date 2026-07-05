@@ -14,6 +14,7 @@ import {
 import { cn } from "@/components/ui/cn";
 import { AdminChart } from "./AdminChart";
 import { ConfirmActionModal } from "./ConfirmActionModal";
+import { scheduleAdminHashScroll } from "./adminHashScroll";
 import type {
   AdminUserAction,
   AdminUserSummary,
@@ -31,6 +32,23 @@ type PendingAction = {
   action: AdminUserAction;
   label: string;
 };
+
+type SectionKey =
+  | "overview"
+  | "revenue"
+  | "plaid"
+  | "analytics"
+  | "health"
+  | "logs"
+  | "users"
+  | "feedback";
+
+function sectionLoadError(status: number): string {
+  if (status === 503) {
+    return "Admin backend is not configured (missing SUPABASE_SERVICE_ROLE_KEY).";
+  }
+  return "Failed to load this section.";
+}
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat("en-US", {
@@ -55,11 +73,13 @@ function Section({
   id,
   title,
   description,
+  loadError,
   children,
 }: {
   id: string;
   title: string;
   description?: string;
+  loadError?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -70,6 +90,11 @@ function Section({
           <p className="mt-1 text-sm text-[var(--text-muted)]">{description}</p>
         ) : null}
       </div>
+      {loadError ? (
+        <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+          {loadError}
+        </div>
+      ) : null}
       {children}
     </section>
   );
@@ -82,6 +107,7 @@ function MetricGrid({ children }: { children: React.ReactNode }) {
 export function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sectionErrors, setSectionErrors] = useState<Partial<Record<SectionKey, string>>>({});
   const [overview, setOverview] = useState<AdminOverviewMetrics | null>(null);
   const [revenue, setRevenue] = useState<AdminRevenueMetrics | null>(null);
   const [plaid, setPlaid] = useState<AdminPlaidMetrics | null>(null);
@@ -101,58 +127,75 @@ export function AdminDashboard() {
   const loadDashboard = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setSectionErrors({});
 
-    try {
-      const [
-        overviewRes,
-        revenueRes,
-        plaidRes,
-        analyticsRes,
-        healthRes,
-        logsRes,
-        usersRes,
-        feedbackRes,
-      ] = await Promise.all([
-        fetch("/api/admin/overview"),
-        fetch("/api/admin/revenue"),
-        fetch("/api/admin/plaid"),
-        fetch("/api/admin/analytics"),
-        fetch("/api/admin/health"),
-        fetch("/api/admin/logs"),
-        fetch("/api/admin/users"),
-        fetch("/api/admin/feedback"),
-      ]);
+    const loadSection = async (
+      key: SectionKey,
+      url: string,
+      apply: (payload: unknown) => void,
+    ): Promise<void> => {
+      try {
+        const response = await fetch(url);
 
-      for (const response of [
-        overviewRes,
-        revenueRes,
-        plaidRes,
-        analyticsRes,
-        healthRes,
-        logsRes,
-        usersRes,
-        feedbackRes,
-      ]) {
         if (response.status === 403) {
           throw new Error("You do not have admin access.");
         }
-        if (!response.ok) {
-          throw new Error("Failed to load admin dashboard.");
-        }
-      }
 
-      setOverview(await overviewRes.json());
-      setRevenue(await revenueRes.json());
-      setPlaid(await plaidRes.json());
-      setAnalytics(await analyticsRes.json());
-      setHealth((await healthRes.json()).checks ?? []);
-      setLogs((await logsRes.json()).logs ?? []);
-      setUsers((await usersRes.json()).users ?? []);
-      setFeedback((await feedbackRes.json()).reports ?? []);
+        if (!response.ok) {
+          setSectionErrors((current) => ({
+            ...current,
+            [key]: sectionLoadError(response.status),
+          }));
+          return;
+        }
+
+        apply(await response.json());
+      } catch (loadError) {
+        if (loadError instanceof Error && loadError.message.includes("admin access")) {
+          throw loadError;
+        }
+
+        setSectionErrors((current) => ({
+          ...current,
+          [key]: "Failed to load this section.",
+        }));
+      }
+    };
+
+    try {
+      await Promise.all([
+        loadSection("overview", "/api/admin/overview", (payload) =>
+          setOverview(payload as AdminOverviewMetrics),
+        ),
+        loadSection("revenue", "/api/admin/revenue", (payload) =>
+          setRevenue(payload as AdminRevenueMetrics),
+        ),
+        loadSection("plaid", "/api/admin/plaid", (payload) => setPlaid(payload as AdminPlaidMetrics)),
+        loadSection("analytics", "/api/admin/analytics", (payload) =>
+          setAnalytics(payload as AdminAnalyticsMetrics),
+        ),
+        loadSection("health", "/api/admin/health", (payload) => {
+          const data = payload as { checks?: AdminHealthCheck[] };
+          setHealth(data.checks ?? []);
+        }),
+        loadSection("logs", "/api/admin/logs", (payload) => {
+          const data = payload as { logs?: AdminEventLogEntry[] };
+          setLogs(data.logs ?? []);
+        }),
+        loadSection("users", "/api/admin/users", (payload) => {
+          const data = payload as { users?: AdminUserSummary[] };
+          setUsers(data.users ?? []);
+        }),
+        loadSection("feedback", "/api/admin/feedback", (payload) => {
+          const data = payload as { reports?: AdminFeedbackReport[] };
+          setFeedback(data.reports ?? []);
+        }),
+      ]);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Unable to load dashboard.");
     } finally {
       setLoading(false);
+      scheduleAdminHashScroll();
     }
   }, []);
 
@@ -256,7 +299,19 @@ export function AdminDashboard() {
 
   return (
     <div className="space-y-14">
-      <Section id="overview" title="Dashboard overview" description="Platform health at a glance.">
+      {Object.keys(sectionErrors).length > 0 ? (
+        <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+          Some dashboard sections failed to load. Check server configuration and retry individual
+          sections below.
+        </div>
+      ) : null}
+
+      <Section
+        id="overview"
+        title="Dashboard overview"
+        description="Platform health at a glance."
+        loadError={sectionErrors.overview}
+      >
         <MetricGrid>
           <StatCard label="Total Users" value={String(overview?.totalUsers ?? 0)} change="" mutedChange />
           <StatCard label="New Users Today" value={String(overview?.newUsersToday ?? 0)} change="" mutedChange />
@@ -273,7 +328,12 @@ export function AdminDashboard() {
         </MetricGrid>
       </Section>
 
-      <Section id="revenue" title="Revenue" description="Subscription metrics from Stripe and Buxme profiles.">
+      <Section
+        id="revenue"
+        title="Revenue"
+        description="Subscription metrics from Stripe and Buxme profiles."
+        loadError={sectionErrors.revenue}
+      >
         <MetricGrid>
           <StatCard label="MRR" value={formatCurrency(revenue?.mrr ?? 0)} change={revenue?.available ? "Stripe live" : "Stripe unavailable"} mutedChange />
           <StatCard label="ARR" value={formatCurrency(revenue?.arr ?? 0)} change="" mutedChange />
@@ -287,17 +347,24 @@ export function AdminDashboard() {
         </MetricGrid>
       </Section>
 
-      {plaid?.available ? (
-        <Section id="plaid" title="Plaid" description="Bank sync connection health.">
+      {plaid?.available || sectionErrors.plaid ? (
+        <Section
+          id="plaid"
+          title="Plaid"
+          description="Bank sync connection health."
+          loadError={sectionErrors.plaid}
+        >
           <MetricGrid>
-            <StatCard label="Connected Institutions" value={String(plaid.connectedInstitutions)} change="" mutedChange />
-            <StatCard label="Connected Accounts" value={String(plaid.connectedAccounts)} change="" mutedChange />
-            <StatCard label="Sync Success Rate" value={`${plaid.syncSuccessRate}%`} change="" mutedChange />
-            <StatCard label="Failed Syncs" value={String(plaid.failedSyncs)} change="" mutedChange positive={false} />
-            <StatCard label="Last Sync" value={formatDate(plaid.lastSync)} change="" mutedChange />
+            <StatCard label="Connected Institutions" value={String(plaid?.connectedInstitutions ?? 0)} change="" mutedChange />
+            <StatCard label="Connected Accounts" value={String(plaid?.connectedAccounts ?? 0)} change="" mutedChange />
+            <StatCard label="Sync Success Rate" value={`${plaid?.syncSuccessRate ?? 0}%`} change="" mutedChange />
+            <StatCard label="Failed Syncs" value={String(plaid?.failedSyncs ?? 0)} change="" mutedChange positive={false} />
+            <StatCard label="Last Sync" value={formatDate(plaid?.lastSync)} change="" mutedChange />
             <StatCard
               label="Average Sync Time"
-              value={plaid.averageSyncTimeMs ? `${plaid.averageSyncTimeMs} ms` : "—"}
+              value={
+                plaid?.averageSyncTimeMs != null ? `${plaid.averageSyncTimeMs} ms` : "—"
+              }
               change=""
               mutedChange
             />
@@ -305,7 +372,12 @@ export function AdminDashboard() {
         </Section>
       ) : null}
 
-      <Section id="users" title="User management" description="Search users and perform privileged account actions.">
+      <Section
+        id="users"
+        title="User management"
+        description="Search users and perform privileged account actions."
+        loadError={sectionErrors.users}
+      >
         <div className="flex flex-col gap-3 sm:flex-row">
           <Input
             value={search}
@@ -383,7 +455,12 @@ export function AdminDashboard() {
         </div>
       </Section>
 
-      <Section id="feedback" title="Feedback queue" description="Bug reports, feature requests, and product feedback submitted by users.">
+      <Section
+        id="feedback"
+        title="Feedback queue"
+        description="Bug reports, feature requests, and product feedback submitted by users."
+        loadError={sectionErrors.feedback}
+      >
         <div className="flex flex-col gap-3 lg:flex-row">
           <Input
             value={feedbackSearch}
@@ -482,7 +559,12 @@ export function AdminDashboard() {
         </div>
       </Section>
 
-      <Section id="analytics" title="Analytics" description="30-day platform trends.">
+      <Section
+        id="analytics"
+        title="Analytics"
+        description="30-day platform trends."
+        loadError={sectionErrors.analytics}
+      >
         <div className="grid gap-4 lg:grid-cols-2">
           <AdminChart title="Daily Signups" points={analytics?.dailySignups ?? []} />
           <AdminChart title="Daily Active Users" points={analytics?.dailyActiveUsers ?? []} />
@@ -494,7 +576,7 @@ export function AdminDashboard() {
         </div>
       </Section>
 
-      <Section id="health" title="System health">
+      <Section id="health" title="System health" loadError={sectionErrors.health}>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {health.map((check) => (
             <Card key={check.id} padding="lg">
@@ -510,7 +592,12 @@ export function AdminDashboard() {
         </div>
       </Section>
 
-      <Section id="logs" title="Logs" description="Recent platform events.">
+      <Section
+        id="logs"
+        title="Logs"
+        description="Recent platform events."
+        loadError={sectionErrors.logs}
+      >
         <div className="mb-4 max-w-xs">
           <Select value={logFilter} onChange={(event) => setLogFilter(event.target.value)}>
             <option value="all">All events</option>

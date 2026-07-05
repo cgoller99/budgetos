@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect } from "react";
 import { cn } from "@/components/ui/cn";
+import { scheduleAdminHashScroll } from "@/components/admin/adminHashScroll";
 
 const NAV_ITEMS = [
   { href: "/admin", label: "Overview" },
@@ -11,11 +13,20 @@ const NAV_ITEMS = [
   { href: "/admin#feedback", label: "Feedback" },
   { href: "/admin#analytics", label: "Analytics" },
   { href: "/admin#health", label: "System" },
+  { href: "/admin#logs", label: "Logs" },
   { href: "/admin#beta", label: "Beta" },
 ] as const;
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+
+  useEffect(() => {
+    scheduleAdminHashScroll();
+
+    const onHashChange = () => scheduleAdminHashScroll();
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, [pathname]);
 
   return (
     <div className="app-shell min-h-screen bg-[var(--background)] text-[var(--foreground)]">
