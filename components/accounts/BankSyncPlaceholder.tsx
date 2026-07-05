@@ -15,6 +15,7 @@ import {
   isPlaidReconnectRequired,
 } from "@/lib/plaid/clientApi";
 import { isPlaidClientEnabled } from "@/lib/plaid/clientConfig";
+import { ANALYTICS_EVENTS, trackEvent } from "@/lib/analytics/client";
 
 type BankSyncConnectProps = {
   connectionId?: string;
@@ -107,6 +108,9 @@ export function BankSyncConnect({
     async (publicToken: string) => {
       try {
         const result = await exchangePlaidPublicToken(publicToken);
+        trackEvent(ANALYTICS_EVENTS.CONNECTED_PLAID, {
+          institution: result.institutionName ?? "unknown",
+        });
         showToast({
           title: "Bank connected",
           subtitle: result.institutionName ?? "Your accounts are syncing.",

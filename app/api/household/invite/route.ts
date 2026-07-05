@@ -4,9 +4,8 @@ import { sendHouseholdInviteEmail } from "@/lib/email/householdInviteEmail";
 import { getSandboxDeliveryError } from "@/lib/email/sandbox";
 import { EmailNotConfiguredError } from "@/lib/email/sendEmail";
 import { getHouseholdInviteUrl } from "@/lib/household/inviteUrls";
-import { isFounderEmail } from "@/lib/founder/emails";
+import { getEffectiveEntitlements } from "@/lib/subscription/entitlements.server";
 import { mapProfileToSubscription } from "@/lib/stripe/subscriptionMapper";
-import { hasProAccess } from "@/lib/subscription/types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type InviteRequestBody = {
@@ -77,11 +76,15 @@ export async function POST(request: Request) {
     }
 
     const subscription = mapProfileToSubscription(profile);
+    const entitlements = getEffectiveEntitlements({
+      email: user.email ?? profile?.email,
+      subscription,
+      adminFounderGranted: profile?.admin_founder_granted,
+    });
 
     if (
       process.env.NEXT_PUBLIC_STRIPE_ENABLED === "true" &&
-      !isFounderEmail(user.email) &&
-      !hasProAccess(subscription)
+      !entitlements.hasProAccess
     ) {
       return NextResponse.json(
         {

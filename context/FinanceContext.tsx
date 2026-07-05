@@ -13,6 +13,7 @@ import {
 import { useToast } from "@/context/ToastContext";
 import { useAuth } from "@/context/AuthContext";
 import { useHousehold } from "@/context/HouseholdContext";
+import { ANALYTICS_EVENTS, trackEvent } from "@/lib/analytics/client";
 import { getDemoFinanceData } from "@/lib/demo/data";
 import { computeFinanceHub } from "@/lib/finance/computeFinanceHub";
 import { coerceFinanceData, emptyFinanceData } from "@/lib/finance/emptyFinanceData";
@@ -655,6 +656,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
           events: [buildAccountAddedEvent(input.name.trim(), accountId)],
         },
       );
+      trackEvent(ANALYTICS_EVENTS.ADDED_ACCOUNT, { account_type: input.type });
     },
     [data, runMutation],
   );
@@ -952,6 +954,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
           events: [buildBillAddedEvent(input.name.trim(), billId)],
         },
       );
+      trackEvent(ANALYTICS_EVENTS.ADDED_BILL, { recurring: input.recurring });
     },
     [data, runMutation],
   );
@@ -1083,6 +1086,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
           events: [buildGoalCreatedEvent(input.name.trim(), goalId)],
         },
       );
+      trackEvent(ANALYTICS_EVENTS.CREATED_GOAL, { goal_type: input.type });
     },
     [data, runMutation],
   );
@@ -1237,6 +1241,8 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
 
   const saveIncomePlan = useCallback(
     async (input: SaveIncomePlanInput) => {
+      const hadPlan = Boolean(data.incomePlan);
+
       await runMutation(
         {
           ...data,
@@ -1260,6 +1266,20 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
         },
         (repository, userId) => repository.saveIncomePlan(userId, input),
       );
+
+      if (!hadPlan) {
+        trackEvent(ANALYTICS_EVENTS.CREATED_INCOME_PLAN, {
+          pay_schedule: input.paySchedule,
+        });
+      }
+
+      if (input.allocations.length > 0) {
+        trackEvent(
+          ANALYTICS_EVENTS.CREATED_BUDGET,
+          { allocation_count: input.allocations.length },
+          { once: true, dedupeKey: "created-budget" },
+        );
+      }
     },
     [data, runMutation],
   );

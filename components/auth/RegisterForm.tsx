@@ -10,6 +10,14 @@ import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
 import { getSafeRedirectPath } from "@/lib/supabase/authUrls";
 
+type BetaAccessResponse = {
+  allowed: boolean;
+  inviteOnly: boolean;
+  isFull: boolean;
+  waitlistEnabled: boolean;
+  reason?: "invite_only" | "beta_full";
+};
+
 export function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -20,6 +28,7 @@ export function RegisterForm() {
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [betaClosedMessage, setBetaClosedMessage] = useState<string | null>(null);
   const passwordInputId = useId();
   const redirect = getSafeRedirectPath(searchParams.get("redirect"), "/onboarding");
   const loginHref = `/login?redirect=${encodeURIComponent(redirect)}`;
@@ -32,12 +41,44 @@ export function RegisterForm() {
     }
   }, [searchParams]);
 
+  useEffect(() => {
+    void fetch("/api/beta/waitlist")
+      .then((response) => response.json())
+      .then((payload: { inviteOnly?: boolean; isFull?: boolean; waitlistEnabled?: boolean }) => {
+        if (payload.inviteOnly) {
+          setBetaClosedMessage("Buxme beta is invite-only. Join the waitlist to get approved first.");
+        } else if (payload.isFull && payload.waitlistEnabled) {
+          setBetaClosedMessage("Beta is currently full. Join the waitlist and we will notify you.");
+        }
+      })
+      .catch(() => undefined);
+  }, []);
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
     setIsSubmitting(true);
 
     try {
+      const accessResponse = await fetch("/api/beta/access", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      const access = (await accessResponse.json()) as BetaAccessResponse;
+
+      if (!access.allowed) {
+        if (access.reason === "invite_only") {
+          throw new Error("Beta is invite-only. Join the waitlist at /beta and wait for approval.");
+        }
+
+        if (access.reason === "beta_full") {
+          throw new Error("Beta is full right now. Join the waitlist at /beta.");
+        }
+
+        throw new Error("Registration is not available right now.");
+      }
+
       const result = await signUp(email, password, fullName, redirect);
 
       if (result.needsEmailVerification) {
@@ -87,6 +128,14 @@ export function RegisterForm() {
       subtitle="Start organizing your financial life"
       footer={
         <>
+          {betaClosedMessage ? (
+            <p className="mb-3 text-sm text-white/45">
+              {betaClosedMessage}{" "}
+              <Link href="/beta" className="text-[#0077ed] hover:underline">
+                Join the beta waitlist
+              </Link>
+            </p>
+          ) : null}
           Already have an account?{" "}
           <Link href={loginHref} className="text-[#0077ed] hover:underline">
             Sign in

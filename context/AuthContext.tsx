@@ -19,6 +19,12 @@ import {
   getSupabaseClient,
   getSupabaseConfig,
 } from "@/lib/supabase/client";
+import {
+  ANALYTICS_EVENTS,
+  identifyAnalyticsUser,
+  resetAnalyticsUser,
+  trackEvent,
+} from "@/lib/analytics/client";
 
 export type SignUpResult = {
   needsEmailVerification: boolean;
@@ -183,12 +189,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (data.session) {
         setSession(data.session);
         setUser(data.session.user);
+        identifyAnalyticsUser({
+          id: data.session.user.id,
+          email: data.session.user.email,
+          name: fullName?.trim() || null,
+        });
+        trackEvent(
+          ANALYTICS_EVENTS.ACCOUNT_CREATED,
+          { method: "email" },
+          { once: true, dedupeKey: `account-${data.session.user.id}` },
+        );
         void ensureProfile(
           supabase,
           data.session.user.id,
           data.session.user.email,
           fullName?.trim(),
         ).catch(() => undefined);
+        void fetch("/api/beta/register", { method: "POST" }).catch(() => undefined);
       }
 
       return {
@@ -222,6 +239,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       setSession(data.session);
       setUser(data.user);
+      identifyAnalyticsUser({
+        id: data.user.id,
+        email: data.user.email,
+        name: (data.user.user_metadata?.full_name as string | undefined) ?? null,
+      });
+      trackEvent(
+        ANALYTICS_EVENTS.LOGIN,
+        { method: "email" },
+        { dedupeKey: `login-${data.user.id}-${Math.floor(Date.now() / 600_000)}` },
+      );
       void ensureProfile(
         supabase,
         data.user.id,
@@ -246,6 +273,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     setUser(null);
     setSession(null);
+    resetAnalyticsUser();
   }, [isConfigured]);
 
   const resetPassword = useCallback(

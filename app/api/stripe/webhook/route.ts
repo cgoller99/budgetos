@@ -6,6 +6,7 @@ import {
   handleCheckoutSessionCompleted,
   syncSubscriptionToProfile,
 } from "@/lib/stripe/subscriptionService";
+import { tryLogAdminEvent } from "@/lib/admin/logEventSafe";
 
 export const runtime = "nodejs";
 
@@ -41,6 +42,11 @@ export async function POST(request: Request) {
         await handleCheckoutSessionCompleted(
           event.data.object as Stripe.Checkout.Session,
         );
+        await tryLogAdminEvent({
+          eventType: "stripe",
+          message: `Checkout completed (${event.id})`,
+          metadata: { type: event.type },
+        });
         break;
       case "customer.subscription.updated":
       case "customer.subscription.deleted": {
@@ -51,6 +57,11 @@ export async function POST(request: Request) {
           { expand: ["items.data.price.product"] },
         );
         await syncSubscriptionToProfile(subscription);
+        await tryLogAdminEvent({
+          eventType: "stripe",
+          message: `${event.type} (${subscription.id})`,
+          metadata: { type: event.type, status: subscription.status },
+        });
         break;
       }
       default:
@@ -60,6 +71,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ received: true });
   } catch (error) {
     console.error("[stripe/webhook] Failed to process event", event.type, error);
+    await tryLogAdminEvent({
+      eventType: "api_failure",
+      message: `Stripe webhook failed for ${event.type}`,
+      metadata: { error: error instanceof Error ? error.message : "Unknown error" },
+    });
     return NextResponse.json({ error: "Webhook handler failed." }, { status: 500 });
   }
 }

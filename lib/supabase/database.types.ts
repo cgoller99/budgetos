@@ -23,6 +23,12 @@ export type ProfileRow = {
   subscription_plan: string;
   subscription_status: string;
   subscription_current_period_end: string | null;
+  is_disabled: boolean;
+  admin_founder_granted: boolean;
+  last_active_at: string | null;
+  onboarding_step: number;
+  onboarding_progress: Record<string, unknown>;
+  beta_status: "pending" | "approved" | "rejected";
   created_at: string;
   updated_at: string;
 };
@@ -40,6 +46,12 @@ export type ProfileInsert = {
   subscription_plan?: string;
   subscription_status?: string;
   subscription_current_period_end?: string | null;
+  is_disabled?: boolean;
+  admin_founder_granted?: boolean;
+  last_active_at?: string | null;
+  onboarding_step?: number;
+  onboarding_progress?: Record<string, unknown>;
+  beta_status?: "pending" | "approved" | "rejected";
   created_at?: string;
   updated_at?: string;
 };
@@ -558,6 +570,53 @@ export type IncomePlanAllocationEventRow = {
   created_at: string;
 };
 
+export type AdminFeedbackReportRow = {
+  id: string;
+  user_id: string | null;
+  user_email: string | null;
+  report_type: "feedback" | "bug" | "feature_request";
+  message: string;
+  screenshot_url: string | null;
+  recording_url: string | null;
+  browser: string | null;
+  page_path: string | null;
+  category: string | null;
+  device: string | null;
+  app_version: string | null;
+  status: "new" | "investigating" | "planned" | "in_progress" | "completed" | "closed";
+  priority: "low" | "normal" | "high" | "urgent";
+  created_at: string;
+  updated_at: string;
+};
+
+export type AdminEventLogRow = {
+  id: string;
+  event_type: "error" | "stripe" | "plaid" | "auth" | "api_failure";
+  message: string;
+  metadata: Record<string, unknown>;
+  user_id: string | null;
+  created_at: string;
+};
+
+export type BetaSettingsRow = {
+  id: number;
+  invite_only: boolean;
+  max_beta_users: number | null;
+  waitlist_enabled: boolean;
+  updated_at: string;
+};
+
+export type BetaWaitlistRow = {
+  id: string;
+  email: string;
+  full_name: string | null;
+  status: "pending" | "approved" | "rejected";
+  source: string;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -665,6 +724,30 @@ export type Database = {
       };
       income_plan_allocation_events: {
         Row: IncomePlanAllocationEventRow;
+        Insert: Record<string, unknown>;
+        Update: Record<string, unknown>;
+        Relationships: [];
+      };
+      admin_feedback_reports: {
+        Row: AdminFeedbackReportRow;
+        Insert: Record<string, unknown>;
+        Update: Record<string, unknown>;
+        Relationships: [];
+      };
+      admin_event_logs: {
+        Row: AdminEventLogRow;
+        Insert: Record<string, unknown>;
+        Update: Record<string, unknown>;
+        Relationships: [];
+      };
+      beta_settings: {
+        Row: BetaSettingsRow;
+        Insert: Record<string, unknown>;
+        Update: Record<string, unknown>;
+        Relationships: [];
+      };
+      beta_waitlist: {
+        Row: BetaWaitlistRow;
         Insert: Record<string, unknown>;
         Update: Record<string, unknown>;
         Relationships: [];

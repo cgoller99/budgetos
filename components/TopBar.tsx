@@ -1,10 +1,7 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
 import { PageIntro } from "@/components/guidance/PageIntro";
 import { GlobalSearch } from "@/components/search/GlobalSearch";
-import { cn } from "@/components/ui/cn";
-import { sidebarActiveClassName, sidebarInactiveClassName } from "@/components/ui/tokens";
-import { getNavRoute, NAV_ROUTES } from "@/lib/navigation";
+import { getNavRoute } from "@/lib/navigation";
 
 type TopBarProps = {
   activeHref?: string;
@@ -21,37 +18,18 @@ export function TopBar({
 
   return (
     <>
-      <header className="flex items-start justify-between gap-6 border-b border-[var(--surface-border)] bg-[var(--background)]/40 px-6 py-6 backdrop-blur-sm lg:px-10 lg:py-7">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">
+      <header className="flex items-start justify-between gap-4 border-b border-[var(--surface-border)] bg-[var(--background)]/40 px-4 py-5 backdrop-blur-sm sm:gap-6 sm:px-6 sm:py-6 lg:px-10 lg:py-7">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-xl font-semibold tracking-tight text-[var(--foreground)] sm:text-2xl lg:text-3xl">
             {title}
           </h1>
           <PageIntro subtitle={activeRoute?.subtitle} />
         </div>
-        <div className="flex items-center gap-3 sm:gap-4">
+        <div className="flex shrink-0 items-center gap-2 sm:gap-4">
           <GlobalSearch />
           {notificationCenter}
         </div>
       </header>
-
-      <nav className="flex gap-2 overflow-x-auto border-b border-[var(--surface-border)] px-6 py-4 lg:hidden">
-        {NAV_ROUTES.map((route) => {
-          const isActive = route.href === activeHref;
-
-          return (
-            <Link
-              key={route.href}
-              href={route.href}
-              className={cn(
-                "shrink-0 rounded-2xl px-4 py-2.5 text-sm font-medium transition-all duration-200 ease-out",
-                isActive ? sidebarActiveClassName : sidebarInactiveClassName,
-              )}
-            >
-              {route.label}
-            </Link>
-          );
-        })}
-      </nav>
     </>
   );
 }

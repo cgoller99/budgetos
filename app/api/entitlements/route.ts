@@ -32,6 +32,7 @@ export async function GET(request: Request) {
     const entitlements = getEffectiveEntitlements({
       email: auth.user.email ?? auth.profile?.email,
       subscription,
+      adminFounderGranted: auth.profile?.admin_founder_granted,
     });
 
     return NextResponse.json({

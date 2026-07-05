@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Badge, Button, Card, CardContent, CardHeader } from "@/components/ui";
 import { cn } from "@/components/ui/cn";
 import { useSubscription } from "@/context/SubscriptionContext";
 import { useToast } from "@/context/ToastContext";
+import { ANALYTICS_EVENTS, trackEvent } from "@/lib/analytics/client";
 import { PLAN_DEFINITIONS } from "@/lib/subscription/plans";
 import {
   getPlanDisplayName,
@@ -73,6 +74,7 @@ export function BillingSection() {
   } = useSubscription();
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const checkoutTrackedRef = useRef(false);
 
   const runAction = useCallback(
     async (key: string, action: () => Promise<void>) => {
@@ -102,6 +104,14 @@ export function BillingSection() {
     const checkout = searchParams.get("checkout");
 
     if (checkout === "success") {
+      if (!checkoutTrackedRef.current) {
+        checkoutTrackedRef.current = true;
+        trackEvent(
+          ANALYTICS_EVENTS.SUBSCRIPTION_PURCHASED,
+          { plan: subscription.plan },
+          { once: true, dedupeKey: "subscription-purchased" },
+        );
+      }
       showToast({
         title: "Subscription updated",
         subtitle: "Your Buxme plan is now active.",
@@ -115,10 +125,11 @@ export function BillingSection() {
         subtitle: "No changes were made to your plan.",
       });
     }
-  }, [refreshSubscription, searchParams, showToast]);
+  }, [refreshSubscription, searchParams, showToast, subscription.plan]);
 
   async function handleCheckout(plan: PaidSubscriptionPlan) {
     await runAction(`checkout-${plan}`, async () => {
+      trackEvent(ANALYTICS_EVENTS.STRIPE_CHECKOUT_STARTED, { plan });
       const url = await startStripeCheckout(plan);
       window.location.assign(url);
     });
@@ -126,8 +137,16 @@ export function BillingSection() {
 
   async function handleChangePlan(plan: PaidSubscriptionPlan) {
     await runAction(`change-${plan}`, async () => {
+      const currentPlan = subscription.plan;
       await changeStripePlan(plan);
       await refreshSubscription({ refresh: true });
+
+      if (plan === "pro_plus" && currentPlan === "pro") {
+        trackEvent(ANALYTICS_EVENTS.SUBSCRIPTION_UPGRADED, { from: currentPlan, to: plan });
+      } else if (plan === "pro" && currentPlan === "pro_plus") {
+        trackEvent(ANALYTICS_EVENTS.SUBSCRIPTION_DOWNGRADED, { from: currentPlan, to: plan });
+      }
+
       showToast({
         title: "Plan updated",
         subtitle: `You are now on ${getPlanDisplayName(plan)}.`,
@@ -139,6 +158,7 @@ export function BillingSection() {
     await runAction("cancel", async () => {
       await cancelStripeSubscription({ atPeriodEnd: true });
       await refreshSubscription({ refresh: true });
+      trackEvent(ANALYTICS_EVENTS.SUBSCRIPTION_CANCELLED, { plan: subscription.plan });
       showToast({
         title: "Subscription canceled",
         subtitle: "Your plan stays active until the end of the billing period.",

@@ -4,6 +4,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import { FinanceProvider } from "@/context/FinanceContext";
 import { HouseholdProvider } from "@/context/HouseholdContext";
 import { ToastProvider } from "@/context/ToastContext";
+import { AnalyticsProvider } from "@/components/providers/AnalyticsProvider";
 import { ThemeInit } from "@/components/providers/ThemeInit";
 
 type AppProvidersProps = {
@@ -15,9 +16,11 @@ export function AppProviders({ children }: AppProvidersProps) {
     <ToastProvider>
       <ThemeInit />
       <AuthProvider>
-        <HouseholdProvider>
-          <FinanceProvider>{children}</FinanceProvider>
-        </HouseholdProvider>
+        <AnalyticsProvider>
+          <HouseholdProvider>
+            <FinanceProvider>{children}</FinanceProvider>
+          </HouseholdProvider>
+        </AnalyticsProvider>
       </AuthProvider>
     </ToastProvider>
   );

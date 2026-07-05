@@ -20,8 +20,10 @@ export type EffectiveEntitlements = {
 export function getEffectiveEntitlements(input: {
   email: string | null | undefined;
   subscription: UserSubscription;
+  adminFounderGranted?: boolean;
 }): EffectiveEntitlements {
-  const isFounder = isFounderEmail(input.email);
+  const isFounder =
+    isFounderEmail(input.email) || Boolean(input.adminFounderGranted);
 
   if (isFounder) {
     return {

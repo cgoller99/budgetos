@@ -1,5 +1,6 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { canAccessAdminDashboard } from "@/lib/admin/apiAuth";
 import { isFounderEmail } from "@/lib/founder/emails";
 import { mapProfileToSubscription } from "@/lib/stripe/subscriptionMapper";
 import { getRequiredPlanForPath } from "@/lib/subscription/plans";
@@ -45,6 +46,28 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const pathname = request.nextUrl.pathname;
+
+  if (pathname.startsWith("/admin") || pathname.startsWith("/api/admin")) {
+    if (!user) {
+      if (pathname.startsWith("/api/admin")) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = "/login";
+      redirectUrl.searchParams.set("redirect", pathname);
+      return NextResponse.redirect(redirectUrl);
+    }
+
+    if (!canAccessAdminDashboard(user.email)) {
+      if (pathname.startsWith("/api/admin")) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+
+      return new NextResponse("Forbidden", { status: 403 });
+    }
+  }
+
   const requiredPlan = getRequiredPlanForPath(pathname);
   if (user && requiredPlan) {
     if (isFounderEmail(user.email)) {

@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { ANALYTICS_EVENTS, trackEvent } from "@/lib/analytics/client";
 import type {
   Household,
   HouseholdInvite,
@@ -166,6 +167,8 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
           applySnapshot(snapshot);
         }
 
+        trackEvent(ANALYTICS_EVENTS.INVITED_HOUSEHOLD, { email_domain: email.split("@")[1] ?? "" });
+
         return {
           inviteUrl: payload.inviteUrl ?? null,
           resendId: payload.resendId ?? null,
@@ -192,6 +195,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       try {
         const snapshot = await service.acceptInvite(user.id, inviteId);
         applySnapshot(snapshot);
+        trackEvent(ANALYTICS_EVENTS.ACCEPTED_INVITE, { invite_id: inviteId });
       } catch (mutationError) {
         setError(getErrorMessage(mutationError));
         throw mutationError;
