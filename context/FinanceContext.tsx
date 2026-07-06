@@ -20,7 +20,6 @@ import type { FinancialSnapshot } from "@/lib/finance/financialEngine";
 import {
   isIncomePlanPaycheckDue,
   markIncomePlanAutoRun,
-  shouldAutoApplyPlaidPaycheck,
 } from "@/lib/finance/autoScheduler";
 import { coerceFinanceData, emptyFinanceData } from "@/lib/finance/emptyFinanceData";
 import {
@@ -1445,9 +1444,12 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
     }
 
     const plan = data.incomePlan;
-    const plaidSuggestion = shouldAutoApplyPlaidPaycheck(automationSuggestions);
 
-    if (!isIncomePlanPaycheckDue(data) && !plaidSuggestion) {
+    // Only auto-run when the plan's scheduled pay date has actually arrived
+    // (isIncomePlanPaycheckDue is bounded by today). A "paycheck detected"
+    // suggestion must NOT auto-apply: it does not advance/clear itself, so it
+    // would re-fire every render and march the pay date into the future.
+    if (!isIncomePlanPaycheckDue(data)) {
       return;
     }
 
@@ -1476,13 +1478,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
         autoRunInFlightRef.current = false;
       }
     })();
-  }, [
-    automationSuggestions,
-    data,
-    isLoading,
-    markIncomePlanPaycheckReceived,
-    showToast,
-  ]);
+  }, [data, isLoading, markIncomePlanPaycheckReceived, showToast]);
 
   const hub = useMemo(() => computeFinanceHub(data), [data]);
   const mergedNotifications = useMemo(
