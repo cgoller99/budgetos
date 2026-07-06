@@ -164,7 +164,9 @@ export function FeedbackCenter() {
         type="button"
         onClick={() => setIsOpen(true)}
         className={cn(
-          "fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] right-4 z-40 flex h-12 min-w-12 items-center justify-center rounded-full border border-[#0077ed]/30 bg-[#0077ed] px-4 text-sm font-medium text-white shadow-[0_8px_24px_rgba(0,119,237,0.35)] transition-transform hover:scale-[1.02] active:scale-[0.98] sm:bottom-6 sm:right-6",
+          // Sit above the mobile bottom nav (which is ~4rem tall and shown below lg);
+          // drop back to the corner on desktop where the nav is hidden.
+          "fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom))] right-4 z-40 flex h-12 min-w-12 items-center justify-center rounded-full border border-[#0077ed]/30 bg-[#0077ed] px-4 text-sm font-medium text-white shadow-[0_8px_24px_rgba(0,119,237,0.35)] transition-transform hover:scale-[1.02] active:scale-[0.98] lg:bottom-6 lg:right-6",
         )}
         aria-label="Open feedback center"
       >
