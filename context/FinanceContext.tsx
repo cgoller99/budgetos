@@ -1433,14 +1433,14 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
     [addBill, markIncomePlanPaycheckReceived, showToast],
   );
 
-  const autoRunRef = useRef(false);
+  // Tracks the `${planId}:${payDate}` keys we've already attempted this session so a
+  // failed auto-run never retries in a tight loop (which would repeatedly advance and
+  // roll back the pay date and spam sync errors).
+  const autoRunAttemptsRef = useRef<Set<string>>(new Set());
+  const autoRunInFlightRef = useRef(false);
 
   useEffect(() => {
-    autoRunRef.current = false;
-  }, [data.incomePlan?.id, data.incomePlan?.nextPayDate]);
-
-  useEffect(() => {
-    if (isLoading || !data.incomePlan || autoRunRef.current) {
+    if (isLoading || !data.incomePlan || autoRunInFlightRef.current) {
       return;
     }
 
@@ -1451,7 +1451,14 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
       return;
     }
 
-    autoRunRef.current = true;
+    const attemptKey = `${plan.id}:${plan.nextPayDate}`;
+
+    if (autoRunAttemptsRef.current.has(attemptKey)) {
+      return;
+    }
+
+    autoRunAttemptsRef.current.add(attemptKey);
+    autoRunInFlightRef.current = true;
 
     void (async () => {
       try {
@@ -1463,7 +1470,10 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
           type: "success",
         });
       } catch {
-        autoRunRef.current = false;
+        // Leave the attempt recorded so we don't retry this pay date automatically;
+        // the user can retry manually from the Income hub.
+      } finally {
+        autoRunInFlightRef.current = false;
       }
     })();
   }, [

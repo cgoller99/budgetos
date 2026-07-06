@@ -318,20 +318,17 @@ export class IncomePlanRepository {
 
     if (paycheckError) throw paycheckError;
 
-    const allocationEventRows = paycheckEvent.allocationEvents.map((event) =>
-      this.withHouseholdId(
-        {
-          id: event.id,
-          paycheck_event_id: paycheckEvent.id,
-          allocation_id: event.allocationId,
-          user_id: userId,
-          amount: event.amount,
-          transaction_id: event.transactionId,
-          created_at: timestamp,
-        },
-        householdId,
-      ),
-    );
+    // income_plan_allocation_events has no household_id column; it is scoped by
+    // user_id via RLS and inherits household context from its parent paycheck event.
+    const allocationEventRows = paycheckEvent.allocationEvents.map((event) => ({
+      id: event.id,
+      paycheck_event_id: paycheckEvent.id,
+      allocation_id: event.allocationId,
+      user_id: userId,
+      amount: event.amount,
+      transaction_id: event.transactionId,
+      created_at: timestamp,
+    }));
 
     if (allocationEventRows.length > 0) {
       const { error: allocationEventError } = await this.supabase
