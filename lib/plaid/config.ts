@@ -31,11 +31,26 @@ const PLACEHOLDER_ENCRYPTION_KEYS = new Set([
 function normalizePlaidEnvironment(value: string | undefined): PlaidEnvironment {
   const normalized = value?.trim().toLowerCase();
 
-  if (normalized === "production" || normalized === "development") {
+  if (
+    normalized === "production" ||
+    normalized === "development" ||
+    normalized === "sandbox"
+  ) {
     return normalized;
   }
 
-  return "sandbox";
+  return "production";
+}
+
+export function getPlaidEnvironmentLabel(environment: PlaidEnvironment): string {
+  switch (environment) {
+    case "production":
+      return "Production";
+    case "development":
+      return "Development";
+    default:
+      return "Sandbox";
+  }
 }
 
 function isValidWebhookUrl(value: string | undefined): boolean {
@@ -56,7 +71,15 @@ function getConfigurationError(
   secret: string | undefined,
   tokenEncryptionKey: string | undefined,
   webhookUrl: string | undefined,
+  environment: PlaidEnvironment,
 ): string | null {
+  if (process.env.VERCEL_ENV === "production" && environment === "sandbox") {
+    return "PLAID_ENV cannot be sandbox in production. Set PLAID_ENV=production and use production API keys from the Plaid Dashboard.";
+  }
+
+  if (environment === "production" && !webhookUrl) {
+    return "PLAID_WEBHOOK_URL is required in production. Set it to your public webhook endpoint (e.g. https://buxme.co/api/plaid/webhook).";
+  }
   if (!clientId) {
     return "PLAID_CLIENT_ID is missing. Add it to .env.local and restart the dev server.";
   }
@@ -106,6 +129,7 @@ export function getPlaidConfig(): PlaidConfig {
     secret,
     tokenEncryptionKey,
     webhookUrl,
+    environment,
   );
 
   return {

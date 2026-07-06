@@ -1,6 +1,6 @@
 import "server-only";
 
-import { isPlaidEnabled } from "@/lib/plaid/config";
+import { getPlaidConfig, getPlaidEnvironmentLabel } from "@/lib/plaid/config";
 import { isStripeEnabled } from "@/lib/stripe/config";
 import { getSupabaseConfig } from "@/lib/supabase/config";
 import type { BuxmeSupabaseClient } from "@/lib/supabase/client";
@@ -44,11 +44,26 @@ export async function getAdminSystemHealth(
     detail: isStripeEnabled() ? "Configured" : "Missing keys or price configuration",
   });
 
+  const plaidConfig = getPlaidConfig();
+  const plaidEnvironmentLabel =
+    plaidConfig.configurationError === null
+      ? getPlaidEnvironmentLabel(plaidConfig.environment)
+      : null;
+
   checks.push({
     id: "plaid",
     label: "Plaid",
-    status: isPlaidEnabled() ? "green" : "yellow",
-    detail: isPlaidEnabled() ? "Configured" : "Not configured",
+    status: plaidConfig.configurationError
+      ? process.env.VERCEL_ENV === "production" &&
+        plaidConfig.environment === "sandbox"
+        ? "red"
+        : "yellow"
+      : "green",
+    detail:
+      plaidConfig.configurationError ??
+      (plaidEnvironmentLabel
+        ? `Configured (${plaidEnvironmentLabel})`
+        : "Configured"),
   });
 
   checks.push({
