@@ -46,6 +46,7 @@ const REQUIRED_PROFILE_COLUMNS = ["household_id"];
 
 const TABLE_SELECT_COLUMN = {
   household_members: "household_id,user_id",
+  user_release_views: "user_id,release_id",
 };
 
 function loadEnvFile(filePath) {
@@ -272,6 +273,12 @@ async function main() {
     console.log("  1. Open Supabase SQL Editor");
     console.log("  2. Run supabase/schema.sql");
     console.log("  3. Run migrations in supabase/migrations/ (oldest first)");
+  } else if (rlsProtectedTables.length !== REQUIRED_TABLES.length) {
+    const unprotected = REQUIRED_TABLES.filter((table) => !rlsProtectedTables.includes(table));
+    console.log("\nRLS fix:");
+    console.log("  Run pending migrations in supabase/migrations/ (e.g. 20260709_admin_feedback_rls.sql)");
+    console.log(`  Tables not blocking anonymous writes: ${unprotected.join(", ")}`);
+    console.log("  Or: npm run apply:admin-feedback-rls (requires SUPABASE_DB_PASSWORD)");
   }
 
   console.log("\nProfile column checks:");
