@@ -44,6 +44,22 @@ function normalizePlaidEnvironment(value: string | undefined): PlaidEnvironment 
   return "production";
 }
 
+function normalizePlaidWebhookUrl(value: string | undefined): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  let normalized = value.trim();
+
+  // Common copy-paste from docs/templates: "URL=https://..."
+  const urlPrefixMatch = normalized.match(/^URL=(.+)$/i);
+  if (urlPrefixMatch) {
+    normalized = urlPrefixMatch[1].trim();
+  }
+
+  return normalized;
+}
+
 function resolveEffectiveWebhookUrl(
   webhookUrl: string | undefined,
   environment: PlaidEnvironment,
@@ -152,7 +168,7 @@ export function getPlaidConfig(): PlaidConfig {
   const secret = process.env.PLAID_SECRET?.trim();
   const environment = normalizePlaidEnvironment(process.env.PLAID_ENV);
   const tokenEncryptionKey = process.env.PLAID_TOKEN_ENCRYPTION_KEY?.trim();
-  const rawWebhookUrl = process.env.PLAID_WEBHOOK_URL?.trim();
+  const rawWebhookUrl = normalizePlaidWebhookUrl(process.env.PLAID_WEBHOOK_URL);
   const webhookUrl = resolveEffectiveWebhookUrl(rawWebhookUrl, environment);
   const configurationError = getConfigurationError(
     clientId,
@@ -183,4 +199,37 @@ export function assertPlaidConfigured(): void {
 
 export function isPlaidEnabled(): boolean {
   return getPlaidConfig().isConfigured;
+}
+
+export type PlaidEnvVarStatus = "present" | "empty" | "missing";
+
+export type PlaidConfigDiagnostic = {
+  variable: string;
+  status: PlaidEnvVarStatus;
+  requiredForConfigured: boolean;
+};
+
+const PLAID_CONFIGURED_VARS = [
+  "PLAID_CLIENT_ID",
+  "PLAID_SECRET",
+  "PLAID_ENV",
+  "PLAID_TOKEN_ENCRYPTION_KEY",
+  "PLAID_WEBHOOK_URL",
+] as const;
+
+export function getPlaidConfigDiagnostics(): PlaidConfigDiagnostic[] {
+  return PLAID_CONFIGURED_VARS.map((variable) => {
+    const raw = process.env[variable];
+    let status: PlaidEnvVarStatus = "missing";
+
+    if (raw !== undefined) {
+      status = raw.trim() === "" ? "empty" : "present";
+    }
+
+    return {
+      variable,
+      status,
+      requiredForConfigured: true,
+    };
+  });
 }

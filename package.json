@@ -17,6 +17,7 @@
     "sync:env": "node scripts/sync-public-env-from-production.mjs",
     "env:pull": "node scripts/pull-vercel-env.mjs",
     "audit:env": "node scripts/audit-env.mjs",
+    "diagnose:plaid": "node scripts/diagnose-plaid-config.mjs",
     "audit:remote": "node scripts/audit-production-remote.mjs",
     "setup:production": "node --env-file=.env.local scripts/setup-production.mjs",
     "apply:supabase-sql": "node --env-file=.env.local scripts/apply-supabase-sql-api.mjs",
