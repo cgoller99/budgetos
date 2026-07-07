@@ -6,7 +6,8 @@ import {
   getPlaidErrorMessage,
   isPlaidItemLoginRequired,
   PLAID_COUNTRY_CODES,
-  PLAID_LINK_PRODUCTS,
+  PLAID_LINK_ADDITIONAL_CONSENTED_PRODUCTS,
+  PLAID_LINK_REQUIRED_PRODUCTS,
 } from "@/lib/plaid/plaidClient";
 import { getPlaidConfig, resolvePlaidWebhookUrl } from "@/lib/plaid/config";
 import { getPlaidOAuthRedirectUri } from "@/lib/plaid/oauth";
@@ -35,7 +36,8 @@ export async function createPlaidLinkToken(
   const request: LinkTokenCreateRequest = {
     user: { client_user_id: input.userId },
     client_name: "Buxme",
-    products: [...PLAID_LINK_PRODUCTS],
+    products: [...PLAID_LINK_REQUIRED_PRODUCTS],
+    additional_consented_products: [...PLAID_LINK_ADDITIONAL_CONSENTED_PRODUCTS],
     country_codes: [...PLAID_COUNTRY_CODES],
     language: "en",
     webhook: resolvePlaidWebhookUrl(config),

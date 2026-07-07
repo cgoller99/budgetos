@@ -205,6 +205,17 @@ function auditProductionModeInCode() {
   if (service.includes('client_name: "Buxme"')) {
     recordPass("Link token uses Buxme client name");
   }
+
+  if (
+    service.includes("products: [...PLAID_LINK_REQUIRED_PRODUCTS]") &&
+    service.includes("additional_consented_products: [...PLAID_LINK_ADDITIONAL_CONSENTED_PRODUCTS]")
+  ) {
+    recordPass("Link initializes Transactions only; Investments/Liabilities are additional consented");
+  } else {
+    recordFail(
+      "Link must require Transactions only — Liabilities in required products restricts Link to credit/loan accounts",
+    );
+  }
 }
 
 function auditApiEndpoints() {

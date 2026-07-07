@@ -52,10 +52,22 @@ export function getPlaidClient(): PlaidApi {
   return cachedClient;
 }
 
-export const PLAID_LINK_PRODUCTS = [
-  Products.Transactions,
+/** Required at Link — checking/savings and transaction accounts. */
+export const PLAID_LINK_REQUIRED_PRODUCTS = [Products.Transactions] as const;
+
+/**
+ * Consented via DTM but fetched post-Link in syncService (PFM best practice).
+ * Do NOT put Liabilities in required products — Link would only show credit/loan accounts.
+ */
+export const PLAID_LINK_ADDITIONAL_CONSENTED_PRODUCTS = [
   Products.Investments,
   Products.Liabilities,
+] as const;
+
+/** @deprecated Use PLAID_LINK_REQUIRED_PRODUCTS + PLAID_LINK_ADDITIONAL_CONSENTED_PRODUCTS */
+export const PLAID_LINK_PRODUCTS = [
+  ...PLAID_LINK_REQUIRED_PRODUCTS,
+  ...PLAID_LINK_ADDITIONAL_CONSENTED_PRODUCTS,
 ] as const;
 
 export const PLAID_COUNTRY_CODES = [CountryCode.Us] as const;
