@@ -18,8 +18,10 @@ function resolvePlaidBasePath(environment: ReturnType<typeof getPlaidConfig>["en
       return PlaidEnvironments.production;
     case "development":
       return PlaidEnvironments.development;
-    default:
+    case "sandbox":
       return PlaidEnvironments.sandbox;
+    default:
+      return PlaidEnvironments.production;
   }
 }
 
