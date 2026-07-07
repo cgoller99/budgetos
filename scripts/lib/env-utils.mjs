@@ -224,6 +224,16 @@ export function getRequiredVarNames() {
   return ENV_CATALOG.flatMap(({ vars }) => vars.filter((v) => v.required).map((v) => v.name));
 }
 
+export function getSecretVarNames() {
+  return ENV_CATALOG.flatMap(({ vars }) =>
+    vars.filter((v) => v.required && v.secret).map((v) => v.name),
+  );
+}
+
+export function isSecretVar(name) {
+  return getSecretVarNames().includes(name);
+}
+
 export function stripBom(text) {
   return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
 }
