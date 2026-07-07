@@ -6,6 +6,10 @@ export const PLAID_WEBHOOK_MAX_AGE = "5 min";
 export const PLAID_DATA_TRANSPARENCY_DASHBOARD_URL =
   "https://dashboard.plaid.com/link/data-transparency-v5";
 
+/** Plaid Dashboard → Activity → OAuth institution registration status */
+export const PLAID_OAUTH_INSTITUTIONS_DASHBOARD_URL =
+  "https://dashboard.plaid.com/activity/status/oauth-institutions";
+
 /** Recommended DTM use cases for Buxme (pick 1–3 in the dashboard). */
 export const PLAID_RECOMMENDED_DTM_USE_CASES = [
   "Track and manage your finances",

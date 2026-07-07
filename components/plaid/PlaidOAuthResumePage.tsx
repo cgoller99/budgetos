@@ -9,13 +9,12 @@ import { useToast } from "@/context/ToastContext";
 import { usePlaidLinkSession } from "@/hooks/usePlaidLinkSession";
 import {
   exchangePlaidPublicToken,
-  isPlaidOAuthMisconfigurationExit,
+  formatPlaidConnectErrorMessage,
 } from "@/lib/plaid/clientApi";
 import {
   clearStoredPlaidLinkToken,
   isPlaidOAuthReturn,
   readStoredPlaidLinkToken,
-  PLAID_PRODUCTION_OAUTH_REDIRECT_URI,
 } from "@/lib/plaid/oauth";
 import { ANALYTICS_EVENTS, trackEvent } from "@/lib/analytics/client";
 
@@ -91,11 +90,7 @@ function PlaidOAuthResumeInner({
         return;
       }
 
-      setError(
-        isPlaidOAuthMisconfigurationExit(new Error(message), status ?? null)
-          ? `${message} Register ${PLAID_PRODUCTION_OAUTH_REDIRECT_URI} in Plaid Dashboard → Allowed redirect URIs.`
-          : message,
-      );
+      setError(formatPlaidConnectErrorMessage(message, status ?? null));
     },
     [router],
   );

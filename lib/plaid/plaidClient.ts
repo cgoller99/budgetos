@@ -12,6 +12,7 @@ import { assertPlaidConfigured, getPlaidConfig } from "@/lib/plaid/config";
 import {
   PLAID_DATA_TRANSPARENCY_DASHBOARD_URL,
   PLAID_DTM_SETUP_INSTRUCTIONS,
+  PLAID_OAUTH_INSTITUTIONS_DASHBOARD_URL,
 } from "@/lib/plaid/constants";
 
 let cachedClient: PlaidApi | null = null;
@@ -103,6 +104,13 @@ export function getPlaidErrorMessage(error: unknown): string {
     /data transparency messaging use case/i.test(baseMessage)
   ) {
     return `${baseMessage} ${PLAID_DTM_SETUP_INSTRUCTIONS} ${PLAID_DATA_TRANSPARENCY_DASHBOARD_URL}`;
+  }
+
+  if (
+    plaidError?.error_code === "INSTITUTION_REGISTRATION_REQUIRED" ||
+    /register your application with this institution/i.test(baseMessage)
+  ) {
+    return `${baseMessage} Check registration status at ${PLAID_OAUTH_INSTITUTIONS_DASHBOARD_URL}. Charles Schwab and PNC require additional steps and can take several days.`;
   }
 
   return baseMessage;

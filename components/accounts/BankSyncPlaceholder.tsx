@@ -9,7 +9,7 @@ import { usePlaidLinkSession } from "@/hooks/usePlaidLinkSession";
 import { bankSyncComingSoonMessage } from "@/lib/integrations/bankSync";
 import {
   exchangePlaidPublicToken,
-  isPlaidOAuthMisconfigurationExit,
+  formatPlaidConnectErrorMessage,
   isPlaidReconnectRequired,
 } from "@/lib/plaid/clientApi";
 import { isPlaidClientEnabled } from "@/lib/plaid/clientConfig";
@@ -161,13 +161,7 @@ export function BankSyncConnect({
 
   const handleExitMessage = useCallback((message: string | null, status?: string | null) => {
     if (message) {
-      if (isPlaidOAuthMisconfigurationExit(new Error(message), status ?? null)) {
-        setError(
-          `${message} Register https://buxme.co/oauth/plaid in Plaid Dashboard → Allowed redirect URIs.`,
-        );
-      } else {
-        setError(message);
-      }
+      setError(formatPlaidConnectErrorMessage(message, status ?? null));
     }
 
     if (!isPlaidOAuthHandoffExit(status)) {
