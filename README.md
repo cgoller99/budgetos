@@ -18,8 +18,12 @@ npm install
 
 ```bash
 cp .env.local.example .env.local
+npm run sync:env
 vercel env pull .env.local --environment=production
+npm run sync:env
 ```
+
+`sync:env` pulls public vars (Supabase anon key, site URL, defaults) from the live site without overwriting server secrets. `vercel env pull` fills Stripe, Resend, Plaid Client ID, and other secrets that never ship in the browser bundle.
 
 If you do not use the Vercel CLI, copy every Production variable manually from **Vercel → Project → Settings → Environment Variables**.
 
@@ -43,6 +47,8 @@ Open [http://localhost:3000](http://localhost:3000).
 
 | Command | Description |
 |---------|-------------|
+| `npm run sync:env` | Pull public env vars from buxme.co into `.env.local` |
+| `npm run audit:remote` | Probe live buxme.co for Plaid/Resend configuration gaps |
 | `npm run verify:production` | Full production readiness audit (env, Supabase, Plaid, Stripe, lint, build) |
 | `npm run verify:env` | All required environment variables |
 | `npm run verify:supabase` | Supabase connectivity, tables, RLS, storage |
