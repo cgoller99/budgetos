@@ -6,13 +6,16 @@
  * Usage:
  *   npm run sync:env
  *   node scripts/sync-public-env-from-production.mjs --url https://buxme.co
+ *   node scripts/sync-public-env-from-production.mjs --public-only
  */
 
-import fs from "node:fs";
-import path from "node:path";
+import {
+  ENV_PATH,
+  mergeEnvMaps,
+  parseEnvFile,
+  writeEnvFile,
+} from "./lib/env-utils.mjs";
 
-const ROOT = path.resolve(import.meta.dirname, "..");
-const ENV_PATH = path.join(ROOT, ".env.local");
 const DEFAULT_SITE = "https://buxme.co";
 
 const PUBLIC_DEFAULTS = {
@@ -23,95 +26,11 @@ const PUBLIC_DEFAULTS = {
   RESEND_FROM_EMAIL: "noreply@buxme.co",
   RESEND_FROM_NAME: "Buxme",
   NEXT_PUBLIC_POSTHOG_HOST: "https://us.i.posthog.com",
+  NEXT_PUBLIC_STRIPE_PRO_PRICE: "$7.99",
+  NEXT_PUBLIC_STRIPE_PRO_PLUS_PRICE: "$14.99",
 };
 
-function parseEnvFile(filePath) {
-  if (!fs.existsSync(filePath)) return { lines: [], map: new Map() };
-
-  const lines = fs.readFileSync(filePath, "utf8").split("\n");
-  const map = new Map();
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const index = trimmed.indexOf("=");
-    if (index === -1) continue;
-    map.set(trimmed.slice(0, index).trim(), trimmed.slice(index + 1).trim());
-  }
-
-  return { lines, map };
-}
-
-function writeEnvFile(map) {
-  const orderedKeys = [
-    "# Supabase",
-    "NEXT_PUBLIC_SUPABASE_URL",
-    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
-    "SUPABASE_SERVICE_ROLE_KEY",
-    "",
-    "# Site",
-    "NEXT_PUBLIC_SITE_URL",
-    "",
-    "# Plaid Production",
-    "PLAID_CLIENT_ID",
-    "PLAID_SECRET",
-    "PLAID_ENV",
-    "PLAID_TOKEN_ENCRYPTION_KEY",
-    "PLAID_WEBHOOK_URL",
-    "NEXT_PUBLIC_PLAID_ENABLED",
-    "",
-    "# Stripe Live Mode",
-    "STRIPE_SECRET_KEY",
-    "STRIPE_WEBHOOK_SECRET",
-    "STRIPE_PRO_PRICE_ID",
-    "STRIPE_PRO_PLUS_PRICE_ID",
-    "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY",
-    "NEXT_PUBLIC_STRIPE_ENABLED",
-    "NEXT_PUBLIC_STRIPE_PRO_PRICE",
-    "NEXT_PUBLIC_STRIPE_PRO_PLUS_PRICE",
-    "",
-    "# Email",
-    "RESEND_API_KEY",
-    "RESEND_FROM_EMAIL",
-    "RESEND_FROM_NAME",
-    "",
-    "# Analytics",
-    "NEXT_PUBLIC_POSTHOG_KEY",
-    "NEXT_PUBLIC_POSTHOG_HOST",
-    "",
-    "# Security & access",
-    "CRON_SECRET",
-    "ADMIN_EMAILS",
-    "FOUNDER_EMAILS",
-  ];
-
-  const written = new Set();
-  const output = ["# Buxme local environment — never commit", ""];
-
-  for (const entry of orderedKeys) {
-    if (entry.startsWith("#") || entry === "") {
-      output.push(entry);
-      continue;
-    }
-
-    written.add(entry);
-    const value = map.get(entry);
-    if (value) {
-      output.push(`${entry}=${value}`);
-    } else {
-      output.push(`# ${entry}=`);
-    }
-  }
-
-  for (const [key, value] of map.entries()) {
-    if (!written.has(key)) {
-      output.push(`${key}=${value}`);
-    }
-  }
-
-  output.push("");
-  fs.writeFileSync(ENV_PATH, output.join("\n"));
-}
+const PUBLIC_KEYS = new Set(Object.keys(PUBLIC_DEFAULTS));
 
 async function fetchSiteAssets(siteUrl) {
   const html = await fetch(siteUrl).then((response) => response.text());
@@ -160,68 +79,88 @@ function extractPublicValues(source) {
 }
 
 async function main() {
-  const siteUrl = (process.argv.find((arg, index) => process.argv[index - 1] === "--url") ?? DEFAULT_SITE).replace(/\/$/, "");
-  const { map: existing } = parseEnvFile(ENV_PATH);
-  const merged = new Map(existing);
+  const args = process.argv.slice(2);
+  const publicOnly = args.includes("--public-only");
+  const siteUrl = (args.find((arg, index) => args[index - 1] === "--url") ?? DEFAULT_SITE).replace(/\/$/, "");
+
+  const existing = parseEnvFile(ENV_PATH);
+  let merged = new Map(existing);
 
   console.log(`Syncing public env from ${siteUrl} ...`);
 
   const source = await fetchSiteAssets(siteUrl);
   const discovered = extractPublicValues(source);
+  const patch = new Map(Object.entries(discovered));
 
-  for (const [key, value] of Object.entries(discovered)) {
-    if (!merged.get(key)) {
-      merged.set(key, value);
-      console.log(`+ ${key}`);
+  if (publicOnly) {
+    for (const [key, value] of patch) {
+      if (!PUBLIC_KEYS.has(key) && !key.startsWith("NEXT_PUBLIC_")) {
+        continue;
+      }
+      if (!merged.has(key) || merged.get(key) === "") {
+        merged.set(key, value);
+        console.log(`+ ${key}`);
+      }
+    }
+  } else {
+    merged = mergeEnvMaps(existing, patch, { fillEmpty: true });
+
+    for (const [key, value] of patch) {
+      if (!existing.has(key) || existing.get(key) === "") {
+        console.log(`+ ${key}`);
+      }
+    }
+
+    if (!merged.has("ADMIN_EMAILS") || merged.get("ADMIN_EMAILS") === "") {
+      merged.set("ADMIN_EMAILS", "christiangoller99@gmail.com");
+      console.log("+ ADMIN_EMAILS (default founder email)");
+    }
+
+    if (!merged.has("FOUNDER_EMAILS") || merged.get("FOUNDER_EMAILS") === "") {
+      merged.set("FOUNDER_EMAILS", "christiangoller99@gmail.com");
+      console.log("+ FOUNDER_EMAILS (default founder email)");
+    }
+
+    if (!merged.has("CRON_SECRET") || merged.get("CRON_SECRET") === "") {
+      const { randomBytes } = await import("node:crypto");
+      merged.set("CRON_SECRET", randomBytes(32).toString("hex"));
+      console.log("+ CRON_SECRET (generated locally — copy to Vercel Production if missing)");
     }
   }
 
-  if (!merged.get("ADMIN_EMAILS")) {
-    merged.set("ADMIN_EMAILS", "christiangoller99@gmail.com");
-    console.log("+ ADMIN_EMAILS (default founder email)");
-  }
-
-  if (!merged.get("FOUNDER_EMAILS")) {
-    merged.set("FOUNDER_EMAILS", "christiangoller99@gmail.com");
-    console.log("+ FOUNDER_EMAILS (default founder email)");
-  }
-
-  if (!merged.get("CRON_SECRET")) {
-    const { randomBytes } = await import("node:crypto");
-    merged.set("CRON_SECRET", randomBytes(32).toString("hex"));
-    console.log("+ CRON_SECRET (generated)");
-  }
-
-  if (!merged.get("NEXT_PUBLIC_STRIPE_PRO_PRICE")) {
-    merged.set("NEXT_PUBLIC_STRIPE_PRO_PRICE", "$7.99");
-  }
-
-  if (!merged.get("NEXT_PUBLIC_STRIPE_PRO_PLUS_PRICE")) {
-    merged.set("NEXT_PUBLIC_STRIPE_PRO_PLUS_PRICE", "$14.99");
-  }
-
-  writeEnvFile(merged);
+  writeEnvFile(merged, ENV_PATH);
   console.log(`\nWrote ${ENV_PATH}`);
+  console.log("Note: sync:env never removes keys pulled from Vercel, even when values are empty.");
 
-  const missingSecrets = [
+  const secretKeys = [
     "PLAID_CLIENT_ID",
+    "PLAID_SECRET",
     "STRIPE_SECRET_KEY",
     "STRIPE_WEBHOOK_SECRET",
     "STRIPE_PRO_PRICE_ID",
     "STRIPE_PRO_PLUS_PRICE_ID",
     "RESEND_API_KEY",
     "NEXT_PUBLIC_POSTHOG_KEY",
-  ].filter((name) => !merged.get(name));
+  ];
+
+  const emptySecrets = secretKeys.filter((name) => merged.has(name) && merged.get(name) === "");
+  const missingSecrets = secretKeys.filter((name) => !merged.has(name) || merged.get(name) === "");
+
+  if (emptySecrets.length > 0) {
+    console.log("\n⚠ Keys present but empty (set values in Vercel Production):");
+    for (const name of emptySecrets) {
+      console.log(`  • ${name}`);
+    }
+  }
 
   if (missingSecrets.length > 0) {
-    console.log("\nStill missing server-side secrets:");
+    console.log("\nStill missing or empty server-side secrets:");
     for (const name of missingSecrets) {
       console.log(`  • ${name}`);
     }
-    console.log("\nRun: vercel env pull .env.local --environment=production");
-    console.log("Or copy them from Vercel → Project → Settings → Environment Variables.");
+    console.log("\nRun: npm run audit:env");
   } else {
-    console.log("\nAll tracked env vars are present locally.");
+    console.log("\nAll tracked secret vars have values.");
   }
 }
 

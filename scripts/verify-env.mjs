@@ -4,63 +4,22 @@
  *
  * Usage:
  *   npm run verify:env
- *   node --env-file=.env.local scripts/verify-env.mjs
+ *   node scripts/verify-env.mjs
  */
 
 import fs from "node:fs";
-import path from "node:path";
+import {
+  ENV_PATH,
+  classifyEnvValue,
+  getEnv,
+  getRequiredVarNames,
+  hydrateProcessEnvFromFile,
+  parseEnvFile,
+} from "./lib/env-utils.mjs";
 
-const ROOT = path.resolve(import.meta.dirname, "..");
-const ENV_PATH = path.join(ROOT, ".env.local");
+hydrateProcessEnvFromFile();
 
-const REQUIRED = [
-  "NEXT_PUBLIC_SUPABASE_URL",
-  "NEXT_PUBLIC_SUPABASE_ANON_KEY",
-  "SUPABASE_SERVICE_ROLE_KEY",
-  "NEXT_PUBLIC_SITE_URL",
-  "PLAID_CLIENT_ID",
-  "PLAID_SECRET",
-  "PLAID_ENV",
-  "PLAID_TOKEN_ENCRYPTION_KEY",
-  "PLAID_WEBHOOK_URL",
-  "NEXT_PUBLIC_PLAID_ENABLED",
-  "STRIPE_SECRET_KEY",
-  "STRIPE_WEBHOOK_SECRET",
-  "STRIPE_PRO_PRICE_ID",
-  "STRIPE_PRO_PLUS_PRICE_ID",
-  "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY",
-  "NEXT_PUBLIC_STRIPE_ENABLED",
-  "RESEND_API_KEY",
-  "RESEND_FROM_EMAIL",
-  "CRON_SECRET",
-  "ADMIN_EMAILS",
-  "FOUNDER_EMAILS",
-  "NEXT_PUBLIC_POSTHOG_KEY",
-];
-
-const PLACEHOLDER = [/^your-/i, /xxxx/i, /^change-me$/i, /^YOUR-/];
-
-function loadEnvFile(filePath) {
-  if (!fs.existsSync(filePath)) return {};
-  const values = {};
-  for (const line of fs.readFileSync(filePath, "utf8").split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const index = trimmed.indexOf("=");
-    if (index === -1) continue;
-    let value = trimmed.slice(index + 1).trim();
-    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-      value = value.slice(1, -1);
-    }
-    values[trimmed.slice(0, index).trim()] = value;
-  }
-  return values;
-}
-
-function getEnv(name) {
-  return process.env[name]?.trim() || loadEnvFile(ENV_PATH)[name]?.trim() || "";
-}
-
+const REQUIRED = getRequiredVarNames();
 const issues = [];
 
 console.log("Buxme environment variable check\n");
@@ -68,33 +27,46 @@ console.log("Buxme environment variable check\n");
 if (!fs.existsSync(ENV_PATH)) {
   console.error("✗ .env.local is missing");
   console.error("  Fix: cp .env.local.example .env.local");
-  console.error("  Then: vercel env pull .env.local --environment=production");
+  console.error("  Then: npm run env:pull");
   process.exit(1);
 }
 
-console.log("✓ .env.local exists\n");
+const map = parseEnvFile(ENV_PATH);
+console.log(`✓ .env.local exists (${map.size} keys parsed)\n`);
 
 for (const name of REQUIRED) {
-  const value = getEnv(name);
-  if (!value) {
-    issues.push(`${name} is missing`);
-    console.error(`✗ ${name} is missing`);
+  const raw = map.has(name) ? map.get(name) : undefined;
+  const status = classifyEnvValue(raw);
+
+  if (status === "ok") {
+    console.log(`✓ ${name}`);
     continue;
   }
-  if (PLACEHOLDER.some((pattern) => pattern.test(value))) {
+
+  if (status === "empty") {
+    issues.push(`${name} is empty`);
+    console.error(`✗ ${name} is empty (key in .env.local but no value — check Vercel Production)`);
+    continue;
+  }
+
+  if (status === "placeholder") {
     issues.push(`${name} is a placeholder`);
     console.error(`✗ ${name} is still a placeholder`);
     continue;
   }
-  console.log(`✓ ${name}`);
+
+  issues.push(`${name} is missing`);
+  console.error(`✗ ${name} is missing`);
 }
 
-if (getEnv("PLAID_ENV") !== "production") {
+const plaidEnv = getEnv("PLAID_ENV");
+if (plaidEnv !== "production") {
   issues.push("PLAID_ENV must be production");
-  console.error(`✗ PLAID_ENV must be production (current: ${getEnv("PLAID_ENV") || "unset"})`);
+  console.error(`✗ PLAID_ENV must be production (current: ${plaidEnv || "unset"})`);
 }
 
-if (getEnv("PLAID_WEBHOOK_URL") !== "https://buxme.co/api/plaid/webhook") {
+const webhookUrl = getEnv("PLAID_WEBHOOK_URL");
+if (webhookUrl !== "https://buxme.co/api/plaid/webhook") {
   issues.push("PLAID_WEBHOOK_URL must be https://buxme.co/api/plaid/webhook");
   console.error("✗ PLAID_WEBHOOK_URL must be https://buxme.co/api/plaid/webhook");
 }
@@ -111,7 +83,8 @@ if (stripePublishable && !stripePublishable.startsWith("pk_live_")) {
   console.error("✗ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY must start with pk_live_");
 }
 
-if (getEnv("PLAID_TOKEN_ENCRYPTION_KEY").length > 0 && getEnv("PLAID_TOKEN_ENCRYPTION_KEY").length < 32) {
+const encryptionKey = getEnv("PLAID_TOKEN_ENCRYPTION_KEY");
+if (encryptionKey && encryptionKey.length < 32) {
   issues.push("PLAID_TOKEN_ENCRYPTION_KEY must be at least 32 characters");
   console.error("✗ PLAID_TOKEN_ENCRYPTION_KEY must be at least 32 characters");
 }
@@ -119,7 +92,8 @@ if (getEnv("PLAID_TOKEN_ENCRYPTION_KEY").length > 0 && getEnv("PLAID_TOKEN_ENCRY
 console.log("");
 if (issues.length > 0) {
   console.error(`❌ ${issues.length} environment issue(s) found.`);
-  console.error("\nFix: vercel env pull .env.local --environment=production");
+  console.error("\nRun: npm run audit:env   (full checklist + diagnosis)");
+  console.error("Run: npm run env:pull    (pull from Vercel without wiping secrets)");
   process.exit(1);
 }
 
