@@ -108,6 +108,7 @@ function auditLocalFile() {
     } else {
       console.log("  1. Variable exists in Vercel but no value was saved in the dashboard");
       console.log("  2. Variable was added via broken `vercel env add --value` (stores empty — use dashboard instead)");
+      console.log("  3. npm run sync:env ran after vercel env pull and commented out empty keys (fixed in latest code)");
     }
   }
 
