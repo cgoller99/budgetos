@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { isAdminEmail } from "@/lib/admin/emails";
 import { isFounderEmail } from "@/lib/founder/emails";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { getSupabaseConfig } from "@/lib/supabase/config";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { BuxmeSupabaseClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
@@ -21,6 +22,15 @@ export function canAccessAdminDashboard(email: string | null | undefined): boole
 export async function requireAdminApiUser(): Promise<
   AdminApiAuth | { response: NextResponse }
 > {
+  if (!getSupabaseConfig().isConfigured) {
+    return {
+      response: NextResponse.json(
+        { error: "Supabase is not configured." },
+        { status: 503 },
+      ),
+    };
+  }
+
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -57,8 +67,12 @@ export async function requireAdminApiUser(): Promise<
 }
 
 export async function requireAdminPageUser(): Promise<
-  { user: User } | { forbidden: true } | { unauthorized: true }
+  { user: User } | { forbidden: true } | { unauthorized: true } | { misconfigured: true }
 > {
+  if (!getSupabaseConfig().isConfigured) {
+    return { misconfigured: true };
+  }
+
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Verifies Supabase env, client init, table presence, and basic API connectivity.
- * Usage: node scripts/verify-supabase.mjs
+ * Usage: npm run verify:supabase
  */
 
 import fs from "node:fs";
@@ -10,12 +10,14 @@ import { createClient } from "@supabase/supabase-js";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const ENV_PATH = path.join(ROOT, ".env.local");
+const MIGRATIONS_DIR = path.join(ROOT, "supabase/migrations");
 
 const REQUIRED_TABLES = [
   "profiles",
   "accounts",
   "transactions",
   "bills",
+  "bill_splits",
   "goals",
   "investments",
   "recurring_items",
@@ -23,6 +25,21 @@ const REQUIRED_TABLES = [
   "households",
   "household_members",
   "household_invites",
+  "bank_connections",
+  "plaid_recurring_dismissals",
+  "income_plans",
+  "income_plan_allocations",
+  "income_plan_paycheck_events",
+  "income_plan_allocation_events",
+  "envelope_balances",
+  "allocation_ledger",
+  "admin_feedback_reports",
+  "admin_event_logs",
+  "beta_settings",
+  "beta_waitlist",
+  "app_releases",
+  "app_release_changes",
+  "user_release_views",
 ];
 
 const REQUIRED_PROFILE_COLUMNS = ["household_id"];
@@ -30,17 +47,6 @@ const REQUIRED_PROFILE_COLUMNS = ["household_id"];
 const TABLE_SELECT_COLUMN = {
   household_members: "household_id,user_id",
 };
-
-const MIGRATION_FILES = [
-  "supabase/schema.sql",
-  "supabase/migrations/20260627_auth_rls.sql",
-  "supabase/migrations/20260627_backend_tables.sql",
-  "supabase/migrations/20260627_recurring_engine.sql",
-  "supabase/migrations/20260627_transaction_engine.sql",
-  "supabase/migrations/20260627_profiles_onboarding.sql",
-  "supabase/migrations/20260627_feature_expansion.sql",
-  "supabase/migrations/20260628_household_complete.sql",
-];
 
 function loadEnvFile(filePath) {
   if (!fs.existsSync(filePath)) {
@@ -89,9 +95,15 @@ async function main() {
 
   let allOk = true;
 
-  for (const file of MIGRATION_FILES) {
-    const exists = fs.existsSync(path.join(ROOT, file));
-    allOk = report(`Migration file present (${file})`, exists) && allOk;
+  allOk = report("supabase/schema.sql present", fs.existsSync(path.join(ROOT, "supabase/schema.sql"))) && allOk;
+
+  const migrationFiles = fs
+    .readdirSync(MIGRATIONS_DIR)
+    .filter((file) => file.endsWith(".sql"))
+    .sort();
+
+  for (const file of migrationFiles) {
+    allOk = report(`Migration present (${file})`, true) && allOk;
   }
 
   console.log("");
@@ -104,6 +116,11 @@ async function main() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
     ""
   ).trim();
+  const serviceRoleKey = (
+    fileEnv.SUPABASE_SERVICE_ROLE_KEY ??
+    process.env.SUPABASE_SERVICE_ROLE_KEY ??
+    ""
+  ).trim();
 
   allOk = report(".env.local exists", fs.existsSync(ENV_PATH)) && allOk;
   allOk = report("NEXT_PUBLIC_SUPABASE_URL is set", Boolean(url), url ? `${url.length} chars` : "empty") && allOk;
@@ -113,10 +130,17 @@ async function main() {
       Boolean(anonKey),
       anonKey ? `${anonKey.length} chars` : "empty",
     ) && allOk;
+  allOk =
+    report(
+      "SUPABASE_SERVICE_ROLE_KEY is set",
+      Boolean(serviceRoleKey),
+      serviceRoleKey ? `${serviceRoleKey.length} chars` : "empty",
+    ) && allOk;
 
   if (!url || !anonKey) {
-    console.log("\nCannot test live connection until .env.local values are filled.");
-    process.exit(allOk ? 1 : 1);
+    console.log("\nCannot test live connection until Supabase env vars are filled.");
+    console.log("Fix: vercel env pull .env.local --environment=production");
+    process.exit(1);
   }
 
   allOk = report("URL format looks valid", /^https:\/\/.+\.supabase\.co\/?$/.test(url)) && allOk;
@@ -175,8 +199,8 @@ async function main() {
     const response = await fetch(
       `${restBase}/${table}?select=${selectColumn}&limit=0`,
       {
-      method: "GET",
-      headers: restHeaders,
+        method: "GET",
+        headers: restHeaders,
       },
     );
 
@@ -248,8 +272,6 @@ async function main() {
     console.log("  1. Open Supabase SQL Editor");
     console.log("  2. Run supabase/schema.sql");
     console.log("  3. Run migrations in supabase/migrations/ (oldest first)");
-    console.log("  4. Household sharing: open supabase/migrations/20260628_household_complete.sql in your repo, copy ALL SQL, paste into SQL Editor, Run");
-    console.log("     (Do not paste the file path — paste the SQL file contents)");
   }
 
   console.log("\nProfile column checks:");
@@ -270,7 +292,27 @@ async function main() {
     allOk = report(`  profiles.${column}`, response.ok, response.ok ? "exists" : `HTTP ${response.status}`) && allOk;
   }
 
-  console.log(`\n${allOk ? "All checks passed." : "Some checks failed."}`);
+  console.log("\nStorage bucket check:");
+  try {
+    const serviceClient = createClient(url, serviceRoleKey || anonKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data, error } = await serviceClient.storage.getBucket("feedback-attachments");
+    if (error) {
+      allOk = report("  feedback-attachments bucket", false, error.message) && allOk;
+    } else {
+      allOk = report("  feedback-attachments bucket", Boolean(data), data?.public ? "public" : "private") && allOk;
+    }
+  } catch (error) {
+    allOk =
+      report(
+        "  feedback-attachments bucket",
+        false,
+        error instanceof Error ? error.message : String(error),
+      ) && allOk;
+  }
+
+  console.log(`\n${allOk ? "✅ Supabase verification passed." : "❌ Supabase verification failed."}`);
   process.exit(allOk ? 0 : 1);
 }
 

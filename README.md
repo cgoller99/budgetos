@@ -14,53 +14,24 @@ Production: [https://buxme.co](https://buxme.co)
 npm install
 ```
 
-2. Copy environment variables into `.env.local`:
+2. Pull production environment variables to your new dev machine:
 
 ```bash
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_DB_URL=
-NEXT_PUBLIC_SITE_URL=https://buxme.co
-RESEND_API_KEY=
-RESEND_FROM_EMAIL=noreply@buxme.co
-RESEND_FROM_NAME=Buxme
-
-# Plaid (Production)
-PLAID_CLIENT_ID=
-PLAID_SECRET=
-PLAID_ENV=production
-PLAID_TOKEN_ENCRYPTION_KEY=
-PLAID_WEBHOOK_URL=https://buxme.co/api/plaid/webhook
-NEXT_PUBLIC_PLAID_ENABLED=true
+cp .env.local.example .env.local
+vercel env pull .env.local --environment=production
 ```
 
-See `.env.local.example` for the full template.
+If you do not use the Vercel CLI, copy every Production variable manually from **Vercel → Project → Settings → Environment Variables**.
 
-### Plaid production setup
+3. Apply Supabase migrations from `supabase/migrations/` if needed (oldest first).
 
-1. In the [Plaid Dashboard](https://dashboard.plaid.com/), switch to **Production** keys (not Sandbox).
-2. Set these in `.env.local` and Vercel:
-   - `PLAID_ENV=production`
-   - `PLAID_CLIENT_ID` / `PLAID_SECRET` (production keys)
-   - `PLAID_WEBHOOK_URL=https://buxme.co/api/plaid/webhook`
-   - `PLAID_TOKEN_ENCRYPTION_KEY` (32+ character random string)
-   - `NEXT_PUBLIC_PLAID_ENABLED=true`
-   - `SUPABASE_SERVICE_ROLE_KEY` (required for webhook processing)
-3. Register `https://buxme.co/api/plaid/webhook` in the Plaid Dashboard.
-4. Link token creation automatically attaches the production webhook URL to new Items.
-5. Webhook requests are verified with Plaid JWT signatures (`Plaid-Verification` header) in production.
-
-Verify configuration and webhook reachability:
+4. Verify your environment:
 
 ```bash
-npm run verify:plaid
+npm run verify:production
 ```
 
-**Note:** Sandbox bank connections do not carry over. Users must reconnect after switching to production keys.
-
-3. Apply Supabase migrations from `supabase/migrations/`.
-
-4. Run the development server:
+5. Run the development server:
 
 ```bash
 npm run dev
@@ -68,22 +39,25 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-## Scripts
+## Verification scripts
 
 | Command | Description |
 |---------|-------------|
-| `npm run dev` | Start Next.js dev server |
-| `npm run build` | Production build |
-| `npm run verify:supabase` | Verify Supabase connectivity |
-| `npm run verify:plaid` | Verify Plaid production env and webhook health |
+| `npm run verify:production` | Full production readiness audit (env, Supabase, Plaid, Stripe, lint, build) |
+| `npm run verify:env` | All required environment variables |
+| `npm run verify:supabase` | Supabase connectivity, tables, RLS, storage |
+| `npm run verify:plaid` | Plaid Production credentials and webhook |
+| `npm run verify:stripe` | Stripe Live Mode keys and price IDs |
 | `npm run debug:household-invite-email` | Test invite email delivery |
 
 ## Stack
 
 - **Next.js 16** — App Router, React 19
-- **Supabase** — Auth, Postgres, RLS
+- **Supabase** — Auth, Postgres, RLS, Realtime
+- **Plaid** — Production bank linking and transaction sync
+- **Stripe** — Live subscriptions (Pro / Pro+)
 - **Resend** — Transactional email
-- **Plaid** — Production bank linking, JWT-verified webhooks, transaction sync
+- **PostHog** — Product analytics
 - **Tailwind CSS 4** — UI styling
 
 ## Legacy domain
