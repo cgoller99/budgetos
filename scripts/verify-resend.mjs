@@ -10,7 +10,8 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const ENV_PATH = path.join(path.resolve(import.meta.dirname, ".."), ".env.local");
+const ROOT = path.resolve(import.meta.dirname, "..");
+const ENV_PATH = path.join(ROOT, ".env.local");
 
 function loadEnvFile(filePath) {
   if (!fs.existsSync(filePath)) return {};
@@ -29,9 +30,19 @@ function loadEnvFile(filePath) {
   return values;
 }
 
-function getEnv(name) {
-  return process.env[name]?.trim() || loadEnvFile(ENV_PATH)[name]?.trim() || "";
+function hydrateEnvFromFile() {
+  for (const [key, value] of Object.entries(loadEnvFile(ENV_PATH))) {
+    if (process.env[key] === undefined) {
+      process.env[key] = value;
+    }
+  }
 }
+
+function getEnv(name) {
+  return process.env[name]?.trim() || "";
+}
+
+hydrateEnvFromFile();
 
 const issues = [];
 
@@ -45,6 +56,17 @@ function pass(message) {
 }
 
 console.log("Buxme Resend verification\n");
+
+if (!fs.existsSync(ENV_PATH)) {
+  console.error("✗ .env.local is missing\n");
+  console.error("Fix:");
+  console.error("  cp .env.local.example .env.local");
+  console.error("  npm run sync:env");
+  console.error("  vercel env pull .env.local --environment=production");
+  process.exit(1);
+}
+
+console.log(`✓ .env.local found (${ENV_PATH})\n`);
 
 const apiKey = getEnv("RESEND_API_KEY");
 const fromEmail = getEnv("RESEND_FROM_EMAIL");
@@ -96,7 +118,17 @@ if (apiKey && apiKey.startsWith("re_") && apiKey.length >= 20 && !apiKey.include
 
 console.log("");
 if (issues.length > 0) {
-  console.error(`❌ Resend verification failed (${issues.length} issue(s)).`);
+  console.error(`❌ Resend verification failed (${issues.length} issue(s)).\n`);
+  console.error("Fix your .env.local (lines must NOT be commented out):\n");
+  console.error("  # Quick fill for sender (public values):");
+  console.error("  npm run sync:env\n");
+  console.error("  # Pull RESEND_API_KEY from Vercel Production:");
+  console.error("  vercel login");
+  console.error("  vercel env pull .env.local --environment=production\n");
+  console.error("  # Or paste manually from https://resend.com/api-keys:");
+  console.error("  RESEND_API_KEY=re_...");
+  console.error("  RESEND_FROM_EMAIL=noreply@buxme.co");
+  console.error("  RESEND_FROM_NAME=Buxme");
   process.exit(1);
 }
 
