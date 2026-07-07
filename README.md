@@ -48,6 +48,7 @@ Open [http://localhost:3000](http://localhost:3000).
 | Command | Description |
 |---------|-------------|
 | `npm run sync:env` | Pull public env vars from buxme.co into `.env.local` |
+| `npm run setup:production` | Full setup: sync env, Vercel pull, Supabase SQL, verify |
 | `npm run audit:remote` | Probe live buxme.co for Plaid/Resend configuration gaps |
 | `npm run verify:production` | Full production readiness audit (env, Supabase, Plaid, Stripe, lint, build) |
 | `npm run verify:env` | All required environment variables |

@@ -15,6 +15,8 @@
     "verify:production": "node --env-file=.env.local scripts/verify-production.mjs",
     "sync:env": "node scripts/sync-public-env-from-production.mjs",
     "audit:remote": "node scripts/audit-production-remote.mjs",
+    "setup:production": "node --env-file=.env.local scripts/setup-production.mjs",
+    "apply:supabase-sql": "node --env-file=.env.local scripts/apply-supabase-sql-api.mjs",
     "household:migration": "node scripts/print-household-migration.mjs",
     "apply:household-migration": "node scripts/apply-household-migration.mjs",
     "apply:household-invite-migration": "node scripts/apply-household-invite-migration.mjs",
