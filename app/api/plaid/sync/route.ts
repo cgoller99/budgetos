@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { assertPlaidConfigured, getPlaidConfig } from "@/lib/plaid/config";
 import { requirePlaidApiUser, plaidErrorResponse } from "@/lib/plaid/apiAuth";
 import { syncPlaidForUser } from "@/lib/plaid/syncService";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 type SyncRequestBody = {
   connectionId?: string;
@@ -30,7 +31,7 @@ export async function POST(request: Request) {
 
     const body = (await request.json().catch(() => ({}))) as SyncRequestBody;
     const results = await syncPlaidForUser({
-      supabase: auth.supabase,
+      supabase: createSupabaseAdminClient(),
       userId: auth.user.id,
       connectionId: body.connectionId,
     });

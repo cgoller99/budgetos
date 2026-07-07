@@ -9,7 +9,7 @@ import { usePlaidLinkSession } from "@/hooks/usePlaidLinkSession";
 import { bankSyncComingSoonMessage } from "@/lib/integrations/bankSync";
 import {
   exchangePlaidPublicToken,
-  isPlaidOAuthMisconfigurationExit,
+  formatPlaidConnectErrorMessage,
   isPlaidReconnectRequired,
 } from "@/lib/plaid/clientApi";
 import { isPlaidClientEnabled } from "@/lib/plaid/clientConfig";
@@ -86,7 +86,7 @@ export function BankSyncConnect({
   buttonLabel,
   compact = false,
 }: BankSyncConnectProps) {
-  const { connectBank, reconnectBank, isSyncing } = useFinance();
+  const { connectBank, reconnectBank, isSyncing, refreshFinance } = useFinance();
   const { showToast } = useToast();
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [isLoadingToken, setIsLoadingToken] = useState(false);
@@ -139,6 +139,8 @@ export function BankSyncConnect({
             subtitle: result.syncError,
           });
         }
+
+        await refreshFinance();
       } catch (successError) {
         const message =
           successError instanceof Error
@@ -154,18 +156,12 @@ export function BankSyncConnect({
         setAutoOpenLink(false);
       }
     },
-    [showToast],
+    [refreshFinance, showToast],
   );
 
   const handleExitMessage = useCallback((message: string | null, status?: string | null) => {
     if (message) {
-      if (isPlaidOAuthMisconfigurationExit(new Error(message), status ?? null)) {
-        setError(
-          `${message} Register https://buxme.co/oauth/plaid in Plaid Dashboard → Allowed redirect URIs.`,
-        );
-      } else {
-        setError(message);
-      }
+      setError(formatPlaidConnectErrorMessage(message, status ?? null));
     }
 
     if (!isPlaidOAuthHandoffExit(status)) {

@@ -4,6 +4,7 @@ import { getPlaidConfig, getPlaidConfigDiagnostics, resolvePlaidWebhookUrl } fro
 import { getPlaidOAuthRedirectUri } from "@/lib/plaid/oauth";
 import {
   PLAID_DATA_TRANSPARENCY_DASHBOARD_URL,
+  PLAID_OAUTH_INSTITUTIONS_DASHBOARD_URL,
   PLAID_RECOMMENDED_DTM_USE_CASES,
 } from "@/lib/plaid/constants";
 import { parsePlaidWebhookEvent } from "@/lib/plaid/webhookEvents";
@@ -26,6 +27,7 @@ export async function GET() {
       configured: config.isConfigured,
       configurationError: config.configurationError,
       oauthRedirectUri: getPlaidOAuthRedirectUri(),
+      oauthInstitutionsDashboardUrl: PLAID_OAUTH_INSTITUTIONS_DASHBOARD_URL,
       dataTransparencyDashboardUrl: PLAID_DATA_TRANSPARENCY_DASHBOARD_URL,
       recommendedDtmUseCases: [...PLAID_RECOMMENDED_DTM_USE_CASES],
       checks: getPlaidConfigDiagnostics(),

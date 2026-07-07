@@ -6,6 +6,7 @@ import {
   getPlaidErrorMessage,
 } from "@/lib/plaid/plaidService";
 import { syncPlaidConnection } from "@/lib/plaid/syncService";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { BankConnectionsRepository } from "@/lib/supabase/repositories/bankConnectionsRepository";
 
 type ExchangeRequestBody = {
@@ -84,7 +85,7 @@ export async function POST(request: Request) {
 
     try {
       const syncResult = await syncPlaidConnection({
-        supabase: auth.supabase,
+        supabase: createSupabaseAdminClient(),
         userId: auth.user.id,
         connection,
       });

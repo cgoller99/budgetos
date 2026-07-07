@@ -2,6 +2,12 @@
 
 import type { PlaidSyncResult } from "@/lib/plaid/types";
 import {
+  formatPlaidConnectErrorMessage,
+  isPlaidInstitutionRegistrationRequired,
+  isPlaidOAuthMisconfigurationExit,
+  isPlaidOAuthRedirectMisconfiguration,
+} from "@/lib/plaid/connectErrors";
+import {
   logPlaidClientRequest,
   logPlaidClientResponse,
 } from "@/lib/plaid/linkLogging";
@@ -138,19 +144,9 @@ export function isPlaidReconnectRequired(error: unknown): boolean {
   );
 }
 
-export function isPlaidOAuthMisconfigurationExit(
-  error: unknown,
-  status: string | null,
-): boolean {
-  const message =
-    error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
-
-  return (
-    message.includes("oauth") ||
-    message.includes("redirect_uri") ||
-    message.includes("invalid_link_token") ||
-    message.includes("invalid link token") ||
-    status === "requires_oauth" ||
-    status === "oauth"
-  );
-}
+export {
+  formatPlaidConnectErrorMessage,
+  isPlaidInstitutionRegistrationRequired,
+  isPlaidOAuthMisconfigurationExit,
+  isPlaidOAuthRedirectMisconfiguration,
+};

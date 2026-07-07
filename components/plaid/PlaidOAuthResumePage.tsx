@@ -4,17 +4,17 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader } from "@/components/ui";
+import { useFinance } from "@/context/FinanceContext";
 import { useToast } from "@/context/ToastContext";
 import { usePlaidLinkSession } from "@/hooks/usePlaidLinkSession";
 import {
   exchangePlaidPublicToken,
-  isPlaidOAuthMisconfigurationExit,
+  formatPlaidConnectErrorMessage,
 } from "@/lib/plaid/clientApi";
 import {
   clearStoredPlaidLinkToken,
   isPlaidOAuthReturn,
   readStoredPlaidLinkToken,
-  PLAID_PRODUCTION_OAUTH_REDIRECT_URI,
 } from "@/lib/plaid/oauth";
 import { ANALYTICS_EVENTS, trackEvent } from "@/lib/analytics/client";
 
@@ -42,6 +42,7 @@ function PlaidOAuthResumeInner({
 }) {
   const router = useRouter();
   const { showToast } = useToast();
+  const { refreshFinance } = useFinance();
   const [error, setError] = useState<string | null>(null);
   const [opened, setOpened] = useState(false);
 
@@ -65,6 +66,7 @@ function PlaidOAuthResumeInner({
           });
         }
 
+        await refreshFinance();
         router.replace("/accounts");
       } catch (exchangeError) {
         const message =
@@ -78,7 +80,7 @@ function PlaidOAuthResumeInner({
         });
       }
     },
-    [router, showToast],
+    [refreshFinance, router, showToast],
   );
 
   const handleExitMessage = useCallback(
@@ -88,11 +90,7 @@ function PlaidOAuthResumeInner({
         return;
       }
 
-      setError(
-        isPlaidOAuthMisconfigurationExit(new Error(message), status ?? null)
-          ? `${message} Register ${PLAID_PRODUCTION_OAUTH_REDIRECT_URI} in Plaid Dashboard → Allowed redirect URIs.`
-          : message,
-      );
+      setError(formatPlaidConnectErrorMessage(message, status ?? null));
     },
     [router],
   );
