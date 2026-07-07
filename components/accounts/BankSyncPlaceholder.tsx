@@ -13,7 +13,11 @@ import {
   isPlaidReconnectRequired,
 } from "@/lib/plaid/clientApi";
 import { isPlaidClientEnabled } from "@/lib/plaid/clientConfig";
-import { storePlaidLinkToken, clearStoredPlaidLinkToken } from "@/lib/plaid/oauth";
+import {
+  storePlaidLinkToken,
+  clearStoredPlaidLinkToken,
+  isPlaidOAuthHandoffExit,
+} from "@/lib/plaid/oauth";
 import { ANALYTICS_EVENTS, trackEvent } from "@/lib/analytics/client";
 
 type BankSyncConnectProps = {
@@ -164,8 +168,10 @@ export function BankSyncConnect({
       }
     }
 
-    setLinkToken(null);
-    setAutoOpenLink(false);
+    if (!isPlaidOAuthHandoffExit(status)) {
+      setLinkToken(null);
+      setAutoOpenLink(false);
+    }
   }, []);
 
   if (!plaidEnabled) {

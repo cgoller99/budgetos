@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader } from "@/components/ui";
 import { useToast } from "@/context/ToastContext";
@@ -11,26 +12,38 @@ import {
 } from "@/lib/plaid/clientApi";
 import {
   clearStoredPlaidLinkToken,
-  getPlaidOAuthRedirectUri,
   isPlaidOAuthReturn,
   readStoredPlaidLinkToken,
+  PLAID_PRODUCTION_OAUTH_REDIRECT_URI,
 } from "@/lib/plaid/oauth";
 import { ANALYTICS_EVENTS, trackEvent } from "@/lib/analytics/client";
 
-export function PlaidOAuthResumePage() {
+type OAuthBootstrap = {
+  oauthReturn: boolean;
+  linkToken: string | null;
+  receivedRedirectUri: string | null;
+};
+
+function readOAuthBootstrap(): OAuthBootstrap {
+  const href = window.location.href;
+  const oauthReturn = isPlaidOAuthReturn(href);
+
+  return {
+    oauthReturn,
+    linkToken: oauthReturn ? readStoredPlaidLinkToken() : null,
+    receivedRedirectUri: oauthReturn ? href : null,
+  };
+}
+
+function PlaidOAuthResumeInner({
+  bootstrap,
+}: {
+  bootstrap: OAuthBootstrap;
+}) {
   const router = useRouter();
   const { showToast } = useToast();
   const [error, setError] = useState<string | null>(null);
-  const [linkToken, setLinkToken] = useState<string | null>(null);
-  const [receivedRedirectUri, setReceivedRedirectUri] = useState<string | null>(null);
-  const [oauthReturn, setOauthReturn] = useState(false);
-
-  useEffect(() => {
-    const href = window.location.href;
-    setOauthReturn(isPlaidOAuthReturn(href));
-    setLinkToken(readStoredPlaidLinkToken());
-    setReceivedRedirectUri(href);
-  }, []);
+  const [opened, setOpened] = useState(false);
 
   const handleLinked = useCallback(
     async (publicToken: string) => {
@@ -69,42 +82,47 @@ export function PlaidOAuthResumePage() {
   );
 
   const handleExitMessage = useCallback(
-    (message: string | null) => {
+    (message: string | null, status?: string | null) => {
       if (!message) {
         router.replace("/accounts");
         return;
       }
 
-      setError(message);
+      setError(
+        isPlaidOAuthMisconfigurationExit(new Error(message), status ?? null)
+          ? `${message} Register ${PLAID_PRODUCTION_OAUTH_REDIRECT_URI} in Plaid Dashboard → Allowed redirect URIs.`
+          : message,
+      );
     },
     [router],
   );
 
   const { open, ready } = usePlaidLinkSession({
-    linkToken,
-    receivedRedirectUri,
+    linkToken: bootstrap.linkToken,
+    receivedRedirectUri: bootstrap.receivedRedirectUri,
     onLinked: (publicToken) => handleLinked(publicToken),
     onExitMessage: handleExitMessage,
   });
 
   useEffect(() => {
-    if (!oauthReturn) {
+    if (!bootstrap.oauthReturn) {
       setError("Missing Plaid OAuth state. Start bank connection from Accounts again.");
       return;
     }
 
-    if (!linkToken) {
+    if (!bootstrap.linkToken) {
       setError("Missing Plaid link token. Start bank connection from Accounts again.");
       return;
     }
 
-    if (ready) {
+    if (ready && !opened) {
+      setOpened(true);
       open();
     }
-  }, [linkToken, oauthReturn, open, ready]);
+  }, [bootstrap.linkToken, bootstrap.oauthReturn, open, opened, ready]);
 
   return (
-    <div className="mx-auto flex min-h-[50vh] max-w-lg items-center py-16">
+    <div className="mx-auto flex min-h-screen max-w-lg items-center px-6 py-16">
       <Card padding="lg" className="w-full">
         <CardHeader title="Finishing bank connection" />
         <CardContent className="space-y-3 text-sm text-white/60">
@@ -113,14 +131,31 @@ export function PlaidOAuthResumePage() {
           ) : (
             <p>Resuming Plaid Link after bank sign-in…</p>
           )}
-          {error && isPlaidOAuthMisconfigurationExit(new Error(error), null) && (
-            <p>
-              Register <code className="text-white/80">{getPlaidOAuthRedirectUri()}</code> in Plaid
-              Dashboard → Allowed redirect URIs.
-            </p>
+          {error && (
+            <Link href="/accounts" className="inline-block text-sm text-[#4da3ff] hover:underline">
+              Back to Accounts
+            </Link>
           )}
         </CardContent>
       </Card>
     </div>
   );
+}
+
+export function PlaidOAuthResumePage() {
+  const [bootstrap, setBootstrap] = useState<OAuthBootstrap | null>(null);
+
+  useEffect(() => {
+    setBootstrap(readOAuthBootstrap());
+  }, []);
+
+  if (!bootstrap) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#0a0f1a]">
+        <div className="h-8 w-8 animate-pulse rounded-full bg-[#0077ed]/30" />
+      </div>
+    );
+  }
+
+  return <PlaidOAuthResumeInner bootstrap={bootstrap} />;
 }

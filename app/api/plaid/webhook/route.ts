@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { tryLogAdminEvent } from "@/lib/admin/logEventSafe";
 import { getPlaidConfig, getPlaidConfigDiagnostics, resolvePlaidWebhookUrl } from "@/lib/plaid/config";
+import { getPlaidOAuthRedirectUri } from "@/lib/plaid/oauth";
 import { parsePlaidWebhookEvent } from "@/lib/plaid/webhookEvents";
 import { processPlaidWebhookEvent } from "@/lib/plaid/webhookProcessor";
 import { verifyPlaidWebhook } from "@/lib/plaid/webhookVerification";
@@ -20,6 +21,7 @@ export async function GET() {
       webhookUrl,
       configured: config.isConfigured,
       configurationError: config.configurationError,
+      oauthRedirectUri: getPlaidOAuthRedirectUri(),
       checks: getPlaidConfigDiagnostics(),
       verificationRequired: config.environment === "production",
     },

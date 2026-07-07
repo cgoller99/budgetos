@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import {
   usePlaidLink,
   type PlaidLinkOnSuccessMetadata,
@@ -54,16 +54,26 @@ export function usePlaidLinkSession({
     [],
   );
 
-  const config: PlaidLinkOptions = {
-    token: linkToken,
-    onSuccess,
-    onExit,
-    onEvent,
+  const config = useMemo<PlaidLinkOptions>(() => {
+    const next: PlaidLinkOptions = {
+      token: linkToken,
+      onSuccess,
+      onExit,
+      onEvent,
+    };
+
+    if (receivedRedirectUri) {
+      next.receivedRedirectUri = receivedRedirectUri;
+    }
+
+    return next;
+  }, [linkToken, onEvent, onExit, onSuccess, receivedRedirectUri]);
+
+  // react-plaid-link does not re-create the handler when receivedRedirectUri changes.
+  const instanceKey = `${linkToken ?? "none"}:${receivedRedirectUri ?? "none"}`;
+
+  return {
+    instanceKey,
+    ...usePlaidLink(config),
   };
-
-  if (receivedRedirectUri) {
-    config.receivedRedirectUri = receivedRedirectUri;
-  }
-
-  return usePlaidLink(config);
 }

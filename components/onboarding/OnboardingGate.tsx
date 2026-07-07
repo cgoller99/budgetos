@@ -1,13 +1,18 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { PageLoadingState } from "@/components/ui";
 import { useFinance } from "@/context/FinanceContext";
 
 export function OnboardingGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const { isLoading, onboardingComplete } = useFinance();
+
+  if (pathname.startsWith("/oauth/plaid")) {
+    return children;
+  }
 
   useEffect(() => {
     if (!isLoading && !onboardingComplete) {

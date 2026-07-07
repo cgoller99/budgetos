@@ -77,7 +77,10 @@ export async function POST(request: Request) {
       linkTokenPrefix: `${linkToken.slice(0, 12)}…`,
     });
 
-    return NextResponse.json({ linkToken });
+    return NextResponse.json({
+      linkToken,
+      redirectUri: getPlaidOAuthRedirectUri(),
+    });
   } catch (error) {
     console.error("[plaid/link-token] Failed to create link token", error);
     return plaidErrorResponse(error, "Unable to create Plaid link token.");

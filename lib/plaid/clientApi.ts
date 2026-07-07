@@ -64,10 +64,15 @@ export async function fetchPlaidLinkToken(input?: {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input ?? {}),
   });
-  const body = await parseApiResponse<{ linkToken: string }>(
+  const body = await parseApiResponse<{ linkToken: string; redirectUri?: string }>(
     response,
     "/api/plaid/link-token",
   );
+
+  if (body.redirectUri) {
+    console.info("[plaid/client] link-token redirectUri", body.redirectUri);
+  }
+
   return body.linkToken;
 }
 
