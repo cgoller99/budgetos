@@ -66,8 +66,9 @@ if (!skipVercel) {
     "--yes",
   ]);
 
-  run("3/5 Re-sync public env (preserve secrets)", "node", [
+  run("3/5 Merge public env (preserve pulled secrets)", "node", [
     "scripts/sync-public-env-from-production.mjs",
+    "--public-only",
   ]);
 } else {
   console.log("\nSkipping Vercel env pull (--skip-vercel)");

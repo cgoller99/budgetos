@@ -11,42 +11,15 @@
  */
 
 import { spawnSync } from "node:child_process";
-import fs from "node:fs";
+import { hydrateProcessEnvFromFile } from "./lib/env-utils.mjs";
 import path from "node:path";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
-const ENV_PATH = path.join(ROOT, ".env.local");
 const args = process.argv.slice(2);
 const skipBuild = args.includes("--skip-build");
 const skipRemote = args.includes("--skip-remote");
 
-function loadEnvFile() {
-  if (!fs.existsSync(ENV_PATH)) {
-    return;
-  }
-
-  for (const line of fs.readFileSync(ENV_PATH, "utf8").split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-
-    const index = trimmed.indexOf("=");
-    if (index === -1) continue;
-
-    const key = trimmed.slice(0, index).trim();
-    let value = trimmed.slice(index + 1).trim();
-
-    if (
-      (value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1);
-    }
-
-    if (process.env[key] === undefined) {
-      process.env[key] = value;
-    }
-  }
-}
+hydrateProcessEnvFromFile();
 
 function runStep(title, command, stepArgs = []) {
   console.log(`\n${"=".repeat(72)}`);
@@ -64,8 +37,6 @@ function runStep(title, command, stepArgs = []) {
     process.exit(result.status ?? 1);
   }
 }
-
-loadEnvFile();
 
 console.log("Buxme Production Readiness Audit");
 console.log("================================");
