@@ -153,14 +153,14 @@ export function BankSyncConnect({
     [showToast],
   );
 
-  const handleExitMessage = useCallback((message: string | null) => {
+  const handleExitMessage = useCallback((message: string | null, status?: string | null) => {
     if (message) {
-      setError(message);
-
-      if (isPlaidOAuthMisconfigurationExit(new Error(message), null)) {
+      if (isPlaidOAuthMisconfigurationExit(new Error(message), status ?? null)) {
         setError(
           `${message} Register https://buxme.co/oauth/plaid in Plaid Dashboard → Allowed redirect URIs.`,
         );
+      } else {
+        setError(message);
       }
     }
 
