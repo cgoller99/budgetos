@@ -18,6 +18,7 @@ const ROOT = path.resolve(import.meta.dirname, "..");
 const ENV_PATH = path.join(ROOT, ".env.local");
 const PRODUCTION_WEBHOOK_URL = "https://buxme.co/api/plaid/webhook";
 const PRODUCTION_API_HOST = "production.plaid.com";
+const PLAID_DTM_DASHBOARD_URL = "https://dashboard.plaid.com/link/data-transparency-v5";
 
 const PLACEHOLDER_PATTERNS = [
   /^your-/i,
@@ -458,6 +459,19 @@ async function auditRemoteWebhook(webhookUrl, skipRemote) {
   }
 }
 
+function auditDataTransparencyDashboard() {
+  section("11. Data Transparency Messaging (Plaid Dashboard — required for Production Link)");
+
+  console.log("  Plaid requires at least one DTM use case before Link works in Production.");
+  console.log(`  Configure: ${PLAID_DTM_DASHBOARD_URL}`);
+  console.log("  Recommended use cases for Buxme (pick 1–3, then Publish):");
+  console.log("    • Track and manage your finances");
+  console.log("    • Invest your money");
+  console.log("    • Pay down debt");
+  console.log("  Also confirm Allowed redirect URIs includes: https://buxme.co/oauth/plaid");
+  recordPass("Manual DTM checklist printed (cannot be verified remotely)");
+}
+
 function printSummary(skipRemote) {
   section("Result");
 
@@ -469,7 +483,10 @@ function printSummary(skipRemote) {
     if (skipRemote) {
       console.log("\n   Re-run without --skip-remote to validate the live webhook on buxme.co.");
     } else {
-      console.log("\n   Final manual step: register the webhook URL in Plaid Dashboard → Production.");
+      console.log("\n   Manual Plaid Dashboard steps:");
+      console.log("     • DTM use cases: https://dashboard.plaid.com/link/data-transparency-v5");
+      console.log("     • Redirect URI: https://buxme.co/oauth/plaid");
+      console.log("     • Webhook URL: https://buxme.co/api/plaid/webhook");
     }
     return;
   }
@@ -504,6 +521,7 @@ async function main() {
   auditSandboxReferences();
   await auditPlaidProductionCredentials();
   await auditRemoteWebhook(webhookUrl, skipRemote);
+  auditDataTransparencyDashboard();
   printSummary(skipRemote);
 
   process.exit(issues.length > 0 ? 1 : 0);

@@ -46,6 +46,11 @@ export async function createPlaidLinkToken(
     request.access_token = input.accessToken;
   }
 
+  const linkCustomizationName = process.env.PLAID_LINK_CUSTOMIZATION_NAME?.trim();
+  if (linkCustomizationName) {
+    request.link_customization_name = linkCustomizationName;
+  }
+
   const response = await client.linkTokenCreate(request);
   return response.data.link_token;
 }

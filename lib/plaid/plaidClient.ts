@@ -9,6 +9,10 @@ import {
   type PlaidError,
 } from "plaid";
 import { assertPlaidConfigured, getPlaidConfig } from "@/lib/plaid/config";
+import {
+  PLAID_DATA_TRANSPARENCY_DASHBOARD_URL,
+  PLAID_DTM_SETUP_INSTRUCTIONS,
+} from "@/lib/plaid/constants";
 
 let cachedClient: PlaidApi | null = null;
 
@@ -63,18 +67,18 @@ export function isPlaidItemLoginRequired(error: unknown): boolean {
 
 export function getPlaidErrorMessage(error: unknown): string {
   const plaidError = error as PlaidError | undefined;
+  const baseMessage =
+    plaidError?.display_message ||
+    plaidError?.error_message ||
+    (error instanceof Error ? error.message : null) ||
+    "Unexpected Plaid error.";
 
-  if (plaidError?.display_message) {
-    return plaidError.display_message;
+  if (
+    plaidError?.error_code === "INVALID_LINK_CUSTOMIZATION" ||
+    /data transparency messaging use case/i.test(baseMessage)
+  ) {
+    return `${baseMessage} ${PLAID_DTM_SETUP_INSTRUCTIONS} ${PLAID_DATA_TRANSPARENCY_DASHBOARD_URL}`;
   }
 
-  if (plaidError?.error_message) {
-    return plaidError.error_message;
-  }
-
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return "Unexpected Plaid error.";
+  return baseMessage;
 }

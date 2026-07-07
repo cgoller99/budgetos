@@ -68,6 +68,12 @@ export const ENV_CATALOG = [
         source: "Vercel Production env",
         example: "true",
       },
+      {
+        name: "PLAID_LINK_CUSTOMIZATION_NAME",
+        required: false,
+        source:
+          "Plaid Dashboard → Link → Customizations → customization name (after DTM use cases are published)",
+      },
     ],
   },
   {

@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { tryLogAdminEvent } from "@/lib/admin/logEventSafe";
 import { getPlaidConfig, getPlaidConfigDiagnostics, resolvePlaidWebhookUrl } from "@/lib/plaid/config";
 import { getPlaidOAuthRedirectUri } from "@/lib/plaid/oauth";
+import {
+  PLAID_DATA_TRANSPARENCY_DASHBOARD_URL,
+  PLAID_RECOMMENDED_DTM_USE_CASES,
+} from "@/lib/plaid/constants";
 import { parsePlaidWebhookEvent } from "@/lib/plaid/webhookEvents";
 import { processPlaidWebhookEvent } from "@/lib/plaid/webhookProcessor";
 import { verifyPlaidWebhook } from "@/lib/plaid/webhookVerification";
@@ -22,6 +26,8 @@ export async function GET() {
       configured: config.isConfigured,
       configurationError: config.configurationError,
       oauthRedirectUri: getPlaidOAuthRedirectUri(),
+      dataTransparencyDashboardUrl: PLAID_DATA_TRANSPARENCY_DASHBOARD_URL,
+      recommendedDtmUseCases: [...PLAID_RECOMMENDED_DTM_USE_CASES],
       checks: getPlaidConfigDiagnostics(),
       verificationRequired: config.environment === "production",
     },
