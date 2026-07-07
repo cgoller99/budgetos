@@ -5,6 +5,7 @@ import {
   getPlaidClient,
   getPlaidErrorMessage,
   isPlaidItemLoginRequired,
+  isPlaidTransactionsPendingError,
 } from "@/lib/plaid/plaidClient";
 import {
   detectPlaidPayrollCandidates,
@@ -83,6 +84,82 @@ async function ensureInitialSyncWindow(accessToken: string): Promise<void> {
   });
 }
 
+async function syncPlaidTransactions(params: {
+  accessToken: string;
+  connection: BankConnectionRow;
+  repository: BankConnectionsRepository;
+  userId: string;
+  householdId: string | null;
+  accountIdMap: Map<string, string>;
+}): Promise<{
+  added: number;
+  modified: number;
+  removed: number;
+  nextCursor: string | null;
+  pendingError: string | null;
+}> {
+  const {
+    accessToken,
+    connection,
+    repository,
+    userId,
+    householdId,
+    accountIdMap,
+  } = params;
+
+  try {
+    if (!connection.transactions_cursor) {
+      await ensureInitialSyncWindow(accessToken);
+    }
+
+    const syncResult = await fetchAllSyncTransactions({
+      accessToken,
+      cursor: connection.transactions_cursor,
+    });
+
+    const mappedTransactions = [...syncResult.added, ...syncResult.modified].map(
+      mapPlaidTransaction,
+    );
+
+    const persistResult = await repository.persistSyncedTransactions({
+      userId,
+      householdId,
+      accountIdMap,
+      transactions: mappedTransactions,
+      removedExternalIds: syncResult.removed,
+    });
+
+    return {
+      added: persistResult.added,
+      modified: persistResult.modified,
+      removed: persistResult.removed,
+      nextCursor: syncResult.nextCursor,
+      pendingError: null,
+    };
+  } catch (error) {
+    if (isPlaidItemLoginRequired(error)) {
+      throw error;
+    }
+
+    const message = getPlaidErrorMessage(error);
+    const pending = isPlaidTransactionsPendingError(error);
+
+    console.warn("[plaid/sync] transaction sync deferred", {
+      connectionId: connection.id,
+      pending,
+      message,
+    });
+
+    return {
+      added: 0,
+      modified: 0,
+      removed: 0,
+      nextCursor: connection.transactions_cursor,
+      pendingError: message,
+    };
+  }
+}
+
 export async function syncPlaidConnection(params: {
   supabase: BuxmeSupabaseClient;
   userId: string;
@@ -119,25 +196,13 @@ export async function syncPlaidConnection(params: {
       accounts: mappedAccounts,
     });
 
-    if (!connection.transactions_cursor) {
-      await ensureInitialSyncWindow(accessToken);
-    }
-
-    const syncResult = await fetchAllSyncTransactions({
+    const transactionResult = await syncPlaidTransactions({
       accessToken,
-      cursor: connection.transactions_cursor,
-    });
-
-    const mappedTransactions = [...syncResult.added, ...syncResult.modified].map(
-      mapPlaidTransaction,
-    );
-
-    const persistResult = await repository.persistSyncedTransactions({
+      connection,
+      repository,
       userId,
       householdId,
       accountIdMap,
-      transactions: mappedTransactions,
-      removedExternalIds: syncResult.removed,
     });
 
     let investmentsSynced = 0;
@@ -191,30 +256,29 @@ export async function syncPlaidConnection(params: {
     await repository.markConnectionSynced({
       connectionId: connection.id,
       userId,
-      transactionsCursor: syncResult.nextCursor,
+      transactionsCursor: transactionResult.nextCursor,
       status: "connected",
-      errorCode: null,
-      errorMessage: null,
+      errorCode: transactionResult.pendingError ? "TRANSACTIONS_PENDING" : null,
+      errorMessage: transactionResult.pendingError,
     });
 
     return {
       connectionId: connection.id,
       accountsSynced: mappedAccounts.length,
-      transactionsAdded: persistResult.added,
-      transactionsModified: persistResult.modified,
-      transactionsRemoved: persistResult.removed,
+      transactionsAdded: transactionResult.added,
+      transactionsModified: transactionResult.modified,
+      transactionsRemoved: transactionResult.removed,
       investmentsSynced,
       liabilitiesSynced,
     };
   } catch (error) {
     const message = getPlaidErrorMessage(error);
-    const status = isPlaidItemLoginRequired(error) ? "error" : "error";
 
     await repository.markConnectionSynced({
       connectionId: connection.id,
       userId,
       transactionsCursor: connection.transactions_cursor,
-      status,
+      status: "error",
       errorCode: isPlaidItemLoginRequired(error) ? "ITEM_LOGIN_REQUIRED" : "SYNC_FAILED",
       errorMessage: message,
     });

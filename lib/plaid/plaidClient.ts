@@ -77,6 +77,19 @@ export function isPlaidItemLoginRequired(error: unknown): boolean {
   return plaidError?.error_code === "ITEM_LOGIN_REQUIRED";
 }
 
+/** Transactions may not be ready immediately after Link (webhook INITIAL_UPDATE follows). */
+export function isPlaidTransactionsPendingError(error: unknown): boolean {
+  const plaidError = error as PlaidError | undefined;
+  const code = plaidError?.error_code;
+
+  return (
+    code === "PRODUCT_NOT_READY" ||
+    code === "PRODUCTS_NOT_SUPPORTED" ||
+    code === "TRANSACTIONS_SYNC_MUTATION_DURING_PAGINATION" ||
+    code === "INSTITUTION_NOT_RESPONDING"
+  );
+}
+
 export function getPlaidErrorMessage(error: unknown): string {
   const plaidError = error as PlaidError | undefined;
   const baseMessage =
