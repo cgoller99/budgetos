@@ -39,12 +39,24 @@ See `.env.local.example` for the full template.
 ### Plaid production setup
 
 1. In the [Plaid Dashboard](https://dashboard.plaid.com/), switch to **Production** keys (not Sandbox).
-2. Set `PLAID_ENV=production` in `.env.local` and in Vercel project environment variables.
-3. Set `PLAID_WEBHOOK_URL` to your public webhook endpoint (e.g. `https://buxme.co/api/plaid/webhook`) and register the same URL in Plaid.
-4. Generate a secure random string (32+ characters) for `PLAID_TOKEN_ENCRYPTION_KEY`.
-5. Set `NEXT_PUBLIC_PLAID_ENABLED=true` and redeploy.
+2. Set these in `.env.local` and Vercel:
+   - `PLAID_ENV=production`
+   - `PLAID_CLIENT_ID` / `PLAID_SECRET` (production keys)
+   - `PLAID_WEBHOOK_URL=https://buxme.co/api/plaid/webhook`
+   - `PLAID_TOKEN_ENCRYPTION_KEY` (32+ character random string)
+   - `NEXT_PUBLIC_PLAID_ENABLED=true`
+   - `SUPABASE_SERVICE_ROLE_KEY` (required for webhook processing)
+3. Register `https://buxme.co/api/plaid/webhook` in the Plaid Dashboard.
+4. Link token creation automatically attaches the production webhook URL to new Items.
+5. Webhook requests are verified with Plaid JWT signatures (`Plaid-Verification` header) in production.
 
-**Note:** Sandbox bank connections do not carry over to production. Users will need to reconnect their banks after the switch.
+Verify configuration and webhook reachability:
+
+```bash
+npm run verify:plaid
+```
+
+**Note:** Sandbox bank connections do not carry over. Users must reconnect after switching to production keys.
 
 3. Apply Supabase migrations from `supabase/migrations/`.
 
@@ -63,6 +75,7 @@ Open [http://localhost:3000](http://localhost:3000).
 | `npm run dev` | Start Next.js dev server |
 | `npm run build` | Production build |
 | `npm run verify:supabase` | Verify Supabase connectivity |
+| `npm run verify:plaid` | Verify Plaid production env and webhook health |
 | `npm run debug:household-invite-email` | Test invite email delivery |
 
 ## Stack
@@ -70,7 +83,7 @@ Open [http://localhost:3000](http://localhost:3000).
 - **Next.js 16** — App Router, React 19
 - **Supabase** — Auth, Postgres, RLS
 - **Resend** — Transactional email
-- **Plaid** — Bank account linking and transaction sync (Production)
+- **Plaid** — Production bank linking, JWT-verified webhooks, transaction sync
 - **Tailwind CSS 4** — UI styling
 
 ## Legacy domain

@@ -1,3 +1,5 @@
+import { PLAID_PRODUCTION_WEBHOOK_URL } from "@/lib/plaid/constants";
+
 export type PlaidEnvironment = "sandbox" | "development" | "production";
 
 export type PlaidConfig = {
@@ -42,6 +44,29 @@ function normalizePlaidEnvironment(value: string | undefined): PlaidEnvironment 
   return "production";
 }
 
+function resolveEffectiveWebhookUrl(
+  webhookUrl: string | undefined,
+  environment: PlaidEnvironment,
+): string | undefined {
+  if (webhookUrl) {
+    return webhookUrl;
+  }
+
+  if (environment === "production") {
+    return PLAID_PRODUCTION_WEBHOOK_URL;
+  }
+
+  return undefined;
+}
+
+export function resolvePlaidWebhookUrl(config: PlaidConfig): string {
+  return config.webhookUrl ?? PLAID_PRODUCTION_WEBHOOK_URL;
+}
+
+export function isPlaidWebhookVerificationRequired(): boolean {
+  return getPlaidConfig().environment === "production";
+}
+
 export function getPlaidEnvironmentLabel(environment: PlaidEnvironment): string {
   switch (environment) {
     case "production":
@@ -73,12 +98,16 @@ function getConfigurationError(
   webhookUrl: string | undefined,
   environment: PlaidEnvironment,
 ): string | null {
+  const effectiveWebhookUrl = resolveEffectiveWebhookUrl(webhookUrl, environment);
+
   if (process.env.VERCEL_ENV === "production" && environment === "sandbox") {
     return "PLAID_ENV cannot be sandbox in production. Set PLAID_ENV=production and use production API keys from the Plaid Dashboard.";
   }
 
-  if (environment === "production" && !webhookUrl) {
-    return "PLAID_WEBHOOK_URL is required in production. Set it to your public webhook endpoint (e.g. https://buxme.co/api/plaid/webhook).";
+  if (environment === "production") {
+    if (effectiveWebhookUrl !== PLAID_PRODUCTION_WEBHOOK_URL) {
+      return `PLAID_WEBHOOK_URL must be ${PLAID_PRODUCTION_WEBHOOK_URL} in production.`;
+    }
   }
   if (!clientId) {
     return "PLAID_CLIENT_ID is missing. Add it to .env.local and restart the dev server.";
@@ -111,7 +140,7 @@ function getConfigurationError(
     return "PLAID_TOKEN_ENCRYPTION_KEY must be at least 32 characters for AES-256-GCM.";
   }
 
-  if (!isValidWebhookUrl(webhookUrl)) {
+  if (!isValidWebhookUrl(effectiveWebhookUrl)) {
     return "PLAID_WEBHOOK_URL must be a valid https URL when set.";
   }
 
@@ -123,12 +152,13 @@ export function getPlaidConfig(): PlaidConfig {
   const secret = process.env.PLAID_SECRET?.trim();
   const environment = normalizePlaidEnvironment(process.env.PLAID_ENV);
   const tokenEncryptionKey = process.env.PLAID_TOKEN_ENCRYPTION_KEY?.trim();
-  const webhookUrl = process.env.PLAID_WEBHOOK_URL?.trim();
+  const rawWebhookUrl = process.env.PLAID_WEBHOOK_URL?.trim();
+  const webhookUrl = resolveEffectiveWebhookUrl(rawWebhookUrl, environment);
   const configurationError = getConfigurationError(
     clientId,
     secret,
     tokenEncryptionKey,
-    webhookUrl,
+    rawWebhookUrl,
     environment,
   );
 

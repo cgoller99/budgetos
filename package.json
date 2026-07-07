@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "eslint",
     "verify:supabase": "node scripts/verify-supabase.mjs",
+    "verify:plaid": "node --env-file=.env.local scripts/verify-plaid.mjs",
     "household:migration": "node scripts/print-household-migration.mjs",
     "apply:household-migration": "node scripts/apply-household-migration.mjs",
     "apply:household-invite-migration": "node scripts/apply-household-invite-migration.mjs",
@@ -28,6 +29,7 @@
   "dependencies": {
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.108.2",
+    "jose": "^6.2.3",
     "next": "16.2.9",
     "plaid": "^42.2.0",
     "posthog-js": "^1.396.6",

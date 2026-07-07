@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getPlaidConfig, getPlaidEnvironmentLabel } from "@/lib/plaid/config";
+import { getPlaidConfig, getPlaidEnvironmentLabel, resolvePlaidWebhookUrl } from "@/lib/plaid/config";
 import { isStripeEnabled } from "@/lib/stripe/config";
 import { getSupabaseConfig } from "@/lib/supabase/config";
 import type { BuxmeSupabaseClient } from "@/lib/supabase/client";
@@ -62,7 +62,7 @@ export async function getAdminSystemHealth(
     detail:
       plaidConfig.configurationError ??
       (plaidEnvironmentLabel
-        ? `Configured (${plaidEnvironmentLabel})`
+        ? `Configured (${plaidEnvironmentLabel}, ${resolvePlaidWebhookUrl(plaidConfig)})`
         : "Configured"),
   });
 

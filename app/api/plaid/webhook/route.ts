@@ -1,72 +1,98 @@
 import { NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { syncPlaidForUser } from "@/lib/plaid/syncService";
-import { BankConnectionsRepository } from "@/lib/supabase/repositories/bankConnectionsRepository";
+import { tryLogAdminEvent } from "@/lib/admin/logEventSafe";
+import { getPlaidConfig, resolvePlaidWebhookUrl } from "@/lib/plaid/config";
+import { parsePlaidWebhookEvent } from "@/lib/plaid/webhookEvents";
+import { processPlaidWebhookEvent } from "@/lib/plaid/webhookProcessor";
+import { verifyPlaidWebhook } from "@/lib/plaid/webhookVerification";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
-type PlaidWebhookBody = {
-  webhook_type?: string;
-  webhook_code?: string;
-  item_id?: string;
-};
+export const runtime = "nodejs";
+
+export async function GET() {
+  const config = getPlaidConfig();
+  const webhookUrl = resolvePlaidWebhookUrl(config);
+
+  return NextResponse.json(
+    {
+      ok: true,
+      service: "plaid-webhook",
+      environment: config.environment,
+      webhookUrl,
+      configured: config.isConfigured,
+      verificationRequired: config.environment === "production",
+    },
+    { status: 200 },
+  );
+}
 
 export async function POST(request: Request) {
+  const config = getPlaidConfig();
+  const body = await request.text();
+  const verificationHeader = request.headers.get("plaid-verification");
+
+  if (!config.isConfigured) {
+    console.error("[plaid/webhook] Plaid is not configured:", config.configurationError);
+    return NextResponse.json({ error: "Plaid is not configured." }, { status: 503 });
+  }
+
+  const verification = await verifyPlaidWebhook(body, verificationHeader);
+
+  if (!verification.verified) {
+    console.error("[plaid/webhook] Signature verification failed:", verification.reason);
+    await tryLogAdminEvent({
+      eventType: "plaid",
+      message: "Plaid webhook verification failed",
+      metadata: { reason: verification.reason },
+    });
+    return NextResponse.json({ error: "Invalid Plaid webhook signature." }, { status: 401 });
+  }
+
+  let event;
+
   try {
-    const body = (await request.json()) as PlaidWebhookBody;
-    const itemId = body.item_id?.trim();
+    event = parsePlaidWebhookEvent(body);
+  } catch (error) {
+    console.error("[plaid/webhook] Invalid JSON payload", error);
+    return NextResponse.json({ error: "Invalid webhook payload." }, { status: 400 });
+  }
 
-    if (!itemId) {
-      return NextResponse.json({ ok: true, ignored: true });
-    }
+  try {
+    const supabase = createSupabaseAdminClient();
+    const result = await processPlaidWebhookEvent({ event, supabase });
 
-    const supabase = await createSupabaseServerClient();
-    const repository = new BankConnectionsRepository(supabase);
-    const { data: connections, error } = await supabase
-      .from("bank_connections")
-      .select("*")
-      .eq("external_item_id", itemId)
-      .neq("status", "disconnected");
-
-    if (error) {
-      throw error;
-    }
-
-    const connection = connections?.[0];
-
-    if (!connection) {
-      return NextResponse.json({ ok: true, ignored: true });
-    }
-
-    if (
-      body.webhook_type === "TRANSACTIONS" &&
-      (body.webhook_code === "SYNC_UPDATES_AVAILABLE" ||
-        body.webhook_code === "DEFAULT_UPDATE" ||
-        body.webhook_code === "INITIAL_UPDATE" ||
-        body.webhook_code === "HISTORICAL_UPDATE")
-    ) {
-      await syncPlaidForUser({
-        supabase,
-        userId: connection.user_id,
-        connectionId: connection.id,
+    if (result.status === "processed") {
+      await tryLogAdminEvent({
+        eventType: "plaid",
+        message: `Processed ${result.webhookType}/${result.webhookCode}`,
+        metadata: {
+          itemId: event.item_id,
+          connectionId: result.connectionId,
+          syncTriggered: result.syncTriggered ?? false,
+          environment: event.environment ?? config.environment,
+        },
       });
     }
 
-    if (
-      body.webhook_type === "ITEM" &&
-      (body.webhook_code === "ERROR" || body.webhook_code === "PENDING_EXPIRATION")
-    ) {
-      await repository.markConnectionSynced({
-        connectionId: connection.id,
-        userId: connection.user_id,
-        transactionsCursor: connection.transactions_cursor,
-        status: "error",
-        errorCode: body.webhook_code,
-        errorMessage: "Bank connection requires re-authentication.",
-      });
-    }
-
-    return NextResponse.json({ ok: true });
+    return NextResponse.json(
+      {
+        ok: true,
+        status: result.status,
+        webhookType: result.webhookType,
+        webhookCode: result.webhookCode,
+      },
+      { status: 200 },
+    );
   } catch (error) {
     console.error("[plaid/webhook] Failed to process webhook", error);
-    return NextResponse.json({ ok: false }, { status: 500 });
+    await tryLogAdminEvent({
+      eventType: "api_failure",
+      message: "Plaid webhook handler failed",
+      metadata: {
+        webhookType: event.webhook_type,
+        webhookCode: event.webhook_code,
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
+    });
+    return NextResponse.json({ error: "Webhook handler failed." }, { status: 500 });
   }
 }
