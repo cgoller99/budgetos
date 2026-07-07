@@ -70,7 +70,7 @@ function auditLocalFile() {
     if (status === "empty") {
       console.error(`✗ ${name} is empty (key exists in .env.local but value is blank)`);
       emptyCount += 1;
-      issues.push(`${name}: empty in .env.local — value missing in Vercel Production or was stripped by sync:env`);
+      issues.push(`${name}: empty in .env.local — sensitive Vercel vars cannot be exported via env pull`);
       continue;
     }
 
@@ -93,10 +93,22 @@ function auditLocalFile() {
   console.log(`  Placeholder: ${placeholderCount}`);
 
   if (emptyCount > 0) {
-    console.log("\n⚠ Empty values usually mean:");
-    console.log("  1. The variable exists in Vercel but has no value saved for Production");
-    console.log("  2. npm run sync:env ran after vercel env pull and commented out empty keys (fixed in latest code)");
-    console.log("  3. vercel env pull targeted the wrong project or environment");
+    const emptyKeys = required.filter((name) => map.has(name) && classifyEnvValue(map.get(name)) === "empty");
+    const looksLikeVercelPull =
+      fs.readFileSync(ENV_PATH, "utf8").includes("# Created by Vercel CLI") &&
+      emptyKeys.length >= 5;
+
+    console.log("\n⚠ Empty values — likely causes:");
+    if (looksLikeVercelPull) {
+      console.log("  • PRIMARY: Vercel Production vars use type=sensitive (CLI default).");
+      console.log("    vercel env pull CANNOT export sensitive values — it writes KEY=\"\" by design.");
+      console.log("    Values still work on buxme.co at runtime; they are not readable via CLI.");
+      console.log("  • Fix local .env.local: copy values from each provider dashboard (see checklist below).");
+      console.log("    Do NOT rely on vercel env pull for Production secrets.");
+    } else {
+      console.log("  1. Variable exists in Vercel but no value was saved in the dashboard");
+      console.log("  2. Variable was added via broken `vercel env add --value` (stores empty — use dashboard instead)");
+    }
   }
 
   return issues;
