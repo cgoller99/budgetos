@@ -9,6 +9,7 @@ import {
   PLAID_LINK_PRODUCTS,
 } from "@/lib/plaid/plaidClient";
 import { getPlaidConfig, resolvePlaidWebhookUrl } from "@/lib/plaid/config";
+import { getPlaidOAuthRedirectUri } from "@/lib/plaid/oauth";
 import { decryptAccessToken, encryptAccessToken } from "@/lib/plaid/tokenVault";
 import type { PlaidLinkMode } from "@/lib/plaid/types";
 import type { BankConnectionRow } from "@/lib/supabase/database.types";
@@ -38,6 +39,7 @@ export async function createPlaidLinkToken(
     country_codes: [...PLAID_COUNTRY_CODES],
     language: "en",
     webhook: resolvePlaidWebhookUrl(config),
+    redirect_uri: getPlaidOAuthRedirectUri(),
   };
 
   if (input.mode === "update" && input.accessToken) {

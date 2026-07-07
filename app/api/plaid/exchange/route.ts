@@ -37,9 +37,16 @@ export async function POST(request: Request) {
     const body = (await request.json()) as ExchangeRequestBody;
     const publicToken = body.publicToken?.trim();
 
+    console.info("[plaid/exchange] request", {
+      userId: auth.user.id,
+      hasPublicToken: Boolean(publicToken),
+      publicTokenPrefix: publicToken ? `${publicToken.slice(0, 12)}…` : null,
+      connectionId: body.connectionId ?? null,
+    });
+
     if (!publicToken) {
       return NextResponse.json(
-        { error: "publicToken is required." },
+        { error: "publicToken is required.", code: "INVALID_REQUEST" },
         { status: 400 },
       );
     }
@@ -82,6 +89,13 @@ export async function POST(request: Request) {
         connection,
       });
 
+      console.info("[plaid/exchange] success", {
+        userId: auth.user.id,
+        connectionId: connection.id,
+        itemId: exchangeResult.itemId,
+        institutionName: connection.institution_name,
+      });
+
       return NextResponse.json({
         ok: true,
         connectionId: connection.id,
@@ -89,6 +103,12 @@ export async function POST(request: Request) {
         sync: syncResult,
       });
     } catch (syncError) {
+      console.warn("[plaid/exchange] connected but initial sync failed", {
+        userId: auth.user.id,
+        connectionId: connection.id,
+        syncError: getPlaidErrorMessage(syncError),
+      });
+
       return NextResponse.json(
         {
           ok: true,

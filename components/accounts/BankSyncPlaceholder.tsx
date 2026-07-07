@@ -1,20 +1,19 @@
 "use client";
 
-import { useCallback, useState } from "react";
-import {
-  usePlaidLink,
-  type PlaidLinkOnSuccessMetadata,
-  type PlaidLinkOptions,
-} from "react-plaid-link";
+import { useCallback, useEffect, useState } from "react";
+import type { PlaidLinkOnSuccessMetadata } from "react-plaid-link";
 import { Badge, Button, Card, CardContent, CardHeader } from "@/components/ui";
 import { useFinance } from "@/context/FinanceContext";
 import { useToast } from "@/context/ToastContext";
+import { usePlaidLinkSession } from "@/hooks/usePlaidLinkSession";
 import { bankSyncComingSoonMessage } from "@/lib/integrations/bankSync";
 import {
   exchangePlaidPublicToken,
+  isPlaidOAuthMisconfigurationExit,
   isPlaidReconnectRequired,
 } from "@/lib/plaid/clientApi";
 import { isPlaidClientEnabled } from "@/lib/plaid/clientConfig";
+import { storePlaidLinkToken, clearStoredPlaidLinkToken } from "@/lib/plaid/oauth";
 import { ANALYTICS_EVENTS, trackEvent } from "@/lib/analytics/client";
 
 type BankSyncConnectProps = {
@@ -26,26 +25,36 @@ type BankSyncConnectProps = {
 
 function BankSyncLinkButton({
   linkToken,
-  onSuccess,
+  onLinked,
+  onExitMessage,
   buttonLabel,
   compact,
   disabled,
   onPrepare,
   isPreparing,
+  autoOpen,
 }: {
   linkToken: string | null;
-  onSuccess: (publicToken: string, metadata: PlaidLinkOnSuccessMetadata) => void;
+  onLinked: (publicToken: string, metadata: PlaidLinkOnSuccessMetadata) => void | Promise<void>;
+  onExitMessage?: (message: string | null, status?: string | null) => void;
   buttonLabel: string;
   compact?: boolean;
   disabled?: boolean;
   onPrepare: () => Promise<void>;
   isPreparing: boolean;
+  autoOpen: boolean;
 }) {
-  const config: PlaidLinkOptions = {
-    token: linkToken,
-    onSuccess,
-  };
-  const { open, ready } = usePlaidLink(config);
+  const { open, ready } = usePlaidLinkSession({
+    linkToken,
+    onLinked,
+    onExitMessage,
+  });
+
+  useEffect(() => {
+    if (autoOpen && linkToken && ready) {
+      open();
+    }
+  }, [autoOpen, linkToken, open, ready]);
 
   const handleClick = async () => {
     if (!linkToken) {
@@ -77,6 +86,7 @@ export function BankSyncConnect({
   const { showToast } = useToast();
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [isLoadingToken, setIsLoadingToken] = useState(false);
+  const [autoOpenLink, setAutoOpenLink] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const plaidEnabled = isPlaidClientEnabled();
   const label =
@@ -92,7 +102,9 @@ export function BankSyncConnect({
         mode === "update" && connectionId
           ? await reconnectBank(connectionId)
           : await connectBank();
+      storePlaidLinkToken(token);
       setLinkToken(token);
+      setAutoOpenLink(true);
     } catch (loadError) {
       const message =
         loadError instanceof Error
@@ -104,10 +116,11 @@ export function BankSyncConnect({
     }
   }, [connectionId, connectBank, mode, reconnectBank]);
 
-  const handleSuccess = useCallback(
+  const handleLinked = useCallback(
     async (publicToken: string) => {
       try {
         const result = await exchangePlaidPublicToken(publicToken);
+        clearStoredPlaidLinkToken();
         trackEvent(ANALYTICS_EVENTS.CONNECTED_PLAID, {
           institution: result.institutionName ?? "unknown",
         });
@@ -134,10 +147,26 @@ export function BankSyncConnect({
         });
       } finally {
         setLinkToken(null);
+        setAutoOpenLink(false);
       }
     },
     [showToast],
   );
+
+  const handleExitMessage = useCallback((message: string | null) => {
+    if (message) {
+      setError(message);
+
+      if (isPlaidOAuthMisconfigurationExit(new Error(message), null)) {
+        setError(
+          `${message} Register https://buxme.co/oauth/plaid in Plaid Dashboard → Allowed redirect URIs.`,
+        );
+      }
+    }
+
+    setLinkToken(null);
+    setAutoOpenLink(false);
+  }, []);
 
   if (!plaidEnabled) {
     return (
@@ -183,19 +212,25 @@ export function BankSyncConnect({
         <div className="flex flex-wrap gap-2">
           <BankSyncLinkButton
             linkToken={linkToken}
-            onSuccess={(publicToken) => void handleSuccess(publicToken)}
+            onLinked={(publicToken) => void handleLinked(publicToken)}
+            onExitMessage={handleExitMessage}
             buttonLabel={isSyncing ? "Syncing..." : label}
             compact={compact}
             disabled={isSyncing}
             onPrepare={loadLinkToken}
             isPreparing={isLoadingToken}
+            autoOpen={autoOpenLink}
           />
           {linkToken && (
             <Button
               variant="secondary"
               size={compact ? "sm" : "md"}
               disabled={isLoadingToken}
-              onClick={() => setLinkToken(null)}
+              onClick={() => {
+                setLinkToken(null);
+                setAutoOpenLink(false);
+                clearStoredPlaidLinkToken();
+              }}
             >
               Reset link
             </Button>
