@@ -7,8 +7,8 @@
  */
 
 import { spawnSync } from "node:child_process";
-import path from "node:path";
 import fs from "node:fs";
+import path from "node:path";
 import { ENV_PATH, parseEnvFile } from "./lib/env-utils.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
