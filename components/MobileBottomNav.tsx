@@ -2,48 +2,29 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { MobileMoreSheet } from "@/components/navigation/MobileMoreSheet";
 import { NavIcon } from "@/components/NavIcon";
 import { cn } from "@/components/ui/cn";
 import { sidebarActiveClassName, sidebarInactiveClassName } from "@/components/ui/tokens";
-import { NAV_ROUTES } from "@/lib/navigation";
-
-const MOBILE_PRIMARY_HREFS = [
-  "/dashboard",
-  "/accounts",
-  "/bills",
-  "/income",
-  "/transactions",
-] as const;
-
-const MOBILE_MORE_HREFS = [
-  "/calendar",
-  "/savings",
-  "/debt",
-  "/investments",
-  "/reports",
-  "/roadmap",
-  "/settings",
-];
+import {
+  MOBILE_PRIMARY_NAV,
+  isMobileMoreRoute,
+} from "@/lib/mobile/navigation";
+import { MobileMoreSheet } from "@/components/navigation/MobileMoreSheet";
 
 export function MobileBottomNav({ activeHref }: { activeHref: string }) {
   const [moreOpen, setMoreOpen] = useState(false);
-  const primaryRoutes = NAV_ROUTES.filter((route) =>
-    MOBILE_PRIMARY_HREFS.includes(route.href as (typeof MOBILE_PRIMARY_HREFS)[number]),
-  );
-  const isMoreActive = MOBILE_MORE_HREFS.some(
-    (href) => href === activeHref || activeHref.startsWith(`${href}?`),
-  );
+  const path = activeHref.split("?")[0] ?? activeHref;
+  const isMoreActive = isMobileMoreRoute(activeHref);
 
   return (
     <>
       <nav
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--surface-border)] bg-[var(--background)]/95 px-2 pb-[calc(0.625rem+env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--surface-border)] bg-[var(--background)]/95 px-1 pb-[calc(0.625rem+env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl lg:hidden"
         aria-label="Primary navigation"
       >
         <div className="mx-auto flex max-w-lg items-stretch justify-between gap-0.5">
-          {primaryRoutes.map((route) => {
-            const isActive = route.href === activeHref;
+          {MOBILE_PRIMARY_NAV.map((route) => {
+            const isActive = route.href === path;
 
             return (
               <Link
@@ -66,7 +47,7 @@ export function MobileBottomNav({ activeHref }: { activeHref: string }) {
                 >
                   <NavIcon name={route.icon} />
                 </span>
-                <span className="truncate">{route.label.split(" ")[0]}</span>
+                <span className="truncate">{route.label}</span>
               </Link>
             );
           })}

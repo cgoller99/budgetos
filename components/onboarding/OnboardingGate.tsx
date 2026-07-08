@@ -9,16 +9,21 @@ export function OnboardingGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const { isLoading, onboardingComplete } = useFinance();
-
-  if (pathname.startsWith("/oauth/plaid")) {
-    return children;
-  }
+  const skipGate = pathname.startsWith("/oauth/plaid");
 
   useEffect(() => {
+    if (skipGate) {
+      return;
+    }
+
     if (!isLoading && !onboardingComplete) {
       router.replace("/onboarding");
     }
-  }, [isLoading, onboardingComplete, router]);
+  }, [isLoading, onboardingComplete, router, skipGate]);
+
+  if (skipGate) {
+    return children;
+  }
 
   if (isLoading) {
     return <PageLoadingState label="Loading your finances" />;

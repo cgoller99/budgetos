@@ -175,6 +175,15 @@ export function SettingsContent() {
   }, [isConfigured]);
 
   useEffect(() => {
+    if (typeof window === "undefined" || !window.location.hash) {
+      return;
+    }
+
+    const target = document.querySelector(window.location.hash);
+    target?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+
+  useEffect(() => {
     setTheme(getStoredThemePreference());
     setNotificationPrefs(getNotificationPreferences());
   }, []);

@@ -54,9 +54,6 @@ export function NextPaycheckCard() {
           <p className="text-base text-[var(--text-muted)]">
             Tell Buxme where each paycheck goes. Setup takes about five minutes.
           </p>
-          <Link href="/income?tab=plan" className="mt-4 inline-block">
-            <Button size="sm">Create Income Plan</Button>
-          </Link>
         </CardContent>
       </Card>
     );

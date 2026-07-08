@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Button, Input, Modal, Select } from "@/components/ui";
 import { cn } from "@/components/ui/cn";
@@ -66,6 +66,16 @@ export function FeedbackCenter() {
     setMessage("");
     setScreenshotFile(null);
     setRecordingFile(null);
+  }, []);
+
+  useEffect(() => {
+    function handleOpenFeedback() {
+      setIsOpen(true);
+    }
+
+    window.addEventListener("buxme:open-feedback", handleOpenFeedback);
+    return () =>
+      window.removeEventListener("buxme:open-feedback", handleOpenFeedback);
   }, []);
 
   async function uploadAttachment(file: File, kind: "screenshot" | "recording") {
@@ -166,7 +176,7 @@ export function FeedbackCenter() {
         className={cn(
           // Sit above the mobile bottom nav (which is ~4rem tall and shown below lg);
           // drop back to the corner on desktop where the nav is hidden.
-          "fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom))] right-4 z-40 flex h-12 min-w-12 items-center justify-center rounded-full border border-[#0077ed]/30 bg-[#0077ed] px-4 text-sm font-medium text-white shadow-[0_8px_24px_rgba(0,119,237,0.35)] transition-transform hover:scale-[1.02] active:scale-[0.98] lg:bottom-6 lg:right-6",
+          "fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom))] right-4 z-40 hidden h-12 min-w-12 items-center justify-center rounded-full border border-[#0077ed]/30 bg-[#0077ed] px-4 text-sm font-medium text-white shadow-[0_8px_24px_rgba(0,119,237,0.35)] transition-transform hover:scale-[1.02] active:scale-[0.98] lg:bottom-6 lg:right-6 lg:flex",
         )}
         aria-label="Open feedback center"
       >

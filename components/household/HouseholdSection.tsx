@@ -341,7 +341,7 @@ export function HouseholdSection() {
   }
 
   return (
-    <Card padding="lg">
+    <Card padding="lg" id="household">
       <CardHeader
         title="Shared household"
         action={

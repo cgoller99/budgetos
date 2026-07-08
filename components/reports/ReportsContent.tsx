@@ -49,11 +49,12 @@ function TrendChart({ points, valueKey, color, emptyMessage }: TrendChartProps) 
   }
 
   return (
-    <div
-      className="flex items-end justify-between gap-2 pt-2"
-      role="img"
-      aria-label={`${valueKey} trend chart`}
-    >
+    <div className="overflow-x-auto pb-1">
+      <div
+        className="flex min-w-[320px] items-end justify-between gap-2 pt-2"
+        role="img"
+        aria-label={`${valueKey} trend chart`}
+      >
       {points.map((point) => {
         const value = point[valueKey];
         const heightPercent = maxValue > 0 ? (value / maxValue) * 100 : 0;
@@ -81,6 +82,7 @@ function TrendChart({ points, valueKey, color, emptyMessage }: TrendChartProps) 
           </div>
         );
       })}
+      </div>
     </div>
   );
 }

@@ -53,14 +53,14 @@ export function logPlaidLinkEvent(
 }
 
 export function logPlaidClientRequest(
-  path: "/api/plaid/link-token" | "/api/plaid/exchange",
+  path: "/api/plaid/link-token" | "/api/plaid/exchange" | "/api/plaid/sync",
   input: Record<string, unknown>,
 ): void {
   console.info(`[plaid/client] POST ${path}`, input);
 }
 
 export function logPlaidClientResponse(
-  path: "/api/plaid/link-token" | "/api/plaid/exchange",
+  path: "/api/plaid/link-token" | "/api/plaid/exchange" | "/api/plaid/sync",
   response: Response,
   body: Record<string, unknown>,
 ): void {

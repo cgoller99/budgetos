@@ -65,14 +65,24 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
         aria-modal="true"
         aria-labelledby="modal-title"
         className={cn(
-          "relative flex max-h-[min(90dvh,calc(100vh-2rem))] w-full max-w-md flex-col overflow-hidden rounded-t-3xl border border-[var(--surface-border)] bg-[var(--surface)] shadow-2xl sm:rounded-3xl",
+          "relative flex h-[100dvh] max-h-[100dvh] w-full max-w-none flex-col overflow-hidden rounded-none border border-[var(--surface-border)] bg-[var(--surface)] shadow-2xl sm:h-auto sm:max-h-[min(90dvh,calc(100vh-2rem))] sm:max-w-md sm:rounded-3xl",
           isAnimating ? "modal-panel-enter" : "translate-y-3 scale-[0.97] opacity-0",
         )}
       >
-        <div className="overflow-y-auto overscroll-contain p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:p-8">
-          <h2 id="modal-title" className={panelTitleClassName}>
-            {title}
-          </h2>
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:p-8">
+          <div className="flex items-start justify-between gap-4">
+            <h2 id="modal-title" className={panelTitleClassName}>
+              {title}
+            </h2>
+            <button
+              type="button"
+              onClick={onClose}
+              className="focus-ring min-h-11 min-w-11 rounded-xl text-sm text-white/50 hover:text-white sm:hidden"
+              aria-label="Close"
+            >
+              Close
+            </button>
+          </div>
           <div className="mt-7">{children}</div>
         </div>
       </div>

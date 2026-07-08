@@ -5,21 +5,7 @@ import { usePathname } from "next/navigation";
 import { NavIcon } from "@/components/NavIcon";
 import { cn } from "@/components/ui/cn";
 import { sidebarActiveClassName, sidebarInactiveClassName } from "@/components/ui/tokens";
-import { NAV_MORE_ROUTES, NAV_ROUTES, NAV_SECONDARY_ROUTES } from "@/lib/navigation";
-
-const MOBILE_PRIMARY_HREFS = new Set([
-  "/dashboard",
-  "/accounts",
-  "/bills",
-  "/income",
-  "/savings",
-]);
-
-const secondaryRoutes = [
-  ...NAV_SECONDARY_ROUTES,
-  ...NAV_ROUTES.filter((route) => !MOBILE_PRIMARY_HREFS.has(route.href)),
-  ...NAV_MORE_ROUTES,
-];
+import { MOBILE_MORE_NAV } from "@/lib/mobile/navigation";
 
 type MobileMoreSheetProps = {
   open: boolean;
@@ -34,6 +20,11 @@ export function MobileMoreSheet({ open, onClose, activeHref }: MobileMoreSheetPr
     return null;
   }
 
+  function openFeedback() {
+    onClose();
+    window.dispatchEvent(new CustomEvent("buxme:open-feedback"));
+  }
+
   return (
     <>
       <button
@@ -43,7 +34,7 @@ export function MobileMoreSheet({ open, onClose, activeHref }: MobileMoreSheetPr
         onClick={onClose}
       />
       <div
-        className="fixed inset-x-0 bottom-0 z-50 max-h-[70vh] overflow-y-auto rounded-t-3xl border border-[var(--surface-border)] bg-[var(--background)] px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-50 max-h-[75vh] overflow-y-auto rounded-t-3xl border border-[var(--surface-border)] bg-[var(--background)] px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 lg:hidden"
         role="dialog"
         aria-label="More navigation"
       >
@@ -52,9 +43,31 @@ export function MobileMoreSheet({ open, onClose, activeHref }: MobileMoreSheetPr
           More
         </p>
         <div className="grid grid-cols-2 gap-2">
-          {secondaryRoutes.map((route) => {
+          {MOBILE_MORE_NAV.map((route) => {
+            const hrefPath = route.href.split("#")[0]!;
             const isActive =
-              activeHref === route.href || pathname === route.href;
+              activeHref === route.href ||
+              pathname === hrefPath ||
+              pathname.startsWith(`${hrefPath}/`);
+
+            if ("action" in route && route.action === "feedback") {
+              return (
+                <button
+                  key={route.label}
+                  type="button"
+                  onClick={openFeedback}
+                  className={cn(
+                    "focus-ring flex min-h-12 items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm font-medium transition-colors",
+                    sidebarInactiveClassName,
+                  )}
+                >
+                  <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-[var(--surface-subtle)]">
+                    <NavIcon name={route.icon} />
+                  </span>
+                  {route.label}
+                </button>
+              );
+            }
 
             return (
               <Link
@@ -66,7 +79,7 @@ export function MobileMoreSheet({ open, onClose, activeHref }: MobileMoreSheetPr
                   isActive ? sidebarActiveClassName : sidebarInactiveClassName,
                 )}
               >
-                <span className="flex size-8 items-center justify-center rounded-xl bg-[var(--surface-subtle)]">
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-[var(--surface-subtle)]">
                   <NavIcon name={route.icon} />
                 </span>
                 {route.label}

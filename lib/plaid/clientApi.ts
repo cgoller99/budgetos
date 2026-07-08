@@ -38,7 +38,7 @@ function formatApiError(body: ApiErrorBody, status: number): string {
 
 async function parseApiResponse<T>(
   response: Response,
-  path: "/api/plaid/link-token" | "/api/plaid/exchange",
+  path: "/api/plaid/link-token" | "/api/plaid/exchange" | "/api/plaid/sync",
 ): Promise<T> {
   const body = (await response.json().catch(() => ({}))) as T & ApiErrorBody;
   logPlaidClientResponse(path, response, body as Record<string, unknown>);
@@ -100,7 +100,7 @@ export async function syncPlaidBank(connectionId?: string): Promise<PlaidSyncRes
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ connectionId }),
   });
-  const body = await parseApiResponse<{ results: PlaidSyncResult[] }>(response, "/api/plaid/exchange");
+  const body = await parseApiResponse<{ results: PlaidSyncResult[] }>(response, "/api/plaid/sync");
   return body.results;
 }
 
