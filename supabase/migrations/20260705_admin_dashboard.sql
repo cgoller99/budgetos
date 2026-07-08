@@ -52,6 +52,7 @@ CREATE INDEX IF NOT EXISTS admin_event_logs_event_type_idx
   ON public.admin_event_logs (event_type, created_at DESC);
 
 ALTER TABLE public.admin_event_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.admin_feedback_reports ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY admin_feedback_reports_insert_own
   ON public.admin_feedback_reports

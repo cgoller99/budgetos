@@ -51,7 +51,7 @@ export function IncomeHubContent() {
       </div>
 
       <div
-        className="flex gap-1 overflow-x-auto rounded-2xl border border-white/[0.06] bg-white/[0.02] p-1"
+        className="grid grid-cols-2 gap-1 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-1 sm:grid-cols-4"
         role="tablist"
         aria-label="Income sections"
       >
@@ -63,7 +63,7 @@ export function IncomeHubContent() {
             aria-selected={activeTab === tab.id}
             onClick={() => setTab(tab.id)}
             className={cn(
-              "focus-ring min-h-11 shrink-0 rounded-xl px-4 py-2 text-sm font-medium transition-colors",
+              "focus-ring min-h-11 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
               activeTab === tab.id
                 ? "bg-[#0077ed]/20 text-[#4da3ff]"
                 : "text-[var(--text-muted)] hover:text-white",

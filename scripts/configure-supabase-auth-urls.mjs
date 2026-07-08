@@ -9,6 +9,7 @@ const SITE_URL = "https://buxme.co";
 const REDIRECT_URLS = [
   `${SITE_URL}/auth/callback`,
   `${SITE_URL}/auth/confirm`,
+  `${SITE_URL}/household/invite/*`,
   `${SITE_URL}/**`,
   "http://localhost:3000/auth/callback",
   "http://localhost:3000/auth/confirm",

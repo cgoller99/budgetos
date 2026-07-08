@@ -1,4 +1,12 @@
 #!/usr/bin/env node
+/**
+ * Apply admin_feedback_reports RLS migration.
+ * Tries Management API first, then direct Postgres connection.
+ *
+ * Usage:
+ *   npm run apply:admin-feedback-rls
+ *   SUPABASE_ACCESS_TOKEN=sbp_... npm run apply:admin-feedback-rls
+ */
 import fs from "node:fs";
 import path from "node:path";
 import pg from "pg";
@@ -59,33 +67,81 @@ function resolveDatabaseUrl(env) {
   return null;
 }
 
-async function main() {
-  const fileEnv = loadEnvFile(ENV_PATH);
-  const databaseUrl = resolveDatabaseUrl(fileEnv);
-  if (!databaseUrl) {
-    console.error("Missing SUPABASE_DB_URL or SUPABASE_DB_PASSWORD in .env.local");
-    console.error("Or run this SQL in Supabase Dashboard → SQL Editor:");
-    console.error(fs.readFileSync(MIGRATION_PATH, "utf8"));
-    process.exit(1);
-  }
+async function applyViaManagementApi(token, projectRef, sql) {
+  const response = await fetch(
+    `https://api.supabase.com/v1/projects/${projectRef}/database/query`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ query: sql }),
+    },
+  );
 
-  const sql = fs.readFileSync(MIGRATION_PATH, "utf8");
+  const body = await response.text();
+  if (!response.ok) {
+    throw new Error(`Management API failed (${response.status}): ${body}`);
+  }
+}
+
+async function applyViaPostgres(databaseUrl, sql) {
   const client = new pg.Client({
     connectionString: databaseUrl,
     ssl: { rejectUnauthorized: false },
   });
 
-  console.log("Applying admin feedback RLS migration...\n");
+  await client.connect();
   try {
-    await client.connect();
     await client.query(sql);
-    console.log("✓ Migration applied successfully.");
+  } finally {
+    await client.end().catch(() => undefined);
+  }
+}
+
+async function main() {
+  const fileEnv = loadEnvFile(ENV_PATH);
+  const sql = fs.readFileSync(MIGRATION_PATH, "utf8");
+  const token =
+    process.env.SUPABASE_ACCESS_TOKEN?.trim() ||
+    fileEnv.SUPABASE_ACCESS_TOKEN?.trim();
+  const supabaseUrl =
+    process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() ||
+    fileEnv.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const projectRef = getProjectRef(supabaseUrl);
+
+  console.log("Applying admin feedback RLS migration...\n");
+
+  if (token && projectRef) {
+    try {
+      await applyViaManagementApi(token, projectRef, sql);
+      console.log("✓ Migration applied via Supabase Management API.");
+      return;
+    } catch (error) {
+      console.warn(
+        `Management API attempt failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  const databaseUrl = resolveDatabaseUrl(fileEnv);
+  if (!databaseUrl) {
+    console.error("Could not apply migration automatically.");
+    console.error("\nOption A — Supabase Dashboard → SQL Editor, run:");
+    console.error(sql);
+    console.error("\nOption B — set SUPABASE_ACCESS_TOKEN in .env.local and re-run.");
+    console.error("Option C — set SUPABASE_DB_PASSWORD in .env.local and re-run.");
+    process.exit(1);
+  }
+
+  try {
+    await applyViaPostgres(databaseUrl, sql);
+    console.log("✓ Migration applied via Postgres connection.");
   } catch (error) {
     console.error("✗ Migration failed:");
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);
-  } finally {
-    await client.end().catch(() => undefined);
   }
 }
 

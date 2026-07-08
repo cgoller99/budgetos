@@ -49,9 +49,9 @@ function TrendChart({ points, valueKey, color, emptyMessage }: TrendChartProps) 
   }
 
   return (
-    <div className="overflow-x-auto pb-1">
+    <div className="pb-1">
       <div
-        className="flex min-w-[320px] items-end justify-between gap-2 pt-2"
+        className="flex items-end justify-between gap-1.5 pt-2 sm:gap-2"
         role="img"
         aria-label={`${valueKey} trend chart`}
       >

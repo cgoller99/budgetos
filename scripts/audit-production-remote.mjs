@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Audits the live buxme.co deployment for missing server configuration.
- * Does not require Vercel credentials — probes public health endpoints only.
+ * Audits the live buxme.co deployment for beta launch readiness.
+ * Probes public health endpoints only — no Vercel credentials required.
  *
  * Usage:
  *   npm run audit:remote
@@ -16,8 +16,8 @@ function getSiteUrl() {
   return value.replace(/\/$/, "");
 }
 
-async function fetchJson(url) {
-  const response = await fetch(url);
+async function fetchJson(url, init) {
+  const response = await fetch(url, init);
   const body = await response.json().catch(() => ({}));
   return { ok: response.ok, status: response.status, body };
 }
@@ -26,6 +26,10 @@ function report(ok, label, detail = "") {
   const icon = ok ? "✓" : "✗";
   console.log(`${icon} ${label}${detail ? `: ${detail}` : ""}`);
   return ok;
+}
+
+function warn(label, detail = "") {
+  console.log(`⚠ ${label}${detail ? `: ${detail}` : ""}`);
 }
 
 async function main() {
@@ -56,6 +60,22 @@ async function main() {
       plaid.body?.webhookUrl ?? "unknown",
     ) && allOk;
 
+  console.log("\nPlaid DTM (manual dashboard step):");
+  warn(
+    "Publish use cases at",
+    plaid.body?.dataTransparencyDashboardUrl ??
+      "https://dashboard.plaid.com/link/data-transparency-v5",
+  );
+  if (Array.isArray(plaid.body?.recommendedDtmUseCases)) {
+    for (const useCase of plaid.body.recommendedDtmUseCases) {
+      console.log(`  • ${useCase}`);
+    }
+  }
+  warn(
+    "OAuth institutions (Schwab, PNC, etc.)",
+    "https://dashboard.plaid.com/activity/status/oauth-institutions",
+  );
+
   const invite = await fetchJson(`${siteUrl}/api/household/invite/health`);
   allOk =
     report(invite.ok, "Invite email health route reachable", `HTTP ${invite.status}`) && allOk;
@@ -66,30 +86,66 @@ async function main() {
       invite.body?.emailConfigured ? invite.body.fromEmail : invite.body?.configurationError ?? "missing RESEND_API_KEY",
     ) && allOk;
 
-  console.log("\nLocal .env.local gaps (server secrets — copy from Vercel Production):");
-  const localOnly = [
-    "PLAID_CLIENT_ID",
-    "STRIPE_SECRET_KEY",
-    "STRIPE_WEBHOOK_SECRET",
-    "STRIPE_PRO_PRICE_ID",
-    "STRIPE_PRO_PLUS_PRICE_ID",
-    "RESEND_API_KEY",
-    "NEXT_PUBLIC_POSTHOG_KEY",
-  ];
+  console.log("\nLaunch configuration:");
+  const launch = await fetchJson(`${siteUrl}/api/health/launch`);
+  if (launch.ok) {
+    allOk =
+      report(
+        launch.body?.cronSecretConfigured === true,
+        "CRON_SECRET configured",
+        launch.body?.cronSecretConfigured ? "present" : "missing on Vercel",
+      ) && allOk;
 
-  for (const name of localOnly) {
-    console.log(`  • ${name}`);
+    if (!launch.body?.posthogConfigured) {
+      warn("NEXT_PUBLIC_POSTHOG_KEY", "missing on Vercel — analytics disabled");
+    } else {
+      report(true, "PostHog configured", "NEXT_PUBLIC_POSTHOG_KEY present");
+    }
+
+    if (!launch.body?.stripeWebhookConfigured) {
+      warn(
+        "STRIPE_WEBHOOK_SECRET",
+        "missing — paid subscriptions will not sync (OK for free beta)",
+      );
+    } else {
+      report(true, "Stripe webhook secret configured", "present");
+    }
+
+    report(
+      launch.body?.stripeConfigured === true,
+      "Stripe checkout configured",
+      launch.body?.stripeConfigured ? "live keys present" : launch.body?.configurationError ?? "incomplete",
+    );
+  } else {
+    allOk = report(false, "Launch health endpoint reachable", `HTTP ${launch.status}`) && allOk;
   }
 
-  console.log("\nFix Vercel + local env:");
-  console.log("  vercel login");
-  console.log("  vercel env pull .env.local --environment=production");
-  console.log("  npm run sync:env");
-  console.log("  npm run verify:production");
+  const stripe = await fetchJson(`${siteUrl}/api/stripe/webhook`);
+  report(
+    stripe.body?.webhookConfigured === true,
+    "Stripe webhook handler ready",
+    stripe.body?.webhookConfigured ? "secret present" : "returns 503 on POST until STRIPE_WEBHOOK_SECRET is set",
+  );
 
-  console.log("\nSupabase (if verify:supabase reports RLS gaps):");
+  const cronProbe = await fetchJson(`${siteUrl}/api/cron/run-paychecks`);
+  allOk =
+    report(
+      cronProbe.status === 401,
+      "Cron route rejects unauthenticated requests",
+      `HTTP ${cronProbe.status}`,
+    ) && allOk;
+
+  console.log("\nSupabase RLS (run locally after env pull):");
+  console.log("  npm run verify:supabase");
   console.log("  npm run apply:admin-feedback-rls");
-  console.log("  Or run supabase/migrations/20260709_admin_feedback_rls.sql in SQL Editor");
+
+  console.log("\nSupabase Auth URLs (verify in dashboard):");
+  console.log("  npm run configure:supabase-auth-urls");
+  console.log("  Site URL: https://buxme.co");
+  console.log("  Redirects: /auth/callback, /household/invite/*, localhost callbacks");
+
+  console.log("\nPhone smoke test:");
+  console.log("  docs/SMOKE_TEST.md");
 
   console.log("");
   if (!allOk) {

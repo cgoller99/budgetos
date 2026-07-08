@@ -137,3 +137,37 @@ export function resolvePlanFromPriceId(priceId: string | null | undefined): "fre
 
   return "free";
 }
+
+export type StripeEnvVarStatus = "present" | "empty" | "missing";
+
+export type StripeConfigDiagnostic = {
+  variable: string;
+  status: StripeEnvVarStatus;
+  requiredForConfigured: boolean;
+};
+
+const STRIPE_CONFIGURED_VARS = [
+  "STRIPE_SECRET_KEY",
+  "STRIPE_WEBHOOK_SECRET",
+  "STRIPE_PRO_PRICE_ID",
+  "STRIPE_PRO_PLUS_PRICE_ID",
+  "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY",
+  "NEXT_PUBLIC_STRIPE_ENABLED",
+] as const;
+
+export function getStripeConfigDiagnostics(): StripeConfigDiagnostic[] {
+  return STRIPE_CONFIGURED_VARS.map((variable) => {
+    const raw = process.env[variable];
+    let status: StripeEnvVarStatus = "missing";
+
+    if (raw !== undefined) {
+      status = raw.trim() === "" ? "empty" : "present";
+    }
+
+    return {
+      variable,
+      status,
+      requiredForConfigured: variable !== "STRIPE_WEBHOOK_SECRET",
+    };
+  });
+}

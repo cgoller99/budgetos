@@ -7,6 +7,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
+import { hydrateProcessEnvFromFile } from "./lib/env-utils.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const ENV_PATH = path.join(ROOT, ".env.local");
@@ -94,6 +95,8 @@ function report(title, ok, detail = "") {
 async function main() {
   console.log("Buxme Supabase verification\n");
 
+  hydrateProcessEnvFromFile();
+
   let allOk = true;
 
   allOk = report("supabase/schema.sql present", fs.existsSync(path.join(ROOT, "supabase/schema.sql"))) && allOk;
@@ -110,7 +113,11 @@ async function main() {
   console.log("");
 
   const fileEnv = loadEnvFile(ENV_PATH);
-  const rawUrl = (fileEnv.NEXT_PUBLIC_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").trim();
+  const rawUrl = (
+    fileEnv.NEXT_PUBLIC_SUPABASE_URL ??
+    process.env.NEXT_PUBLIC_SUPABASE_URL ??
+    ""
+  ).trim();
   const url = rawUrl.replace(/\/rest\/v1\/?$/, "").replace(/\/$/, "");
   const anonKey = (
     fileEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
@@ -280,6 +287,36 @@ async function main() {
     console.log(`  Tables not blocking anonymous writes: ${unprotected.join(", ")}`);
     console.log("  Or: npm run apply:admin-feedback-rls (requires SUPABASE_DB_PASSWORD)");
   }
+
+  console.log("\nAnonymous access checks:");
+  const anonProfilesResponse = await fetch(`${restBase}/profiles?select=id&limit=1`, {
+    method: "GET",
+    headers: restHeaders,
+  });
+  const anonProfilesBody = await anonProfilesResponse.text();
+  const anonProfilesBlocked =
+    anonProfilesResponse.status === 401 ||
+    anonProfilesResponse.status === 403 ||
+    (anonProfilesResponse.ok && anonProfilesBody.includes("[]"));
+  allOk =
+    report(
+      "Anonymous users cannot read profiles",
+      anonProfilesBlocked,
+      anonProfilesResponse.ok ? "empty result" : `HTTP ${anonProfilesResponse.status}`,
+    ) && allOk;
+
+  const anonAccountsResponse = await fetch(`${restBase}/accounts?select=id&limit=1`, {
+    method: "GET",
+    headers: restHeaders,
+  });
+  allOk =
+    report(
+      "Anonymous users cannot read accounts",
+      anonAccountsResponse.status === 401 ||
+        anonAccountsResponse.status === 403 ||
+        (anonAccountsResponse.ok && (await anonAccountsResponse.text()).includes("[]")),
+      `HTTP ${anonAccountsResponse.status}`,
+    ) && allOk;
 
   console.log("\nProfile column checks:");
   for (const column of REQUIRED_PROFILE_COLUMNS) {

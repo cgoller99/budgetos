@@ -6,7 +6,10 @@ function isAuthorized(request: Request): boolean {
   const cronSecret = process.env.CRON_SECRET?.trim();
 
   if (!cronSecret) {
-    return process.env.NODE_ENV === "development";
+    if (process.env.NODE_ENV === "development" && !process.env.VERCEL) {
+      return true;
+    }
+    return false;
   }
 
   const authHeader = request.headers.get("authorization");

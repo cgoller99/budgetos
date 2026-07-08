@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
-import { getStripeConfig } from "@/lib/stripe/config";
+import { getStripeConfig, getStripeConfigDiagnostics } from "@/lib/stripe/config";
 import { getStripeWebhookClient } from "@/lib/stripe/stripeClient";
 import {
   handleCheckoutSessionCompleted,
@@ -9,6 +9,25 @@ import {
 import { tryLogAdminEvent } from "@/lib/admin/logEventSafe";
 
 export const runtime = "nodejs";
+
+export async function GET() {
+  const config = getStripeConfig();
+  const siteUrl = config.siteUrl.replace(/\/$/, "");
+
+  return NextResponse.json(
+    {
+      ok: true,
+      service: "stripe-webhook",
+      configured: config.isConfigured,
+      webhookConfigured: Boolean(config.webhookSecret),
+      configurationError: config.configurationError,
+      webhookUrl: `${siteUrl}/api/stripe/webhook`,
+      liveMode: config.secretKey?.startsWith("sk_live_") ?? false,
+      checks: getStripeConfigDiagnostics(),
+    },
+    { status: 200 },
+  );
+}
 
 export async function POST(request: Request) {
   const config = getStripeConfig();

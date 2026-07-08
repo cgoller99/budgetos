@@ -111,6 +111,11 @@ export function BillingSection() {
           { plan: subscription.plan },
           { once: true, dedupeKey: "subscription-purchased" },
         );
+        trackEvent(
+          ANALYTICS_EVENTS.SUBSCRIPTION_STARTED,
+          { plan: subscription.plan },
+          { once: true, dedupeKey: "subscription-started" },
+        );
       }
       showToast({
         title: "Subscription updated",

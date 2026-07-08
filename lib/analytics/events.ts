@@ -14,6 +14,8 @@ export const ANALYTICS_EVENTS = {
   VIEWED_REPORTS: "viewed_reports",
   STRIPE_CHECKOUT_STARTED: "stripe_checkout_started",
   SUBSCRIPTION_PURCHASED: "subscription_purchased",
+  /** Alias used in launch analytics checklist */
+  SUBSCRIPTION_STARTED: "subscription_started",
   SUBSCRIPTION_CANCELLED: "subscription_cancelled",
   SUBSCRIPTION_UPGRADED: "subscription_upgraded",
   SUBSCRIPTION_DOWNGRADED: "subscription_downgraded",
