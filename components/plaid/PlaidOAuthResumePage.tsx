@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader } from "@/components/ui";
+import { useFinance } from "@/context/FinanceContext";
 import { useToast } from "@/context/ToastContext";
 import { usePlaidLinkSession } from "@/hooks/usePlaidLinkSession";
 import {
@@ -42,6 +43,7 @@ function PlaidOAuthResumeInner({
 }) {
   const router = useRouter();
   const { showToast } = useToast();
+  const { refreshFinance } = useFinance();
   const [error, setError] = useState<string | null>(null);
   const [opened, setOpened] = useState(false);
 
@@ -65,6 +67,7 @@ function PlaidOAuthResumeInner({
           });
         }
 
+        await refreshFinance();
         router.replace("/accounts");
       } catch (exchangeError) {
         const message =
@@ -78,7 +81,7 @@ function PlaidOAuthResumeInner({
         });
       }
     },
-    [router, showToast],
+    [refreshFinance, router, showToast],
   );
 
   const handleExitMessage = useCallback(

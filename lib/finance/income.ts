@@ -1,6 +1,12 @@
 import { calculateMonthlyIncome } from "@/lib/calculations/cashFlow";
 import { toMonthlyAmount } from "@/lib/calculations/monthlyAmount";
 import { startOfDay } from "@/lib/finance/bills";
+import {
+  getEffectiveIncomeSources,
+  isIncomePlanSourceId,
+  isIncomeSourceActive,
+  withEffectiveIncome,
+} from "@/lib/finance/effectiveIncome";
 import type {
   EditIncomeInput,
   FinanceData,
@@ -38,9 +44,28 @@ function formatPayDate(value: string | null | undefined): string {
   });
 }
 
+function resolveDepositAccountName(
+  data: FinanceData,
+  depositAccountId: string | null | undefined,
+): string {
+  if (!depositAccountId) {
+    return "—";
+  }
+
+  const account = data.accounts.find((item) => item.id === depositAccountId);
+
+  if (!account) {
+    return "—";
+  }
+
+  return account.lastFour
+    ? `${account.name} •••• ${account.lastFour}`
+    : account.name;
+}
+
 export function getRecurringMonthlyIncome(data: FinanceData): number {
-  return (data.income ?? [])
-    .filter((source) => source.schedule?.status !== "paused")
+  return getEffectiveIncomeSources(data)
+    .filter(isIncomeSourceActive)
     .reduce(
       (total, source) =>
         total + toMonthlyAmount(source.amount, source.frequency),
@@ -92,10 +117,11 @@ export function buildUpdatedIncomeSource(
 
 export function enrichIncomeSource(
   source: IncomeSource,
+  data: FinanceData,
   referenceDate = new Date(),
 ): IncomeTableRow {
   const schedule = source.schedule;
-  const isActive = schedule?.status !== "paused";
+  const isActive = isIncomeSourceActive(source);
   const nextPayDateRaw = schedule
     ? parseDateString(schedule.nextOccurrence)
     : null;
@@ -105,13 +131,17 @@ export function enrichIncomeSource(
     name: source.name,
     amount: source.amount,
     frequencyLabel: getIncomeFrequencyLabel(source.frequency),
+    category: source.category?.trim() || "—",
+    depositAccountName: resolveDepositAccountName(data, source.depositAccountId),
+    startDate: schedule ? formatPayDate(schedule.startDate) : "—",
     nextPayDate: nextPayDateRaw
       ? formatPayDate(schedule?.nextOccurrence)
       : "—",
     lastPaid: formatPayDate(schedule?.lastProcessedDate),
     isActive,
     statusLabel: isActive ? "Active" : "Paused",
-    canMarkReceived: isActive,
+    canMarkReceived: isActive && !isIncomePlanSourceId(source.id),
+    isFromIncomePlan: isIncomePlanSourceId(source.id),
   };
 }
 
@@ -119,10 +149,13 @@ export function getIncomeTableRows(
   data: FinanceData,
   referenceDate = new Date(),
 ): IncomeTableRow[] {
-  const normalized = normalizeRecurringFinanceData(data, referenceDate);
+  const normalized = normalizeRecurringFinanceData(
+    withEffectiveIncome(data),
+    referenceDate,
+  );
 
-  return (normalized.income ?? [])
-    .map((source) => enrichIncomeSource(source, referenceDate))
+  return getEffectiveIncomeSources(normalized)
+    .map((source) => enrichIncomeSource(source, normalized, referenceDate))
     .sort((left, right) => {
       if (left.isActive !== right.isActive) {
         return left.isActive ? -1 : 1;
@@ -136,11 +169,14 @@ export function getNextPaycheck(
   data: FinanceData,
   referenceDate = new Date(),
 ): IncomeDashboardSummary["nextPaycheck"] {
-  const normalized = normalizeRecurringFinanceData(data, referenceDate);
+  const normalized = normalizeRecurringFinanceData(
+    withEffectiveIncome(data),
+    referenceDate,
+  );
   const today = startOfDay(referenceDate);
 
-  const candidates = (normalized.income ?? []).flatMap((source) => {
-    if (!source.schedule || source.schedule.status !== "active") {
+  const candidates = getEffectiveIncomeSources(normalized).flatMap((source) => {
+    if (!isIncomeSourceActive(source) || !source.schedule) {
       return [];
     }
 
@@ -186,12 +222,15 @@ export function getUpcomingIncome(
   formattedDate: string;
   daysUntil: number;
 }> {
-  const normalized = normalizeRecurringFinanceData(data, referenceDate);
+  const normalized = normalizeRecurringFinanceData(
+    withEffectiveIncome(data),
+    referenceDate,
+  );
   const today = startOfDay(referenceDate);
 
-  return (normalized.income ?? [])
+  return getEffectiveIncomeSources(normalized)
     .flatMap((source) => {
-      if (!source.schedule || source.schedule.status !== "active") {
+      if (!isIncomeSourceActive(source) || !source.schedule) {
         return [];
       }
 
@@ -219,12 +258,14 @@ export function getIncomeDashboardSummary(
   data: FinanceData,
   referenceDate = new Date(),
 ): IncomeDashboardSummary {
-  const normalized = normalizeRecurringFinanceData(data, referenceDate);
+  const normalized = normalizeRecurringFinanceData(
+    withEffectiveIncome(data),
+    referenceDate,
+  );
   const monthlyIncome = calculateMonthlyIncome(normalized, referenceDate);
-  const sourceCount = normalized.income.length;
-  const activeSourceCount = normalized.income.filter(
-    (source) => source.schedule?.status !== "paused",
-  ).length;
+  const sources = getEffectiveIncomeSources(normalized);
+  const sourceCount = sources.length;
+  const activeSourceCount = sources.filter(isIncomeSourceActive).length;
 
   return {
     monthlyIncome,

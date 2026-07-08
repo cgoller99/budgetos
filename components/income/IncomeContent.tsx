@@ -20,6 +20,7 @@ import {
   getIncomeDashboardSummary,
   getIncomeTableRows,
 } from "@/lib/finance/income";
+import { isIncomePlanSourceId } from "@/lib/finance/effectiveIncome";
 import type { IncomeSource } from "@/lib/finance/types";
 import { cn } from "@/components/ui/cn";
 
@@ -47,6 +48,10 @@ export function IncomeContent({ embedded = false }: { embedded?: boolean }) {
   }
 
   function findIncome(id: string): IncomeSource | null {
+    if (id.startsWith("__buxme_income_plan__")) {
+      return null;
+    }
+
     return finance.income.find((source) => source.id === id) ?? null;
   }
 
@@ -180,10 +185,12 @@ export function IncomeContent({ embedded = false }: { embedded?: boolean }) {
       ) : (
         <section className="space-y-4">
           <div className="hidden rounded-3xl border border-white/[0.04] bg-white/[0.015] px-6 py-4 lg:block">
-            <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,0.7fr)_auto] gap-4 text-xs font-medium uppercase tracking-[0.14em] text-white/35">
+            <div className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,0.7fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.7fr)_auto] gap-3 text-xs font-medium uppercase tracking-[0.14em] text-white/35">
               <span>Source name</span>
               <span>Amount</span>
               <span>Frequency</span>
+              <span>Category</span>
+              <span>Deposit account</span>
               <span>Next pay date</span>
               <span>Last paid</span>
               <span>Status</span>
@@ -196,10 +203,26 @@ export function IncomeContent({ embedded = false }: { embedded?: boolean }) {
               <IncomeRow
                 key={row.id}
                 row={row}
-                onEdit={() => setEditIncomeId(row.id)}
-                onDelete={() => setDeleteIncomeId(row.id)}
-                onPause={() => void handlePause(row.id)}
-                onResume={() => void handleResume(row.id)}
+                onEdit={() => {
+                  if (!isIncomePlanSourceId(row.id)) {
+                    setEditIncomeId(row.id);
+                  }
+                }}
+                onDelete={() => {
+                  if (!isIncomePlanSourceId(row.id)) {
+                    setDeleteIncomeId(row.id);
+                  }
+                }}
+                onPause={() => {
+                  if (!isIncomePlanSourceId(row.id)) {
+                    void handlePause(row.id);
+                  }
+                }}
+                onResume={() => {
+                  if (!isIncomePlanSourceId(row.id)) {
+                    void handleResume(row.id);
+                  }
+                }}
                 onMarkReceived={() => void handleMarkReceived(row.id)}
               />
             ))}

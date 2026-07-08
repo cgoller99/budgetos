@@ -83,11 +83,15 @@ export type IncomeTableRow = {
   name: string;
   amount: number;
   frequencyLabel: string;
+  category: string;
+  depositAccountName: string;
+  startDate: string;
   nextPayDate: string;
   lastPaid: string;
   isActive: boolean;
   statusLabel: string;
   canMarkReceived: boolean;
+  isFromIncomePlan?: boolean;
 };
 
 export type BillStatus =
@@ -374,6 +378,12 @@ export type Debt = {
   monthlyChange: number;
   dueDay: number;
   accountType: DebtAccountType;
+  institution?: string;
+  lastFour?: string | null;
+  isPlaidLinked?: boolean;
+  bankConnectionId?: string | null;
+  institutionLogoUrl?: string | null;
+  lastSyncedAt?: string | null;
 };
 
 export type AddDebtInput = {

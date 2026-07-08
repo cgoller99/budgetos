@@ -1,4 +1,8 @@
 import { getBillProgressList, getBillStatusVariant, startOfDay } from "@/lib/finance/bills";
+import {
+  getEffectiveIncomeSources,
+  isIncomeSourceActive,
+} from "@/lib/finance/effectiveIncome";
 import type { BillProgress, BillStatus, FinanceData } from "@/lib/finance/types";
 import { normalizeRecurringFinanceData } from "@/lib/recurring";
 import { parseDateString, toDateString } from "@/lib/recurring/schedule";
@@ -74,8 +78,8 @@ function incomeEventsForDate(
   data: FinanceData,
   date: Date,
 ): CalendarEvent[] {
-  return (data.income ?? []).flatMap((source) => {
-    if (!source.schedule || source.schedule.status !== "active") {
+  return getEffectiveIncomeSources(data).flatMap((source) => {
+    if (!isIncomeSourceActive(source) || !source.schedule) {
       return [];
     }
 

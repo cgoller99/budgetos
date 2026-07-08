@@ -1,4 +1,5 @@
 import type { AccountSubtype, AccountType as PlaidAccountType, Transaction } from "plaid";
+import { inferDebtAccountType } from "@/lib/finance/debts";
 import type { DebtAccountType } from "@/lib/finance/types";
 import type {
   PlaidMappedAccount,
@@ -15,6 +16,33 @@ function toNumber(value: number | null | undefined): number {
   return value;
 }
 
+function normalizeLastFour(mask: string | null | undefined): string | null {
+  if (!mask) {
+    return null;
+  }
+
+  const digits = mask.replace(/\D/g, "");
+
+  if (digits.length === 0) {
+    return null;
+  }
+
+  return digits.length >= 4 ? digits.slice(-4) : digits;
+}
+
+function mapLoanSubtype(subtype: AccountSubtype | null): DebtAccountType {
+  switch (subtype) {
+    case "student":
+      return "student_loan";
+    case "mortgage":
+      return "mortgage";
+    case "auto":
+      return "auto_loan";
+    default:
+      return "other";
+  }
+}
+
 function mapPlaidAccountType(
   type: PlaidAccountType,
   subtype: AccountSubtype | null,
@@ -24,7 +52,7 @@ function mapPlaidAccountType(
   }
 
   if (type === "loan") {
-    return { accountType: "credit_card", recordKind: "debt" };
+    return { accountType: "other", recordKind: "debt" };
   }
 
   if (type === "investment" || type === "brokerage") {
@@ -38,16 +66,59 @@ function mapPlaidAccountType(
   return { accountType: "checking", recordKind: "account" };
 }
 
-function inferDebtAccountType(name: string): DebtAccountType {
-  const normalized = name.toLowerCase();
+function mapPlaidBalances(
+  type: PlaidAccountType,
+  balances: {
+    current: number | null;
+    available: number | null;
+  },
+): { balance: number; availableBalance: number | null } {
+  const isDebt = type === "credit" || type === "loan";
+  const current = toNumber(balances.current);
 
-  if (normalized.includes("student")) return "student_loan";
-  if (normalized.includes("auto") || normalized.includes("car")) return "auto_loan";
-  if (normalized.includes("mortgage") || normalized.includes("home")) return "mortgage";
-  if (normalized.includes("medical")) return "medical";
-  if (normalized.includes("credit")) return "credit_card";
+  return {
+    balance: isDebt ? Math.abs(current) : current,
+    availableBalance:
+      balances.available === null
+        ? null
+        : isDebt
+          ? Math.abs(toNumber(balances.available))
+          : toNumber(balances.available),
+  };
+}
 
-  return "other";
+function resolveAccountName(account: {
+  name: string;
+  official_name?: string | null;
+}): string {
+  const official = account.official_name?.trim();
+  const name = account.name.trim();
+
+  return official || name || "Account";
+}
+
+function resolveDebtAccountType(
+  account: {
+    type: PlaidAccountType;
+    subtype: AccountSubtype | null;
+    name: string;
+    official_name?: string | null;
+  },
+): DebtAccountType {
+  if (account.type === "credit") {
+    return "credit_card";
+  }
+
+  if (account.type === "loan") {
+    const fromSubtype = mapLoanSubtype(account.subtype);
+    if (fromSubtype !== "other") {
+      return fromSubtype;
+    }
+  }
+
+  return inferDebtAccountType(
+    resolveAccountName(account),
+  );
 }
 
 export function mapPlaidAccount(params: {
@@ -69,28 +140,33 @@ export function mapPlaidAccount(params: {
 }): PlaidMappedAccount {
   const { account, itemId, institutionName, institutionLogoUrl } = params;
   const mapped = mapPlaidAccountType(account.type, account.subtype);
-  const balance = Math.abs(toNumber(account.balances.current));
-  const availableBalance =
-    account.balances.available === null
-      ? null
-      : Math.abs(toNumber(account.balances.available));
+  const { balance, availableBalance } = mapPlaidBalances(
+    account.type,
+    account.balances,
+  );
+  const displayName = resolveAccountName(account);
+  const safeInstitution =
+    institutionName.trim() && !institutionName.startsWith("ins_")
+      ? institutionName.trim()
+      : "Linked institution";
 
   const result: PlaidMappedAccount = {
     externalAccountId: account.account_id,
     externalItemId: itemId,
-    name: account.name.trim() || account.official_name?.trim() || "Account",
+    name: displayName,
     officialName: account.official_name ?? null,
-    institution: institutionName,
+    institution: safeInstitution,
     institutionLogoUrl,
     type: mapped.accountType,
     recordKind: mapped.recordKind,
     balance,
-    availableBalance,
-    lastFour: account.mask ?? null,
+    availableBalance:
+      mapped.recordKind === "debt" ? null : availableBalance,
+    lastFour: normalizeLastFour(account.mask),
   };
 
   if (mapped.recordKind === "debt") {
-    result.type = inferDebtAccountType(result.name);
+    result.type = resolveDebtAccountType(account);
     result.originalBalance = balance;
     result.minimumPayment = null;
     result.interestRate = null;

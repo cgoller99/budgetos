@@ -51,7 +51,7 @@ function CalendarDayCell({
       type="button"
       onClick={() => onSelect(day.date)}
       className={cn(
-        "flex min-h-[5.5rem] flex-col rounded-2xl border p-3 text-left transition-colors",
+        "flex min-h-[4rem] flex-col rounded-xl border p-1.5 text-left transition-colors sm:min-h-[5.5rem] sm:rounded-2xl sm:p-3",
         isSelected
           ? "border-[#0077ed]/40 bg-[#0077ed]/10"
           : "border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04]",
@@ -73,7 +73,7 @@ function CalendarDayCell({
         )}
       </div>
       {hasBills && (
-        <p className="mt-auto pt-2 text-xs text-white/45">
+        <p className="mt-auto hidden pt-1 text-xs text-white/45 sm:block">
           {day.bills.length} bill{day.bills.length === 1 ? "" : "s"}
         </p>
       )}
@@ -177,17 +177,18 @@ export function CalendarContent() {
         <Card padding="lg">
           <CardHeader title="Monthly view" />
           <CardContent>
-            <div className="mb-3 grid grid-cols-7 gap-2">
+            <div className="mb-3 grid grid-cols-7 gap-1 sm:gap-2">
               {WEEKDAY_LABELS.map((label) => (
                 <div
                   key={label}
-                  className="text-center text-xs font-medium uppercase tracking-wide text-white/35"
+                  className="text-center text-[10px] font-medium uppercase tracking-wide text-white/35 sm:text-xs"
                 >
-                  {label}
+                  <span className="sm:hidden">{label.slice(0, 1)}</span>
+                  <span className="hidden sm:inline">{label}</span>
                 </div>
               ))}
             </div>
-            <div className="grid grid-cols-7 gap-2">
+            <div className="grid grid-cols-7 gap-1 sm:gap-2">
               {Array.from({ length: leadingBlanks }).map((_, index) => (
                 <div key={`blank-${index}`} />
               ))}

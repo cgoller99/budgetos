@@ -99,7 +99,8 @@ import {
   generateTodayActivity,
   normalizeRecurringFinanceData,
 } from "@/lib/recurring";
-import { getIncomeFrequencyLabel } from "@/lib/recurring/frequencies";
+import { getIncomeFrequencyLabel, normalizeIncomeFrequency } from "@/lib/recurring/frequencies";
+import { createSchedule, parseDateString } from "@/lib/recurring/schedule";
 import type { TodayActivity } from "@/lib/recurring/types";
 import {
   addTransactionToData,
@@ -678,19 +679,34 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
   const addIncome = useCallback(
     async (input: AddIncomeInput) => {
       const incomeId = crypto.randomUUID();
-      const next = normalizeRecurringFinanceData({
-        ...data,
-        income: [
-          ...data.income,
-          {
-            id: incomeId,
-            name: input.name.trim(),
-            amount: input.amount,
-            frequency: input.frequency,
-            category: input.category.trim(),
-          },
-        ],
-      });
+      const referenceDate = new Date();
+      const frequency = normalizeIncomeFrequency(input.frequency);
+      const startDate = input.startDate
+        ? parseDateString(input.startDate)
+        : (() => {
+            const fallback = new Date(referenceDate);
+            fallback.setDate(fallback.getDate() - 120);
+            return fallback;
+          })();
+      const schedule = createSchedule(startDate, frequency, referenceDate);
+      const next = normalizeRecurringFinanceData(
+        {
+          ...data,
+          income: [
+            ...data.income,
+            {
+              id: incomeId,
+              name: input.name.trim(),
+              amount: input.amount,
+              frequency,
+              category: input.category.trim(),
+              depositAccountId: input.depositAccountId ?? null,
+              schedule,
+            },
+          ],
+        },
+        referenceDate,
+      );
 
       await runMutation(
         next,

@@ -5,6 +5,8 @@ import {
   getPlaidClient,
   getPlaidErrorMessage,
   isPlaidItemLoginRequired,
+  isPlaidTransactionsPendingError,
+  PLAID_COUNTRY_CODES,
 } from "@/lib/plaid/plaidClient";
 import {
   detectPlaidPayrollCandidates,
@@ -83,42 +85,65 @@ async function ensureInitialSyncWindow(accessToken: string): Promise<void> {
   });
 }
 
-export async function syncPlaidConnection(params: {
-  supabase: BuxmeSupabaseClient;
-  userId: string;
+async function resolveInstitutionName(params: {
   connection: BankConnectionRow;
-}): Promise<PlaidSyncResult> {
-  const { supabase, userId, connection } = params;
-  const repository = new BankConnectionsRepository(supabase);
-  const householdId = await resolveUserHouseholdId(supabase, userId);
-  const accessToken = decryptConnectionAccessToken(connection);
+  itemInstitutionId: string | null;
+}): Promise<string> {
+  if (
+    params.connection.institution_name &&
+    !params.connection.institution_name.startsWith("ins_")
+  ) {
+    return params.connection.institution_name;
+  }
+
+  const institutionId =
+    params.connection.institution_id ?? params.itemInstitutionId ?? null;
+
+  if (!institutionId) {
+    return "Linked institution";
+  }
 
   try {
     const client = getPlaidClient();
-    const accountsResponse = await client.accountsGet({ access_token: accessToken });
-    const itemId = accountsResponse.data.item.item_id;
-    const institutionName =
-      connection.institution_name ??
-      accountsResponse.data.item.institution_id ??
-      "Linked institution";
-    const institutionLogoUrl = connection.institution_logo_url;
-
-    const mappedAccounts = accountsResponse.data.accounts.map((account) =>
-      mapPlaidAccount({
-        account,
-        itemId,
-        institutionName,
-        institutionLogoUrl,
-      }),
-    );
-
-    const accountIdMap = await repository.upsertLinkedAccounts({
-      userId,
-      householdId,
-      connectionId: connection.id,
-      accounts: mappedAccounts,
+    const response = await client.institutionsGetById({
+      institution_id: institutionId,
+      country_codes: [...PLAID_COUNTRY_CODES],
     });
 
+    return response.data.institution.name;
+  } catch (error) {
+    console.warn("[plaid/sync] institution name lookup failed", {
+      institutionId,
+      message: getPlaidErrorMessage(error),
+    });
+    return "Linked institution";
+  }
+}
+
+async function syncPlaidTransactions(params: {
+  accessToken: string;
+  connection: BankConnectionRow;
+  repository: BankConnectionsRepository;
+  userId: string;
+  householdId: string | null;
+  accountIdMap: Map<string, string>;
+}): Promise<{
+  added: number;
+  modified: number;
+  removed: number;
+  nextCursor: string | null;
+  pendingError: string | null;
+}> {
+  const {
+    accessToken,
+    connection,
+    repository,
+    userId,
+    householdId,
+    accountIdMap,
+  } = params;
+
+  try {
     if (!connection.transactions_cursor) {
       await ensureInitialSyncWindow(accessToken);
     }
@@ -138,6 +163,95 @@ export async function syncPlaidConnection(params: {
       accountIdMap,
       transactions: mappedTransactions,
       removedExternalIds: syncResult.removed,
+    });
+
+    return {
+      added: persistResult.added,
+      modified: persistResult.modified,
+      removed: persistResult.removed,
+      nextCursor: syncResult.nextCursor,
+      pendingError: null,
+    };
+  } catch (error) {
+    if (isPlaidItemLoginRequired(error)) {
+      throw error;
+    }
+
+    const message = getPlaidErrorMessage(error);
+
+    console.warn("[plaid/sync] transaction sync deferred", {
+      connectionId: connection.id,
+      pending: isPlaidTransactionsPendingError(error),
+      message,
+    });
+
+    return {
+      added: 0,
+      modified: 0,
+      removed: 0,
+      nextCursor: connection.transactions_cursor,
+      pendingError: message,
+    };
+  }
+}
+
+export async function syncPlaidConnection(params: {
+  supabase: BuxmeSupabaseClient;
+  userId: string;
+  connection: BankConnectionRow;
+}): Promise<PlaidSyncResult> {
+  const { supabase, userId, connection } = params;
+  const repository = new BankConnectionsRepository(supabase);
+  const householdId = await resolveUserHouseholdId(supabase, userId);
+  const accessToken = decryptConnectionAccessToken(connection);
+
+  try {
+    const client = getPlaidClient();
+    const accountsResponse = await client.accountsGet({ access_token: accessToken });
+    const itemId = accountsResponse.data.item.item_id;
+    const institutionName = await resolveInstitutionName({
+      connection,
+      itemInstitutionId: accountsResponse.data.item.institution_id ?? null,
+    });
+    const institutionLogoUrl = connection.institution_logo_url;
+
+    const mappedAccounts = accountsResponse.data.accounts.map((account) =>
+      mapPlaidAccount({
+        account,
+        itemId,
+        institutionName,
+        institutionLogoUrl,
+      }),
+    );
+
+    console.info("[plaid/sync] mapped accounts", {
+      connectionId: connection.id,
+      userId,
+      institutionName,
+      accounts: mappedAccounts.map((account) => ({
+        externalAccountId: account.externalAccountId,
+        name: account.name,
+        type: account.type,
+        recordKind: account.recordKind,
+        balance: account.balance,
+        lastFour: account.lastFour,
+      })),
+    });
+
+    const accountIdMap = await repository.upsertLinkedAccounts({
+      userId,
+      householdId,
+      connectionId: connection.id,
+      accounts: mappedAccounts,
+    });
+
+    const transactionResult = await syncPlaidTransactions({
+      accessToken,
+      connection,
+      repository,
+      userId,
+      householdId,
+      accountIdMap,
     });
 
     let investmentsSynced = 0;
@@ -160,8 +274,11 @@ export async function syncPlaidConnection(params: {
         holdings: investmentsResponse.data.holdings,
         securities: investmentsResponse.data.securities,
       });
-    } catch {
-      // Investments may not be available for every institution.
+    } catch (error) {
+      console.warn("[plaid/sync] investments sync skipped", {
+        connectionId: connection.id,
+        message: getPlaidErrorMessage(error),
+      });
     }
 
     try {
@@ -184,25 +301,36 @@ export async function syncPlaidConnection(params: {
         liabilities: liabilitiesResponse.data.liabilities,
         accounts: liabilitiesResponse.data.accounts,
       });
-    } catch {
-      // Liabilities may not be available for every institution.
+    } catch (error) {
+      console.warn("[plaid/sync] liabilities sync skipped", {
+        connectionId: connection.id,
+        message: getPlaidErrorMessage(error),
+      });
     }
 
     await repository.markConnectionSynced({
       connectionId: connection.id,
       userId,
-      transactionsCursor: syncResult.nextCursor,
+      transactionsCursor: transactionResult.nextCursor,
       status: "connected",
-      errorCode: null,
-      errorMessage: null,
+      errorCode: transactionResult.pendingError ? "TRANSACTIONS_PENDING" : null,
+      errorMessage: transactionResult.pendingError,
+    });
+
+    console.info("[plaid/sync] connection synced", {
+      connectionId: connection.id,
+      accountsSynced: mappedAccounts.length,
+      transactionsAdded: transactionResult.added,
+      investmentsSynced,
+      liabilitiesSynced,
     });
 
     return {
       connectionId: connection.id,
       accountsSynced: mappedAccounts.length,
-      transactionsAdded: persistResult.added,
-      transactionsModified: persistResult.modified,
-      transactionsRemoved: persistResult.removed,
+      transactionsAdded: transactionResult.added,
+      transactionsModified: transactionResult.modified,
+      transactionsRemoved: transactionResult.removed,
       investmentsSynced,
       liabilitiesSynced,
     };

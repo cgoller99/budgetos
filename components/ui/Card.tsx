@@ -74,17 +74,17 @@ export function CardHeader({
   return (
     <div
       className={cn(
-        "mb-7 flex items-start justify-between gap-6",
+        "mb-7 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between",
         className,
       )}
     >
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <h2 className={panelTitleClassName}>{title}</h2>
         {description && (
           <p className={panelDescriptionClassName}>{description}</p>
         )}
       </div>
-      {action}
+      {action ? <div className="w-full shrink-0 sm:w-auto">{action}</div> : null}
     </div>
   );
 }

@@ -13,12 +13,12 @@ const MOBILE_PRIMARY_HREFS = [
   "/accounts",
   "/bills",
   "/income",
-  "/savings",
+  "/transactions",
 ] as const;
 
 const MOBILE_MORE_HREFS = [
   "/calendar",
-  "/transactions",
+  "/savings",
   "/debt",
   "/investments",
   "/reports",

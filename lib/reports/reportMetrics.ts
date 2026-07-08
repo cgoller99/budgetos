@@ -1,4 +1,6 @@
 import type { FinanceData, Transaction } from "@/lib/finance/types";
+import { calculateMonthlyIncome } from "@/lib/calculations/cashFlow";
+import { withEffectiveIncome } from "@/lib/finance/effectiveIncome";
 
 export type MonthlyTrendPoint = {
   key: string;
@@ -43,8 +45,12 @@ function transactionsInMonth(
   return transactions.filter((transaction) => monthKey(transaction.date) === key);
 }
 
-export function computeMonthlyTrends(data: FinanceData): MonthlyTrendPoint[] {
-  const months = getLastMonths(MONTH_COUNT);
+export function computeMonthlyTrends(
+  data: FinanceData,
+  reference = new Date(),
+): MonthlyTrendPoint[] {
+  const months = getLastMonths(MONTH_COUNT, reference);
+  const currentKey = `${reference.getFullYear()}-${String(reference.getMonth() + 1).padStart(2, "0")}`;
 
   for (const month of months) {
     const monthTransactions = transactionsInMonth(data.transactions, month.key);
@@ -60,6 +66,14 @@ export function computeMonthlyTrends(data: FinanceData): MonthlyTrendPoint[] {
     month.savings = monthTransactions
       .filter((transaction) => transaction.type === "expense" && transaction.goalId)
       .reduce((total, transaction) => total + transaction.amount, 0);
+
+    if (month.key === currentKey) {
+      const projectedIncome = calculateMonthlyIncome(
+        withEffectiveIncome(data),
+        reference,
+      );
+      month.income = Math.max(month.income, projectedIncome);
+    }
   }
 
   return months;

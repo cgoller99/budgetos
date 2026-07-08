@@ -50,7 +50,7 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
   if (!isMounted) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+    <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-6">
       <button
         type="button"
         aria-label="Close modal"
@@ -65,14 +65,16 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
         aria-modal="true"
         aria-labelledby="modal-title"
         className={cn(
-          "relative w-full max-w-md rounded-3xl border border-[var(--surface-border)] bg-[var(--surface)] p-8 shadow-2xl",
+          "relative flex max-h-[min(90dvh,calc(100vh-2rem))] w-full max-w-md flex-col overflow-hidden rounded-t-3xl border border-[var(--surface-border)] bg-[var(--surface)] shadow-2xl sm:rounded-3xl",
           isAnimating ? "modal-panel-enter" : "translate-y-3 scale-[0.97] opacity-0",
         )}
       >
-        <h2 id="modal-title" className={panelTitleClassName}>
-          {title}
-        </h2>
-        <div className="mt-7">{children}</div>
+        <div className="overflow-y-auto overscroll-contain p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:p-8">
+          <h2 id="modal-title" className={panelTitleClassName}>
+            {title}
+          </h2>
+          <div className="mt-7">{children}</div>
+        </div>
       </div>
     </div>
   );

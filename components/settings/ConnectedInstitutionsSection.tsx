@@ -5,9 +5,23 @@ import { BankSyncConnect } from "@/components/accounts/BankSyncPlaceholder";
 import { Badge, Button, Card, CardContent, CardHeader } from "@/components/ui";
 import { useFinance } from "@/context/FinanceContext";
 import { useToast } from "@/context/ToastContext";
+import { DEBT_ACCOUNT_TYPE_LABELS } from "@/lib/finance/debts";
 import { formatCurrency } from "@/lib/finance/format";
-import type { Account, BankConnection } from "@/lib/finance/types";
+import type { Account, BankConnection, Debt } from "@/lib/finance/types";
 import { isPlaidClientEnabled } from "@/lib/plaid/clientConfig";
+
+type LinkedAccountItem = {
+  id: string;
+  name: string;
+  institution: string;
+  typeLabel: string;
+  balance: number;
+  availableBalance?: number | null;
+  lastFour?: string | null;
+  institutionLogoUrl?: string | null;
+  lastSyncedAt?: string | null;
+  isDebt?: boolean;
+};
 
 function formatSyncTime(value: string | null | undefined): string {
   if (!value) {
@@ -28,12 +42,40 @@ function formatSyncTime(value: string | null | undefined): string {
   });
 }
 
+function toLinkedAccountItem(account: Account): LinkedAccountItem {
+  return {
+    id: account.id,
+    name: account.name,
+    institution: account.institution,
+    typeLabel: account.type.replace("_", " "),
+    balance: account.balance,
+    availableBalance: account.availableBalance,
+    lastFour: account.lastFour,
+    institutionLogoUrl: account.institutionLogoUrl,
+    lastSyncedAt: account.lastSyncedAt,
+  };
+}
+
+function toLinkedDebtItem(debt: Debt): LinkedAccountItem {
+  return {
+    id: debt.id,
+    name: debt.name,
+    institution: debt.institution ?? "",
+    typeLabel: DEBT_ACCOUNT_TYPE_LABELS[debt.accountType],
+    balance: debt.balance,
+    lastFour: debt.lastFour,
+    institutionLogoUrl: debt.institutionLogoUrl,
+    lastSyncedAt: debt.lastSyncedAt,
+    isDebt: true,
+  };
+}
+
 function ConnectionAccounts({
-  accounts,
+  items,
 }: {
-  accounts: Account[];
+  items: LinkedAccountItem[];
 }) {
-  if (accounts.length === 0) {
+  if (items.length === 0) {
     return (
       <p className="text-sm text-white/45">No linked accounts synced yet.</p>
     );
@@ -41,43 +83,46 @@ function ConnectionAccounts({
 
   return (
     <div className="space-y-3">
-      {accounts.map((account) => (
+      {items.map((item) => (
         <div
-          key={account.id}
+          key={item.id}
           className="flex items-start justify-between gap-3 rounded-xl border border-white/8 bg-white/[0.03] px-4 py-3"
         >
-          <div className="flex items-start gap-3">
-            {account.institutionLogoUrl ? (
+          <div className="flex min-w-0 items-start gap-3">
+            {item.institutionLogoUrl ? (
               <img
-                src={account.institutionLogoUrl}
+                src={item.institutionLogoUrl}
                 alt=""
-                className="mt-0.5 h-8 w-8 rounded-lg bg-white/10 object-contain p-1"
+                className="mt-0.5 h-8 w-8 shrink-0 rounded-lg bg-white/10 object-contain p-1"
               />
             ) : (
-              <div className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-lg bg-[#0077ed]/20 text-sm">
-                🏦
+              <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#0077ed]/20 text-sm">
+                {item.isDebt ? "💳" : "🏦"}
               </div>
             )}
-            <div>
-              <p className="font-medium text-white">{account.name}</p>
-              <p className="text-sm text-white/45">
-                {account.institution}
-                {account.lastFour ? ` •••• ${account.lastFour}` : ""}
+            <div className="min-w-0">
+              <p className="truncate font-medium text-white">{item.name}</p>
+              <p className="truncate text-sm text-white/45">
+                {item.institution || "Linked institution"}
+                {item.lastFour ? ` •••• ${item.lastFour}` : ""}
               </p>
               <p className="text-xs text-white/35">
-                {account.type.replace("_", " ")} • Last synced{" "}
-                {formatSyncTime(account.lastSyncedAt)}
+                {item.typeLabel}
+                {item.lastSyncedAt
+                  ? ` • Last synced ${formatSyncTime(item.lastSyncedAt)}`
+                  : ""}
               </p>
             </div>
           </div>
-          <div className="text-right">
+          <div className="shrink-0 text-right">
             <p className="font-medium text-white">
-              {formatCurrency(account.balance)}
+              {formatCurrency(item.balance)}
             </p>
-            {account.availableBalance !== null &&
-              account.availableBalance !== undefined && (
+            {!item.isDebt &&
+              item.availableBalance !== null &&
+              item.availableBalance !== undefined && (
                 <p className="text-xs text-white/45">
-                  {formatCurrency(account.availableBalance)} available
+                  {formatCurrency(item.availableBalance)} available
                 </p>
               )}
           </div>
@@ -89,13 +134,13 @@ function ConnectionAccounts({
 
 function ConnectedInstitutionCard({
   connection,
-  accounts,
+  items,
   onSync,
   onDisconnect,
   isSyncing,
 }: {
   connection: BankConnection;
-  accounts: Account[];
+  items: LinkedAccountItem[];
   onSync: (connectionId: string) => Promise<void>;
   onDisconnect: (connectionId: string) => Promise<void>;
   isSyncing: boolean;
@@ -119,30 +164,13 @@ function ConnectedInstitutionCard({
         }
       />
       <CardContent className="space-y-4">
-        <div className="flex items-center gap-3">
-          {connection.institutionLogoUrl ? (
-            <img
-              src={connection.institutionLogoUrl}
-              alt=""
-              className="h-10 w-10 rounded-xl bg-white/10 object-contain p-1"
-            />
-          ) : (
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#0077ed]/20 text-lg">
-              🏦
-            </div>
-          )}
-          <div>
-            <p className="text-sm text-white/55">
-              Last sync: {formatSyncTime(connection.lastSyncedAt)}
-            </p>
-            {connection.errorMessage && (
-              <p className="text-sm text-amber-300">{connection.errorMessage}</p>
-            )}
-          </div>
-        </div>
-
-        <ConnectionAccounts accounts={accounts} />
-
+        <p className="text-sm text-white/45">
+          Last synced {formatSyncTime(connection.lastSyncedAt)}
+        </p>
+        {connection.errorMessage && (
+          <p className="text-sm text-amber-300">{connection.errorMessage}</p>
+        )}
+        <ConnectionAccounts items={items} />
         <div className="flex flex-wrap gap-2">
           <Button
             size="sm"
@@ -152,21 +180,22 @@ function ConnectedInstitutionCard({
             {isSyncing ? "Syncing..." : "Sync now"}
           </Button>
           <Button
-            size="sm"
             variant="secondary"
+            size="sm"
+            disabled={isSyncing}
             onClick={() => setShowReconnect((value) => !value)}
           >
             Reconnect
           </Button>
           <Button
+            variant="ghost"
             size="sm"
-            variant="secondary"
+            disabled={isSyncing}
             onClick={() => void onDisconnect(connection.id)}
           >
             Disconnect
           </Button>
         </div>
-
         {showReconnect && (
           <BankSyncConnect
             connectionId={connection.id}
@@ -184,6 +213,7 @@ export function ConnectedInstitutionsSection() {
   const {
     bankConnections,
     accounts,
+    debts,
     syncBank,
     disconnectBank,
     isSyncing,
@@ -191,8 +221,8 @@ export function ConnectedInstitutionsSection() {
   const { showToast } = useToast();
   const plaidEnabled = isPlaidClientEnabled();
 
-  const accountsByConnection = useMemo(() => {
-    const grouped = new Map<string, Account[]>();
+  const itemsByConnection = useMemo(() => {
+    const grouped = new Map<string, LinkedAccountItem[]>();
 
     for (const account of accounts) {
       if (!account.bankConnectionId) {
@@ -200,12 +230,22 @@ export function ConnectedInstitutionsSection() {
       }
 
       const existing = grouped.get(account.bankConnectionId) ?? [];
-      existing.push(account);
+      existing.push(toLinkedAccountItem(account));
       grouped.set(account.bankConnectionId, existing);
     }
 
+    for (const debt of debts) {
+      if (!debt.bankConnectionId) {
+        continue;
+      }
+
+      const existing = grouped.get(debt.bankConnectionId) ?? [];
+      existing.push(toLinkedDebtItem(debt));
+      grouped.set(debt.bankConnectionId, existing);
+    }
+
     return grouped;
-  }, [accounts]);
+  }, [accounts, debts]);
 
   const activeConnections = bankConnections.filter(
     (connection) => connection.status !== "disconnected",
@@ -249,27 +289,24 @@ export function ConnectedInstitutionsSection() {
     <section className="space-y-4">
       <div>
         <h2 className="text-lg font-semibold text-white">Connected institutions</h2>
-        <p className="text-sm text-white/45">
-          Manage linked banks, manual sync, and reconnect when credentials expire.
+        <p className="mt-1 text-sm text-white/45">
+          Linked checking, savings, credit, loan, and investment accounts from Plaid.
         </p>
       </div>
 
       {activeConnections.length === 0 ? (
         <BankSyncConnect />
       ) : (
-        <div className="space-y-4">
-          {activeConnections.map((connection) => (
-            <ConnectedInstitutionCard
-              key={connection.id}
-              connection={connection}
-              accounts={accountsByConnection.get(connection.id) ?? []}
-              onSync={handleSync}
-              onDisconnect={handleDisconnect}
-              isSyncing={isSyncing}
-            />
-          ))}
-          <BankSyncConnect buttonLabel="Connect another bank" compact />
-        </div>
+        activeConnections.map((connection) => (
+          <ConnectedInstitutionCard
+            key={connection.id}
+            connection={connection}
+            items={itemsByConnection.get(connection.id) ?? []}
+            onSync={handleSync}
+            onDisconnect={handleDisconnect}
+            isSyncing={isSyncing}
+          />
+        ))
       )}
     </section>
   );

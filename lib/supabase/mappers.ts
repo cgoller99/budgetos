@@ -149,6 +149,12 @@ export function mapDebtRow(row: AccountRow): Debt {
     monthlyChange: toNumber(row.monthly_change),
     dueDay: row.due_day ?? 1,
     accountType: (row.type as DebtAccountType) || inferDebtAccountType(row.name),
+    institution: row.institution ?? "",
+    lastFour: row.last_four,
+    isPlaidLinked: Boolean(row.bank_connection_id),
+    bankConnectionId: row.bank_connection_id,
+    institutionLogoUrl: row.institution_logo_url,
+    lastSyncedAt: row.last_synced_at,
   };
 }
 

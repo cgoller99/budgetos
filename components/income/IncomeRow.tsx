@@ -25,12 +25,14 @@ export function IncomeRow({
 }: IncomeRowProps) {
   return (
     <article className="bill-card-enter rounded-3xl border border-white/[0.04] bg-white/[0.015] p-5 transition-colors duration-200 hover:border-white/[0.07] sm:p-6">
-      <div className="hidden grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,0.7fr)_auto] items-center gap-4 lg:grid">
+      <div className="hidden grid-cols-[minmax(0,1.2fr)_minmax(0,0.7fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.7fr)_auto] items-center gap-3 lg:grid">
         <p className="truncate text-base font-medium text-white">{row.name}</p>
         <p className="text-base font-semibold tabular-nums text-emerald-400/90">
           {formatCurrency(row.amount)}
         </p>
         <p className="text-sm text-white/60">{row.frequencyLabel}</p>
+        <p className="truncate text-sm text-white/60">{row.category}</p>
+        <p className="truncate text-sm text-white/60">{row.depositAccountName}</p>
         <p className="text-sm text-white/60">{row.nextPayDate}</p>
         <p className="text-sm text-white/60">{row.lastPaid}</p>
         <Badge variant={getIncomeStatusVariant(row.isActive)}>
@@ -58,9 +60,14 @@ export function IncomeRow({
               </Badge>
             </div>
             <p className="mt-2 text-sm text-white/38">
-              {row.frequencyLabel} · Next {row.nextPayDate}
+              {row.frequencyLabel} · {row.category}
             </p>
-            <p className="mt-1 text-sm text-white/38">Last paid {row.lastPaid}</p>
+            <p className="mt-1 text-sm text-white/38">
+              Deposit: {row.depositAccountName}
+            </p>
+            <p className="mt-1 text-sm text-white/38">
+              Next {row.nextPayDate} · Last paid {row.lastPaid}
+            </p>
           </div>
           <p className="shrink-0 text-xl font-semibold tabular-nums text-emerald-400/90">
             {formatCurrency(row.amount)}
@@ -70,6 +77,7 @@ export function IncomeRow({
         <div className="border-t border-white/[0.04] pt-5">
           <IncomeRowActions
             row={row}
+            compact
             onEdit={onEdit}
             onDelete={onDelete}
             onPause={onPause}
@@ -84,40 +92,76 @@ export function IncomeRow({
 
 function IncomeRowActions({
   row,
+  compact = false,
   onEdit,
   onDelete,
   onPause,
   onResume,
   onMarkReceived,
-}: IncomeRowProps) {
+}: IncomeRowProps & { compact?: boolean }) {
+  if (row.isFromIncomePlan) {
+    return (
+      <p className="text-sm text-white/45">
+        Managed in Paycheck plan
+      </p>
+    );
+  }
+
   return (
-    <div className={cn("flex flex-wrap gap-2 lg:justify-end")}>
+    <div
+      className={cn(
+        "flex gap-2",
+        compact ? "flex-col sm:flex-row sm:flex-wrap" : "flex-wrap lg:justify-end",
+      )}
+    >
       <Button
         type="button"
         size="sm"
+        className={compact ? "min-h-11 w-full sm:w-auto" : undefined}
         onClick={onMarkReceived}
         disabled={!row.canMarkReceived}
       >
         Mark received
       </Button>
       {row.isActive ? (
-        <Button type="button" variant="secondary" size="sm" onClick={onPause}>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          className={compact ? "min-h-11 w-full sm:w-auto" : undefined}
+          onClick={onPause}
+        >
           Pause
         </Button>
       ) : (
-        <Button type="button" variant="secondary" size="sm" onClick={onResume}>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          className={compact ? "min-h-11 w-full sm:w-auto" : undefined}
+          onClick={onResume}
+        >
           Resume
         </Button>
       )}
-      <Button type="button" variant="secondary" size="sm" onClick={onEdit}>
+      <Button
+        type="button"
+        variant="secondary"
+        size="sm"
+        className={compact ? "min-h-11 w-full sm:w-auto" : undefined}
+        onClick={onEdit}
+      >
         Edit
       </Button>
       <Button
         type="button"
         variant="ghost"
         size="sm"
+        className={cn(
+          "text-rose-400/90 hover:text-rose-300",
+          compact ? "min-h-11 w-full sm:w-auto" : undefined,
+        )}
         onClick={onDelete}
-        className="text-rose-400/90 hover:text-rose-300"
       >
         Delete
       </Button>

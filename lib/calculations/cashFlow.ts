@@ -1,5 +1,9 @@
 import type { FinanceData } from "@/lib/finance/types";
 import { toMonthlyAmount } from "@/lib/calculations/monthlyAmount";
+import {
+  getEffectiveIncomeSources,
+  isIncomeSourceActive,
+} from "@/lib/finance/effectiveIncome";
 import { sumTransactionsByType } from "@/lib/transactions";
 import type { CashFlowResult } from "./types";
 
@@ -16,17 +20,28 @@ function toBarWidthPercent(amount: number, maxAmount: number): number {
   return Math.round((amount / maxAmount) * 100 * barDisplayScale);
 }
 
+function isRecurringPaycheckLedgerIncome(notes: string | undefined): boolean {
+  const normalized = (notes ?? "").toLowerCase();
+  return normalized.includes("paycheck received");
+}
+
 export function calculateMonthlyIncome(
   data: FinanceData,
   referenceDate = new Date(),
 ): number {
-  const recurring = sum(
-    (data.income ?? [])
-      .filter((source) => source.schedule?.status !== "paused")
-      .map((source) =>
-        toMonthlyAmount(source.amount, source.frequency),
-      ),
+  const recurringSources = getEffectiveIncomeSources(data).filter(
+    isIncomeSourceActive,
   );
+  const recurring = sum(
+    recurringSources.map((source) =>
+      toMonthlyAmount(source.amount, source.frequency),
+    ),
+  );
+
+  if (recurringSources.length > 0) {
+    return recurring;
+  }
+
   const ledgerIncome = sumTransactionsByType(data, "income", referenceDate);
   return recurring + ledgerIncome;
 }
@@ -70,3 +85,5 @@ export function calculateCashFlow(
     spendingBarWidthPercent: toBarWidthPercent(spending, flowMax),
   };
 }
+
+export { isRecurringPaycheckLedgerIncome };

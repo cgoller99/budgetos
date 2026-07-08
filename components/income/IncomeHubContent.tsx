@@ -44,9 +44,6 @@ export function IncomeHubContent() {
         <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-subtle)]">
           Cash Flow
         </p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white">
-          Income
-        </h1>
         <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
           Paychecks, your plan, allocation history, and forecasts — all in one
           place. Plans run automatically on your schedule.

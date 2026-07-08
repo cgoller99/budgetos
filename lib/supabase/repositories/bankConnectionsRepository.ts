@@ -24,6 +24,20 @@ function toNumber(value: number | string | null | undefined): number {
   return 0;
 }
 
+function dueDayFromIsoDate(value: string | null | undefined): number | null {
+  if (!value) {
+    return null;
+  }
+
+  const day = new Date(value).getUTCDate();
+
+  if (Number.isNaN(day) || day < 1 || day > 31) {
+    return null;
+  }
+
+  return day;
+}
+
 export function mapBankConnectionRow(row: BankConnectionRow): BankConnection {
   return {
     id: row.id,
@@ -214,8 +228,6 @@ export class BankConnectionsRepository {
       .from("accounts")
       .update({
         bank_connection_id: null,
-        external_account_id: null,
-        external_item_id: null,
         updated_at: timestamp,
       })
       .eq("bank_connection_id", connectionId)
@@ -225,8 +237,6 @@ export class BankConnectionsRepository {
       .from("investments")
       .update({
         bank_connection_id: null,
-        external_account_id: null,
-        external_item_id: null,
         updated_at: timestamp,
       })
       .eq("bank_connection_id", connectionId)
@@ -241,15 +251,21 @@ export class BankConnectionsRepository {
   }): Promise<Map<string, string>> {
     const accountIdMap = new Map<string, string>();
     const timestamp = new Date().toISOString();
+    let inserted = 0;
+    let updated = 0;
+    let skippedInvestments = 0;
 
     for (const account of input.accounts) {
       if (account.recordKind === "investment") {
+        skippedInvestments += 1;
         continue;
       }
 
       const { data: existing, error: existingError } = await this.supabase
         .from("accounts")
-        .select("id")
+        .select(
+          "id, original_balance, monthly_change, interest_rate, minimum_payment, due_day, bank_connection_id",
+        )
         .eq("user_id", input.userId)
         .eq("external_account_id", account.externalAccountId)
         .maybeSingle();
@@ -266,7 +282,6 @@ export class BankConnectionsRepository {
         institution: account.institution,
         type: account.type,
         balance: account.balance,
-        monthly_change: 0,
         bank_connection_id: input.connectionId,
         external_account_id: account.externalAccountId,
         external_item_id: account.externalItemId,
@@ -277,14 +292,29 @@ export class BankConnectionsRepository {
         interest_rate: account.interestRate ?? null,
         minimum_payment: account.minimumPayment ?? null,
         due_day: account.dueDay ?? null,
-        original_balance: account.originalBalance ?? null,
         updated_at: timestamp,
       };
 
       if (existing?.id) {
         const { error } = await this.supabase
           .from("accounts")
-          .update(payload)
+          .update({
+            ...payload,
+            monthly_change: existing.monthly_change ?? 0,
+            original_balance:
+              existing.original_balance ??
+              account.originalBalance ??
+              account.balance,
+            interest_rate:
+              account.interestRate ??
+              existing.interest_rate ??
+              null,
+            minimum_payment:
+              account.minimumPayment ??
+              existing.minimum_payment ??
+              null,
+            due_day: account.dueDay ?? existing.due_day ?? 1,
+          })
           .eq("id", existing.id);
 
         if (error) {
@@ -292,12 +322,17 @@ export class BankConnectionsRepository {
         }
 
         accountIdMap.set(account.externalAccountId, existing.id);
+        updated += 1;
         continue;
       }
 
       const { data: created, error } = await this.supabase
         .from("accounts")
-        .insert(payload)
+        .insert({
+          ...payload,
+          monthly_change: 0,
+          original_balance: account.originalBalance ?? account.balance,
+        })
         .select("id")
         .single();
 
@@ -306,7 +341,17 @@ export class BankConnectionsRepository {
       }
 
       accountIdMap.set(account.externalAccountId, created.id);
+      inserted += 1;
     }
+
+    console.info("[plaid/sync] upsertLinkedAccounts", {
+      connectionId: input.connectionId,
+      userId: input.userId,
+      total: input.accounts.length,
+      inserted,
+      updated,
+      skippedInvestments,
+    });
 
     return accountIdMap;
   }
@@ -321,12 +366,14 @@ export class BankConnectionsRepository {
     let added = 0;
     let modified = 0;
     let removed = 0;
+    let skippedMissingAccount = 0;
     const timestamp = new Date().toISOString();
 
     for (const transaction of input.transactions) {
       const accountId = input.accountIdMap.get(transaction.externalAccountId);
 
       if (!accountId) {
+        skippedMissingAccount += 1;
         continue;
       }
 
@@ -392,6 +439,13 @@ export class BankConnectionsRepository {
       }
 
       removed = data?.length ?? 0;
+    }
+
+    if (skippedMissingAccount > 0) {
+      console.warn("[plaid/sync] transactions skipped (missing account map)", {
+        userId: input.userId,
+        skippedMissingAccount,
+      });
     }
 
     return { added, modified, removed };
@@ -513,7 +567,7 @@ export class BankConnectionsRepository {
 
       const { data: existing, error: existingError } = await this.supabase
         .from("accounts")
-        .select("id")
+        .select("id, original_balance, monthly_change, interest_rate, minimum_payment, due_day")
         .eq("user_id", input.userId)
         .eq("external_account_id", account.account_id)
         .maybeSingle();
@@ -521,6 +575,14 @@ export class BankConnectionsRepository {
       if (existingError) {
         throw existingError;
       }
+
+      const dueDay =
+        dueDayFromIsoDate(credit?.next_payment_due_date) ??
+        dueDayFromIsoDate(credit?.last_payment_date) ??
+        dueDayFromIsoDate(mortgage?.next_payment_due_date) ??
+        dueDayFromIsoDate(student?.last_payment_date) ??
+        mapped.dueDay ??
+        1;
 
       const payload = {
         user_id: input.userId,
@@ -530,12 +592,11 @@ export class BankConnectionsRepository {
         institution: mapped.institution,
         type: mapped.type,
         balance: mapped.balance,
-        monthly_change: 0,
         bank_connection_id: input.connectionId,
         external_account_id: account.account_id,
         external_item_id: input.itemId,
         institution_logo_url: input.institutionLogoUrl,
-        available_balance: mapped.availableBalance,
+        available_balance: null,
         last_four: mapped.lastFour,
         last_synced_at: timestamp,
         interest_rate:
@@ -548,15 +609,21 @@ export class BankConnectionsRepository {
           mortgage?.next_monthly_payment ??
           student?.minimum_payment_amount ??
           null,
-        due_day: 1,
-        original_balance: mapped.balance,
+        due_day: dueDay,
         updated_at: timestamp,
       };
 
       if (existing?.id) {
         const { error } = await this.supabase
           .from("accounts")
-          .update(payload)
+          .update({
+            ...payload,
+            monthly_change: existing.monthly_change ?? 0,
+            original_balance: existing.original_balance ?? mapped.balance,
+            interest_rate: payload.interest_rate ?? existing.interest_rate,
+            minimum_payment: payload.minimum_payment ?? existing.minimum_payment,
+            due_day: payload.due_day ?? existing.due_day ?? 1,
+          })
           .eq("id", existing.id);
 
         if (error) {
@@ -565,7 +632,11 @@ export class BankConnectionsRepository {
         continue;
       }
 
-      const { error } = await this.supabase.from("accounts").insert(payload);
+      const { error } = await this.supabase.from("accounts").insert({
+        ...payload,
+        monthly_change: 0,
+        original_balance: mapped.balance,
+      });
 
       if (error) {
         throw error;
