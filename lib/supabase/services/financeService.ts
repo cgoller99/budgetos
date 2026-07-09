@@ -343,6 +343,31 @@ export class FinanceService {
     return this.loadFinanceData(userId);
   }
 
+  async deleteAccount(userId: string, accountId: string): Promise<FinanceData> {
+    const current = await this.loadFinanceData(userId);
+    const account = current.accounts.find((item) => item.id === accountId);
+
+    if (!account) {
+      throw new Error("Account not found.");
+    }
+
+    if (account.isPlaidLinked) {
+      throw new Error(
+        "Disconnect this bank in Settings before removing linked accounts.",
+      );
+    }
+
+    const { error } = await this.supabase
+      .from("accounts")
+      .delete()
+      .eq("id", accountId)
+      .eq("user_id", userId)
+      .eq("record_kind", "account");
+
+    if (error) throw error;
+    return this.loadFinanceData(userId);
+  }
+
   async createIncome(
     userId: string,
     input: AddIncomeInput,

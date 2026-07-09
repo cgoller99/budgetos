@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { AccountCard } from "@/components/accounts/AccountCard";
 import { AddAccountModal } from "@/components/accounts/AddAccountModal";
+import { DeleteAccountModal } from "@/components/accounts/DeleteAccountModal";
 import { BankSyncPlaceholder } from "@/components/accounts/BankSyncPlaceholder";
 import { Button, EmptyState, PageHeader, SkeletonGrid } from "@/components/ui";
 import { pageContainerWideClassName } from "@/components/ui/tokens";
@@ -12,6 +13,12 @@ import { cn } from "@/components/ui/cn";
 export function AccountsContent() {
   const { accounts, isLoading } = useFinance();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [deleteAccountId, setDeleteAccountId] = useState<string | null>(null);
+
+  const deleteAccount =
+    deleteAccountId !== null
+      ? (accounts.find((account) => account.id === deleteAccountId) ?? null)
+      : null;
 
   if (isLoading) {
     return <SkeletonGrid count={3} />;
@@ -38,7 +45,11 @@ export function AccountsContent() {
       ) : (
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
           {accounts.map((account) => (
-            <AccountCard key={account.id} account={account} />
+            <AccountCard
+              key={account.id}
+              account={account}
+              onDelete={() => setDeleteAccountId(account.id)}
+            />
           ))}
         </div>
       )}
@@ -46,6 +57,11 @@ export function AccountsContent() {
       <AddAccountModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
+      />
+
+      <DeleteAccountModal
+        account={deleteAccount}
+        onClose={() => setDeleteAccountId(null)}
       />
     </div>
   );

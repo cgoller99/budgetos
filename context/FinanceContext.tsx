@@ -154,6 +154,7 @@ export type FinanceContextValue = FinanceData & {
   switchDemoProfile: (demoProfileId: DemoProfileId) => Promise<void>;
   exitDemoMode: () => Promise<void>;
   addAccount: (input: AddAccountInput) => Promise<void>;
+  deleteAccount: (accountId: string) => Promise<void>;
   addIncome: (input: AddIncomeInput) => Promise<void>;
   editIncome: (incomeId: string, input: EditIncomeInput) => Promise<void>;
   deleteIncome: (incomeId: string) => Promise<void>;
@@ -672,6 +673,19 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
         },
       );
       trackEvent(ANALYTICS_EVENTS.ADDED_ACCOUNT, { account_type: input.type });
+    },
+    [data, runMutation],
+  );
+
+  const deleteAccount = useCallback(
+    async (accountId: string) => {
+      await runMutation(
+        {
+          ...data,
+          accounts: data.accounts.filter((account) => account.id !== accountId),
+        },
+        (repository, userId) => repository.deleteAccount(userId, accountId),
+      );
     },
     [data, runMutation],
   );
@@ -1528,6 +1542,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
       switchDemoProfile,
       exitDemoMode,
       addAccount,
+      deleteAccount,
       addIncome,
       editIncome,
       deleteIncome,
@@ -1567,6 +1582,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
     }),
     [
       addAccount,
+      deleteAccount,
       addBill,
       addDebt,
       addIncome,
