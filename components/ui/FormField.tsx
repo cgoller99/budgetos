@@ -6,6 +6,7 @@ type FormFieldProps = HTMLAttributes<HTMLDivElement> & {
   label: string;
   children: ReactNode;
   htmlFor?: string;
+  hint?: string;
 };
 
 export function FormField({
@@ -13,6 +14,7 @@ export function FormField({
   children,
   className,
   htmlFor,
+  hint,
   ...props
 }: FormFieldProps) {
   return (
@@ -24,6 +26,7 @@ export function FormField({
       ) : (
         <span className={labelClassName}>{label}</span>
       )}
+      {hint ? <p className="mt-1 text-xs text-white/45">{hint}</p> : null}
       {children}
     </div>
   );

@@ -1,3 +1,4 @@
+import { isAccountIncludedInNetWorth } from "@/lib/finance/accountPreferences";
 import { isCashAccountType } from "@/lib/finance/accountTypes";
 import type { Account, FinanceData, Investment } from "@/lib/finance/types";
 import type { CalculationResult, NetWorthBreakdown } from "./types";
@@ -56,8 +57,9 @@ function categorizeDebtName(name: string): "credit_card" | "loan" | "mortgage" {
 }
 
 export function calculateCash(data: FinanceData): CalculationResult {
-  const cashAccounts = (data.accounts ?? []).filter((account) =>
-    isCashAccountType(account.type),
+  const cashAccounts = (data.accounts ?? []).filter(
+    (account) =>
+      isCashAccountType(account.type) && isAccountIncludedInNetWorth(account),
   );
 
   return {
@@ -68,7 +70,10 @@ export function calculateCash(data: FinanceData): CalculationResult {
 
 export function calculateInvestments(data: FinanceData): CalculationResult {
   const portfolioAccounts = (data.accounts ?? []).filter(
-    (account) => isInvestmentAccount(account) && !isPropertyAsset(account),
+    (account) =>
+      isInvestmentAccount(account) &&
+      !isPropertyAsset(account) &&
+      isAccountIncludedInNetWorth(account),
   );
   const portfolioHoldings = data.investments ?? [];
 
@@ -83,8 +88,8 @@ export function calculateInvestments(data: FinanceData): CalculationResult {
 }
 
 export function calculatePropertyAssets(data: FinanceData): CalculationResult {
-  const propertyAccounts = (data.accounts ?? []).filter((account) =>
-    isPropertyAsset(account),
+  const propertyAccounts = (data.accounts ?? []).filter(
+    (account) => isPropertyAsset(account) && isAccountIncludedInNetWorth(account),
   );
 
   return {
@@ -95,7 +100,8 @@ export function calculatePropertyAssets(data: FinanceData): CalculationResult {
 
 export function calculateDebt(data: FinanceData): CalculationResult {
   const creditCardAccounts = (data.accounts ?? []).filter(
-    (account) => account.type === "credit_card",
+    (account) =>
+      account.type === "credit_card" && isAccountIncludedInNetWorth(account),
   );
   const structuredDebts = data.debts ?? [];
 

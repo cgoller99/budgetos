@@ -273,6 +273,56 @@ export class BankConnectionsRepository {
       .eq("user_id", userId);
   }
 
+  async removeConnectionAccounts(
+    connectionId: string,
+    userId: string,
+  ): Promise<string[]> {
+    const { data: accountRows, error: listError } = await this.supabase
+      .from("accounts")
+      .select("id")
+      .eq("bank_connection_id", connectionId)
+      .eq("user_id", userId)
+      .eq("record_kind", "account");
+
+    if (listError) {
+      throw listError;
+    }
+
+    const accountIds = (accountRows ?? []).map((row) => row.id);
+    const timestamp = new Date().toISOString();
+
+    const { error: accountsError } = await this.supabase
+      .from("accounts")
+      .delete()
+      .eq("bank_connection_id", connectionId)
+      .eq("user_id", userId)
+      .eq("record_kind", "account");
+
+    if (accountsError) {
+      throw accountsError;
+    }
+
+    await this.supabase
+      .from("investments")
+      .delete()
+      .eq("bank_connection_id", connectionId)
+      .eq("user_id", userId);
+
+    await this.supabase
+      .from("bank_connections")
+      .update({
+        status: "disconnected",
+        access_token_encrypted: null,
+        access_token_iv: null,
+        access_token_tag: null,
+        updated_at: timestamp,
+      })
+      .eq("id", connectionId)
+      .eq("user_id", userId);
+
+    return accountIds;
+  }
+
   async upsertLinkedAccounts(input: {
     userId: string;
     householdId: string | null;

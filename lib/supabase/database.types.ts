@@ -90,6 +90,13 @@ export type AccountRow = RecurringColumns & {
   last_four: string | null;
   last_synced_at: string | null;
   household_id: string | null;
+  nickname: string | null;
+  icon: string | null;
+  color: string | null;
+  include_in_net_worth: boolean;
+  include_in_safe_to_spend: boolean;
+  is_hidden: boolean;
+  archived_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -121,6 +128,13 @@ export type AccountInsert = {
   last_processed_date?: string | null;
   recurring_status?: string | null;
   household_id?: string | null;
+  nickname?: string | null;
+  icon?: string | null;
+  color?: string | null;
+  include_in_net_worth?: boolean;
+  include_in_safe_to_spend?: boolean;
+  is_hidden?: boolean;
+  archived_at?: string | null;
   created_at?: string;
   updated_at?: string;
 };

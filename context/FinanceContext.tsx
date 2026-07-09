@@ -27,12 +27,15 @@ import {
   applyDebtPaymentToData,
   applyGoalContributionToData,
 } from "@/lib/finance/balanceEffects";
+import { buildUpdatedAccount } from "@/lib/finance/accounts";
 import { buildUpdatedDebt } from "@/lib/finance/debts";
+import { disconnectPlaidAccount as disconnectPlaidAccountRequest } from "@/lib/accounts/clientApi";
 import { buildUpdatedBill } from "@/lib/finance/bills";
 import { buildUpdatedIncomeSource } from "@/lib/finance/income";
 import { getGoalTypeMeta } from "@/lib/finance/goalTypes";
 import type {
   AddAccountInput,
+  DeleteAccountOptions,
   AddBillInput,
   AddDebtInput,
   AddIncomeInput,
@@ -41,6 +44,7 @@ import type {
   AddTransactionInput,
   CreateGoalInput,
   DashboardData,
+  EditAccountInput,
   EditBillInput,
   EditDebtInput,
   EditGoalInput,
@@ -154,7 +158,15 @@ export type FinanceContextValue = FinanceData & {
   switchDemoProfile: (demoProfileId: DemoProfileId) => Promise<void>;
   exitDemoMode: () => Promise<void>;
   addAccount: (input: AddAccountInput) => Promise<void>;
-  deleteAccount: (accountId: string) => Promise<void>;
+  editAccount: (accountId: string, input: EditAccountInput) => Promise<void>;
+  deleteAccount: (
+    accountId: string,
+    options?: DeleteAccountOptions,
+  ) => Promise<void>;
+  disconnectPlaidAccount: (
+    accountId: string,
+    options?: DeleteAccountOptions,
+  ) => Promise<void>;
   addIncome: (input: AddIncomeInput) => Promise<void>;
   editIncome: (incomeId: string, input: EditIncomeInput) => Promise<void>;
   deleteIncome: (incomeId: string) => Promise<void>;
@@ -677,17 +689,129 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
     [data, runMutation],
   );
 
+  const editAccount = useCallback(
+    async (accountId: string, input: EditAccountInput) => {
+      const existing = data.accounts.find((account) => account.id === accountId);
+
+      if (!existing) {
+        return;
+      }
+
+      const updated = buildUpdatedAccount(existing, input);
+
+      await runMutation(
+        {
+          ...data,
+          accounts: data.accounts.map((account) =>
+            account.id === accountId ? updated : account,
+          ),
+        },
+        (repository, userId) =>
+          repository.updateAccount(userId, accountId, input),
+      );
+    },
+    [data, runMutation],
+  );
+
   const deleteAccount = useCallback(
-    async (accountId: string) => {
+    async (accountId: string, options: DeleteAccountOptions = {}) => {
+      const nextTransactions = options.deleteTransactions
+        ? data.transactions.filter(
+            (transaction) =>
+              transaction.accountId !== accountId &&
+              transaction.transferAccountId !== accountId,
+          )
+        : data.transactions.map((transaction) => ({
+            ...transaction,
+            accountId:
+              transaction.accountId === accountId ? "" : transaction.accountId,
+            transferAccountId:
+              transaction.transferAccountId === accountId
+                ? null
+                : transaction.transferAccountId,
+          }));
+
       await runMutation(
         {
           ...data,
           accounts: data.accounts.filter((account) => account.id !== accountId),
+          transactions: nextTransactions,
         },
-        (repository, userId) => repository.deleteAccount(userId, accountId),
+        (repository, userId) =>
+          repository.deleteAccount(userId, accountId, options),
       );
     },
     [data, runMutation],
+  );
+
+  const disconnectPlaidAccount = useCallback(
+    async (accountId: string, options: DeleteAccountOptions = {}) => {
+      const account = data.accounts.find((item) => item.id === accountId);
+
+      if (!account?.bankConnectionId) {
+        throw new Error("Account is not linked to Plaid.");
+      }
+
+      const connectionId = account.bankConnectionId;
+      const removedAccountIds = new Set(
+        data.accounts
+          .filter((item) => item.bankConnectionId === connectionId)
+          .map((item) => item.id),
+      );
+
+      setIsSyncing(true);
+
+      try {
+        await disconnectPlaidAccountRequest({
+          accountId,
+          deleteTransactions: options.deleteTransactions,
+        });
+
+        setData((current) =>
+          coerceFinanceData({
+            ...current,
+            accounts: current.accounts.filter(
+              (item) => !removedAccountIds.has(item.id),
+            ),
+            transactions: options.deleteTransactions
+              ? current.transactions.filter(
+                  (transaction) =>
+                    !removedAccountIds.has(transaction.accountId) &&
+                    (!transaction.transferAccountId ||
+                      !removedAccountIds.has(transaction.transferAccountId)),
+                )
+              : current.transactions.map((transaction) => ({
+                  ...transaction,
+                  accountId: removedAccountIds.has(transaction.accountId)
+                    ? ""
+                    : transaction.accountId,
+                  transferAccountId:
+                    transaction.transferAccountId &&
+                    removedAccountIds.has(transaction.transferAccountId)
+                      ? null
+                      : transaction.transferAccountId,
+                })),
+            bankConnections: current.bankConnections.filter(
+              (connection) => connection.id !== connectionId,
+            ),
+          }),
+        );
+
+        await refreshFinance();
+      } catch (disconnectError) {
+        const message = getErrorMessage(disconnectError);
+        setError(message);
+        showToast({
+          title: "Could not disconnect bank",
+          subtitle: message,
+          type: "error",
+        });
+        throw disconnectError;
+      } finally {
+        setIsSyncing(false);
+      }
+    },
+    [data.accounts, refreshFinance, showToast],
   );
 
   const addIncome = useCallback(
@@ -1542,7 +1666,9 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
       switchDemoProfile,
       exitDemoMode,
       addAccount,
+      editAccount,
       deleteAccount,
+      disconnectPlaidAccount,
       addIncome,
       editIncome,
       deleteIncome,
@@ -1582,7 +1708,9 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
     }),
     [
       addAccount,
+      editAccount,
       deleteAccount,
+      disconnectPlaidAccount,
       addBill,
       addDebt,
       addIncome,
