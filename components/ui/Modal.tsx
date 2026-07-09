@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { lockBodyScroll, unlockBodyScroll } from "@/lib/ui/bodyScrollLock";
 import { cn } from "./cn";
 import { panelTitleClassName } from "./tokens";
 
@@ -18,17 +20,20 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
   useEffect(() => {
     if (isOpen) {
       setIsMounted(true);
-      document.body.style.overflow = "hidden";
+      lockBodyScroll();
 
       const frame = window.requestAnimationFrame(() => {
         window.requestAnimationFrame(() => setIsAnimating(true));
       });
 
-      return () => window.cancelAnimationFrame(frame);
+      return () => {
+        window.cancelAnimationFrame(frame);
+        unlockBodyScroll();
+      };
     }
 
     setIsAnimating(false);
-    document.body.style.overflow = "";
+    unlockBodyScroll();
 
     const timeout = window.setTimeout(() => setIsMounted(false), 300);
     return () => window.clearTimeout(timeout);
@@ -47,16 +52,16 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isMounted) return null;
+  if (!isMounted || typeof document === "undefined") return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-6">
+  return createPortal(
+    <div className="fixed inset-0 z-[60] flex items-end justify-center p-0 sm:items-center sm:p-6">
       <button
         type="button"
         aria-label="Close modal"
         onClick={onClose}
         className={cn(
-          "absolute inset-0 bg-black/50 backdrop-blur-sm",
+          "absolute inset-0 bg-black/45",
           isAnimating ? "modal-backdrop-enter" : "opacity-0",
         )}
       />
@@ -86,6 +91,7 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
           <div className="mt-7">{children}</div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

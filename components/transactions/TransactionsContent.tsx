@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AddTransactionModal } from "@/components/transactions/AddTransactionModal";
 import { DeleteTransactionModal } from "@/components/transactions/DeleteTransactionModal";
 import { EditTransactionModal } from "@/components/transactions/EditTransactionModal";
@@ -15,21 +16,59 @@ import { pageContainerWideClassName } from "@/components/ui/tokens";
 import { useFinance } from "@/context/FinanceContext";
 import { formatCurrency } from "@/lib/finance/format";
 import {
+  buildTransactionsHref,
+  describeTransactionFilters,
+  parseTransactionFilters,
+  serializeTransactionFilters,
+} from "@/lib/transactions/filterParams";
+import {
   filterAndSortTransactions,
   getTransactionSummary,
+  type TransactionFilterState,
 } from "@/lib/transactions";
 import { cn } from "@/components/ui/cn";
 
-export function TransactionsContent() {
+function TransactionsContentInner() {
   const finance = useFinance();
-  const [filters, setFilters] = useState(DEFAULT_TRANSACTION_FILTERS);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [filters, setFilters] = useState<TransactionFilterState>(() =>
+    parseTransactionFilters(searchParams),
+  );
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [editTransactionId, setEditTransactionId] = useState<string | null>(
+  const [editTransactionId, setEditTransactionId] = useState<string | null>(null);
+  const [deleteTransactionId, setDeleteTransactionId] = useState<string | null>(null);
+  const [highlightedTransactionId, setHighlightedTransactionId] = useState<string | null>(
     null,
   );
-  const [deleteTransactionId, setDeleteTransactionId] = useState<string | null>(
-    null,
+  const hasScrolledRef = useRef(false);
+
+  useEffect(() => {
+    setFilters(parseTransactionFilters(searchParams));
+    hasScrolledRef.current = false;
+  }, [searchParams]);
+
+  const syncFiltersToUrl = useCallback(
+    (nextFilters: TransactionFilterState) => {
+      const params = serializeTransactionFilters(nextFilters);
+      const query = params.toString();
+      router.replace(query ? `/transactions?${query}` : "/transactions");
+    },
+    [router],
   );
+
+  const handleFiltersChange = useCallback(
+    (nextFilters: TransactionFilterState) => {
+      setFilters(nextFilters);
+      syncFiltersToUrl(nextFilters);
+    },
+    [syncFiltersToUrl],
+  );
+
+  const clearFilters = useCallback(() => {
+    setFilters(DEFAULT_TRANSACTION_FILTERS);
+    router.replace("/transactions");
+  }, [router]);
 
   const summary = useMemo(() => getTransactionSummary(finance), [finance]);
   const transactions = useMemo(
@@ -37,18 +76,56 @@ export function TransactionsContent() {
     [finance, filters],
   );
 
+  const hasActiveFilters = useMemo(() => {
+    const serialized = serializeTransactionFilters(filters).toString();
+    return serialized.length > 0;
+  }, [filters]);
+
+  const filterDescription = useMemo(
+    () => describeTransactionFilters(filters),
+    [filters],
+  );
+
+  useEffect(() => {
+    const targetId = filters.transactionId;
+
+    if (!targetId || hasScrolledRef.current) {
+      return;
+    }
+
+    const exists = finance.transactions.some((transaction) => transaction.id === targetId);
+
+    if (!exists) {
+      return;
+    }
+
+    const element = document.getElementById(`transaction-${targetId}`);
+
+    if (!element) {
+      return;
+    }
+
+    hasScrolledRef.current = true;
+    setHighlightedTransactionId(targetId);
+    element.scrollIntoView({ behavior: "smooth", block: "center" });
+
+    const timeout = window.setTimeout(() => {
+      setHighlightedTransactionId(null);
+    }, 2400);
+
+    return () => window.clearTimeout(timeout);
+  }, [filters.transactionId, finance.transactions, transactions.length]);
+
   if (finance.isLoading) {
     return <SkeletonGrid count={3} />;
   }
 
   const editTransaction =
-    finance.transactions.find(
-      (transaction) => transaction.id === editTransactionId,
-    ) ?? null;
+    finance.transactions.find((transaction) => transaction.id === editTransactionId) ??
+    null;
   const deleteTransaction =
-    finance.transactions.find(
-      (transaction) => transaction.id === deleteTransactionId,
-    ) ?? null;
+    finance.transactions.find((transaction) => transaction.id === deleteTransactionId) ??
+    null;
 
   return (
     <div className={cn(pageContainerWideClassName)}>
@@ -58,23 +135,39 @@ export function TransactionsContent() {
         }
       />
 
+      {hasActiveFilters ? (
+        <div className="flex flex-col gap-3 rounded-2xl border border-[#0077ed]/25 bg-[#0077ed]/10 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-white/75">
+            Showing transactions related to:{" "}
+            <span className="font-medium text-white">{filterDescription}</span>
+          </p>
+          <Button type="button" variant="secondary" size="sm" onClick={clearFilters}>
+            Clear filters
+          </Button>
+        </div>
+      ) : null}
+
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-        <StatCard
-          label="Income this month"
-          value={formatCurrency(summary.monthIncome)}
-          change={`${summary.monthCount} transactions`}
-          positive
-        />
-        <StatCard
-          label="Expenses this month"
-          value={formatCurrency(summary.monthExpenses)}
-          change={`${summary.count} total recorded`}
-          positive={false}
-        />
+        <Link href={buildTransactionsHref({ type: "income", filterLabel: "Income this month" })}>
+          <StatCard
+            label="Income this month"
+            value={formatCurrency(summary.monthIncome)}
+            change={`${summary.monthCount} transactions`}
+            positive
+          />
+        </Link>
+        <Link href={buildTransactionsHref({ type: "expense", filterLabel: "Expenses this month" })}>
+          <StatCard
+            label="Expenses this month"
+            value={formatCurrency(summary.monthExpenses)}
+            change={`${summary.count} total recorded`}
+            positive={false}
+          />
+        </Link>
       </div>
 
       <section className="rounded-3xl border border-white/[0.04] bg-white/[0.015] p-7 sm:p-8">
-        <TransactionFilters filters={filters} onChange={setFilters} />
+        <TransactionFilters filters={filters} onChange={handleFiltersChange} />
       </section>
 
       {finance.accounts.length === 0 ? (
@@ -91,12 +184,20 @@ export function TransactionsContent() {
       ) : transactions.length === 0 ? (
         <EmptyState
           icon="💳"
-          title="No transactions yet"
-          description="Add your first transaction or adjust your search and filters."
+          title={hasActiveFilters ? "No matching transactions" : "No transactions yet"}
+          description={
+            hasActiveFilters
+              ? `Nothing matched ${filterDescription}. Try clearing filters or broadening your search.`
+              : "Add your first transaction or adjust your search and filters."
+          }
           action={
-            <Button onClick={() => setIsCreateOpen(true)}>
-              Add transaction
-            </Button>
+            hasActiveFilters ? (
+              <Button variant="secondary" onClick={clearFilters}>
+                Clear filters
+              </Button>
+            ) : (
+              <Button onClick={() => setIsCreateOpen(true)}>Add transaction</Button>
+            )
           }
         />
       ) : (
@@ -106,6 +207,7 @@ export function TransactionsContent() {
               key={transaction.id}
               transaction={transaction}
               data={finance}
+              highlighted={highlightedTransactionId === transaction.id}
               onEdit={() => setEditTransactionId(transaction.id)}
               onDelete={() => setDeleteTransactionId(transaction.id)}
             />
@@ -126,5 +228,13 @@ export function TransactionsContent() {
         onClose={() => setDeleteTransactionId(null)}
       />
     </div>
+  );
+}
+
+export function TransactionsContent() {
+  return (
+    <Suspense fallback={<SkeletonGrid count={3} />}>
+      <TransactionsContentInner />
+    </Suspense>
   );
 }

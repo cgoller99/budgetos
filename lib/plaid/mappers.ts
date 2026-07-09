@@ -59,7 +59,13 @@ function mapPlaidAccountType(
     return { accountType: "investment", recordKind: "investment" };
   }
 
-  if (subtype === "savings" || subtype === "money market" || subtype === "cd") {
+  if (
+    subtype === "savings" ||
+    subtype === "money market" ||
+    subtype === "cd" ||
+    subtype === "hsa" ||
+    subtype === "cash management"
+  ) {
     return { accountType: "savings", recordKind: "account" };
   }
 
@@ -153,7 +159,9 @@ export function mapPlaidAccount(params: {
   const result: PlaidMappedAccount = {
     externalAccountId: account.account_id,
     externalItemId: itemId,
-    name: displayName,
+    name: displayName || (safeInstitution !== "Linked institution"
+      ? `${safeInstitution} account`
+      : "Account"),
     officialName: account.official_name ?? null,
     institution: safeInstitution,
     institutionLogoUrl,
@@ -174,6 +182,29 @@ export function mapPlaidAccount(params: {
   }
 
   return result;
+}
+
+export function summarizePlaidAccountMapping(params: {
+  userId: string;
+  connectionId: string;
+  itemId: string;
+  accounts: PlaidMappedAccount[];
+}): void {
+  console.info("[plaid/mapping] account ownership validation", {
+    userId: params.userId,
+    connectionId: params.connectionId,
+    itemId: params.itemId,
+    accountCount: params.accounts.length,
+    accounts: params.accounts.map((account) => ({
+      externalAccountId: account.externalAccountId,
+      recordKind: account.recordKind,
+      type: account.type,
+      institution: account.institution,
+      name: account.name,
+      lastFour: account.lastFour ? `****${account.lastFour}` : null,
+      balance: account.balance,
+    })),
+  });
 }
 
 function mapPlaidCategory(transaction: Transaction): string {

@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { InfoTooltip } from "@/components/guidance/InfoTooltip";
 import { AnimatedNumber, Card, CardContent, CardHeader } from "@/components/ui";
 import { useFinance } from "@/context/FinanceContext";
 import { formatCurrency } from "@/lib/finance/format";
 import type { MoneyFlowStageData } from "@/lib/finance/types";
+import { getMoneyFlowStageHref } from "@/lib/transactions/filterParams";
 import { cn } from "@/components/ui/cn";
 
 function formatFlowAmount(amount: number, isOutflow: boolean): string {
@@ -75,16 +76,20 @@ function FlowStageNode({
 
 export function MoneyFlowCard() {
   const { dashboard } = useFinance();
+  const router = useRouter();
   const { moneyFlow } = dashboard;
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const stages = moneyFlow.stages;
+
+  function handleStageSelect(stageId: string) {
+    router.push(getMoneyFlowStageHref(stageId));
+  }
 
   return (
     <Card padding="lg" hover className="money-flow-enter">
       <CardHeader
         title="Money flow"
         action={
-          <InfoTooltip label="Shows where monthly income goes after bills, goals, debt, and other outflows." />
+          <InfoTooltip label="Shows where monthly income goes after bills, goals, debt, and other outflows. Tap a stage to view related transactions." />
         }
       />
 
@@ -94,17 +99,17 @@ export function MoneyFlowCard() {
             <FlowStageNode
               key={stage.id}
               stage={stage}
-              isSelected={selectedId === stage.id}
-              onSelect={() =>
-                setSelectedId((current) =>
-                  current === stage.id ? null : stage.id,
-                )
-              }
+              isSelected={false}
+              onSelect={() => handleStageSelect(stage.id)}
             />
           ))}
         </div>
 
-        <div className="mt-8 border-t border-[var(--surface-border)] pt-7">
+        <button
+          type="button"
+          onClick={() => handleStageSelect("safeToSpend")}
+          className="mt-8 w-full border-t border-[var(--surface-border)] pt-7 text-left transition-colors hover:opacity-90"
+        >
           <p className="text-sm text-[var(--text-muted)]">Safe to spend</p>
           <p className="mt-2 text-2xl font-semibold tabular-nums text-[#4da3ff] sm:text-3xl">
             <AnimatedNumber
@@ -112,7 +117,7 @@ export function MoneyFlowCard() {
               format={(value) => formatCurrency(Math.round(value))}
             />
           </p>
-        </div>
+        </button>
       </CardContent>
     </Card>
   );

@@ -205,6 +205,36 @@ export class BankConnectionsRepository {
     }
   }
 
+  async syncConnectionHousehold(input: {
+    connectionId: string;
+    userId: string;
+    householdId: string | null;
+    institutionName?: string | null;
+  }): Promise<void> {
+    const payload: {
+      household_id: string | null;
+      updated_at: string;
+      institution_name?: string | null;
+    } = {
+      household_id: input.householdId,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (input.institutionName && !input.institutionName.startsWith("ins_")) {
+      payload.institution_name = input.institutionName;
+    }
+
+    const { error } = await this.supabase
+      .from("bank_connections")
+      .update(payload)
+      .eq("id", input.connectionId)
+      .eq("user_id", input.userId);
+
+    if (error) {
+      throw error;
+    }
+  }
+
   async disconnectConnection(connectionId: string, userId: string): Promise<void> {
     const timestamp = new Date().toISOString();
 
@@ -253,14 +283,8 @@ export class BankConnectionsRepository {
     const timestamp = new Date().toISOString();
     let inserted = 0;
     let updated = 0;
-    let skippedInvestments = 0;
 
     for (const account of input.accounts) {
-      if (account.recordKind === "investment") {
-        skippedInvestments += 1;
-        continue;
-      }
-
       const { data: existing, error: existingError } = await this.supabase
         .from("accounts")
         .select(
@@ -315,7 +339,8 @@ export class BankConnectionsRepository {
               null,
             due_day: account.dueDay ?? existing.due_day ?? 1,
           })
-          .eq("id", existing.id);
+          .eq("id", existing.id)
+          .eq("user_id", input.userId);
 
         if (error) {
           throw error;
@@ -350,7 +375,6 @@ export class BankConnectionsRepository {
       total: input.accounts.length,
       inserted,
       updated,
-      skippedInvestments,
     });
 
     return accountIdMap;
@@ -407,7 +431,8 @@ export class BankConnectionsRepository {
         const { error } = await this.supabase
           .from("transactions")
           .update(payload)
-          .eq("id", existing.id);
+          .eq("id", existing.id)
+          .eq("user_id", input.userId);
 
         if (error) {
           throw error;
@@ -515,7 +540,8 @@ export class BankConnectionsRepository {
         const { error } = await this.supabase
           .from("investments")
           .update(payload)
-          .eq("id", existing.id);
+          .eq("id", existing.id)
+          .eq("user_id", input.userId);
 
         if (error) {
           throw error;
@@ -624,7 +650,8 @@ export class BankConnectionsRepository {
             minimum_payment: payload.minimum_payment ?? existing.minimum_payment,
             due_day: payload.due_day ?? existing.due_day ?? 1,
           })
-          .eq("id", existing.id);
+          .eq("id", existing.id)
+          .eq("user_id", input.userId);
 
         if (error) {
           throw error;

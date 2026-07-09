@@ -37,15 +37,28 @@ export async function processPlaidWebhookEvent(params: {
     throw error;
   }
 
-  const connection = connections?.[0];
-
-  if (!connection) {
+  if (!connections || connections.length === 0) {
     return {
       status: "not_found",
       webhookType,
       webhookCode,
     };
   }
+
+  if (connections.length > 1) {
+    console.error("[plaid/webhook] multiple connections for item_id", {
+      itemId,
+      connectionIds: connections.map((row) => row.id),
+      userIds: connections.map((row) => row.user_id),
+    });
+    return {
+      status: "ignored",
+      webhookType,
+      webhookCode,
+    };
+  }
+
+  const connection = connections[0];
 
   const shouldSync =
     (webhookType === "TRANSACTIONS" &&

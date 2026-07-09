@@ -14,6 +14,24 @@ import {
   getNotificationPreferences,
   type NotificationCategory,
 } from "@/lib/notifications/preferences";
+import { buildTransactionsHref } from "@/lib/transactions/filterParams";
+
+function buildActivityHref(event: FinanceEvent): string | undefined {
+  if (
+    event.entityType === "transaction" &&
+    event.entityId &&
+    (event.type === "transaction_added" ||
+      event.type === "transaction_updated" ||
+      event.type === "transaction_deleted")
+  ) {
+    return buildTransactionsHref({
+      transactionId: event.entityId,
+      filterLabel: event.label,
+    });
+  }
+
+  return undefined;
+}
 
 function hasSurface(event: FinanceEvent, surface: FinanceEventSurface): boolean {
   return Array.isArray(event.surfaces) && event.surfaces.includes(surface);
@@ -60,6 +78,9 @@ function toActivityItem(event: FinanceEvent): ActivityItem {
     icon: event.icon ?? "✓",
     tone: event.tone ?? "neutral",
     timestamp: event.timestamp ?? new Date().toISOString(),
+    href: buildActivityHref(event),
+    entityId: event.entityId,
+    entityType: event.entityType,
   };
 }
 

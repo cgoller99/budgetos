@@ -6,6 +6,7 @@ import { Badge, Card, CardContent, CardHeader } from "@/components/ui";
 import { useFinance } from "@/context/FinanceContext";
 import { getBillStatusVariant, getBillsDueThisWeek } from "@/lib/finance/bills";
 import { formatCurrency } from "@/lib/finance/format";
+import { buildTransactionsHref } from "@/lib/transactions/filterParams";
 
 const MAX_BILLS = 4;
 
@@ -32,24 +33,30 @@ export function UpcomingBillsCard({ embedded = false }: UpcomingBillsCardProps) 
     ) : (
       <ul className="space-y-4">
         {bills.map((bill) => (
-          <li
-            key={bill.id}
-            className="flex items-center justify-between gap-4 py-1"
-          >
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2.5">
-                <p className="truncate text-base font-medium text-white">
-                  {bill.name}
-                </p>
-                <Badge variant={getBillStatusVariant(bill.status)}>
-                  {bill.statusLabel}
-                </Badge>
+          <li key={bill.id}>
+            <Link
+              href={buildTransactionsHref({
+                search: bill.name,
+                type: "expense",
+                filterLabel: `${bill.name} payments`,
+              })}
+              className="focus-ring flex min-h-12 items-center justify-between gap-4 rounded-2xl py-1 transition-colors hover:bg-white/[0.03]"
+            >
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <p className="truncate text-base font-medium text-white">
+                    {bill.name}
+                  </p>
+                  <Badge variant={getBillStatusVariant(bill.status)}>
+                    {bill.statusLabel}
+                  </Badge>
+                </div>
+                <p className="mt-1 text-sm text-white/38">{bill.formattedDueDate}</p>
               </div>
-              <p className="mt-1 text-sm text-white/38">{bill.formattedDueDate}</p>
-            </div>
-            <p className="shrink-0 text-base font-semibold tabular-nums text-white">
-              {formatCurrency(bill.amount)}
-            </p>
+              <p className="shrink-0 text-base font-semibold tabular-nums text-white">
+                {formatCurrency(bill.amount)}
+              </p>
+            </Link>
           </li>
         ))}
       </ul>

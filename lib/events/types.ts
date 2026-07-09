@@ -51,6 +51,9 @@ export type ActivityItem = {
   icon: string;
   tone: FinanceEventTone;
   timestamp: string;
+  href?: string;
+  entityId?: string;
+  entityType?: string;
 };
 
 export type NotificationItem = {

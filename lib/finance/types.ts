@@ -595,6 +595,7 @@ export type SmartInsight = {
   before: string;
   highlight?: string;
   after: string;
+  transactionHref?: string;
 };
 
 export type NextGoalSummary = {

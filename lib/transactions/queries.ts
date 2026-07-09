@@ -9,6 +9,13 @@ export type TransactionFilterState = {
   category: string;
   sortField: TransactionSortField;
   sortDirection: TransactionSortDirection;
+  transactionId?: string | null;
+  merchant?: string | null;
+  dateFrom?: string | null;
+  dateTo?: string | null;
+  amountMin?: number | null;
+  amountMax?: number | null;
+  filterLabel?: string | null;
 };
 
 export const DEFAULT_TRANSACTION_FILTERS: TransactionFilterState = {
@@ -49,11 +56,56 @@ function matchesSearch(
   );
 }
 
+function matchesDateRange(
+  transaction: Transaction,
+  dateFrom: string | null | undefined,
+  dateTo: string | null | undefined,
+): boolean {
+  if (!dateFrom && !dateTo) {
+    return true;
+  }
+
+  const transactionDate = transaction.date.slice(0, 10);
+
+  if (dateFrom && transactionDate < dateFrom) {
+    return false;
+  }
+
+  if (dateTo && transactionDate > dateTo) {
+    return false;
+  }
+
+  return true;
+}
+
+function matchesAmountRange(
+  transaction: Transaction,
+  amountMin: number | null | undefined,
+  amountMax: number | null | undefined,
+): boolean {
+  if (amountMin !== null && amountMin !== undefined && transaction.amount < amountMin) {
+    return false;
+  }
+
+  if (amountMax !== null && amountMax !== undefined && transaction.amount > amountMax) {
+    return false;
+  }
+
+  return true;
+}
+
 export function filterAndSortTransactions(
   data: FinanceData,
   filters: TransactionFilterState,
 ): Transaction[] {
   let results = (data.transactions ?? []).filter((transaction) => {
+    if (
+      filters.transactionId &&
+      transaction.id !== filters.transactionId
+    ) {
+      return false;
+    }
+
     if (filters.type !== "all" && transaction.type !== filters.type) {
       return false;
     }
@@ -62,6 +114,14 @@ export function filterAndSortTransactions(
       filters.category !== "all" &&
       (transaction.category ?? "").toLowerCase() !== filters.category.toLowerCase()
     ) {
+      return false;
+    }
+
+    if (!matchesDateRange(transaction, filters.dateFrom, filters.dateTo)) {
+      return false;
+    }
+
+    if (!matchesAmountRange(transaction, filters.amountMin, filters.amountMax)) {
       return false;
     }
 

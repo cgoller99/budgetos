@@ -39,6 +39,10 @@ import type { AllocationForecast, LedgerReport } from "@/lib/allocation/types";
 import { buildCalendarMonth, type CalendarMonthSummary } from "@/lib/finance/calendarEvents";
 import { formatCurrency } from "@/lib/finance/format";
 import { getPrimaryHealthReasons } from "@/lib/calculations";
+import {
+  buildTransactionsHref,
+  getCurrentMonthDateRange,
+} from "@/lib/transactions/filterParams";
 
 export type FinancialSnapshot = {
   normalized: FinanceData;
@@ -75,12 +79,21 @@ function buildSmartInsights(
       ? Math.round((diningBill.amount / savings.monthlyIncome) * 100)
       : 0;
 
+  const { dateFrom, dateTo } = getCurrentMonthDateRange();
+
   const insights: SmartInsight[] = [
     {
       tone: "blue",
       before: "You're on pace to save ",
       highlight: formatCurrency(savings.annualSavingsProjection),
       after: " this year if current habits continue.",
+      transactionHref: buildTransactionsHref({
+        type: "expense",
+        category: "Savings",
+        dateFrom,
+        dateTo,
+        filterLabel: "Savings-related spending",
+      }),
     },
   ];
 
@@ -89,6 +102,13 @@ function buildSmartInsights(
       tone: "emerald",
       before: "",
       after: `Dining spend is ${diningShare}% of income — great progress.`,
+      transactionHref: buildTransactionsHref({
+        type: "expense",
+        search: "dining",
+        dateFrom,
+        dateTo,
+        filterLabel: "Dining spending",
+      }),
     });
   } else {
     insights.push({
@@ -98,6 +118,12 @@ function buildSmartInsights(
         primaryReasons[0]?.message ??
         health.reasons[0]?.message ??
         "Add income and bills to unlock personalized insights.",
+      transactionHref: buildTransactionsHref({
+        type: "expense",
+        dateFrom,
+        dateTo,
+        filterLabel: "Recent spending",
+      }),
     });
   }
 
@@ -106,6 +132,13 @@ function buildSmartInsights(
       tone: "amber",
       before: "",
       after: `Your ${insuranceBill.name.toLowerCase()} bill is ${formatCurrency(insuranceBill.amount)}/mo. Review quotes to optimize.`,
+      transactionHref: buildTransactionsHref({
+        type: "expense",
+        search: insuranceBill.name,
+        dateFrom,
+        dateTo,
+        filterLabel: `${insuranceBill.name} spending`,
+      }),
     });
   } else {
     insights.push({
@@ -115,6 +148,12 @@ function buildSmartInsights(
         primaryReasons[1]?.message ??
         health.reasons[1]?.message ??
         "Track spending to improve your financial health score.",
+      transactionHref: buildTransactionsHref({
+        type: "expense",
+        dateFrom,
+        dateTo,
+        filterLabel: "Recent spending",
+      }),
     });
   }
 

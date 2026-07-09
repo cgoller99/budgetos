@@ -15,7 +15,7 @@ export function RecentActivityCard() {
         description="Connected updates across your financial command center"
         action={
           <Link
-            href="/reports"
+            href="/transactions"
             className="text-xs font-medium text-[#0077ed] hover:underline"
           >
             View all

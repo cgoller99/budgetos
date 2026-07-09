@@ -12,6 +12,7 @@ import {
 type TransactionRowProps = {
   transaction: Transaction;
   data: FinanceData;
+  highlighted?: boolean;
   onEdit: () => void;
   onDelete: () => void;
 };
@@ -38,6 +39,7 @@ function getTypeVariant(
 export function TransactionRow({
   transaction,
   data,
+  highlighted = false,
   onEdit,
   onDelete,
 }: TransactionRowProps) {
@@ -53,7 +55,15 @@ export function TransactionRow({
         : transaction.amount;
 
   return (
-    <article className="bill-card-enter flex flex-col gap-5 rounded-3xl border border-white/[0.04] bg-white/[0.015] p-5 transition-colors duration-200 hover:border-white/[0.07] sm:flex-row sm:items-center sm:justify-between sm:p-6">
+    <article
+      id={`transaction-${transaction.id}`}
+      className={cn(
+        "bill-card-enter flex flex-col gap-5 rounded-3xl border bg-white/[0.015] p-5 transition-colors duration-200 sm:flex-row sm:items-center sm:justify-between sm:p-6",
+        highlighted
+          ? "border-[#0077ed]/40 bg-[#0077ed]/10 ring-2 ring-[#0077ed]/25"
+          : "border-white/[0.04] hover:border-white/[0.07]",
+      )}
+    >
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2.5">
           <Badge variant={getTypeVariant(transaction.type)}>

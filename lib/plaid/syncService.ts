@@ -13,6 +13,7 @@ import {
   detectPlaidRecurringCandidates,
   mapPlaidAccount,
   mapPlaidTransaction,
+  summarizePlaidAccountMapping,
 } from "@/lib/plaid/mappers";
 import { decryptConnectionAccessToken } from "@/lib/plaid/plaidService";
 import type {
@@ -236,6 +237,20 @@ export async function syncPlaidConnection(params: {
         balance: account.balance,
         lastFour: account.lastFour,
       })),
+    });
+
+    summarizePlaidAccountMapping({
+      userId,
+      connectionId: connection.id,
+      itemId,
+      accounts: mappedAccounts,
+    });
+
+    await repository.syncConnectionHousehold({
+      connectionId: connection.id,
+      userId,
+      householdId,
+      institutionName,
     });
 
     const accountIdMap = await repository.upsertLinkedAccounts({

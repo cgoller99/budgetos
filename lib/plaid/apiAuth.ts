@@ -1,4 +1,7 @@
+import "server-only";
+
 import { NextResponse } from "next/server";
+import { resolveUserHouseholdId } from "@/lib/supabase/householdFinance";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getPlaidErrorMessage } from "@/lib/plaid/plaidService";
 import type { PlaidError } from "plaid";
@@ -14,24 +17,17 @@ export async function requirePlaidApiUser() {
     return {
       supabase,
       user: null,
+      householdId: null,
       response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
     };
   }
 
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("household_id")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (profileError) {
-    throw profileError;
-  }
+  const householdId = await resolveUserHouseholdId(supabase, user.id);
 
   return {
     supabase,
     user,
-    householdId: profile?.household_id ?? null,
+    householdId,
     response: null,
   };
 }
@@ -71,7 +67,7 @@ export function plaidErrorResponse(error: unknown, fallback = "Plaid request fai
       code,
       error_type: plaidError?.error_type ?? null,
       error_code: plaidError?.error_code ?? null,
-      error_message: plaidError?.error_message ?? message,
+      error_message: plaidError?.error_message ?? null,
       display_message: plaidError?.display_message ?? null,
       request_id: plaidError?.request_id ?? null,
     },
