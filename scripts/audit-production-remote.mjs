@@ -151,6 +151,14 @@ async function main() {
       "User/household tables block anonymous writes",
       `${supabaseHealth.body?.tablesBlockingAnonWrites ?? 0}/${supabaseHealth.body?.tablesChecked ?? 0} tables protected`,
     );
+    allOk =
+      report(
+        supabaseHealth.body?.accountManagementMigrationApplied === true,
+        "Account management migration applied",
+        supabaseHealth.body?.accountManagementMigrationApplied
+          ? "preference columns present"
+          : "run npm run apply:account-management-migration",
+      ) && allOk;
   } else {
     allOk =
       report(

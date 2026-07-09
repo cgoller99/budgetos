@@ -75,6 +75,21 @@ if (!skipVercel) {
 }
 
 if (!skipSupabase) {
+  const applyAccountManagement = spawnSync(
+    "node",
+    [
+      "--env-file=.env.local",
+      "scripts/apply-account-management-migration.mjs",
+    ],
+    { cwd: ROOT, stdio: "inherit", env: process.env },
+  );
+
+  if (applyAccountManagement.status !== 0) {
+    console.log("\n⚠ Account management migration not applied (missing Supabase credentials?).");
+    console.log("  Add SUPABASE_ACCESS_TOKEN or SUPABASE_DB_PASSWORD to .env.local and re-run.");
+    console.log("  Or call POST /api/cron/apply-account-management-migration with CRON_SECRET after deploy.");
+  }
+
   const apply = spawnSync(
     "node",
     [

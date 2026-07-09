@@ -371,6 +371,30 @@ export class FinanceService {
       .eq("user_id", userId)
       .eq("record_kind", "account");
 
+    if (
+      error &&
+      (error.code === "42703" ||
+        error.message?.includes("column") ||
+        error.message?.includes("nickname"))
+    ) {
+      const { error: fallbackError } = await this.supabase
+        .from("accounts")
+        .update({
+          name: updated.name.trim(),
+          institution: updated.institution.trim(),
+          type: updated.type,
+          balance: updated.balance,
+          original_balance: updated.startingBalance ?? null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", accountId)
+        .eq("user_id", userId)
+        .eq("record_kind", "account");
+
+      if (fallbackError) throw fallbackError;
+      return this.loadFinanceData(userId);
+    }
+
     if (error) throw error;
     return this.loadFinanceData(userId);
   }

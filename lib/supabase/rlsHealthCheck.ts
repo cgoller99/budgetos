@@ -1,3 +1,5 @@
+import { checkAccountManagementMigrationApplied } from "@/lib/supabase/applySqlMigration";
+
 const RLS_PROBE_TABLES = [
   "admin_feedback_reports",
   "profiles",
@@ -21,6 +23,7 @@ export type SupabaseRlsHealth = {
   tablesBlockingAnonWrites: number;
   adminFeedbackRlsEnabled: boolean;
   allRequiredTablesProtected: boolean;
+  accountManagementMigrationApplied: boolean;
   probes: Record<string, RlsTableProbe>;
 };
 
@@ -42,6 +45,7 @@ export async function checkSupabaseRlsHealth(): Promise<SupabaseRlsHealth> {
       tablesBlockingAnonWrites: 0,
       adminFeedbackRlsEnabled: false,
       allRequiredTablesProtected: false,
+      accountManagementMigrationApplied: false,
       probes: {},
     };
   }
@@ -93,6 +97,8 @@ export async function checkSupabaseRlsHealth(): Promise<SupabaseRlsHealth> {
     probes.admin_feedback_reports?.anonWriteBlocked === true;
   const allRequiredTablesProtected =
     tablesBlockingAnonWrites === RLS_PROBE_TABLES.length;
+  const accountManagementMigrationApplied =
+    await checkAccountManagementMigrationApplied();
 
   return {
     configured: true,
@@ -101,6 +107,7 @@ export async function checkSupabaseRlsHealth(): Promise<SupabaseRlsHealth> {
     tablesBlockingAnonWrites,
     adminFeedbackRlsEnabled,
     allRequiredTablesProtected,
+    accountManagementMigrationApplied,
     probes,
   };
 }

@@ -33,6 +33,7 @@
     "apply:notification-preferences-migration": "node scripts/apply-notification-preferences-migration.mjs",
     "apply:plaid-migration": "node scripts/apply-plaid-migration.mjs",
     "apply:admin-feedback-rls": "node --env-file=.env.local scripts/apply-admin-feedback-rls.mjs",
+    "apply:account-management-migration": "node --env-file=.env.local scripts/apply-account-management-migration.mjs",
     "apply:stripe-migration": "node scripts/apply-stripe-migration.mjs",
     "create:stripe-prices": "node --env-file=.env.local scripts/create-stripe-prices.mjs",
     "debug:household-invite-email": "node --env-file=.env.local scripts/debug-household-invite-email.mjs",
@@ -55,6 +56,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/pg": "^8.20.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
