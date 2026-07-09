@@ -14,6 +14,7 @@ import {
   ProgressBar,
   SkeletonGrid,
 } from "@/components/ui";
+import { MobileCollapsibleSection } from "@/components/ui/MobileCollapsibleSection";
 import { cn } from "@/components/ui/cn";
 import { pageContainerWideClassName } from "@/components/ui/tokens";
 import { useFinance } from "@/context/FinanceContext";
@@ -23,6 +24,7 @@ import {
   computeTotalGoalSavings,
   downloadTransactionsCsv,
   getTrendMaxValue,
+  type CategoryBreakdownItem,
   type MonthlyTrendPoint,
 } from "@/lib/reports/reportMetrics";
 
@@ -87,9 +89,155 @@ function TrendChart({ points, valueKey, color, emptyMessage }: TrendChartProps) 
   );
 }
 
+function MonthlyTrendsSection({
+  monthlyTrends,
+  totalGoalSavings,
+}: {
+  monthlyTrends: MonthlyTrendPoint[];
+  totalGoalSavings: number;
+}) {
+  return (
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+      <Card padding="lg">
+        <CardHeader title="Monthly spending" />
+        <CardContent>
+          <TrendChart
+            points={monthlyTrends}
+            valueKey="spending"
+            color="#f87171"
+            emptyMessage="Expense transactions will appear here."
+          />
+        </CardContent>
+      </Card>
+
+      <Card padding="lg">
+        <CardHeader title="Monthly income" />
+        <CardContent>
+          <TrendChart
+            points={monthlyTrends}
+            valueKey="income"
+            color="#34d399"
+            emptyMessage="Income transactions will appear here."
+          />
+        </CardContent>
+      </Card>
+
+      <Card padding="lg">
+        <CardHeader
+          title="Savings trend"
+          description={`${formatCurrency(totalGoalSavings)} saved across goals`}
+        />
+        <CardContent>
+          <TrendChart
+            points={monthlyTrends}
+            valueKey="savings"
+            color="#0077ed"
+            emptyMessage="Goal contributions will appear here."
+          />
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function CategoryAndExportSection({
+  categoryBreakdown,
+  transactionCount,
+  onExportCsv,
+}: {
+  categoryBreakdown: CategoryBreakdownItem[];
+  transactionCount: number;
+  onExportCsv: () => void;
+}) {
+  return (
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+      <Card padding="lg">
+        <CardHeader
+          title="Category breakdown"
+          description="Expenses by category"
+        />
+        <CardContent>
+          {categoryBreakdown.length === 0 ? (
+            <p className="py-6 text-center text-sm text-white/35">
+              Add expense transactions to see category breakdown.
+            </p>
+          ) : (
+            <ul className="space-y-5">
+              {categoryBreakdown.map((item) => (
+                <li key={item.category}>
+                  <div className="mb-2 flex items-center justify-between gap-4 text-sm">
+                    <span className="font-medium text-white/80">
+                      {item.category}
+                    </span>
+                    <span className="tabular-nums text-white/45">
+                      {formatCurrency(item.amount)} · {item.percent.toFixed(0)}%
+                    </span>
+                  </div>
+                  <ProgressBar value={item.percent} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card padding="lg">
+        <CardHeader
+          title="Export transactions"
+          description="Download all transactions as CSV"
+          action={
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={onExportCsv}
+              disabled={transactionCount === 0}
+            >
+              Export CSV
+            </Button>
+          }
+        />
+        <CardContent>
+          <p className="text-sm leading-relaxed text-white/40">
+            {transactionCount === 0
+              ? "Record transactions to enable export."
+              : `${transactionCount} transaction${transactionCount === 1 ? "" : "s"} ready to export with date, type, category, amount, account, and notes.`}
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function ReportsSecondarySection({
+  reportEvents,
+}: {
+  reportEvents: ReturnType<typeof getReportEvents>;
+}) {
+  return (
+    <>
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <HealthScoreCard />
+        <BillsOverviewCard />
+      </div>
+
+      <SmartInsights />
+
+      <Card padding="lg">
+        <CardHeader title="Activity log" />
+        <CardContent>
+          <EventHistoryList
+            items={reportEvents}
+            emptyMessage="Activity from accounts, bills, goals, and transactions will appear here."
+          />
+        </CardContent>
+      </Card>
+    </>
+  );
+}
+
 export function ReportsContent() {
   const finance = useFinance();
-  const { snapshot, dashboard, isLoading } = finance;
+  const { snapshot, isLoading } = finance;
 
   const monthlyTrends = snapshot.monthlyTrends;
   const categoryBreakdown = snapshot.categoryBreakdown;
@@ -109,122 +257,52 @@ export function ReportsContent() {
   }
 
   return (
-    <div className={cn(pageContainerWideClassName)}>
+    <div className={cn(pageContainerWideClassName, "space-y-5")}>
       <NetWorthTimeline />
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-        <Card padding="lg">
-          <CardHeader title="Monthly spending" />
-          <CardContent>
-            <TrendChart
-              points={monthlyTrends}
-              valueKey="spending"
-              color="#f87171"
-              emptyMessage="Expense transactions will appear here."
-            />
-          </CardContent>
-        </Card>
+      {/* Mobile: trends first, details behind View more */}
+      <div className="space-y-4 lg:hidden">
+        <MonthlyTrendsSection
+          monthlyTrends={monthlyTrends}
+          totalGoalSavings={totalGoalSavings}
+        />
 
-        <Card padding="lg">
-          <CardHeader title="Monthly income" />
-          <CardContent>
-            <TrendChart
-              points={monthlyTrends}
-              valueKey="income"
-              color="#34d399"
-              emptyMessage="Income transactions will appear here."
-            />
-          </CardContent>
-        </Card>
-
-        <Card padding="lg">
-          <CardHeader
-            title="Savings trend"
-            description={`${formatCurrency(totalGoalSavings)} saved across goals`}
+        <MobileCollapsibleSection
+          title="Categories & export"
+          description="Breakdown by category and CSV download"
+        >
+          <CategoryAndExportSection
+            categoryBreakdown={categoryBreakdown}
+            transactionCount={finance.transactions.length}
+            onExportCsv={handleExportCsv}
           />
-          <CardContent>
-            <TrendChart
-              points={monthlyTrends}
-              valueKey="savings"
-              color="#0077ed"
-              emptyMessage="Goal contributions will appear here."
-            />
-          </CardContent>
-        </Card>
+        </MobileCollapsibleSection>
+
+        <MobileCollapsibleSection
+          title="Health, bills & insights"
+          description="Score, bill overview, and smart recommendations"
+        >
+          <div className="space-y-4">
+            <ReportsSecondarySection reportEvents={reportEvents} />
+          </div>
+        </MobileCollapsibleSection>
       </div>
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <Card padding="lg">
-          <CardHeader
-            title="Category breakdown"
-            description="Expenses by category"
-          />
-          <CardContent>
-            {categoryBreakdown.length === 0 ? (
-              <p className="py-6 text-center text-sm text-white/35">
-                Add expense transactions to see category breakdown.
-              </p>
-            ) : (
-              <ul className="space-y-5">
-                {categoryBreakdown.map((item) => (
-                  <li key={item.category}>
-                    <div className="mb-2 flex items-center justify-between gap-4 text-sm">
-                      <span className="font-medium text-white/80">
-                        {item.category}
-                      </span>
-                      <span className="tabular-nums text-white/45">
-                        {formatCurrency(item.amount)} · {item.percent.toFixed(0)}%
-                      </span>
-                    </div>
-                    <ProgressBar value={item.percent} />
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
+      {/* Desktop: full reports */}
+      <div className="hidden space-y-5 lg:block">
+        <MonthlyTrendsSection
+          monthlyTrends={monthlyTrends}
+          totalGoalSavings={totalGoalSavings}
+        />
 
-        <Card padding="lg">
-          <CardHeader
-            title="Export transactions"
-            description="Download all transactions as CSV"
-            action={
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleExportCsv}
-                disabled={finance.transactions.length === 0}
-              >
-                Export CSV
-              </Button>
-            }
-          />
-          <CardContent>
-            <p className="text-sm leading-relaxed text-white/40">
-              {finance.transactions.length === 0
-                ? "Record transactions to enable export."
-                : `${finance.transactions.length} transaction${finance.transactions.length === 1 ? "" : "s"} ready to export with date, type, category, amount, account, and notes.`}
-            </p>
-          </CardContent>
-        </Card>
+        <CategoryAndExportSection
+          categoryBreakdown={categoryBreakdown}
+          transactionCount={finance.transactions.length}
+          onExportCsv={handleExportCsv}
+        />
+
+        <ReportsSecondarySection reportEvents={reportEvents} />
       </div>
-
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <HealthScoreCard />
-        <BillsOverviewCard />
-      </div>
-
-      <SmartInsights />
-
-      <Card padding="lg">
-        <CardHeader title="Activity log" />
-        <CardContent>
-          <EventHistoryList
-            items={reportEvents}
-            emptyMessage="Activity from accounts, bills, goals, and transactions will appear here."
-          />
-        </CardContent>
-      </Card>
     </div>
   );
 }

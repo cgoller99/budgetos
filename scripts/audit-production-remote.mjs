@@ -169,7 +169,7 @@ async function main() {
   }
 
   console.log("\nIf RLS is not applied:");
-  console.log("  npm run apply:admin-feedback-rls");
+  console.log("  curl -H \"Authorization: Bearer $CRON_SECRET\" https://buxme.co/api/cron/apply-admin-feedback-rls");
   console.log("  Or run supabase/migrations/20260709_admin_feedback_rls.sql in SQL Editor");
 
   console.log("\nSupabase Auth URLs (verify in dashboard):");
