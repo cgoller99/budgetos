@@ -135,9 +135,34 @@ async function main() {
       `HTTP ${cronProbe.status}`,
     ) && allOk;
 
-  console.log("\nSupabase RLS (run locally after env pull):");
-  console.log("  npm run verify:supabase");
+  console.log("\nSupabase RLS:");
+  const supabaseHealth = await fetchJson(`${siteUrl}/api/health/supabase`);
+  if (supabaseHealth.ok && supabaseHealth.body?.configured) {
+    allOk =
+      report(
+        supabaseHealth.body?.adminFeedbackRlsEnabled === true,
+        "admin_feedback_reports RLS enabled",
+        supabaseHealth.body?.adminFeedbackRlsEnabled
+          ? "anonymous writes blocked"
+          : "anonymous writes still allowed — run npm run apply:admin-feedback-rls",
+      ) && allOk;
+    report(
+      supabaseHealth.body?.allRequiredTablesProtected === true,
+      "User/household tables block anonymous writes",
+      `${supabaseHealth.body?.tablesBlockingAnonWrites ?? 0}/${supabaseHealth.body?.tablesChecked ?? 0} tables protected`,
+    );
+  } else {
+    allOk =
+      report(
+        false,
+        "Supabase RLS health endpoint",
+        supabaseHealth.ok ? "misconfigured" : `HTTP ${supabaseHealth.status}`,
+      ) && allOk;
+  }
+
+  console.log("\nIf RLS is not applied:");
   console.log("  npm run apply:admin-feedback-rls");
+  console.log("  Or run supabase/migrations/20260709_admin_feedback_rls.sql in SQL Editor");
 
   console.log("\nSupabase Auth URLs (verify in dashboard):");
   console.log("  npm run configure:supabase-auth-urls");

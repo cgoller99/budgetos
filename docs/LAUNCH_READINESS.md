@@ -33,10 +33,11 @@ Or paste `supabase/migrations/20260709_admin_feedback_rls.sql` into **Supabase â
 **Verify:**
 
 ```bash
+curl -s https://buxme.co/api/health/supabase | jq .
 npm run verify:supabase
 ```
 
-Expect **27/27** tables blocking anonymous writes. Anonymous profile/account reads should return empty or 401.
+Expect `adminFeedbackRlsEnabled: true` and **27/27** tables blocking anonymous writes locally.
 
 **Household sharing:** unchanged â€” uses `user_household_ids()` policies in `20260628_household_complete.sql`.
 
