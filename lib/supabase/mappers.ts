@@ -133,6 +133,33 @@ export function mapAccountRow(row: AccountRow): Account {
     bankConnectionId: row.bank_connection_id,
     externalAccountId: row.external_account_id,
     isPlaidLinked: Boolean(row.bank_connection_id),
+    nickname: row.nickname,
+    icon: row.icon,
+    color: row.color,
+    includeInNetWorth: row.include_in_net_worth ?? true,
+    includeInSafeToSpend: row.include_in_safe_to_spend ?? true,
+    isHidden: row.is_hidden ?? false,
+    archivedAt: row.archived_at,
+    startingBalance:
+      row.original_balance === null ? null : toNumber(row.original_balance),
+  };
+}
+
+export function buildManualAccountUpdate(account: Account) {
+  return {
+    name: account.name.trim(),
+    institution: account.institution.trim(),
+    type: account.type,
+    balance: account.balance,
+    original_balance: account.startingBalance ?? null,
+    nickname: account.nickname?.trim() || null,
+    icon: account.icon || null,
+    color: account.color || null,
+    include_in_net_worth: account.includeInNetWorth !== false,
+    include_in_safe_to_spend: account.includeInSafeToSpend !== false,
+    is_hidden: account.isHidden === true,
+    archived_at: account.archivedAt ?? null,
+    updated_at: new Date().toISOString(),
   };
 }
 

@@ -14,6 +14,10 @@ import { isUserInDemoMode } from "@/lib/finance/demoData";
 import { emptyFinanceData } from "@/lib/finance/emptyFinanceData";
 import { getGoalTypeMeta } from "@/lib/finance/goalTypes";
 import { buildUpdatedIncomeSource } from "@/lib/finance/income";
+import {
+  applyPlaidAccountEditRestrictions,
+  buildUpdatedAccount,
+} from "@/lib/finance/accounts";
 import { buildUpdatedDebt } from "@/lib/finance/debts";
 import type {
   AddAccountInput,
@@ -23,7 +27,9 @@ import type {
   AddMoneyToGoalInput,
   CreateGoalInput,
   EditBillInput,
+  EditAccountInput,
   EditDebtInput,
+  DeleteAccountOptions,
   EditGoalInput,
   EditIncomeInput,
   FinanceData,
@@ -53,6 +59,7 @@ import {
   buildGoalUpdate,
   buildIncomeUpdate,
   buildInvestmentUpdate,
+  buildManualAccountUpdate,
   buildTransactionInsert,
   buildTransactionUpdate,
   mapFinanceData,
@@ -343,7 +350,67 @@ export class FinanceService {
     return this.loadFinanceData(userId);
   }
 
-  async deleteAccount(userId: string, accountId: string): Promise<FinanceData> {
+  async updateAccount(
+    userId: string,
+    accountId: string,
+    input: EditAccountInput,
+  ): Promise<FinanceData> {
+    const current = await this.loadFinanceData(userId);
+    const existing = current.accounts.find((item) => item.id === accountId);
+
+    if (!existing) {
+      throw new Error("Account not found.");
+    }
+
+    const sanitizedInput = applyPlaidAccountEditRestrictions(existing, input);
+    const updated = buildUpdatedAccount(existing, sanitizedInput);
+    const { error } = await this.supabase
+      .from("accounts")
+      .update(buildManualAccountUpdate(updated))
+      .eq("id", accountId)
+      .eq("user_id", userId)
+      .eq("record_kind", "account");
+
+    if (error) throw error;
+    return this.loadFinanceData(userId);
+  }
+
+  private async deleteTransactionsForAccounts(
+    userId: string,
+    accountIds: string[],
+  ): Promise<void> {
+    if (accountIds.length === 0) {
+      return;
+    }
+
+    for (const accountId of accountIds) {
+      const { error: primaryError } = await this.supabase
+        .from("transactions")
+        .delete()
+        .eq("user_id", userId)
+        .eq("account_id", accountId);
+
+      if (primaryError) {
+        throw primaryError;
+      }
+
+      const { error: transferError } = await this.supabase
+        .from("transactions")
+        .delete()
+        .eq("user_id", userId)
+        .eq("transfer_to_account_id", accountId);
+
+      if (transferError) {
+        throw transferError;
+      }
+    }
+  }
+
+  async deleteAccount(
+    userId: string,
+    accountId: string,
+    options: DeleteAccountOptions = {},
+  ): Promise<FinanceData> {
     const current = await this.loadFinanceData(userId);
     const account = current.accounts.find((item) => item.id === accountId);
 
@@ -353,8 +420,12 @@ export class FinanceService {
 
     if (account.isPlaidLinked) {
       throw new Error(
-        "Disconnect this bank in Settings before removing linked accounts.",
+        "Use disconnect to remove Plaid-linked accounts.",
       );
+    }
+
+    if (options.deleteTransactions) {
+      await this.deleteTransactionsForAccounts(userId, [accountId]);
     }
 
     const { error } = await this.supabase

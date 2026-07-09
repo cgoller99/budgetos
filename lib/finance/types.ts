@@ -44,6 +44,14 @@ export type Account = {
   bankConnectionId?: string | null;
   externalAccountId?: string | null;
   isPlaidLinked?: boolean;
+  nickname?: string | null;
+  icon?: string | null;
+  color?: string | null;
+  includeInNetWorth?: boolean;
+  includeInSafeToSpend?: boolean;
+  isHidden?: boolean;
+  archivedAt?: string | null;
+  startingBalance?: number | null;
 };
 
 export type AddAccountInput = {
@@ -51,6 +59,25 @@ export type AddAccountInput = {
   institution: string;
   type: AccountType;
   balance: number;
+};
+
+export type EditAccountInput = {
+  name?: string;
+  institution?: string;
+  type?: AccountType;
+  balance?: number;
+  startingBalance?: number | null;
+  nickname?: string | null;
+  icon?: string | null;
+  color?: string | null;
+  includeInNetWorth?: boolean;
+  includeInSafeToSpend?: boolean;
+  isHidden?: boolean;
+  isArchived?: boolean;
+};
+
+export type DeleteAccountOptions = {
+  deleteTransactions?: boolean;
 };
 
 export type AddIncomeInput = {
