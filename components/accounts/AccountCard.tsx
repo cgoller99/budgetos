@@ -1,4 +1,4 @@
-import { Badge, Card, CardContent } from "@/components/ui";
+import { Badge, Button, Card, CardContent } from "@/components/ui";
 import {
   formatAccountType,
   isLiabilityAccountType,
@@ -8,9 +8,10 @@ import type { Account } from "@/lib/finance/types";
 
 type AccountCardProps = {
   account: Account;
+  onDelete: () => void;
 };
 
-export function AccountCard({ account }: AccountCardProps) {
+export function AccountCard({ account, onDelete }: AccountCardProps) {
   const isLiability = isLiabilityAccountType(account.type);
 
   return (
@@ -36,6 +37,17 @@ export function AccountCard({ account }: AccountCardProps) {
           {isLiability ? "-" : ""}
           {formatCurrency(account.balance)}
         </p>
+
+        <div className="mt-6 flex flex-wrap gap-3 border-t border-white/[0.04] pt-6">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={onDelete}
+            className="text-rose-400/90 hover:text-rose-300"
+          >
+            Delete
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
