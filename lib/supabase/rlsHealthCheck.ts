@@ -1,4 +1,5 @@
 import { checkAccountManagementMigrationApplied } from "@/lib/supabase/applySqlMigration";
+import { verifyAccountPreferencesPersistence } from "@/lib/supabase/accountPreferencesHealth";
 
 const RLS_PROBE_TABLES = [
   "admin_feedback_reports",
@@ -24,6 +25,8 @@ export type SupabaseRlsHealth = {
   adminFeedbackRlsEnabled: boolean;
   allRequiredTablesProtected: boolean;
   accountManagementMigrationApplied: boolean;
+  accountPreferencesPersistenceVerified: boolean;
+  accountPreferencesPersistenceError: string | null;
   probes: Record<string, RlsTableProbe>;
 };
 
@@ -46,6 +49,8 @@ export async function checkSupabaseRlsHealth(): Promise<SupabaseRlsHealth> {
       adminFeedbackRlsEnabled: false,
       allRequiredTablesProtected: false,
       accountManagementMigrationApplied: false,
+      accountPreferencesPersistenceVerified: false,
+      accountPreferencesPersistenceError: null,
       probes: {},
     };
   }
@@ -99,6 +104,14 @@ export async function checkSupabaseRlsHealth(): Promise<SupabaseRlsHealth> {
     tablesBlockingAnonWrites === RLS_PROBE_TABLES.length;
   const accountManagementMigrationApplied =
     await checkAccountManagementMigrationApplied();
+  const persistence =
+    accountManagementMigrationApplied
+      ? await verifyAccountPreferencesPersistence()
+      : {
+          checked: false,
+          passed: false,
+          error: "Migration not applied.",
+        };
 
   return {
     configured: true,
@@ -108,6 +121,8 @@ export async function checkSupabaseRlsHealth(): Promise<SupabaseRlsHealth> {
     adminFeedbackRlsEnabled,
     allRequiredTablesProtected,
     accountManagementMigrationApplied,
+    accountPreferencesPersistenceVerified: persistence.passed,
+    accountPreferencesPersistenceError: persistence.error,
     probes,
   };
 }
