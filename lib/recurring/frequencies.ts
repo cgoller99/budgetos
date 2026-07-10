@@ -10,6 +10,7 @@ export const INCOME_FREQUENCY_LABELS: Record<IncomeFrequency, string> = {
   every_2_weeks: "Biweekly",
   twice_monthly: "Twice Monthly",
   monthly: "Monthly",
+  quarterly: "Quarterly",
   yearly: "Yearly",
 };
 

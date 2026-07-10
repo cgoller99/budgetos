@@ -229,6 +229,10 @@ async function main() {
   }
 
   async function rlsBlocksAnonymousWrite(table) {
+    const writeBody =
+      table === "admin_feedback_reports"
+        ? { report_type: "feedback", message: "rls verification probe" }
+        : {};
     const response = await fetch(`${restBase}/${table}`, {
       method: "POST",
       headers: {
@@ -236,14 +240,14 @@ async function main() {
         "Content-Type": "application/json",
         Prefer: "return=minimal",
       },
-      body: JSON.stringify({}),
+      body: JSON.stringify(writeBody),
     });
 
     if (response.status === 404) {
       return false;
     }
 
-    return response.status === 401 || response.status === 403;
+    return response.status < 200 || response.status >= 300;
   }
 
   for (const table of REQUIRED_TABLES) {

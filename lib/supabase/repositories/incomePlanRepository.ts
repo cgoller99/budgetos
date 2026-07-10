@@ -87,6 +87,7 @@ export function mapIncomePlanRow(
     nextPayDate: row.next_pay_date,
     lastProcessedDate: row.last_processed_date,
     isActive: row.is_active,
+    ownerUserId: row.user_id,
     allocations: allocations
       .filter((item) => item.income_plan_id === row.id)
       .map(mapAllocationRow)
@@ -126,7 +127,10 @@ export class IncomePlanRepository {
 
     const [planResult, allocationResult, paycheckResult, allocationEventResult] =
       await Promise.all([
-        this.scopedSelect("income_plans", userId, householdId)
+        this.supabase
+          .from("income_plans")
+          .select("*")
+          .eq("user_id", userId)
           .eq("is_active", true)
           .limit(1)
           .maybeSingle(),

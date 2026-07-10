@@ -42,6 +42,8 @@ export type IncomePlan = {
   lastProcessedDate: string | null;
   isActive: boolean;
   allocations: IncomePlanAllocation[];
+  /** Owner of this plan — personal income uses only the viewer's plan. */
+  ownerUserId?: string | null;
 };
 
 export type IncomePlanAllocationEvent = {

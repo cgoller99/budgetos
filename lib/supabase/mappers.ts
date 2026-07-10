@@ -328,6 +328,7 @@ export function mapIncomeRow(row: TransactionRow): IncomeSource {
     category: row.category,
     depositAccountId: row.account_id ?? null,
     schedule: mapIncomeSchedule(row),
+    ownerUserId: row.user_id,
   };
 }
 
@@ -361,6 +362,7 @@ export function mapTransactionRow(row: TransactionRow): Transaction {
     billId: row.bill_id,
     debtId: null,
     externalTransactionId: row.external_transaction_id,
+    ownerUserId: row.user_id,
   };
 }
 

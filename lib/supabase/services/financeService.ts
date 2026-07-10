@@ -225,6 +225,8 @@ export class FinanceService {
 
     return {
       ...mapped,
+      viewerUserId: userId,
+      householdId,
       incomePlan: incomePlanData.incomePlan,
       incomePlanPaychecks: incomePlanData.incomePlanPaychecks,
       envelopeBalances: allocationData.envelopeBalances,

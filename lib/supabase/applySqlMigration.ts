@@ -96,6 +96,31 @@ export async function applySqlMigration(sql: string): Promise<"management-api" |
   return "postgres";
 }
 
+export async function checkAdminFeedbackRlsApplied(): Promise<boolean> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "");
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+
+  if (!url || !anonKey) {
+    return false;
+  }
+
+  const response = await fetch(`${url}/rest/v1/admin_feedback_reports`, {
+    method: "POST",
+    headers: {
+      apikey: anonKey,
+      Authorization: `Bearer ${anonKey}`,
+      "Content-Type": "application/json",
+      Prefer: "return=minimal",
+    },
+    body: JSON.stringify({
+      report_type: "feedback",
+      message: "rls health probe",
+    }),
+  });
+
+  return response.status === 401 || response.status === 403;
+}
+
 export async function checkAccountManagementMigrationApplied(): Promise<boolean> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "");
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
