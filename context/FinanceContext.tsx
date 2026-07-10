@@ -859,6 +859,10 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
           ],
         },
       );
+      trackEvent(ANALYTICS_EVENTS.ADDED_INCOME, {
+        frequency: input.frequency,
+        source: "manual",
+      });
     },
     [data, runMutation],
   );

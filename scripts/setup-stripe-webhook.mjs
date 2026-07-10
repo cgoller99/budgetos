@@ -21,8 +21,10 @@ const webhookUrl = `${siteUrl}/api/stripe/webhook`;
 
 const EVENTS = [
   "checkout.session.completed",
+  "customer.subscription.created",
   "customer.subscription.updated",
   "customer.subscription.deleted",
+  "invoice.payment_failed",
 ];
 
 function getEnv(name) {

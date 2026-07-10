@@ -67,6 +67,7 @@ export async function POST(request: Request) {
           metadata: { type: event.type },
         });
         break;
+      case "customer.subscription.created":
       case "customer.subscription.updated":
       case "customer.subscription.deleted": {
         const stripe = getStripeWebhookClient();
@@ -81,6 +82,34 @@ export async function POST(request: Request) {
           message: `${event.type} (${subscription.id})`,
           metadata: { type: event.type, status: subscription.status },
         });
+        break;
+      }
+      case "invoice.payment_failed": {
+        const invoice = event.data.object as Stripe.Invoice;
+        const subscriptionRef =
+          invoice.parent?.subscription_details?.subscription;
+        const subscriptionId =
+          typeof subscriptionRef === "string"
+            ? subscriptionRef
+            : subscriptionRef?.id;
+
+        if (subscriptionId) {
+          const stripe = getStripeWebhookClient();
+          const subscription = await stripe.subscriptions.retrieve(
+            subscriptionId,
+            { expand: ["items.data.price.product"] },
+          );
+          await syncSubscriptionToProfile(subscription);
+          await tryLogAdminEvent({
+            eventType: "stripe",
+            message: `invoice.payment_failed (${subscription.id})`,
+            metadata: {
+              type: event.type,
+              status: subscription.status,
+              invoiceId: invoice.id,
+            },
+          });
+        }
         break;
       }
       default:

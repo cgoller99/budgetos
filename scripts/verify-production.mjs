@@ -41,22 +41,42 @@ function runStep(title, command, stepArgs = []) {
 console.log("Buxme Production Readiness Audit");
 console.log("================================");
 
-runStep("1/6 Environment variables", "node", ["scripts/verify-env.mjs"]);
-runStep("2/6 Supabase connectivity", "node", ["scripts/verify-supabase.mjs"]);
+runStep("1/7 Remote production runtime", "node", [
+  "scripts/audit-production-remote.mjs",
+  ...(process.argv.includes("--public-launch") ? ["--public-launch"] : []),
+]);
+
+const skipLocalSecrets = process.argv.includes("--remote-only");
+if (skipLocalSecrets) {
+  console.log("\nSkipping local secret checks (--remote-only)");
+} else {
+  runStep("2/7 Environment variables", "node", ["scripts/verify-env.mjs"]);
+  runStep("3/7 Supabase connectivity", "node", ["scripts/verify-supabase.mjs"]);
+}
 
 const plaidArgs = ["scripts/verify-plaid.mjs"];
 if (skipRemote) {
   plaidArgs.push("--skip-remote");
 }
-runStep("3/6 Plaid (Production)", "node", plaidArgs);
+runStep(
+  skipLocalSecrets ? "4/7 Plaid (code + remote)" : "4/7 Plaid (Production)",
+  "node",
+  plaidArgs,
+);
 
-runStep("4/6 Stripe configuration", "node", ["scripts/verify-stripe.mjs"]);
-runStep("5/6 Resend configuration", "node", ["scripts/verify-resend.mjs"]);
+if (!skipLocalSecrets) {
+  runStep("5/7 Stripe configuration", "node", ["scripts/verify-stripe.mjs"]);
+  runStep("6/7 Resend configuration", "node", ["scripts/verify-resend.mjs"]);
+}
 
 if (skipBuild) {
   console.log("\nSkipping production build (--skip-build)");
 } else {
-  runStep("6/6 Production build", "npm", ["run", "build"]);
+  runStep(
+    skipLocalSecrets ? "7/7 Production build" : "7/7 Production build",
+    "npm",
+    ["run", "build"],
+  );
 }
 
 console.log("\n✅ Buxme is production-ready.");

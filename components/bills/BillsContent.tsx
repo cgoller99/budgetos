@@ -7,6 +7,7 @@ import { DeleteBillModal } from "@/components/bills/DeleteBillModal";
 import { EditBillModal } from "@/components/bills/EditBillModal";
 import { PaycheckSplitPanel } from "@/components/paycheck/PaycheckSplitPanel";
 import { Button, EmptyState, PageHeader, SkeletonGrid, StatCard } from "@/components/ui";
+import { MobileCollapsibleSection } from "@/components/ui/MobileCollapsibleSection";
 import { pageContainerWideClassName } from "@/components/ui/tokens";
 import { useFinance } from "@/context/FinanceContext";
 import { useToast } from "@/context/ToastContext";
@@ -177,7 +178,17 @@ export function BillsContent() {
         />
       </div>
 
-      <PaycheckSplitPanel />
+      <div className="lg:hidden">
+        <MobileCollapsibleSection
+          title="Paycheck split"
+          description="How bills map to paychecks"
+        >
+          <PaycheckSplitPanel />
+        </MobileCollapsibleSection>
+      </div>
+      <div className="hidden lg:block">
+        <PaycheckSplitPanel />
+      </div>
 
       {finance.bills.length === 0 ? (
         <EmptyState
