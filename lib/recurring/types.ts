@@ -6,6 +6,7 @@ export type IncomeFrequency =
   | "every_2_weeks"
   | "twice_monthly"
   | "monthly"
+  | "quarterly"
   | "yearly";
 
 export type BillFrequency =

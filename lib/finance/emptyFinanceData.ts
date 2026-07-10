@@ -91,5 +91,7 @@ export function coerceFinanceData(
     allocationLedger: data.allocationLedger ?? [],
     bankConnections: data.bankConnections ?? [],
     plaidRecurringDismissals: data.plaidRecurringDismissals ?? [],
+    viewerUserId: data.viewerUserId ?? null,
+    householdId: data.householdId ?? null,
   };
 }

@@ -371,6 +371,8 @@ export type IncomeSource = {
   category: string;
   depositAccountId?: string | null;
   schedule?: RecurringSchedule;
+  /** Owner of this income row — used to exclude other household members. */
+  ownerUserId?: string | null;
 };
 
 export type SavingsGoal = {
@@ -497,6 +499,8 @@ export type Transaction = {
   billId?: string | null;
   debtId?: string | null;
   externalTransactionId?: string | null;
+  /** Owner of this ledger row — used for personal income fallback. */
+  ownerUserId?: string | null;
 };
 
 export type AddTransactionInput = {
@@ -549,6 +553,10 @@ export type FinanceData = {
   allocationLedger: import("@/lib/allocation/types").AllocationLedgerEntry[];
   bankConnections: BankConnection[];
   plaidRecurringDismissals: string[];
+  /** Authenticated user viewing this data — scopes personal income calculations. */
+  viewerUserId?: string | null;
+  /** Resolved household id for diagnostics and shared views. */
+  householdId?: string | null;
 };
 
 export type { IncomePlan, IncomePlanPaycheckEvent, SaveIncomePlanInput, MarkPaycheckReceivedInput };

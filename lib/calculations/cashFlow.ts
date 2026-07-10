@@ -4,6 +4,7 @@ import {
   getEffectiveIncomeSources,
   isIncomeSourceActive,
 } from "@/lib/finance/effectiveIncome";
+import { getPersonalLedgerIncomeForMonth } from "@/lib/finance/personalIncomeScope";
 import { sumTransactionsByType } from "@/lib/transactions";
 import type { CashFlowResult } from "./types";
 
@@ -42,8 +43,7 @@ export function calculateMonthlyIncome(
     return recurring;
   }
 
-  const ledgerIncome = sumTransactionsByType(data, "income", referenceDate);
-  return recurring + ledgerIncome;
+  return getPersonalLedgerIncomeForMonth(data, referenceDate);
 }
 
 export function calculateMonthlySpending(

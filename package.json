@@ -35,6 +35,7 @@
     "apply:admin-feedback-rls": "node --env-file=.env.local scripts/apply-admin-feedback-rls.mjs",
     "apply:account-management-migration": "node --env-file=.env.local scripts/apply-account-management-migration.mjs",
     "verify:account-preferences": "node --env-file=.env.local scripts/verify-account-preferences.mjs",
+    "diagnose:income": "node --env-file=.env.local scripts/diagnose-user-income.mjs",
     "apply:stripe-migration": "node scripts/apply-stripe-migration.mjs",
     "create:stripe-prices": "node --env-file=.env.local scripts/create-stripe-prices.mjs",
     "debug:household-invite-email": "node --env-file=.env.local scripts/debug-household-invite-email.mjs",
