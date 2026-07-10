@@ -6,7 +6,7 @@ import type {
   InvestmentAccount,
 } from "plaid";
 import type { BankConnection, BankConnectionStatus } from "@/lib/finance/types";
-import type { PlaidMappedAccount, PlaidMappedTransaction } from "@/lib/plaid/types";
+import type { PlaidMappedAccount, PlaidMappedTransaction, PlaidTransactionSkipReason } from "@/lib/plaid/types";
 import type {
   BankConnectionInsert,
   BankConnectionRow,
@@ -323,13 +323,76 @@ export class BankConnectionsRepository {
     return accountIds;
   }
 
+  async listExternalAccountIdsForConnection(
+    userId: string,
+    connectionId: string,
+  ): Promise<Set<string>> {
+    const { data, error } = await this.supabase
+      .from("accounts")
+      .select("external_account_id")
+      .eq("user_id", userId)
+      .eq("bank_connection_id", connectionId)
+      .not("external_account_id", "is", null);
+
+    if (error) {
+      throw error;
+    }
+
+    return new Set(
+      (data ?? [])
+        .map((row) => row.external_account_id)
+        .filter((value): value is string => Boolean(value)),
+    );
+  }
+
+  async countTransactionsByAccountIds(
+    userId: string,
+    accountIds: string[],
+  ): Promise<Map<string, number>> {
+    const counts = new Map<string, number>();
+
+    for (const accountId of accountIds) {
+      counts.set(accountId, 0);
+    }
+
+    if (accountIds.length === 0) {
+      return counts;
+    }
+
+    const { data, error } = await this.supabase
+      .from("transactions")
+      .select("account_id")
+      .eq("user_id", userId)
+      .in("account_id", accountIds);
+
+    if (error) {
+      throw error;
+    }
+
+    for (const row of data ?? []) {
+      if (!row.account_id) {
+        continue;
+      }
+
+      counts.set(row.account_id, (counts.get(row.account_id) ?? 0) + 1);
+    }
+
+    return counts;
+  }
+
   async upsertLinkedAccounts(input: {
     userId: string;
     householdId: string | null;
     connectionId: string;
     accounts: PlaidMappedAccount[];
-  }): Promise<Map<string, string>> {
+  }): Promise<{
+    accountIdMap: Map<string, string>;
+    insertedExternalIds: string[];
+    updatedExternalIds: string[];
+  }> {
     const accountIdMap = new Map<string, string>();
+    const insertedExternalIds: string[] = [];
+    const updatedExternalIds: string[] = [];
     const timestamp = new Date().toISOString();
     let inserted = 0;
     let updated = 0;
@@ -397,6 +460,7 @@ export class BankConnectionsRepository {
         }
 
         accountIdMap.set(account.externalAccountId, existing.id);
+        updatedExternalIds.push(account.externalAccountId);
         updated += 1;
         continue;
       }
@@ -416,6 +480,7 @@ export class BankConnectionsRepository {
       }
 
       accountIdMap.set(account.externalAccountId, created.id);
+      insertedExternalIds.push(account.externalAccountId);
       inserted += 1;
     }
 
@@ -425,9 +490,10 @@ export class BankConnectionsRepository {
       total: input.accounts.length,
       inserted,
       updated,
+      insertedExternalIds,
     });
 
-    return accountIdMap;
+    return { accountIdMap, insertedExternalIds, updatedExternalIds };
   }
 
   async persistSyncedTransactions(input: {
@@ -436,7 +502,12 @@ export class BankConnectionsRepository {
     accountIdMap: Map<string, string>;
     transactions: PlaidMappedTransaction[];
     removedExternalIds: string[];
-  }): Promise<{ added: number; modified: number; removed: number }> {
+  }): Promise<{
+    added: number;
+    modified: number;
+    removed: number;
+    skipped: Array<{ reason: PlaidTransactionSkipReason; count: number }>;
+  }> {
     let added = 0;
     let modified = 0;
     let removed = 0;
@@ -523,7 +594,17 @@ export class BankConnectionsRepository {
       });
     }
 
-    return { added, modified, removed };
+    const skipped: Array<{ reason: PlaidTransactionSkipReason; count: number }> =
+      [];
+
+    if (skippedMissingAccount > 0) {
+      skipped.push({
+        reason: "missing_account_map",
+        count: skippedMissingAccount,
+      });
+    }
+
+    return { added, modified, removed, skipped };
   }
 
   async upsertInvestmentHoldings(input: {

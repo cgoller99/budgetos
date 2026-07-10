@@ -228,6 +228,7 @@ function mapPlaidCategory(transaction: Transaction): string {
 
 function resolvePlaidTransactionType(
   transaction: Transaction,
+  accountContext?: Pick<PlaidMappedAccount, "recordKind" | "type">,
 ): PlaidMappedTransaction["type"] {
   const primary = transaction.personal_finance_category?.primary;
   const detailed = transaction.personal_finance_category?.detailed ?? "";
@@ -240,16 +241,33 @@ function resolvePlaidTransactionType(
     return "transfer";
   }
 
+  const amount = toNumber(transaction.amount);
+  const isCreditCard =
+    accountContext?.recordKind === "debt" &&
+    accountContext.type === "credit_card";
+
+  if (isCreditCard) {
+    if (amount <= 0) {
+      return "transfer";
+    }
+
+    return "expense";
+  }
+
   if (primary === "INCOME" || primary === "DEPOSIT") {
     return "income";
   }
 
-  const amount = toNumber(transaction.amount);
+  if (primary === "LOAN_PAYMENTS") {
+    return "transfer";
+  }
+
   return amount < 0 ? "income" : "expense";
 }
 
 export function mapPlaidTransaction(
   transaction: Transaction,
+  accountContext?: Pick<PlaidMappedAccount, "recordKind" | "type">,
 ): PlaidMappedTransaction {
   const amount = toNumber(transaction.amount);
   const normalizedAmount = Math.abs(amount);
@@ -262,7 +280,7 @@ export function mapPlaidTransaction(
     externalTransactionId: transaction.transaction_id,
     externalAccountId: transaction.account_id,
     amount: normalizedAmount,
-    type: resolvePlaidTransactionType(transaction),
+    type: resolvePlaidTransactionType(transaction, accountContext),
     category: mapPlaidCategory(transaction),
     date: transaction.date,
     notes: merchantName,
