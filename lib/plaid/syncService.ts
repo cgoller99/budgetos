@@ -16,6 +16,11 @@ import {
   summarizePlaidAccountMapping,
 } from "@/lib/plaid/mappers";
 import { decryptConnectionAccessToken } from "@/lib/plaid/plaidService";
+import {
+  backfillHistoricalTransactions,
+  selectAccountsNeedingBackfill,
+  type PlaidTransactionBackfillResult,
+} from "@/lib/plaid/transactionBackfill";
 import type {
   PlaidMappedAccount,
   PlaidMappedTransaction,
@@ -345,6 +350,7 @@ function buildSyncDiagnostics(params: {
   insertedExternalIds: string[];
   transactionResult: Awaited<ReturnType<typeof syncPlaidTransactions>>;
   transactionCounts: Map<string, number>;
+  backfillResult: PlaidTransactionBackfillResult | null;
 }): PlaidSyncDiagnostics {
   const inserted = new Set(params.insertedExternalIds);
 
@@ -382,6 +388,16 @@ function buildSyncDiagnostics(params: {
     database: {
       transactionCountByAccountId: Object.fromEntries(params.transactionCounts),
     },
+    backfill: params.backfillResult
+      ? {
+          accountsRequested: params.backfillResult.accountsRequested,
+          fetchedFromPlaid: params.backfillResult.fetchedFromPlaid,
+          inserted: params.backfillResult.inserted,
+          updated: params.backfillResult.updated,
+          skipped: params.backfillResult.skipped,
+          error: params.backfillResult.error,
+        }
+      : undefined,
   };
 }
 
@@ -458,7 +474,7 @@ export async function syncPlaidConnection(params: {
 
     const accountContextMap = buildAccountContextMap(mappedAccounts);
 
-    const transactionResult = await syncPlaidTransactions({
+    let transactionResult = await syncPlaidTransactions({
       accessToken,
       connection,
       repository,
@@ -468,6 +484,53 @@ export async function syncPlaidConnection(params: {
       accountContextMap,
       newAccountExternalIds,
     });
+
+    let transactionCounts = await repository.countTransactionsByAccountIds(
+      userId,
+      [...accountIdMap.values()],
+    );
+
+    let backfillResult: PlaidTransactionBackfillResult | null = null;
+    const accountsNeedingBackfill = selectAccountsNeedingBackfill({
+      mappedAccounts,
+      accountIdMap,
+      transactionCounts,
+    });
+
+    if (accountsNeedingBackfill.length > 0) {
+      console.info("[plaid/sync] backfilling accounts with zero persisted transactions", {
+        connectionId: connection.id,
+        userId,
+        accounts: accountsNeedingBackfill.map((account) => ({
+          externalAccountId: account.externalAccountId,
+          name: account.name,
+          type: account.type,
+          recordKind: account.recordKind,
+          lastFour: account.lastFour ? `****${account.lastFour}` : null,
+        })),
+      });
+
+      await requestTransactionsRefresh(accessToken);
+      await sleep(SYNC_RETRY_DELAY_MS);
+
+      backfillResult = await backfillHistoricalTransactions({
+        accessToken,
+        repository,
+        userId,
+        householdId,
+        accountIdMap,
+        accountContextMap,
+        accounts: accountsNeedingBackfill,
+      });
+
+      transactionResult.added += backfillResult.inserted;
+      transactionResult.modified += backfillResult.updated;
+
+      transactionCounts = await repository.countTransactionsByAccountIds(
+        userId,
+        [...accountIdMap.values()],
+      );
+    }
 
     let investmentsSynced = 0;
     let liabilitiesSynced = 0;
@@ -523,10 +586,7 @@ export async function syncPlaidConnection(params: {
       });
     }
 
-    const transactionCounts = await repository.countTransactionsByAccountIds(
-      userId,
-      [...accountIdMap.values()],
-    );
+    const transactionCountsForDiagnostics = transactionCounts;
 
     const diagnostics = buildSyncDiagnostics({
       connectionId: connection.id,
@@ -535,19 +595,19 @@ export async function syncPlaidConnection(params: {
       accountIdMap,
       insertedExternalIds,
       transactionResult,
-      transactionCounts,
+      transactionCounts: transactionCountsForDiagnostics,
+      backfillResult,
     });
 
     const newCreditAccountsWithoutTransactions = diagnostics.accounts.filter(
       (account) =>
-        account.isNew &&
         account.recordKind === "debt" &&
         account.type === "credit_card" &&
-        (transactionCounts.get(account.internalAccountId) ?? 0) === 0,
+        (transactionCountsForDiagnostics.get(account.internalAccountId) ?? 0) === 0,
     );
 
     if (newCreditAccountsWithoutTransactions.length > 0) {
-      console.warn("[plaid/sync] new credit accounts still have zero transactions", {
+      console.warn("[plaid/sync] credit accounts still have zero transactions after backfill", {
         connectionId: connection.id,
         userId,
         accounts: newCreditAccountsWithoutTransactions.map((account) => ({
@@ -556,6 +616,8 @@ export async function syncPlaidConnection(params: {
           lastFour: account.lastFour ? `****${account.lastFour}` : null,
         })),
         pendingError: transactionResult.pendingError,
+        backfillError: backfillResult?.error ?? null,
+        backfillFetched: backfillResult?.fetchedFromPlaid ?? 0,
       });
     }
 
@@ -564,8 +626,16 @@ export async function syncPlaidConnection(params: {
       userId,
       transactionsCursor: transactionResult.nextCursor,
       status: "connected",
-      errorCode: transactionResult.pendingError ? "TRANSACTIONS_PENDING" : null,
-      errorMessage: transactionResult.pendingError,
+      errorCode:
+        newCreditAccountsWithoutTransactions.length > 0
+          ? "TRANSACTIONS_PENDING"
+          : transactionResult.pendingError
+            ? "TRANSACTIONS_PENDING"
+            : null,
+      errorMessage:
+        newCreditAccountsWithoutTransactions.length > 0
+          ? "Credit card transactions are still syncing. Tap Sync now again in a minute."
+          : transactionResult.pendingError,
     });
 
     console.info("[plaid/sync] connection synced", {

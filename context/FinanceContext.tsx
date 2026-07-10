@@ -90,6 +90,7 @@ import {
   fetchPlaidLinkToken,
   syncPlaidBank,
 } from "@/lib/plaid/clientApi";
+import type { PlaidSyncResult } from "@/lib/plaid/types";
 import { normalizeBillCategory } from "@/lib/finance/billCategories";
 import type { DemoProfileId, OnboardingMode, OnboardingState } from "@/lib/onboarding/types";
 import {
@@ -213,7 +214,7 @@ export type FinanceContextValue = FinanceData & {
   ) => Promise<void>;
   connectBank: () => Promise<string>;
   reconnectBank: (connectionId: string) => Promise<string>;
-  syncBank: (connectionId?: string) => Promise<void>;
+  syncBank: (connectionId?: string) => Promise<PlaidSyncResult[]>;
   disconnectBank: (connectionId: string) => Promise<void>;
   markNotificationRead: (notificationId: string) => void;
   markAllNotificationsRead: () => void;
@@ -1522,8 +1523,9 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
       setIsSyncing(true);
 
       try {
-        await syncPlaidBank(connectionId);
+        const results = await syncPlaidBank(connectionId);
         await refreshFinance();
+        return results;
       } finally {
         setIsSyncing(false);
       }

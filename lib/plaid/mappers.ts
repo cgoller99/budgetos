@@ -47,7 +47,7 @@ function mapPlaidAccountType(
   type: PlaidAccountType,
   subtype: AccountSubtype | null,
 ): { accountType: string; recordKind: PlaidMappedAccount["recordKind"] } {
-  if (type === "credit") {
+  if (type === "credit" || subtype === "credit card") {
     return { accountType: "credit_card", recordKind: "debt" };
   }
 

@@ -39,6 +39,14 @@ export type PlaidSyncDiagnostics = {
   database: {
     transactionCountByAccountId: Record<string, number>;
   };
+  backfill?: {
+    accountsRequested: number;
+    fetchedFromPlaid: number;
+    inserted: number;
+    updated: number;
+    skipped: Array<{ reason: PlaidTransactionSkipReason; count: number }>;
+    error: string | null;
+  };
 };
 
 export type PlaidSyncResult = {
