@@ -81,10 +81,22 @@ function TransactionsContentInner() {
 
   const handleSyncNow = useCallback(async () => {
     try {
-      await syncBank();
+      const results = await syncBank();
+      const added = results.reduce(
+        (sum, result) => sum + result.transactionsAdded,
+        0,
+      );
+      const backfilled = results.reduce(
+        (sum, result) => sum + (result.diagnostics?.backfill?.inserted ?? 0),
+        0,
+      );
+
       showToast({
-        title: "Bank sync complete",
-        subtitle: "Balances and transactions were refreshed.",
+        title: added + backfilled > 0 ? "Bank sync complete" : "Sync finished",
+        subtitle:
+          added + backfilled > 0
+            ? `Imported ${added + backfilled} transaction${added + backfilled === 1 ? "" : "s"}.`
+            : "No new transactions yet. If you just linked a credit card, wait a minute and sync again.",
       });
     } catch (error) {
       showToast({
