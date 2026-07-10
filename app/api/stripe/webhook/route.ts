@@ -7,6 +7,11 @@ import {
   syncSubscriptionToProfile,
 } from "@/lib/stripe/subscriptionService";
 import { tryLogAdminEvent } from "@/lib/admin/logEventSafe";
+import {
+  ANALYTICS_EVENTS,
+  captureServerEvent,
+} from "@/lib/analytics/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
@@ -100,6 +105,34 @@ export async function POST(request: Request) {
             { expand: ["items.data.price.product"] },
           );
           await syncSubscriptionToProfile(subscription);
+
+          const customerId =
+            typeof subscription.customer === "string"
+              ? subscription.customer
+              : subscription.customer?.id;
+
+          let userId: string | undefined;
+          if (customerId) {
+            const supabase = createSupabaseAdminClient();
+            const { data: profile } = await supabase
+              .from("profiles")
+              .select("id, subscription_plan")
+              .eq("stripe_customer_id", customerId)
+              .maybeSingle();
+            userId = profile?.id;
+
+            await captureServerEvent(
+              ANALYTICS_EVENTS.SUBSCRIPTION_PAYMENT_FAILED,
+              {
+                plan: profile?.subscription_plan ?? "unknown",
+                subscription_id: subscription.id,
+                invoice_id: invoice.id ?? null,
+                status: subscription.status,
+              },
+              { distinctId: userId },
+            );
+          }
+
           await tryLogAdminEvent({
             eventType: "stripe",
             message: `invoice.payment_failed (${subscription.id})`,
@@ -107,6 +140,7 @@ export async function POST(request: Request) {
               type: event.type,
               status: subscription.status,
               invoiceId: invoice.id,
+              userId,
             },
           });
         }
