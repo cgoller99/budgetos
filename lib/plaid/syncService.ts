@@ -17,9 +17,11 @@ import {
 } from "@/lib/plaid/mappers";
 import { decryptConnectionAccessToken } from "@/lib/plaid/plaidService";
 import type {
+  PlaidMappedAccount,
   PlaidMappedTransaction,
   PlaidPayrollCandidate,
   PlaidRecurringCandidate,
+  PlaidSyncDiagnostics,
   PlaidSyncResult,
 } from "@/lib/plaid/types";
 import type { BankConnectionRow } from "@/lib/supabase/database.types";
@@ -28,6 +30,12 @@ import { BankConnectionsRepository } from "@/lib/supabase/repositories/bankConne
 import { resolveUserHouseholdId } from "@/lib/supabase/householdFinance";
 
 const INITIAL_SYNC_LOOKBACK_DAYS = 730;
+const SYNC_RETRY_DELAY_MS = 2500;
+const MAX_SYNC_ATTEMPTS = 4;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 function monthsAgoIso(days: number): string {
   const date = new Date();
@@ -86,6 +94,19 @@ async function ensureInitialSyncWindow(accessToken: string): Promise<void> {
   });
 }
 
+async function requestTransactionsRefresh(accessToken: string): Promise<boolean> {
+  try {
+    const client = getPlaidClient();
+    await client.transactionsRefresh({ access_token: accessToken });
+    return true;
+  } catch (error) {
+    console.warn("[plaid/sync] transactionsRefresh failed", {
+      message: getPlaidErrorMessage(error),
+    });
+    return false;
+  }
+}
+
 async function resolveInstitutionName(params: {
   connection: BankConnectionRow;
   itemInstitutionId: string | null;
@@ -121,19 +142,49 @@ async function resolveInstitutionName(params: {
   }
 }
 
-async function syncPlaidTransactions(params: {
+function buildAccountContextMap(
+  accounts: PlaidMappedAccount[],
+): Map<string, Pick<PlaidMappedAccount, "recordKind" | "type">> {
+  return new Map(
+    accounts.map((account) => [
+      account.externalAccountId,
+      { recordKind: account.recordKind, type: account.type },
+    ]),
+  );
+}
+
+function mapSyncTransactions(
+  transactions: Transaction[],
+  accountContextMap: Map<string, Pick<PlaidMappedAccount, "recordKind" | "type">>,
+): PlaidMappedTransaction[] {
+  return transactions.map((transaction) =>
+    mapPlaidTransaction(
+      transaction,
+      accountContextMap.get(transaction.account_id),
+    ),
+  );
+}
+
+async function syncPlaidTransactionsOnce(params: {
   accessToken: string;
   connection: BankConnectionRow;
   repository: BankConnectionsRepository;
   userId: string;
   householdId: string | null;
   accountIdMap: Map<string, string>;
+  accountContextMap: Map<string, Pick<PlaidMappedAccount, "recordKind" | "type">>;
+  primeInitialWindow: boolean;
 }): Promise<{
   added: number;
   modified: number;
   removed: number;
+  skipped: PlaidSyncDiagnostics["persisted"]["skipped"];
   nextCursor: string | null;
   pendingError: string | null;
+  fetchedFromPlaid: number;
+  addedFromPlaid: number;
+  modifiedFromPlaid: number;
+  removedFromPlaid: number;
 }> {
   const {
     accessToken,
@@ -142,10 +193,12 @@ async function syncPlaidTransactions(params: {
     userId,
     householdId,
     accountIdMap,
+    accountContextMap,
+    primeInitialWindow,
   } = params;
 
   try {
-    if (!connection.transactions_cursor) {
+    if (primeInitialWindow) {
       await ensureInitialSyncWindow(accessToken);
     }
 
@@ -154,8 +207,9 @@ async function syncPlaidTransactions(params: {
       cursor: connection.transactions_cursor,
     });
 
-    const mappedTransactions = [...syncResult.added, ...syncResult.modified].map(
-      mapPlaidTransaction,
+    const mappedTransactions = mapSyncTransactions(
+      [...syncResult.added, ...syncResult.modified],
+      accountContextMap,
     );
 
     const persistResult = await repository.persistSyncedTransactions({
@@ -170,8 +224,13 @@ async function syncPlaidTransactions(params: {
       added: persistResult.added,
       modified: persistResult.modified,
       removed: persistResult.removed,
+      skipped: persistResult.skipped,
       nextCursor: syncResult.nextCursor,
       pendingError: null,
+      fetchedFromPlaid: syncResult.added.length + syncResult.modified.length,
+      addedFromPlaid: syncResult.added.length,
+      modifiedFromPlaid: syncResult.modified.length,
+      removedFromPlaid: syncResult.removed.length,
     };
   } catch (error) {
     if (isPlaidItemLoginRequired(error)) {
@@ -190,10 +249,140 @@ async function syncPlaidTransactions(params: {
       added: 0,
       modified: 0,
       removed: 0,
+      skipped: [],
       nextCursor: connection.transactions_cursor,
       pendingError: message,
+      fetchedFromPlaid: 0,
+      addedFromPlaid: 0,
+      modifiedFromPlaid: 0,
+      removedFromPlaid: 0,
     };
   }
+}
+
+async function syncPlaidTransactions(params: {
+  accessToken: string;
+  connection: BankConnectionRow;
+  repository: BankConnectionsRepository;
+  userId: string;
+  householdId: string | null;
+  accountIdMap: Map<string, string>;
+  accountContextMap: Map<string, Pick<PlaidMappedAccount, "recordKind" | "type">>;
+  newAccountExternalIds: string[];
+}): Promise<{
+  added: number;
+  modified: number;
+  removed: number;
+  skipped: PlaidSyncDiagnostics["persisted"]["skipped"];
+  nextCursor: string | null;
+  pendingError: string | null;
+  refreshRequested: boolean;
+  syncAttempts: number;
+  fetchedFromPlaid: number;
+  addedFromPlaid: number;
+  modifiedFromPlaid: number;
+  removedFromPlaid: number;
+}> {
+  const shouldPrimeInitialWindow = !params.connection.transactions_cursor;
+  const shouldForceRefresh =
+    params.newAccountExternalIds.length > 0 || shouldPrimeInitialWindow;
+
+  let refreshRequested = false;
+
+  if (shouldForceRefresh) {
+    refreshRequested = await requestTransactionsRefresh(params.accessToken);
+    if (refreshRequested) {
+      await sleep(SYNC_RETRY_DELAY_MS);
+    }
+  }
+
+  let latest = await syncPlaidTransactionsOnce({
+    ...params,
+    primeInitialWindow: shouldPrimeInitialWindow,
+  });
+
+  let syncAttempts = 1;
+
+  const needsRetry = () =>
+    Boolean(latest.pendingError) ||
+    (shouldForceRefresh &&
+      latest.fetchedFromPlaid === 0 &&
+      latest.added === 0 &&
+      latest.modified === 0);
+
+  while (needsRetry() && syncAttempts < MAX_SYNC_ATTEMPTS) {
+    syncAttempts += 1;
+    refreshRequested =
+      (await requestTransactionsRefresh(params.accessToken)) || refreshRequested;
+    await sleep(SYNC_RETRY_DELAY_MS * syncAttempts);
+    latest = await syncPlaidTransactionsOnce({
+      ...params,
+      primeInitialWindow: false,
+    });
+  }
+
+  return {
+    added: latest.added,
+    modified: latest.modified,
+    removed: latest.removed,
+    skipped: latest.skipped,
+    nextCursor: latest.nextCursor,
+    pendingError: latest.pendingError,
+    refreshRequested,
+    syncAttempts,
+    fetchedFromPlaid: latest.fetchedFromPlaid,
+    addedFromPlaid: latest.addedFromPlaid,
+    modifiedFromPlaid: latest.modifiedFromPlaid,
+    removedFromPlaid: latest.removedFromPlaid,
+  };
+}
+
+function buildSyncDiagnostics(params: {
+  connectionId: string;
+  itemId: string;
+  mappedAccounts: PlaidMappedAccount[];
+  accountIdMap: Map<string, string>;
+  insertedExternalIds: string[];
+  transactionResult: Awaited<ReturnType<typeof syncPlaidTransactions>>;
+  transactionCounts: Map<string, number>;
+}): PlaidSyncDiagnostics {
+  const inserted = new Set(params.insertedExternalIds);
+
+  return {
+    connectionId: params.connectionId,
+    itemId: params.itemId,
+    accounts: params.mappedAccounts.map((account) => ({
+      externalAccountId: account.externalAccountId,
+      internalAccountId:
+        params.accountIdMap.get(account.externalAccountId) ?? "",
+      name: account.name,
+      recordKind: account.recordKind,
+      type: account.type,
+      lastFour: account.lastFour,
+      balance: account.balance,
+      institution: account.institution,
+      isNew: inserted.has(account.externalAccountId),
+    })),
+    plaid: {
+      fetchedFromPlaid: params.transactionResult.fetchedFromPlaid,
+      addedFromPlaid: params.transactionResult.addedFromPlaid,
+      modifiedFromPlaid: params.transactionResult.modifiedFromPlaid,
+      removedFromPlaid: params.transactionResult.removedFromPlaid,
+      pending: Boolean(params.transactionResult.pendingError),
+      pendingError: params.transactionResult.pendingError,
+      refreshRequested: params.transactionResult.refreshRequested,
+      syncAttempts: params.transactionResult.syncAttempts,
+    },
+    persisted: {
+      inserted: params.transactionResult.added,
+      updated: params.transactionResult.modified,
+      deleted: params.transactionResult.removed,
+      skipped: params.transactionResult.skipped,
+    },
+    database: {
+      transactionCountByAccountId: Object.fromEntries(params.transactionCounts),
+    },
+  };
 }
 
 export async function syncPlaidConnection(params: {
@@ -208,6 +397,8 @@ export async function syncPlaidConnection(params: {
 
   try {
     const client = getPlaidClient();
+    const priorExternalAccountIds =
+      await repository.listExternalAccountIdsForConnection(userId, connection.id);
     const accountsResponse = await client.accountsGet({ access_token: accessToken });
     const itemId = accountsResponse.data.item.item_id;
     const institutionName = await resolveInstitutionName({
@@ -253,12 +444,19 @@ export async function syncPlaidConnection(params: {
       institutionName,
     });
 
-    const accountIdMap = await repository.upsertLinkedAccounts({
-      userId,
-      householdId,
-      connectionId: connection.id,
-      accounts: mappedAccounts,
-    });
+    const { accountIdMap, insertedExternalIds } =
+      await repository.upsertLinkedAccounts({
+        userId,
+        householdId,
+        connectionId: connection.id,
+        accounts: mappedAccounts,
+      });
+
+    const newAccountExternalIds = mappedAccounts
+      .map((account) => account.externalAccountId)
+      .filter((externalAccountId) => !priorExternalAccountIds.has(externalAccountId));
+
+    const accountContextMap = buildAccountContextMap(mappedAccounts);
 
     const transactionResult = await syncPlaidTransactions({
       accessToken,
@@ -267,6 +465,8 @@ export async function syncPlaidConnection(params: {
       userId,
       householdId,
       accountIdMap,
+      accountContextMap,
+      newAccountExternalIds,
     });
 
     let investmentsSynced = 0;
@@ -323,6 +523,42 @@ export async function syncPlaidConnection(params: {
       });
     }
 
+    const transactionCounts = await repository.countTransactionsByAccountIds(
+      userId,
+      [...accountIdMap.values()],
+    );
+
+    const diagnostics = buildSyncDiagnostics({
+      connectionId: connection.id,
+      itemId,
+      mappedAccounts,
+      accountIdMap,
+      insertedExternalIds,
+      transactionResult,
+      transactionCounts,
+    });
+
+    const newCreditAccountsWithoutTransactions = diagnostics.accounts.filter(
+      (account) =>
+        account.isNew &&
+        account.recordKind === "debt" &&
+        account.type === "credit_card" &&
+        (transactionCounts.get(account.internalAccountId) ?? 0) === 0,
+    );
+
+    if (newCreditAccountsWithoutTransactions.length > 0) {
+      console.warn("[plaid/sync] new credit accounts still have zero transactions", {
+        connectionId: connection.id,
+        userId,
+        accounts: newCreditAccountsWithoutTransactions.map((account) => ({
+          externalAccountId: account.externalAccountId,
+          name: account.name,
+          lastFour: account.lastFour ? `****${account.lastFour}` : null,
+        })),
+        pendingError: transactionResult.pendingError,
+      });
+    }
+
     await repository.markConnectionSynced({
       connectionId: connection.id,
       userId,
@@ -335,9 +571,12 @@ export async function syncPlaidConnection(params: {
     console.info("[plaid/sync] connection synced", {
       connectionId: connection.id,
       accountsSynced: mappedAccounts.length,
+      newAccounts: newAccountExternalIds.length,
       transactionsAdded: transactionResult.added,
-      investmentsSynced,
-      liabilitiesSynced,
+      transactionsModified: transactionResult.modified,
+      syncAttempts: transactionResult.syncAttempts,
+      refreshRequested: transactionResult.refreshRequested,
+      diagnostics,
     });
 
     return {
@@ -348,6 +587,7 @@ export async function syncPlaidConnection(params: {
       transactionsRemoved: transactionResult.removed,
       investmentsSynced,
       liabilitiesSynced,
+      diagnostics,
     };
   } catch (error) {
     const message = getPlaidErrorMessage(error);

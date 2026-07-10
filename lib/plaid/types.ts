@@ -2,6 +2,45 @@ export type PlaidSyncScope = "connection" | "all";
 
 export type PlaidLinkMode = "create" | "update";
 
+export type PlaidTransactionSkipReason = "missing_account_map";
+
+export type PlaidSyncAccountSummary = {
+  externalAccountId: string;
+  internalAccountId: string;
+  name: string;
+  recordKind: PlaidMappedAccount["recordKind"];
+  type: string;
+  lastFour: string | null;
+  balance: number;
+  institution: string;
+  isNew: boolean;
+};
+
+export type PlaidSyncDiagnostics = {
+  connectionId: string;
+  itemId: string | null;
+  accounts: PlaidSyncAccountSummary[];
+  plaid: {
+    fetchedFromPlaid: number;
+    addedFromPlaid: number;
+    modifiedFromPlaid: number;
+    removedFromPlaid: number;
+    pending: boolean;
+    pendingError: string | null;
+    refreshRequested: boolean;
+    syncAttempts: number;
+  };
+  persisted: {
+    inserted: number;
+    updated: number;
+    deleted: number;
+    skipped: Array<{ reason: PlaidTransactionSkipReason; count: number }>;
+  };
+  database: {
+    transactionCountByAccountId: Record<string, number>;
+  };
+};
+
 export type PlaidSyncResult = {
   connectionId: string;
   accountsSynced: number;
@@ -10,6 +49,30 @@ export type PlaidSyncResult = {
   transactionsRemoved: number;
   investmentsSynced: number;
   liabilitiesSynced: number;
+  diagnostics?: PlaidSyncDiagnostics;
+};
+
+export type PlaidUserDiagnostics = {
+  ok: true;
+  connections: number;
+  items: Array<{
+    connectionId: string;
+    institutionName: string | null;
+    status: string;
+    errorCode: string | null;
+    errorMessage: string | null;
+    lastSyncedAt: string | null;
+    accounts: Array<{
+      id: string;
+      name: string;
+      recordKind: string;
+      type: string;
+      lastFour: string | null;
+      balance: number;
+      institution: string;
+      transactionCount: number;
+    }>;
+  }>;
 };
 
 export type PlaidMappedAccount = {

@@ -1,4 +1,5 @@
 import type { FinanceData, Transaction, TransactionType } from "@/lib/finance/types";
+import { getLinkedAccountName } from "@/lib/transactions/accountLookup";
 
 export type TransactionSortField = "date" | "amount";
 export type TransactionSortDirection = "asc" | "desc";
@@ -26,12 +27,6 @@ export const DEFAULT_TRANSACTION_FILTERS: TransactionFilterState = {
   sortDirection: "desc",
 };
 
-function getAccountName(data: FinanceData, accountId: string): string {
-  return (
-    data.accounts.find((account) => account.id === accountId)?.name ?? "Account"
-  );
-}
-
 function matchesSearch(
   data: FinanceData,
   transaction: Transaction,
@@ -42,9 +37,9 @@ function matchesSearch(
   }
 
   const query = search.trim().toLowerCase();
-  const accountName = getAccountName(data, transaction.accountId).toLowerCase();
+  const accountName = getLinkedAccountName(data, transaction.accountId).toLowerCase();
   const transferName = transaction.transferAccountId
-    ? getAccountName(data, transaction.transferAccountId).toLowerCase()
+    ? getLinkedAccountName(data, transaction.transferAccountId).toLowerCase()
     : "";
 
   return (

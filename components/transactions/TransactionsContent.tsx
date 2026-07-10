@@ -14,6 +14,7 @@ import { TransactionRow } from "@/components/transactions/TransactionRow";
 import { Button, EmptyState, PageHeader, SkeletonGrid, StatCard } from "@/components/ui";
 import { pageContainerWideClassName } from "@/components/ui/tokens";
 import { useFinance } from "@/context/FinanceContext";
+import { useToast } from "@/context/ToastContext";
 import { formatCurrency } from "@/lib/finance/format";
 import {
   buildTransactionsHref,
@@ -26,10 +27,15 @@ import {
   getTransactionSummary,
   type TransactionFilterState,
 } from "@/lib/transactions";
+import {
+  hasLinkedFinancialAccounts,
+} from "@/lib/transactions/accountLookup";
+import { isPlaidClientEnabled } from "@/lib/plaid/clientConfig";
 import { cn } from "@/components/ui/cn";
 
 function TransactionsContentInner() {
-  const finance = useFinance();
+  const { syncBank, isSyncing, ...finance } = useFinance();
+  const { showToast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [filters, setFilters] = useState<TransactionFilterState>(() =>
@@ -69,6 +75,24 @@ function TransactionsContentInner() {
     setFilters(DEFAULT_TRANSACTION_FILTERS);
     router.replace("/transactions");
   }, [router]);
+
+  const plaidEnabled = isPlaidClientEnabled();
+  const canSyncPlaid = plaidEnabled && hasLinkedFinancialAccounts(finance);
+
+  const handleSyncNow = useCallback(async () => {
+    try {
+      await syncBank();
+      showToast({
+        title: "Bank sync complete",
+        subtitle: "Balances and transactions were refreshed.",
+      });
+    } catch (error) {
+      showToast({
+        title: "Sync failed",
+        subtitle: error instanceof Error ? error.message : "Try again from Settings.",
+      });
+    }
+  }, [showToast, syncBank]);
 
   const summary = useMemo(() => getTransactionSummary(finance), [finance]);
   const transactions = useMemo(
@@ -131,7 +155,18 @@ function TransactionsContentInner() {
     <div className={cn(pageContainerWideClassName)}>
       <PageHeader
         action={
-          <Button onClick={() => setIsCreateOpen(true)}>Add transaction</Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {canSyncPlaid ? (
+              <Button
+                variant="secondary"
+                disabled={isSyncing}
+                onClick={() => void handleSyncNow()}
+              >
+                {isSyncing ? "Syncing..." : "Sync now"}
+              </Button>
+            ) : null}
+            <Button onClick={() => setIsCreateOpen(true)}>Add transaction</Button>
+          </div>
         }
       />
 
@@ -170,7 +205,7 @@ function TransactionsContentInner() {
         <TransactionFilters filters={filters} onChange={handleFiltersChange} />
       </section>
 
-      {finance.accounts.length === 0 ? (
+      {finance.accounts.length === 0 && finance.debts.length === 0 ? (
         <EmptyState
           icon="🏦"
           title="Add an account first"
@@ -188,12 +223,18 @@ function TransactionsContentInner() {
           description={
             hasActiveFilters
               ? `Nothing matched ${filterDescription}. Try clearing filters or broadening your search.`
-              : "Add your first transaction or adjust your search and filters."
+              : canSyncPlaid
+                ? "Sync your linked accounts to import recent activity, or add a transaction manually."
+                : "Add your first transaction or adjust your search and filters."
           }
           action={
             hasActiveFilters ? (
               <Button variant="secondary" onClick={clearFilters}>
                 Clear filters
+              </Button>
+            ) : canSyncPlaid ? (
+              <Button disabled={isSyncing} onClick={() => void handleSyncNow()}>
+                {isSyncing ? "Syncing..." : "Sync linked accounts"}
               </Button>
             ) : (
               <Button onClick={() => setIsCreateOpen(true)}>Add transaction</Button>

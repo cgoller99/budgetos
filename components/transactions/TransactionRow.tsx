@@ -8,6 +8,7 @@ import {
   formatTransactionDate,
   getTransactionTypeLabel,
 } from "@/lib/transactions";
+import { getLinkedAccountName } from "@/lib/transactions/accountLookup";
 
 type TransactionRowProps = {
   transaction: Transaction;
@@ -16,10 +17,6 @@ type TransactionRowProps = {
   onEdit: () => void;
   onDelete: () => void;
 };
-
-function getAccountName(data: FinanceData, accountId: string): string {
-  return data.accounts.find((account) => account.id === accountId)?.name ?? "Account";
-}
 
 function getTypeVariant(
   type: Transaction["type"],
@@ -43,9 +40,9 @@ export function TransactionRow({
   onEdit,
   onDelete,
 }: TransactionRowProps) {
-  const accountName = getAccountName(data, transaction.accountId);
+  const accountName = getLinkedAccountName(data, transaction.accountId);
   const transferName = transaction.transferAccountId
-    ? getAccountName(data, transaction.transferAccountId)
+    ? getLinkedAccountName(data, transaction.transferAccountId)
     : null;
   const signedAmount =
     transaction.type === "expense"
