@@ -226,11 +226,32 @@ function mapPlaidCategory(transaction: Transaction): string {
   return transaction.category?.[0] ?? "Uncategorized";
 }
 
+function resolvePlaidTransactionType(
+  transaction: Transaction,
+): PlaidMappedTransaction["type"] {
+  const primary = transaction.personal_finance_category?.primary;
+  const detailed = transaction.personal_finance_category?.detailed ?? "";
+
+  if (
+    primary === "TRANSFER_IN" ||
+    primary === "TRANSFER_OUT" ||
+    detailed.startsWith("TRANSFER_")
+  ) {
+    return "transfer";
+  }
+
+  if (primary === "INCOME" || primary === "DEPOSIT") {
+    return "income";
+  }
+
+  const amount = toNumber(transaction.amount);
+  return amount < 0 ? "income" : "expense";
+}
+
 export function mapPlaidTransaction(
   transaction: Transaction,
 ): PlaidMappedTransaction {
   const amount = toNumber(transaction.amount);
-  const isIncome = amount < 0;
   const normalizedAmount = Math.abs(amount);
   const merchantName =
     transaction.merchant_name?.trim() ||
@@ -241,7 +262,7 @@ export function mapPlaidTransaction(
     externalTransactionId: transaction.transaction_id,
     externalAccountId: transaction.account_id,
     amount: normalizedAmount,
-    type: isIncome ? "income" : "expense",
+    type: resolvePlaidTransactionType(transaction),
     category: mapPlaidCategory(transaction),
     date: transaction.date,
     notes: merchantName,

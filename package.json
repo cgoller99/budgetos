@@ -19,6 +19,8 @@
     "audit:env": "node scripts/audit-env.mjs",
     "diagnose:plaid": "node scripts/diagnose-plaid-config.mjs",
     "audit:remote": "node scripts/audit-production-remote.mjs",
+    "audit:public-launch": "node scripts/audit-production-remote.mjs --public-launch",
+    "test:income-annualization": "node scripts/test-income-annualization.mjs",
     "setup:stripe-webhook": "node --env-file=.env.local scripts/setup-stripe-webhook.mjs",
     "setup:production": "node --env-file=.env.local scripts/setup-production.mjs",
     "apply:supabase-sql": "node --env-file=.env.local scripts/apply-supabase-sql-api.mjs",

@@ -115,6 +115,10 @@ export function BankSyncConnect({
           ? loadError.message
           : "Unable to start bank connection.";
       setError(message);
+      trackEvent(ANALYTICS_EVENTS.PLAID_CONNECTION_FAILED, {
+        stage: "link_token",
+        mode,
+      });
     } finally {
       setIsLoadingToken(false);
     }
@@ -147,6 +151,10 @@ export function BankSyncConnect({
             ? successError.message
             : "Unable to finish bank connection.";
         setError(message);
+        trackEvent(ANALYTICS_EVENTS.PLAID_CONNECTION_FAILED, {
+          stage: "exchange",
+          mode,
+        });
         showToast({
           title: "Connection failed",
           subtitle: message,

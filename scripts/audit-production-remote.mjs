@@ -9,6 +9,7 @@
  */
 
 const DEFAULT_SITE = "https://buxme.co";
+const publicLaunch = process.argv.includes("--public-launch");
 
 function getSiteUrl() {
   const index = process.argv.indexOf("--url");
@@ -97,35 +98,72 @@ async function main() {
       ) && allOk;
 
     if (!launch.body?.posthogConfigured) {
-      warn("NEXT_PUBLIC_POSTHOG_KEY", "missing on Vercel — analytics disabled");
+      if (publicLaunch) {
+        allOk = report(false, "PostHog configured", "NEXT_PUBLIC_POSTHOG_KEY missing") && allOk;
+      } else {
+        warn("NEXT_PUBLIC_POSTHOG_KEY", "missing on Vercel — analytics disabled");
+      }
     } else {
       report(true, "PostHog configured", "NEXT_PUBLIC_POSTHOG_KEY present");
     }
 
     if (!launch.body?.stripeWebhookConfigured) {
-      warn(
-        "STRIPE_WEBHOOK_SECRET",
-        "missing — paid subscriptions will not sync (OK for free beta)",
-      );
+      if (publicLaunch) {
+        allOk =
+          report(
+            false,
+            "Stripe webhook secret configured",
+            "STRIPE_WEBHOOK_SECRET missing on Vercel",
+          ) && allOk;
+      } else {
+        warn(
+          "STRIPE_WEBHOOK_SECRET",
+          "missing — paid subscriptions will not sync",
+        );
+      }
     } else {
       report(true, "Stripe webhook secret configured", "present");
+    }
+
+    if (publicLaunch && launch.body?.stripeLiveMode !== true) {
+      allOk =
+        report(
+          false,
+          "Stripe live mode enabled",
+          "STRIPE_SECRET_KEY is not sk_live_ on Vercel",
+        ) && allOk;
+    } else if (launch.body?.stripeLiveMode === true) {
+      report(true, "Stripe live mode enabled", "sk_live_ key present");
+    } else if (launch.body?.stripeConfigured) {
+      warn("Stripe mode", "checkout configured but not sk_live_ — use live keys for public billing");
     }
 
     report(
       launch.body?.stripeConfigured === true,
       "Stripe checkout configured",
-      launch.body?.stripeConfigured ? "live keys present" : launch.body?.configurationError ?? "incomplete",
+      launch.body?.stripeConfigured ? "keys present" : launch.body?.configurationError ?? "incomplete",
     );
   } else {
     allOk = report(false, "Launch health endpoint reachable", `HTTP ${launch.status}`) && allOk;
   }
 
   const stripe = await fetchJson(`${siteUrl}/api/stripe/webhook`);
-  report(
-    stripe.body?.webhookConfigured === true,
-    "Stripe webhook handler ready",
-    stripe.body?.webhookConfigured ? "secret present" : "returns 503 on POST until STRIPE_WEBHOOK_SECRET is set",
-  );
+  if (publicLaunch) {
+    allOk =
+      report(
+        stripe.body?.webhookConfigured === true,
+        "Stripe webhook handler ready",
+        stripe.body?.webhookConfigured
+          ? "secret present"
+          : "returns 503 on POST until STRIPE_WEBHOOK_SECRET is set",
+      ) && allOk;
+  } else {
+    report(
+      stripe.body?.webhookConfigured === true,
+      "Stripe webhook handler ready",
+      stripe.body?.webhookConfigured ? "secret present" : "returns 503 on POST until STRIPE_WEBHOOK_SECRET is set",
+    );
+  }
 
   const cronProbe = await fetchJson(`${siteUrl}/api/cron/run-paychecks`);
   allOk =
