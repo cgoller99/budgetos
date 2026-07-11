@@ -1,13 +1,17 @@
-import type { PlaidMappedTransaction, PlaidRecurringCandidate } from "@/lib/plaid/types";
-import { detectPlaidRecurringCandidates } from "@/lib/plaid/mappers";
+import type { PlaidMappedTransaction, RecurringBillCandidate } from "@/lib/plaid/types";
+import { detectRecurringBillCandidatesFromPlaidTransactions } from "@/lib/plaid/recurringBillDetection";
+import type { FinanceData } from "@/lib/finance/types";
 
 export function detectRecurringBillCandidates(
   transactions: PlaidMappedTransaction[],
   dismissedMerchantKeys: string[] = [],
-): PlaidRecurringCandidate[] {
-  const dismissed = new Set(dismissedMerchantKeys.map((key) => key.toLowerCase()));
-
-  return detectPlaidRecurringCandidates(transactions).filter(
-    (candidate) => !dismissed.has(candidate.merchantKey.toLowerCase()),
-  );
+  financeData?: FinanceData,
+): RecurringBillCandidate[] {
+  return detectRecurringBillCandidatesFromPlaidTransactions(transactions, {
+    bills: financeData?.bills ?? [],
+    dismissedMerchantKeys,
+    financeData,
+  });
 }
+
+export { detectRecurringBillCandidatesFromFinanceData } from "@/lib/plaid/recurringBillDetection";

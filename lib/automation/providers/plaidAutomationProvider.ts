@@ -1,8 +1,10 @@
 import type { AutomationProvider, AutomationSuggestion } from "@/lib/automation/types";
 import type { FinanceData } from "@/lib/finance/types";
-import { detectRecurringBillCandidates } from "@/lib/plaid/recurringDetectionService";
+import { candidateToAddBillInput } from "@/lib/plaid/recurringBillDetection";
+import { detectRecurringBillCandidatesFromFinanceData } from "@/lib/plaid/recurringBillDetection";
 import { detectPayrollCandidates } from "@/lib/plaid/incomeDetectionService";
 import type { PlaidMappedTransaction } from "@/lib/plaid/types";
+import { getBillFrequencyLabel } from "@/lib/recurring/frequencies";
 
 function toPlaidMappedTransactions(data: FinanceData): PlaidMappedTransaction[] {
   return data.transactions
@@ -29,17 +31,19 @@ export const plaidAutomationProvider: AutomationProvider = {
     const plaidTransactions = toPlaidMappedTransactions(data);
     const suggestions: AutomationSuggestion[] = [];
 
-    const recurringCandidates = detectRecurringBillCandidates(
-      plaidTransactions,
+    const recurringCandidates = detectRecurringBillCandidatesFromFinanceData(
+      data,
       data.plaidRecurringDismissals ?? [],
-    );
+    ).filter((candidate) => candidate.action === "create");
 
-    for (const candidate of recurringCandidates) {
+    for (const candidate of recurringCandidates.slice(0, 2)) {
+      const billInput = candidateToAddBillInput(candidate);
+
       suggestions.push({
         id: `plaid-recurring-bill-${candidate.merchantKey.replace(/[^a-z0-9]+/g, "-")}`,
         kind: "recurring_bill" as const,
         title: "We found a recurring charge",
-        description: `${candidate.displayName} looks like a recurring bill around $${candidate.averageAmount.toFixed(2)}.`,
+        description: `${candidate.displayName} looks like a ${getBillFrequencyLabel(candidate.frequency).toLowerCase()} bill around $${candidate.averageAmount.toFixed(2)}.`,
         icon: "📅",
         tone: "accent" as const,
         priority: 85,
@@ -51,14 +55,7 @@ export const plaidAutomationProvider: AutomationProvider = {
         primaryAction: {
           label: "Create",
           type: "create_bill",
-          payload: {
-            name: candidate.displayName,
-            amount: candidate.averageAmount,
-            dueDay: candidate.dueDay,
-            autopay: false,
-            recurring: true,
-            category: candidate.category,
-          },
+          payload: billInput,
         },
         secondaryAction: {
           label: "Ignore",

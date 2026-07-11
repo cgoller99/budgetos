@@ -7,6 +7,7 @@ import type {
   PlaidPayrollCandidate,
   PlaidRecurringCandidate,
 } from "@/lib/plaid/types";
+import { detectRecurringBillCandidatesFromPlaidTransactions } from "@/lib/plaid/recurringBillDetection";
 
 function toNumber(value: number | null | undefined): number {
   if (typeof value !== "number" || Number.isNaN(value)) {
@@ -288,84 +289,13 @@ export function mapPlaidTransaction(
   };
 }
 
-function normalizeMerchantKey(value: string): string {
-  return value.toLowerCase().replace(/\s+/g, " ").trim();
-}
-
-function displayMerchantName(value: string): string {
-  return value
-    .split(" ")
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
 
 export function detectPlaidRecurringCandidates(
   transactions: PlaidMappedTransaction[],
 ): PlaidRecurringCandidate[] {
-  const groups = new Map<string, PlaidMappedTransaction[]>();
-
-  for (const transaction of transactions) {
-    if (transaction.type !== "expense") {
-      continue;
-    }
-
-    const merchantKey = normalizeMerchantKey(transaction.notes || transaction.name);
-
-    if (merchantKey.length < 3) {
-      continue;
-    }
-
-    const existing = groups.get(merchantKey) ?? [];
-    existing.push(transaction);
-    groups.set(merchantKey, existing);
-  }
-
-  const candidates: PlaidRecurringCandidate[] = [];
-
-  for (const [merchantKey, items] of groups) {
-    const monthKeys = new Set(items.map((item) => item.date.slice(0, 7)));
-
-    if (monthKeys.size < 2 || items.length < 2) {
-      continue;
-    }
-
-    const amounts = items.map((item) => item.amount);
-    const average =
-      amounts.reduce((total, amount) => total + amount, 0) / amounts.length;
-
-    if (average <= 0) {
-      continue;
-    }
-
-    const amountsSimilar = amounts.every(
-      (amount) => Math.abs(amount - average) / average <= 0.15,
-    );
-
-    if (!amountsSimilar) {
-      continue;
-    }
-
-    const days = items.map((item) => new Date(item.date).getDate());
-    const averageDay =
-      days.reduce((total, day) => total + day, 0) / days.length;
-    const daysSimilar = days.every((day) => Math.abs(day - averageDay) <= 3);
-
-    if (!daysSimilar) {
-      continue;
-    }
-
-    candidates.push({
-      merchantKey,
-      displayName: displayMerchantName(merchantKey),
-      averageAmount: Math.round(average * 100) / 100,
-      dueDay: Math.min(28, Math.max(1, Math.round(averageDay))),
-      category: items[0]?.category ?? "Subscriptions",
-      transactionIds: items.map((item) => item.externalTransactionId),
-    });
-  }
-
-  return candidates;
+  return detectRecurringBillCandidatesFromPlaidTransactions(transactions, {
+    bills: [],
+  });
 }
 
 export function detectPlaidPayrollCandidates(params: {
