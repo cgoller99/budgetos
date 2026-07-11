@@ -13,8 +13,10 @@ import {
 } from "@/lib/plaid/clientApi";
 import {
   clearStoredPlaidLinkToken,
+  clearStoredPlaidReturnPath,
   isPlaidOAuthReturn,
   readStoredPlaidLinkToken,
+  readStoredPlaidReturnPath,
   PLAID_PRODUCTION_OAUTH_REDIRECT_URI,
 } from "@/lib/plaid/oauth";
 import { ANALYTICS_EVENTS, trackEvent } from "@/lib/analytics/client";
@@ -68,7 +70,9 @@ function PlaidOAuthResumeInner({
         }
 
         await refreshFinance();
-        router.replace("/accounts");
+        const returnPath = readStoredPlaidReturnPath();
+        clearStoredPlaidReturnPath();
+        router.replace(returnPath ?? "/accounts");
       } catch (exchangeError) {
         const message =
           exchangeError instanceof Error

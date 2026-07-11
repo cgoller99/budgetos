@@ -262,6 +262,11 @@ export class FinanceService {
     await this.profiles.saveOnboardingState(userId, state);
   }
 
+  async completeGuidedOnboarding(userId: string): Promise<OnboardingState> {
+    const { createFreshOnboardingState } = await import("@/lib/onboarding/demoMode");
+    return this.profiles.saveOnboardingState(userId, createFreshOnboardingState());
+  }
+
   async exitDemoMode(userId: string): Promise<{
     data: FinanceData;
     onboarding: OnboardingState;

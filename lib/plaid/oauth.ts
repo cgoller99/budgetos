@@ -2,6 +2,7 @@ import { getSiteUrl } from "@/lib/supabase/authUrls";
 
 export const PLAID_PRODUCTION_OAUTH_REDIRECT_URI = "https://buxme.co/oauth/plaid";
 export const PLAID_LINK_TOKEN_STORAGE_KEY = "buxme_plaid_link_token";
+export const PLAID_RETURN_PATH_STORAGE_KEY = "buxme_plaid_return_path";
 
 /** Path registered as redirect URI in Plaid Dashboard → Team Settings → API → Allowed redirect URIs */
 export const PLAID_OAUTH_REDIRECT_PATH = "/oauth/plaid";
@@ -66,4 +67,28 @@ export function clearStoredPlaidLinkToken(): void {
 
   window.localStorage.removeItem(PLAID_LINK_TOKEN_STORAGE_KEY);
   window.sessionStorage.removeItem(PLAID_LINK_TOKEN_STORAGE_KEY);
+}
+
+export function storePlaidReturnPath(path: string): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.sessionStorage.setItem(PLAID_RETURN_PATH_STORAGE_KEY, path);
+}
+
+export function readStoredPlaidReturnPath(): string | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  return window.sessionStorage.getItem(PLAID_RETURN_PATH_STORAGE_KEY);
+}
+
+export function clearStoredPlaidReturnPath(): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.sessionStorage.removeItem(PLAID_RETURN_PATH_STORAGE_KEY);
 }

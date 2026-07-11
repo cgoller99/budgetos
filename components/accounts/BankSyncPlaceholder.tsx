@@ -3,10 +3,13 @@
 import { useCallback, useEffect, useState } from "react";
 import type { PlaidLinkOnSuccessMetadata } from "react-plaid-link";
 import { Badge, Button, Card, CardContent, CardHeader } from "@/components/ui";
+import { ManualAccountsPlaidMergeModal } from "@/components/plaid/ManualAccountsPlaidMergeModal";
+import { clearPlaidConnectBannerDismissal } from "@/components/guidance/PlaidConnectBanner";
 import { useFinance } from "@/context/FinanceContext";
 import { useToast } from "@/context/ToastContext";
 import { usePlaidLinkSession } from "@/hooks/usePlaidLinkSession";
 import { bankSyncComingSoonMessage } from "@/lib/integrations/bankSync";
+import { getManualAccounts } from "@/lib/onboarding/progress";
 import {
   exchangePlaidPublicToken,
   isPlaidOAuthMisconfigurationExit,
@@ -86,12 +89,19 @@ export function BankSyncConnect({
   buttonLabel,
   compact = false,
 }: BankSyncConnectProps) {
-  const { connectBank, reconnectBank, isSyncing, refreshFinance } = useFinance();
+  const { connectBank, reconnectBank, isSyncing, refreshFinance, deleteAccount, accounts } =
+    useFinance();
   const { showToast } = useToast();
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [isLoadingToken, setIsLoadingToken] = useState(false);
   const [autoOpenLink, setAutoOpenLink] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mergeModalOpen, setMergeModalOpen] = useState(false);
+  const [manualAccountsBeforeConnect, setManualAccountsBeforeConnect] = useState<
+    typeof accounts
+  >([]);
+  const [plaidAccountCount, setPlaidAccountCount] = useState(0);
+  const [isRemovingManual, setIsRemovingManual] = useState(false);
   const plaidEnabled = isPlaidClientEnabled();
   const label =
     buttonLabel ??
@@ -126,9 +136,12 @@ export function BankSyncConnect({
 
   const handleLinked = useCallback(
     async (publicToken: string) => {
+      const manualBeforeConnect = getManualAccounts(accounts);
+
       try {
         const result = await exchangePlaidPublicToken(publicToken);
         clearStoredPlaidLinkToken();
+        clearPlaidConnectBannerDismissal();
         trackEvent(ANALYTICS_EVENTS.CONNECTED_PLAID, {
           institution: result.institutionName ?? "unknown",
         });
@@ -144,7 +157,15 @@ export function BankSyncConnect({
           });
         }
 
-        await refreshFinance();
+        const refreshed = await refreshFinance();
+
+        if (mode === "create" && manualBeforeConnect.length > 0 && refreshed) {
+          const importedCount = refreshed.accounts.filter((account) => account.bankConnectionId)
+            .length;
+          setManualAccountsBeforeConnect(manualBeforeConnect);
+          setPlaidAccountCount(Math.max(importedCount, 1));
+          setMergeModalOpen(true);
+        }
       } catch (successError) {
         const message =
           successError instanceof Error
@@ -164,8 +185,41 @@ export function BankSyncConnect({
         setAutoOpenLink(false);
       }
     },
-    [refreshFinance, showToast],
+    [accounts, mode, refreshFinance, showToast],
   );
+
+  const handleKeepManualAccounts = useCallback(() => {
+    setMergeModalOpen(false);
+    setManualAccountsBeforeConnect([]);
+  }, []);
+
+  const handleRemoveManualAccounts = useCallback(async () => {
+    setIsRemovingManual(true);
+
+    try {
+      for (const account of manualAccountsBeforeConnect) {
+        await deleteAccount(account.id, { deleteTransactions: true });
+      }
+      showToast({
+        title: "Manual accounts removed",
+        subtitle: "Your Plaid accounts are ready to use.",
+      });
+      setMergeModalOpen(false);
+      setManualAccountsBeforeConnect([]);
+    } catch (removeError) {
+      const message =
+        removeError instanceof Error
+          ? removeError.message
+          : "Unable to remove manual accounts.";
+      showToast({
+        title: "Could not remove accounts",
+        subtitle: message,
+        type: "error",
+      });
+    } finally {
+      setIsRemovingManual(false);
+    }
+  }, [deleteAccount, manualAccountsBeforeConnect, showToast]);
 
   const handleExitMessage = useCallback((message: string | null, status?: string | null) => {
     if (message) {
@@ -253,6 +307,14 @@ export function BankSyncConnect({
           )}
         </div>
       </CardContent>
+      <ManualAccountsPlaidMergeModal
+        isOpen={mergeModalOpen}
+        manualAccounts={manualAccountsBeforeConnect}
+        plaidAccountCount={plaidAccountCount}
+        isPending={isRemovingManual}
+        onKeepManual={handleKeepManualAccounts}
+        onRemoveManual={handleRemoveManualAccounts}
+      />
     </Card>
   );
 }

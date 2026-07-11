@@ -22,6 +22,7 @@
     "audit:public-launch": "node scripts/audit-production-remote.mjs --public-launch",
     "test:income-annualization": "node scripts/test-income-annualization.mjs",
     "test:plaid-credit-mapping": "node scripts/test-plaid-credit-mapping.mjs",
+    "test:onboarding-progress": "node scripts/test-onboarding-progress.mjs",
     "setup:stripe-webhook": "node --env-file=.env.local scripts/setup-stripe-webhook.mjs",
     "setup:production": "node --env-file=.env.local scripts/setup-production.mjs",
     "apply:supabase-sql": "node --env-file=.env.local scripts/apply-supabase-sql-api.mjs",

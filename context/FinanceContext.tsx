@@ -151,11 +151,12 @@ export type FinanceContextValue = FinanceData & {
   onboardingMode: OnboardingMode | null;
   demoProfileId: DemoProfileId | null;
   isDemoMode: boolean;
-  refreshFinance: () => Promise<void>;
+  refreshFinance: () => Promise<FinanceData | undefined>;
   completeOnboarding: (
     mode: OnboardingMode,
     demoProfileId?: DemoProfileId,
   ) => Promise<void>;
+  completeGuidedOnboarding: () => Promise<void>;
   switchDemoProfile: (demoProfileId: DemoProfileId) => Promise<void>;
   exitDemoMode: () => Promise<void>;
   addAccount: (input: AddAccountInput) => Promise<void>;
@@ -314,11 +315,13 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
     const userId = userIdRef.current;
 
     if (!repository || !userId) {
-      return;
+      return undefined;
     }
 
     const next = await repository.loadFinanceData(userId);
-    setData(coerceFinanceData(next));
+    const coerced = coerceFinanceData(next);
+    setData(coerced);
+    return coerced;
   }, []);
 
   const { household } = useHousehold();
@@ -580,6 +583,35 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
     },
     [error, showToast],
   );
+
+  const completeGuidedOnboarding = useCallback(async () => {
+    const repository = repositoryRef.current;
+    const userId = userIdRef.current;
+
+    if (!repository || !userId) {
+      const message = error ?? "Finance data is not ready yet.";
+      showToast({ title: "Unable to continue", subtitle: message, type: "error" });
+      throw new Error(message);
+    }
+
+    setIsSyncing(true);
+
+    try {
+      const onboardingState = await repository.completeGuidedOnboarding(userId);
+      applyOnboardingState(onboardingState, {
+        setOnboardingComplete,
+        setOnboardingMode,
+        setDemoProfileId,
+      });
+    } catch (onboardingError) {
+      const message = getErrorMessage(onboardingError);
+      setError(message);
+      showToast({ title: "Setup failed", subtitle: message, type: "error" });
+      throw onboardingError;
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [error, showToast]);
 
   const switchDemoProfile = useCallback(
     async (profileId: DemoProfileId) => {
@@ -1669,6 +1701,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
       isDemoMode,
       refreshFinance,
       completeOnboarding,
+      completeGuidedOnboarding,
       switchDemoProfile,
       exitDemoMode,
       addAccount,
@@ -1725,6 +1758,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
       applyAllTodayActivity,
       applyTodayActivity,
       completeOnboarding,
+      completeGuidedOnboarding,
       createGoal,
       completeAutomationSuggestion,
       connectBank,
