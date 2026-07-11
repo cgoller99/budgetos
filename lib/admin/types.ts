@@ -5,6 +5,7 @@ export type AdminUserAction =
   | "remove_subscription"
   | "disable_user"
   | "enable_user"
+  | "reset_finance"
   | "delete_user";
 
 export type AdminUserSummary = {

@@ -2,6 +2,7 @@ import "server-only";
 
 import { isFounderEmail } from "@/lib/founder/emails";
 import { logAdminEvent } from "@/lib/admin/eventLog";
+import { factoryResetUserFinance } from "@/lib/admin/factoryResetService";
 import type { BuxmeSupabaseClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
 
@@ -205,6 +206,19 @@ export async function performAdminUserAction(input: {
         ban_duration: "none",
       });
       break;
+    case "reset_finance": {
+      const summary = await factoryResetUserFinance({
+        adminSupabase,
+        userId,
+      });
+      await logAdminEvent(adminSupabase, {
+        eventType: "auth",
+        message: `Admin factory reset finance for user ${userId}`,
+        metadata: { action, userId, actorId: actor.id, summary },
+        userId,
+      });
+      return;
+    }
     case "delete_user":
       await adminSupabase.from("profiles").delete().eq("id", userId);
       await adminSupabase.auth.admin.deleteUser(userId);
