@@ -27,6 +27,8 @@ export {
   deriveWeeklySummaryEvent,
   markAllEventsRead,
   markEventRead,
+  deleteEvent,
+  clearNotificationEvents,
 } from "./eventStore";
 export {
   formatEventTimestamp,

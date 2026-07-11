@@ -64,6 +64,10 @@ export type NotificationItem = {
   tone: FinanceEventTone;
   timestamp: string;
   read: boolean;
+  eventType?: FinanceEventType;
+  entityType?: string;
+  entityId?: string;
+  category?: import("@/lib/notifications/center").NotificationCategory;
   automationSuggestionId?: string;
   detailHref?: string;
   actions?: {

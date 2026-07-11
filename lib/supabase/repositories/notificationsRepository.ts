@@ -103,6 +103,29 @@ export class NotificationsRepository {
       throw error;
     }
   }
+
+  async deleteNotification(userId: string, notificationId: string): Promise<void> {
+    const { error } = await this.supabase
+      .from("notifications")
+      .delete()
+      .eq("id", notificationId)
+      .eq("user_id", userId);
+
+    if (error) {
+      throw error;
+    }
+  }
+
+  async clearAll(userId: string): Promise<void> {
+    const { error } = await this.supabase
+      .from("notifications")
+      .delete()
+      .eq("user_id", userId);
+
+    if (error) {
+      throw error;
+    }
+  }
 }
 
 export { mapNotificationRow, buildNotificationInsert };

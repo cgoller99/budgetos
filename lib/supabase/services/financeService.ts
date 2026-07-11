@@ -251,6 +251,14 @@ export class FinanceService {
     await this.notifications.markAllRead(userId);
   }
 
+  async deleteNotification(userId: string, notificationId: string): Promise<void> {
+    await this.notifications.deleteNotification(userId, notificationId);
+  }
+
+  async clearAllNotifications(userId: string): Promise<void> {
+    await this.notifications.clearAll(userId);
+  }
+
   async loadOnboardingState(userId: string): Promise<OnboardingState> {
     return this.profiles.loadOnboardingState(userId);
   }
