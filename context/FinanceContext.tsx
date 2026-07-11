@@ -71,6 +71,8 @@ import {
   deriveEvents,
   markAllEventsRead,
   markEventRead,
+  deleteEvent,
+  clearNotificationEvents,
 } from "@/lib/events";
 import { normalizePaycheckAssignment } from "@/lib/finance/paycheckSplit";
 import { applyIncomePlanPaycheckToData } from "@/lib/incomePlan/applyPaycheck";
@@ -236,6 +238,8 @@ export type FinanceContextValue = FinanceData & {
   snoozeRecurringBillsPrompt: () => Promise<void>;
   markNotificationRead: (notificationId: string) => void;
   markAllNotificationsRead: () => void;
+  deleteNotification: (notificationId: string) => void;
+  clearAllNotifications: () => void;
 };
 
 type RunMutationOptions = {
@@ -574,6 +578,34 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
 
       if (repository && userId) {
         void repository.markAllNotificationsRead(userId);
+      }
+
+      return next;
+    });
+  }, []);
+
+  const deleteNotification = useCallback((notificationId: string) => {
+    setData((previous) => {
+      const next = deleteEvent(previous, notificationId);
+      const repository = repositoryRef.current;
+      const userId = userIdRef.current;
+
+      if (repository && userId) {
+        void repository.deleteNotification(userId, notificationId);
+      }
+
+      return next;
+    });
+  }, []);
+
+  const clearAllNotifications = useCallback(() => {
+    setData((previous) => {
+      const next = clearNotificationEvents(previous);
+      const repository = repositoryRef.current;
+      const userId = userIdRef.current;
+
+      if (repository && userId) {
+        void repository.clearAllNotifications(userId);
       }
 
       return next;
@@ -1901,6 +1933,8 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
       snoozeRecurringBillsPrompt: snoozeRecurringBillsPromptHandler,
       markNotificationRead,
       markAllNotificationsRead,
+      deleteNotification,
+      clearAllNotifications,
     }),
     [
       addAccount,
@@ -1957,6 +1991,8 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
       isSyncing,
       isDemoMode,
       markAllNotificationsRead,
+      deleteNotification,
+      clearAllNotifications,
       markBillPaid,
       markBillSplitPaid,
       markIncomeReceived,

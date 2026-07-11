@@ -448,3 +448,19 @@ export function markAllEventsRead(data: FinanceData): FinanceData {
     events: (data.events ?? []).map((event) => ({ ...event, read: true })),
   };
 }
+
+export function deleteEvent(data: FinanceData, eventId: string): FinanceData {
+  return {
+    ...data,
+    events: (data.events ?? []).filter((event) => event.id !== eventId),
+  };
+}
+
+export function clearNotificationEvents(data: FinanceData): FinanceData {
+  return {
+    ...data,
+    events: (data.events ?? []).filter(
+      (event) => !Array.isArray(event.surfaces) || !event.surfaces.includes("notification"),
+    ),
+  };
+}
