@@ -129,7 +129,7 @@ export function OnboardingPlaidConnect({
           });
         }
 
-        await refreshFinance();
+        await refreshFinance({ openRecurringBillsModal: true });
         await onConnected();
       } catch (successError) {
         const message =

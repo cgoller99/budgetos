@@ -157,7 +157,7 @@ export function BankSyncConnect({
           });
         }
 
-        const refreshed = await refreshFinance();
+        const refreshed = await refreshFinance({ openRecurringBillsModal: true });
 
         if (mode === "create" && manualBeforeConnect.length > 0 && refreshed) {
           const importedCount = refreshed.accounts.filter((account) => account.bankConnectionId)

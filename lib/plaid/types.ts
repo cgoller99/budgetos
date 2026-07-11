@@ -112,13 +112,25 @@ export type PlaidMappedTransaction = {
   name: string;
 };
 
-export type PlaidRecurringCandidate = {
+export type PlaidRecurringCandidate = RecurringBillCandidate;
+
+export type RecurringBillCandidate = {
   merchantKey: string;
   displayName: string;
   averageAmount: number;
   dueDay: number;
   category: string;
+  frequency: import("@/lib/recurring/types").BillFrequency;
   transactionIds: string[];
+  internalTransactionIds: string[];
+  accountId?: string | null;
+  paymentAccountId?: string | null;
+  lastPaymentDate?: string | null;
+  nextEstimatedPaymentDate?: string | null;
+  autopaySuggested: boolean;
+  source: "plaid_api" | "heuristic";
+  existingBillId?: string | null;
+  action: "create" | "update";
 };
 
 export type PlaidPayrollCandidate = {

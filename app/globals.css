@@ -44,6 +44,7 @@
     radial-gradient(ellipse 80% 50% at 50% -20%, rgba(0, 119, 237, 0.12), transparent),
     radial-gradient(ellipse 54% 40% at 100% 0%, rgba(0, 119, 237, 0.08), transparent),
     linear-gradient(180deg, #f8fbff 0%, #f3f7fc 44%, #eef4fb 100%);
+  color-scheme: light;
 }
 
 @theme inline {
@@ -59,6 +60,41 @@ body {
   font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  color-scheme: dark;
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+}
+
+select,
+select.select-themed {
+  background-color: var(--surface);
+  color: var(--foreground);
+}
+
+select option,
+select.select-themed option {
+  background-color: var(--surface);
+  color: var(--foreground);
+}
+
+[data-theme="light"] select option,
+[data-theme="light"] select.select-themed option {
+  background-color: #ffffff;
+  color: #111827;
+}
+
+select option:checked,
+select.select-themed option:checked {
+  background-color: rgba(0, 119, 237, 0.18);
+  color: var(--foreground);
+}
+
+[data-theme="light"] select option:checked,
+[data-theme="light"] select.select-themed option:checked {
+  background-color: #dbeafe;
+  color: #111827;
 }
 
 .app-shell {
