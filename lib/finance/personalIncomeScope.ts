@@ -1,4 +1,4 @@
-import { calculateMonthlyIncome } from "@/lib/calculations/income";
+import { calculateMonthlyIncome, getIncomeCalculationMode } from "@/lib/calculations/income";
 import { getPersonalLedgerIncomeForMonth } from "@/lib/calculations/incomeLedger";
 import { toMonthlyAmount } from "@/lib/calculations/monthlyAmount";
 import {
@@ -33,7 +33,7 @@ export type IncomeStreamDiagnostic = {
 export type IncomeCalculationDiagnostics = {
   viewerUserId: string | null;
   householdId: string | null;
-  calculationMode: "recurring_sources" | "ledger_fallback" | "plaid_corrected";
+  calculationMode: "recurring_sources" | "ledger_fallback" | "plaid_corrected" | "payroll_detected";
   activeStreamCount: number;
   totalStreamsBeforeDedup: number;
   totalStreamsAfterDedup: number;
@@ -289,10 +289,19 @@ export function diagnoseIncomeCalculation(
   const calculationMode =
     activeStreams.length === 0
       ? "ledger_fallback"
-      : monthlyIncomeAfterDedup !== monthlyIncomeBeforeDedup &&
-          monthlyIncomeBeforeDedup > 0
-        ? "plaid_corrected"
-        : "recurring_sources";
+      : getIncomeCalculationMode(
+            {
+              ...data,
+              income: dedupedSources,
+              incomePlan: personalPlan,
+            },
+            referenceDate,
+          ) === "payroll_detected"
+        ? "payroll_detected"
+        : monthlyIncomeAfterDedup !== monthlyIncomeBeforeDedup &&
+            monthlyIncomeBeforeDedup > 0
+          ? "plaid_corrected"
+          : "recurring_sources";
 
   return {
     viewerUserId,

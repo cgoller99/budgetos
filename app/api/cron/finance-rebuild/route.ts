@@ -9,6 +9,7 @@ import {
   getCurrentMonthLedgerIncomeTotal,
   getIncomeCalculationMode,
 } from "@/lib/calculations/income";
+import { getPayrollIncomeDiagnostics } from "@/lib/calculations/payrollIncome";
 import { filterRealIncomeTransactions } from "@/lib/transactions/transferDetection";
 import { FinanceService } from "@/lib/supabase/services/financeService";
 
@@ -137,6 +138,7 @@ export async function POST(request: Request) {
         averageLedger3Month: Math.round(
           calculateAverageLedgerMonthlyIncome(financeData, referenceDate) * 100,
         ) / 100,
+        payroll: getPayrollIncomeDiagnostics(financeData, referenceDate),
         currentMonthKey: monthKey,
         ledgerMonths,
         diagnostics: incomeDiagnostics?.diagnostics ?? null,

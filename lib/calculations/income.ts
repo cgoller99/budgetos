@@ -5,6 +5,9 @@ import {
   getPersonalLedgerIncomeForMonth,
 } from "@/lib/calculations/incomeLedger";
 import {
+  estimateMonthlyIncomeFromPayrollDeposits,
+} from "@/lib/calculations/payrollIncome";
+import {
   getEffectiveIncomeSources,
   isIncomeSourceActive,
 } from "@/lib/finance/effectiveIncome";
@@ -48,22 +51,35 @@ export function calculateMonthlyIncome(
     ),
   );
 
-  const currentMonthLedger = getPersonalLedgerIncomeForMonth(data, referenceDate);
-  const averageLedger = getAveragePersonalLedgerIncome(data, referenceDate);
+  const payrollEstimate = estimateMonthlyIncomeFromPayrollDeposits(
+    data,
+    referenceDate,
+  );
   const hasPlaidIncome = hasPlaidIncomeHistory(data);
 
   if (recurringSources.length === 0) {
+    if (payrollEstimate && payrollEstimate > 0) {
+      return payrollEstimate;
+    }
+
+    const averageLedger = getAveragePersonalLedgerIncome(data, referenceDate);
     if (averageLedger > 0) {
       return averageLedger;
     }
 
-    return currentMonthLedger;
+    return getPersonalLedgerIncomeForMonth(data, referenceDate);
+  }
+
+  if (payrollEstimate && payrollEstimate > 0 && hasPlaidIncome) {
+    return payrollEstimate;
   }
 
   if (!hasPlaidIncome) {
     return recurring;
   }
 
+  const currentMonthLedger = getPersonalLedgerIncomeForMonth(data, referenceDate);
+  const averageLedger = getAveragePersonalLedgerIncome(data, referenceDate);
   const referenceIncome = averageLedger > 0 ? averageLedger : currentMonthLedger;
 
   if (referenceIncome <= 0) {
@@ -72,7 +88,7 @@ export function calculateMonthlyIncome(
 
   const drift = Math.abs(referenceIncome - recurring) / Math.max(referenceIncome, 1);
 
-  if (drift > 0.2) {
+  if (drift > 0.2 && referenceIncome < recurring) {
     return referenceIncome;
   }
 
@@ -89,17 +105,29 @@ export function calculateAnnualIncome(
 export function getIncomeCalculationMode(
   data: FinanceData,
   referenceDate = new Date(),
-): "recurring" | "ledger_average" | "ledger_current" | "plaid_corrected" {
+): "recurring" | "ledger_average" | "ledger_current" | "plaid_corrected" | "payroll_detected" {
   const recurring = calculateRecurringMonthlyIncome(data);
   const recurringSources = getEffectiveIncomeSources(data).filter(isIncomeSourceActive);
+  const payrollEstimate = estimateMonthlyIncomeFromPayrollDeposits(
+    data,
+    referenceDate,
+  );
 
   if (recurringSources.length === 0) {
+    if (payrollEstimate && payrollEstimate > 0) {
+      return "payroll_detected";
+    }
+
     const averageLedger = getAveragePersonalLedgerIncome(data, referenceDate);
     if (averageLedger > 0) {
       return "ledger_average";
     }
 
     return "ledger_current";
+  }
+
+  if (payrollEstimate && payrollEstimate > 0 && hasPlaidIncomeHistory(data)) {
+    return "payroll_detected";
   }
 
   if (!hasPlaidIncomeHistory(data)) {
@@ -112,6 +140,7 @@ export function getIncomeCalculationMode(
 
   if (
     referenceIncome > 0 &&
+    referenceIncome < recurring &&
     Math.abs(referenceIncome - recurring) / Math.max(referenceIncome, 1) > 0.2
   ) {
     return "plaid_corrected";
