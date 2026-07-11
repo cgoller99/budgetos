@@ -34,6 +34,21 @@ export {
 } from "./savingsProgress";
 
 export {
+  calculateAnnualIncome,
+  calculateAverageLedgerMonthlyIncome,
+  calculateRecurringMonthlyIncome,
+  getCurrentMonthLedgerIncomeTotal,
+  getIncomeCalculationMode,
+} from "./income";
+
+export { calculateAvailableCash, hasPlaidLinkedCashAccounts } from "./availableCash";
+
+export {
+  calculateMonthlySpendingForMoneyFlow,
+  calculateMonthlySpendingFromLedger,
+} from "./spending";
+
+export {
   calculateBillAutopayRate,
   calculateDebtToIncomeRatio,
   calculateEmergencyFundMonths,

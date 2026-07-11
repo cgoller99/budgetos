@@ -1,4 +1,5 @@
 import { calculateMonthlyIncome, calculateMonthlySpending } from "@/lib/calculations/cashFlow";
+import { calculateAvailableCash, hasPlaidLinkedCashAccounts } from "@/lib/calculations/availableCash";
 import { getTotalMinimumPayments } from "@/lib/finance/debts";
 import type { FinanceData } from "@/lib/finance/types";
 
@@ -213,7 +214,15 @@ export function calculateMoneyFlow(data: FinanceData): MoneyFlowResult {
 
   const rawInvestments = calculateRawInvestmentContributions(data);
   const investments = Math.min(rawInvestments, afterGoals);
-  const safeToSpend = Math.max(income - bills - debts - goals - investments, 0);
+  const projectedSafeToSpend = Math.max(
+    income - bills - debts - goals - investments,
+    0,
+  );
+  const availableCash = calculateAvailableCash(data);
+  const safeToSpend =
+    hasPlaidLinkedCashAccounts(data) && availableCash >= 0
+      ? Math.min(projectedSafeToSpend, availableCash)
+      : projectedSafeToSpend;
 
   return {
     income,

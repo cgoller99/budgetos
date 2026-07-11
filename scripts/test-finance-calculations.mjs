@@ -135,4 +135,23 @@ assert.equal(
   "avoids double-counting bill payment expenses",
 );
 
+function calculateAvailableCash(data) {
+  return (data.accounts ?? [])
+    .filter((account) => account.includeInSafeToSpend !== false)
+    .reduce((total, account) => total + (account.availableBalance ?? account.balance), 0);
+}
+
+const safeToSpendSample = {
+  accounts: [{ type: "checking", balance: 800, availableBalance: 750, includeInSafeToSpend: true }],
+  bills: [],
+  debts: [],
+  investments: [],
+  income: [],
+  transactions: [],
+};
+
+const projected = 1200;
+const available = calculateAvailableCash(safeToSpendSample);
+assert.equal(Math.min(projected, available), 750, "caps safe to spend by available cash");
+
 console.log("✅ Finance calculation checks passed.");

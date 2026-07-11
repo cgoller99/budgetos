@@ -5,6 +5,7 @@ import {
   collectUniqueDebtBalances,
   collectUniqueInvestmentValues,
 } from "@/lib/calculations/balanceAggregation";
+import { calculateAvailableCash } from "@/lib/calculations/availableCash";
 import {
   calculateMonthlyIncome,
   calculateMonthlySpending,
@@ -314,8 +315,12 @@ export async function auditUserFinance(
     {
       id: "safe_to_spend",
       label: "Safe To Spend",
-      rawSources: moneyFlow.breakdown,
-      formula: "income - bills - debts - goals - investments (waterfall)",
+      rawSources: {
+        breakdown: moneyFlow.breakdown,
+        availableCash: round(calculateAvailableCash(financeData)),
+      },
+      formula:
+        "min(income - bills - debts - goals - investments, available cash) when Plaid cash linked",
       displayed: round(moneyFlow.safeToSpend),
     },
   ];
