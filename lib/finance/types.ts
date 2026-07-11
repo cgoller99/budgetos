@@ -413,6 +413,7 @@ export type Debt = {
   bankConnectionId?: string | null;
   institutionLogoUrl?: string | null;
   lastSyncedAt?: string | null;
+  externalAccountId?: string | null;
 };
 
 export type AddDebtInput = {
@@ -482,6 +483,7 @@ export type Investment = {
   monthlyContribution: number;
   type: string;
   autoContribution?: AutoContribution;
+  externalAccountId?: string | null;
 };
 
 export type TransactionType = "income" | "expense" | "transfer";

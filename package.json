@@ -24,6 +24,7 @@
     "test:plaid-credit-mapping": "node scripts/test-plaid-credit-mapping.mjs",
     "test:onboarding-progress": "node scripts/test-onboarding-progress.mjs",
     "test:recurring-bill-detection": "node scripts/test-recurring-bill-detection.mjs",
+    "test:finance-calculations": "node scripts/test-finance-calculations.mjs",
     "setup:stripe-webhook": "node --env-file=.env.local scripts/setup-stripe-webhook.mjs",
     "setup:production": "node --env-file=.env.local scripts/setup-production.mjs",
     "apply:supabase-sql": "node --env-file=.env.local scripts/apply-supabase-sql-api.mjs",

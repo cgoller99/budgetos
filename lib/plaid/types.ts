@@ -2,7 +2,7 @@ export type PlaidSyncScope = "connection" | "all";
 
 export type PlaidLinkMode = "create" | "update";
 
-export type PlaidTransactionSkipReason = "missing_account_map";
+export type PlaidTransactionSkipReason = "missing_account_map" | "pending_transaction";
 
 export type PlaidSyncAccountSummary = {
   externalAccountId: string;
@@ -110,6 +110,7 @@ export type PlaidMappedTransaction = {
   date: string;
   notes: string;
   name: string;
+  isPending?: boolean;
 };
 
 export type PlaidRecurringCandidate = RecurringBillCandidate;
