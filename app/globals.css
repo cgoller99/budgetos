@@ -63,10 +63,6 @@ body {
   color-scheme: dark;
 }
 
-[data-theme="light"] {
-  color-scheme: light;
-}
-
 select,
 select.select-themed {
   background-color: var(--surface);
