@@ -1,4 +1,5 @@
-import { calculateMonthlyIncome } from "@/lib/calculations/cashFlow";
+import { calculateMonthlyIncome } from "@/lib/calculations/income";
+import { getPersonalLedgerIncomeForMonth } from "@/lib/calculations/incomeLedger";
 import { toMonthlyAmount } from "@/lib/calculations/monthlyAmount";
 import {
   getEffectiveIncomeSources,
@@ -9,7 +10,6 @@ import {
 import type { FinanceData, IncomeSource } from "@/lib/finance/types";
 import type { IncomePlan } from "@/lib/incomePlan/types";
 import { getIncomeFrequencyLabel } from "@/lib/recurring/frequencies";
-import { getTransactionsForMonth } from "@/lib/transactions";
 
 export type IncomeStreamSource =
   | "manual_recurring"
@@ -33,7 +33,7 @@ export type IncomeStreamDiagnostic = {
 export type IncomeCalculationDiagnostics = {
   viewerUserId: string | null;
   householdId: string | null;
-  calculationMode: "recurring_sources" | "ledger_fallback";
+  calculationMode: "recurring_sources" | "ledger_fallback" | "plaid_corrected";
   activeStreamCount: number;
   totalStreamsBeforeDedup: number;
   totalStreamsAfterDedup: number;
@@ -142,19 +142,7 @@ export function filterPersonalIncomePlan(
   return isPersonalOwnerRow(plan.ownerUserId, viewerUserId) ? plan : null;
 }
 
-export function getPersonalLedgerIncomeForMonth(
-  data: FinanceData,
-  referenceDate = new Date(),
-): number {
-  const viewerUserId = data.viewerUserId ?? null;
-
-  return getTransactionsForMonth(data, referenceDate)
-    .filter((transaction) => transaction.type === "income")
-    .filter((transaction) =>
-      isPersonalOwnerRow(transaction.ownerUserId, viewerUserId),
-    )
-    .reduce((total, transaction) => total + transaction.amount, 0);
-}
+export { getPersonalLedgerIncomeForMonth } from "@/lib/calculations/incomeLedger";
 
 export function diagnoseIncomeCalculation(
   data: FinanceData,
@@ -298,11 +286,18 @@ export function diagnoseIncomeCalculation(
     });
   }
 
+  const calculationMode =
+    activeStreams.length === 0
+      ? "ledger_fallback"
+      : monthlyIncomeAfterDedup !== monthlyIncomeBeforeDedup &&
+          monthlyIncomeBeforeDedup > 0
+        ? "plaid_corrected"
+        : "recurring_sources";
+
   return {
     viewerUserId,
     householdId,
-    calculationMode:
-      activeStreams.length > 0 ? "recurring_sources" : "ledger_fallback",
+    calculationMode,
     activeStreamCount: streams.filter((stream) => stream.included).length,
     totalStreamsBeforeDedup: rawSources.length + (data.incomePlan ? 1 : 0),
     totalStreamsAfterDedup: dedupedSources.length + (personalPlan ? 1 : 0),

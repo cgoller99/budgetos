@@ -227,6 +227,23 @@ function mapPlaidCategory(transaction: Transaction): string {
   return transaction.category?.[0] ?? "Uncategorized";
 }
 
+function looksLikeInternalTransfer(transaction: Transaction): boolean {
+  const haystack = `${transaction.merchant_name ?? ""} ${transaction.name ?? ""} ${transaction.original_description ?? ""}`.toLowerCase();
+
+  return (
+    haystack.includes("transfer") ||
+    haystack.includes("from savings") ||
+    haystack.includes("to savings") ||
+    haystack.includes("from checking") ||
+    haystack.includes("to checking") ||
+    haystack.includes("online transfer") ||
+    haystack.includes("401k") ||
+    haystack.includes("roth") ||
+    haystack.includes("brokerage") ||
+    haystack.includes("money market")
+  );
+}
+
 function resolvePlaidTransactionType(
   transaction: Transaction,
   accountContext?: Pick<PlaidMappedAccount, "recordKind" | "type">,
@@ -239,6 +256,10 @@ function resolvePlaidTransactionType(
     primary === "TRANSFER_OUT" ||
     detailed.startsWith("TRANSFER_")
   ) {
+    return "transfer";
+  }
+
+  if (looksLikeInternalTransfer(transaction)) {
     return "transfer";
   }
 

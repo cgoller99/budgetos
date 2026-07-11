@@ -17,7 +17,8 @@ import {
   type CategoryBreakdownItem,
   type MonthlyTrendPoint,
 } from "@/lib/reports/reportMetrics";
-import { getSafeToSpend, getSafeToSpendWeekly } from "@/lib/finance/safeToSpend";
+import { calculateAvailableCash, hasPlaidLinkedCashAccounts } from "@/lib/calculations/availableCash";
+import { getSafeToSpendWeekly } from "@/lib/finance/safeToSpend";
 import { generateWeeklyPlan } from "@/lib/intelligence";
 import { generateRoadmap, toNextMilestoneSummary } from "@/lib/roadmap";
 import { generateTodayActivity, normalizeRecurringFinanceData } from "@/lib/recurring";
@@ -284,7 +285,9 @@ export function buildDashboardFromSnapshot(
     },
     {
       label: "Cash",
-      value: netWorthBreakdown.cash.value,
+      value: hasPlaidLinkedCashAccounts(normalized)
+        ? calculateAvailableCash(normalized)
+        : netWorthBreakdown.cash.value,
       monthlyChange: netWorthBreakdown.cash.monthlyChange,
     },
     {

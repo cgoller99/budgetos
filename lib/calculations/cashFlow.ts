@@ -1,16 +1,16 @@
 import type { FinanceData } from "@/lib/finance/types";
-import { toMonthlyAmount } from "@/lib/calculations/monthlyAmount";
 import { calculateMonthlySpendingForMoneyFlow } from "@/lib/calculations/spending";
-import {
-  getEffectiveIncomeSources,
-  isIncomeSourceActive,
-} from "@/lib/finance/effectiveIncome";
-import { getPersonalLedgerIncomeForMonth } from "@/lib/finance/personalIncomeScope";
+import { calculateMonthlyIncome } from "@/lib/calculations/income";
 import type { CashFlowResult } from "./types";
 
-function sum(values: number[]): number {
-  return values.reduce((total, value) => total + value, 0);
-}
+export {
+  calculateAnnualIncome,
+  calculateAverageLedgerMonthlyIncome,
+  calculateMonthlyIncome,
+  calculateRecurringMonthlyIncome,
+  getCurrentMonthLedgerIncomeTotal,
+  getIncomeCalculationMode,
+} from "@/lib/calculations/income";
 
 function toBarWidthPercent(amount: number, maxAmount: number): number {
   if (maxAmount <= 0) {
@@ -24,26 +24,6 @@ function toBarWidthPercent(amount: number, maxAmount: number): number {
 function isRecurringPaycheckLedgerIncome(notes: string | undefined): boolean {
   const normalized = (notes ?? "").toLowerCase();
   return normalized.includes("paycheck received");
-}
-
-export function calculateMonthlyIncome(
-  data: FinanceData,
-  referenceDate = new Date(),
-): number {
-  const recurringSources = getEffectiveIncomeSources(data).filter(
-    isIncomeSourceActive,
-  );
-  const recurring = sum(
-    recurringSources.map((source) =>
-      toMonthlyAmount(source.amount, source.frequency),
-    ),
-  );
-
-  if (recurringSources.length > 0) {
-    return recurring;
-  }
-
-  return getPersonalLedgerIncomeForMonth(data, referenceDate);
 }
 
 export function calculateMonthlySpending(

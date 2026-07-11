@@ -1,6 +1,13 @@
 import type { FinanceData, Transaction } from "@/lib/finance/types";
-import { calculateMonthlyIncome } from "@/lib/calculations/cashFlow";
-import { calculateMonthlySpendingFromLedger } from "@/lib/calculations/spending";
+import {
+  calculateMonthlyIncome,
+  getCurrentMonthLedgerIncomeTotal,
+} from "@/lib/calculations/cashFlow";
+import {
+  calculateMonthlySpendingForMoneyFlow,
+  calculateMonthlySpendingFromLedger,
+} from "@/lib/calculations/spending";
+import { filterRealIncomeTransactions } from "@/lib/transactions/transferDetection";
 import { withEffectiveIncome } from "@/lib/finance/effectiveIncome";
 
 export type MonthlyTrendPoint = {
@@ -58,11 +65,15 @@ export function computeMonthlyTrends(
     const [year, monthNumber] = month.key.split("-").map(Number);
     const monthReference = new Date(year, monthNumber - 1, 15);
 
-    month.spending = calculateMonthlySpendingFromLedger(data, monthReference);
+    month.spending =
+      month.key === currentKey
+        ? calculateMonthlySpendingForMoneyFlow(withEffectiveIncome(data), monthReference)
+        : calculateMonthlySpendingFromLedger(data, monthReference);
 
-    month.income = monthTransactions
-      .filter((transaction) => transaction.type === "income")
-      .reduce((total, transaction) => total + transaction.amount, 0);
+    month.income = filterRealIncomeTransactions(
+      data,
+      monthTransactions.filter((transaction) => transaction.type === "income"),
+    ).reduce((total, transaction) => total + transaction.amount, 0);
 
     month.savings = monthTransactions
       .filter((transaction) => transaction.type === "expense" && transaction.goalId)
@@ -74,6 +85,15 @@ export function computeMonthlyTrends(
         reference,
       );
       month.income = Math.max(month.income, projectedIncome);
+
+      const ledgerIncome = getCurrentMonthLedgerIncomeTotal(
+        withEffectiveIncome(data),
+        reference,
+      );
+
+      if (ledgerIncome > 0) {
+        month.income = Math.max(month.income, ledgerIncome);
+      }
     }
   }
 

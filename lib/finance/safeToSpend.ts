@@ -6,8 +6,8 @@ import { normalizeRecurringFinanceData } from "@/lib/recurring";
 export const WEEKS_PER_MONTH = 4.33;
 
 /**
- * Canonical Safe To Spend — monthly remainder after income, bills, debts, goals,
- * and investments. Every surface must use this function.
+ * Canonical Safe To Spend — budget waterfall capped by real available cash
+ * when Plaid-linked accounts are present.
  */
 export function getSafeToSpend(data: FinanceData, referenceDate = new Date()): number {
   const normalized = normalizeRecurringFinanceData(data, referenceDate);
