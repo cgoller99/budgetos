@@ -347,9 +347,11 @@ export async function auditUserFinance(
       label: "Monthly Income",
       rawSources: incomeDiagnostics.streams,
       formula:
-        incomeDiagnostics.calculationMode === "recurring_sources"
-          ? "deduped personal recurring income (+ income plan when applicable)"
-          : "personal ledger income for current month",
+        getIncomeCalculationMode(financeData) === "payroll_detected"
+          ? "median payroll-like Plaid deposit × income plan frequency"
+          : incomeDiagnostics.calculationMode === "recurring_sources"
+            ? "deduped personal recurring income (+ income plan when applicable)"
+            : "personal ledger income for current month",
       displayed: round(calculateMonthlyIncome(financeData)),
     },
     {
