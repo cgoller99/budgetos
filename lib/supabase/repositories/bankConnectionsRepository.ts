@@ -512,9 +512,15 @@ export class BankConnectionsRepository {
     let modified = 0;
     let removed = 0;
     let skippedMissingAccount = 0;
+    let skippedPending = 0;
     const timestamp = new Date().toISOString();
 
     for (const transaction of input.transactions) {
+      if (transaction.isPending) {
+        skippedPending += 1;
+        continue;
+      }
+
       const accountId = input.accountIdMap.get(transaction.externalAccountId);
 
       if (!accountId) {
@@ -604,6 +610,13 @@ export class BankConnectionsRepository {
       });
     }
 
+    if (skippedPending > 0) {
+      skipped.push({
+        reason: "pending_transaction",
+        count: skippedPending,
+      });
+    }
+
     return { added, modified, removed, skipped };
   }
 
@@ -684,6 +697,21 @@ export class BankConnectionsRepository {
 
       if (error) {
         throw error;
+      }
+    }
+
+    const externalAccountIds = input.accounts.map((account) => account.account_id);
+
+    if (externalAccountIds.length > 0) {
+      const { error: pruneError } = await this.supabase
+        .from("accounts")
+        .delete()
+        .eq("user_id", input.userId)
+        .eq("record_kind", "investment")
+        .in("external_account_id", externalAccountIds);
+
+      if (pruneError) {
+        throw pruneError;
       }
     }
   }

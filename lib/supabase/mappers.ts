@@ -34,6 +34,11 @@ import {
 import { normalizeIncomeFrequency } from "@/lib/recurring/frequencies";
 import { inferDebtAccountType } from "@/lib/finance/debts";
 import { normalizePaycheckAssignment } from "@/lib/finance/paycheckSplit";
+import {
+  dedupeAccountsByExternalId,
+  dedupeDebtsByExternalId,
+  dedupeInvestmentsByExternalId,
+} from "@/lib/calculations/balanceAggregation";
 import type { AutoContribution } from "@/lib/recurring/types";
 
 function toNumber(value: number | string | null | undefined): number {
@@ -182,6 +187,7 @@ export function mapDebtRow(row: AccountRow): Debt {
     bankConnectionId: row.bank_connection_id,
     institutionLogoUrl: row.institution_logo_url,
     lastSyncedAt: row.last_synced_at,
+    externalAccountId: row.external_account_id,
   };
 }
 
@@ -257,6 +263,7 @@ export function mapInvestmentRow(row: InvestmentRow): Investment {
     monthlyContribution: toNumber(row.monthly_contribution),
     type: row.type,
     autoContribution: mapInvestmentContributionFromRow(row),
+    externalAccountId: row.external_account_id,
   };
 }
 
@@ -269,6 +276,7 @@ export function mapLegacyInvestmentRow(row: AccountRow): Investment {
     monthlyContribution: toNumber(row.monthly_contribution),
     type: row.type,
     autoContribution: mapInvestmentContribution(row),
+    externalAccountId: row.external_account_id,
   };
 }
 
@@ -366,6 +374,26 @@ export function mapTransactionRow(row: TransactionRow): Transaction {
   };
 }
 
+function dedupeTransactionsByExternalId(transactions: Transaction[]): Transaction[] {
+  const seen = new Set<string>();
+  const result: Transaction[] = [];
+
+  for (const transaction of transactions) {
+    const externalId = transaction.externalTransactionId;
+
+    if (externalId) {
+      if (seen.has(externalId)) {
+        continue;
+      }
+      seen.add(externalId);
+    }
+
+    result.push(transaction);
+  }
+
+  return result;
+}
+
 export function mapFinanceData(
   accountRows: AccountRow[],
   billRows: BillRow[],
@@ -390,23 +418,46 @@ export function mapFinanceData(
     .filter((row) => row.record_kind === "investment")
     .map(mapLegacyInvestmentRow);
 
+  const mappedInvestments =
+    investmentRows.length > 0
+      ? investmentRows.map(mapInvestmentRow)
+      : legacyInvestments;
+
+  const investmentExternalIds = new Set(
+    mappedInvestments
+      .map((investment) => investment.externalAccountId)
+      .filter((value): value is string => Boolean(value)),
+  );
+
+  const supplementalLegacyInvestments = legacyInvestments.filter(
+    (investment) =>
+      investment.externalAccountId &&
+      !investmentExternalIds.has(investment.externalAccountId),
+  );
+
+  const mergedInvestments = dedupeInvestmentsByExternalId([
+    ...mappedInvestments,
+    ...supplementalLegacyInvestments,
+  ]);
+
   const mapped: FinanceData = {
-    accounts: accountRows
-      .filter((row) => row.record_kind === "account")
-      .map(mapAccountRow),
-    debts: accountRows
-      .filter((row) => row.record_kind === "debt")
-      .map(mapDebtRow),
-    investments:
-      investmentRows.length > 0
-        ? investmentRows.map(mapInvestmentRow)
-        : legacyInvestments,
+    accounts: dedupeAccountsByExternalId(
+      accountRows
+        .filter((row) => row.record_kind === "account")
+        .map(mapAccountRow),
+    ),
+    debts: dedupeDebtsByExternalId(
+      accountRows
+        .filter((row) => row.record_kind === "debt")
+        .map(mapDebtRow),
+    ),
+    investments: mergedInvestments,
     bills: billRows.map((row) =>
       mapBillRow(row, splitsByBillId.get(row.id) ?? []),
     ),
     savingsGoals: goalRows.map(mapGoalRow),
     income: recurringIncomeRows.map(mapIncomeRow),
-    transactions: ledgerRows.map(mapTransactionRow),
+    transactions: dedupeTransactionsByExternalId(ledgerRows.map(mapTransactionRow)),
     events,
     incomePlan: null,
     incomePlanPaychecks: [],

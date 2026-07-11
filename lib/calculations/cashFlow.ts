@@ -1,11 +1,11 @@
 import type { FinanceData } from "@/lib/finance/types";
 import { toMonthlyAmount } from "@/lib/calculations/monthlyAmount";
+import { calculateMonthlySpendingForMoneyFlow } from "@/lib/calculations/spending";
 import {
   getEffectiveIncomeSources,
   isIncomeSourceActive,
 } from "@/lib/finance/effectiveIncome";
 import { getPersonalLedgerIncomeForMonth } from "@/lib/finance/personalIncomeScope";
-import { sumTransactionsByType } from "@/lib/transactions";
 import type { CashFlowResult } from "./types";
 
 function sum(values: number[]): number {
@@ -50,13 +50,7 @@ export function calculateMonthlySpending(
   data: FinanceData,
   referenceDate = new Date(),
 ): number {
-  const recurring = sum(
-    (data.bills ?? [])
-      .filter((bill) => bill.recurring)
-      .map((bill) => toMonthlyAmount(bill.amount, bill.frequency ?? "monthly")),
-  );
-  const ledgerExpenses = sumTransactionsByType(data, "expense", referenceDate);
-  return recurring + ledgerExpenses;
+  return calculateMonthlySpendingForMoneyFlow(data, referenceDate);
 }
 
 export function calculateNetCashFlow(

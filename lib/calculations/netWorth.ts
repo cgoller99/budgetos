@@ -1,26 +1,18 @@
+import {
+  collectCashAccounts,
+  collectUniqueDebtBalances,
+  collectUniqueInvestmentValues,
+} from "@/lib/calculations/balanceAggregation";
 import { isAccountIncludedInNetWorth } from "@/lib/finance/accountPreferences";
-import { isCashAccountType } from "@/lib/finance/accountTypes";
-import type { Account, FinanceData, Investment } from "@/lib/finance/types";
+import type { FinanceData, Investment } from "@/lib/finance/types";
+import {
+  isInvestmentAccount,
+  isPropertyAsset,
+} from "@/lib/calculations/netWorthInternals";
 import type { CalculationResult, NetWorthBreakdown } from "./types";
 
 function sum(values: number[]): number {
   return values.reduce((total, value) => total + value, 0);
-}
-
-function isPropertyAsset(account: Account): boolean {
-  const label = `${account.name} ${account.institution}`.toLowerCase();
-
-  return (
-    account.type === "investment" &&
-    (label.includes("equity") ||
-      label.includes("property") ||
-      label.includes("residence") ||
-      label.includes("home"))
-  );
-}
-
-function isInvestmentAccount(account: Account): boolean {
-  return account.type === "crypto" || account.type === "investment";
 }
 
 function categorizeInvestment(investment: Investment): "stocks" | "crypto" | "retirement" {
@@ -57,10 +49,7 @@ function categorizeDebtName(name: string): "credit_card" | "loan" | "mortgage" {
 }
 
 export function calculateCash(data: FinanceData): CalculationResult {
-  const cashAccounts = (data.accounts ?? []).filter(
-    (account) =>
-      isCashAccountType(account.type) && isAccountIncludedInNetWorth(account),
-  );
+  const cashAccounts = collectCashAccounts(data);
 
   return {
     value: sum(cashAccounts.map((account) => account.balance)),
@@ -69,21 +58,24 @@ export function calculateCash(data: FinanceData): CalculationResult {
 }
 
 export function calculateInvestments(data: FinanceData): CalculationResult {
-  const portfolioAccounts = (data.accounts ?? []).filter(
-    (account) =>
-      isInvestmentAccount(account) &&
-      !isPropertyAsset(account) &&
-      isAccountIncludedInNetWorth(account),
-  );
-  const portfolioHoldings = data.investments ?? [];
+  const { items } = collectUniqueInvestmentValues(data);
 
   return {
-    value:
-      sum(portfolioAccounts.map((account) => account.balance)) +
-      sum(portfolioHoldings.map((investment) => investment.value)),
-    monthlyChange:
-      sum(portfolioAccounts.map((account) => account.monthlyChange)) +
-      sum(portfolioHoldings.map((investment) => investment.monthlyChange)),
+    value: sum(items.map((item) => item.value)),
+    monthlyChange: sum(
+      items.map((item) => {
+        if (item.source === "investment") {
+          return (
+            data.investments?.find((investment) => investment.id === item.id)
+              ?.monthlyChange ?? 0
+          );
+        }
+
+        return (
+          data.accounts?.find((account) => account.id === item.id)?.monthlyChange ?? 0
+        );
+      }),
+    ),
   };
 }
 
@@ -99,19 +91,21 @@ export function calculatePropertyAssets(data: FinanceData): CalculationResult {
 }
 
 export function calculateDebt(data: FinanceData): CalculationResult {
-  const creditCardAccounts = (data.accounts ?? []).filter(
-    (account) =>
-      account.type === "credit_card" && isAccountIncludedInNetWorth(account),
-  );
-  const structuredDebts = data.debts ?? [];
+  const { items } = collectUniqueDebtBalances(data);
 
   return {
-    value:
-      sum(creditCardAccounts.map((account) => account.balance)) +
-      sum(structuredDebts.map((debt) => debt.balance)),
-    monthlyChange:
-      sum(creditCardAccounts.map((account) => account.monthlyChange)) +
-      sum(structuredDebts.map((debt) => debt.monthlyChange)),
+    value: sum(items.map((item) => item.balance)),
+    monthlyChange: sum(
+      items.map((item) => {
+        if (item.source === "debt") {
+          return data.debts?.find((debt) => debt.id === item.id)?.monthlyChange ?? 0;
+        }
+
+        return (
+          data.accounts?.find((account) => account.id === item.id)?.monthlyChange ?? 0
+        );
+      }),
+    ),
   };
 }
 
@@ -157,5 +151,6 @@ export function calculateNetWorthBreakdown(data: FinanceData): NetWorthBreakdown
 export {
   categorizeDebtName,
   categorizeInvestment,
+  isInvestmentAccount,
   isPropertyAsset,
 };

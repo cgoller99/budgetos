@@ -286,6 +286,7 @@ export function mapPlaidTransaction(
     date: transaction.date,
     notes: merchantName,
     name: merchantName,
+    isPending: transaction.pending === true,
   };
 }
 

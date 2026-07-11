@@ -1,4 +1,4 @@
-import { calculateCash } from "@/lib/calculations/netWorth";
+import { calculateCash, calculateDebt } from "@/lib/calculations/netWorth";
 import {
   getCurrentYearMonth,
   getDueDateForMonth,
@@ -101,7 +101,7 @@ export function getDebtAccountTypeLabel(accountType: DebtAccountType): string {
 }
 
 export function getTotalDebtBalance(data: FinanceData): number {
-  return sum((data.debts ?? []).map((debt) => debt.balance));
+  return calculateDebt(data).value;
 }
 
 export function getTotalMinimumPayments(data: FinanceData): number {

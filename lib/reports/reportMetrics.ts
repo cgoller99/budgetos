@@ -1,5 +1,6 @@
 import type { FinanceData, Transaction } from "@/lib/finance/types";
 import { calculateMonthlyIncome } from "@/lib/calculations/cashFlow";
+import { calculateMonthlySpendingFromLedger } from "@/lib/calculations/spending";
 import { withEffectiveIncome } from "@/lib/finance/effectiveIncome";
 
 export type MonthlyTrendPoint = {
@@ -54,10 +55,10 @@ export function computeMonthlyTrends(
 
   for (const month of months) {
     const monthTransactions = transactionsInMonth(data.transactions, month.key);
+    const [year, monthNumber] = month.key.split("-").map(Number);
+    const monthReference = new Date(year, monthNumber - 1, 15);
 
-    month.spending = monthTransactions
-      .filter((transaction) => transaction.type === "expense" && !transaction.goalId)
-      .reduce((total, transaction) => total + transaction.amount, 0);
+    month.spending = calculateMonthlySpendingFromLedger(data, monthReference);
 
     month.income = monthTransactions
       .filter((transaction) => transaction.type === "income")

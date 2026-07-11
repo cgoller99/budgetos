@@ -3,7 +3,7 @@ import "server-only";
 import type { Transaction } from "plaid";
 import { getPlaidClient, getPlaidErrorMessage } from "@/lib/plaid/plaidClient";
 import { mapPlaidTransaction } from "@/lib/plaid/mappers";
-import type { PlaidMappedAccount } from "@/lib/plaid/types";
+import type { PlaidMappedAccount, PlaidTransactionSkipReason } from "@/lib/plaid/types";
 import type { BankConnectionsRepository } from "@/lib/supabase/repositories/bankConnectionsRepository";
 
 const BACKFILL_LOOKBACK_DAYS = 730;
@@ -15,7 +15,7 @@ export type PlaidTransactionBackfillResult = {
   inserted: number;
   updated: number;
   removed: number;
-  skipped: Array<{ reason: "missing_account_map"; count: number }>;
+  skipped: Array<{ reason: PlaidTransactionSkipReason; count: number }>;
   error: string | null;
 };
 
