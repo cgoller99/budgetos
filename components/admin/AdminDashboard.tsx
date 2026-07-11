@@ -34,6 +34,36 @@ type PendingAction = {
   label: string;
 };
 
+function getActionConfirmCopy(action: AdminUserAction, label: string): {
+  title: string;
+  description: string;
+  confirmLabel: string;
+} {
+  if (action === "reset_finance") {
+    return {
+      title: "Factory reset finance data",
+      description:
+        "This permanently deletes all finance data for this user: Plaid bank connections, accounts, transactions, bills, goals, income plans, investments, and notifications. The login, profile, and subscription are kept. Onboarding resets to a fresh start. This cannot be undone.",
+      confirmLabel: "Reset finance data",
+    };
+  }
+
+  if (action === "delete_user") {
+    return {
+      title: "Delete user account",
+      description:
+        "This permanently deletes the user profile and auth account. All associated data is removed. This cannot be undone.",
+      confirmLabel: "Delete user",
+    };
+  }
+
+  return {
+    title: `Confirm ${label}`,
+    description: `This will ${label.toLowerCase()} the selected user account. This action may be irreversible.`,
+    confirmLabel: label,
+  };
+}
+
 type SectionKey =
   | "overview"
   | "revenue"
@@ -279,6 +309,10 @@ export function AdminDashboard() {
     );
   }
 
+  const confirmCopy = pendingAction
+    ? getActionConfirmCopy(pendingAction.action, pendingAction.label)
+    : null;
+
   if (loading) {
     return <SkeletonGrid count={4} className="max-w-5xl" />;
   }
@@ -426,12 +460,17 @@ export function AdminDashboard() {
                         ["grant_pro_plus", "Pro+"],
                         ["remove_subscription", "Remove"],
                         user.isDisabled ? ["enable_user", "Enable"] : ["disable_user", "Disable"],
+                        ["reset_finance", "Reset"],
                         ["delete_user", "Delete"],
                       ].map(([action, label]) => (
                         <Button
                           key={action}
                           size="sm"
-                          variant={action === "delete_user" ? "secondary" : "ghost"}
+                          variant={
+                            action === "delete_user" || action === "reset_finance"
+                              ? "secondary"
+                              : "ghost"
+                          }
                           onClick={() =>
                             setPendingAction({
                               userId: user.id,
@@ -629,9 +668,9 @@ export function AdminDashboard() {
 
       <ConfirmActionModal
         isOpen={Boolean(pendingAction)}
-        title={`Confirm ${pendingAction?.label ?? "action"}`}
-        description={`This will ${pendingAction?.label?.toLowerCase() ?? "update"} the selected user account. This action may be irreversible.`}
-        confirmLabel={pendingAction?.label ?? "Confirm"}
+        title={confirmCopy?.title ?? "Confirm action"}
+        description={confirmCopy?.description ?? "This action may be irreversible."}
+        confirmLabel={confirmCopy?.confirmLabel ?? "Confirm"}
         isPending={actionPending}
         onClose={() => setPendingAction(null)}
         onConfirm={() => void runUserAction()}
