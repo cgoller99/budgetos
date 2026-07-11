@@ -33,6 +33,7 @@ import type { BankConnectionRow } from "@/lib/supabase/database.types";
 import type { BuxmeSupabaseClient } from "@/lib/supabase/client";
 import { BankConnectionsRepository } from "@/lib/supabase/repositories/bankConnectionsRepository";
 import { resolveUserHouseholdId } from "@/lib/supabase/householdFinance";
+import { reconcileBillPaymentsForUser } from "@/lib/bills/persistBillReconciliation";
 
 const INITIAL_SYNC_LOOKBACK_DAYS = 730;
 const SYNC_RETRY_DELAY_MS = 2500;
@@ -618,6 +619,25 @@ export async function syncPlaidConnection(params: {
         pendingError: transactionResult.pendingError,
         backfillError: backfillResult?.error ?? null,
         backfillFetched: backfillResult?.fetchedFromPlaid ?? 0,
+      });
+    }
+
+    try {
+      const reconciliation = await reconcileBillPaymentsForUser(supabase, userId);
+      console.info("[plaid/sync] bill payment reconciliation", {
+        connectionId: connection.id,
+        userId,
+        transactionsLinked: reconciliation.reconcile.transactionsLinked,
+        billsUpdated: reconciliation.reconcile.billsUpdated.length,
+      });
+    } catch (reconcileError) {
+      console.warn("[plaid/sync] bill payment reconciliation failed", {
+        connectionId: connection.id,
+        userId,
+        message:
+          reconcileError instanceof Error
+            ? reconcileError.message
+            : String(reconcileError),
       });
     }
 

@@ -104,6 +104,30 @@ export async function syncPlaidBank(connectionId?: string): Promise<PlaidSyncRes
   return body.results;
 }
 
+export async function reconcileBillPayments(): Promise<{
+  transactionsLinked: number;
+  billsUpdated: string[];
+}> {
+  const response = await fetch("/api/finance/reconcile-bills", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  });
+  const body = (await response.json().catch(() => ({}))) as {
+    transactionsLinked?: number;
+    billsUpdated?: string[];
+    error?: string;
+  };
+
+  if (!response.ok) {
+    throw new Error(body.error ?? "Unable to reconcile bill payments.");
+  }
+
+  return {
+    transactionsLinked: body.transactionsLinked ?? 0,
+    billsUpdated: body.billsUpdated ?? [],
+  };
+}
+
 export async function disconnectPlaidBank(connectionId: string): Promise<void> {
   const response = await fetch("/api/plaid/disconnect", {
     method: "POST",

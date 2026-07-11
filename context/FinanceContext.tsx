@@ -91,6 +91,7 @@ import {
   dismissPlaidRecurringSuggestion,
   fetchPlaidLinkToken,
   syncPlaidBank,
+  reconcileBillPayments,
 } from "@/lib/plaid/clientApi";
 import type { PlaidSyncResult, RecurringBillCandidate } from "@/lib/plaid/types";
 import {
@@ -1710,6 +1711,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
           createdCount += 1;
         }
 
+        await reconcileBillPayments();
         const refreshed = await refreshFinance();
         if (refreshed) {
           refreshRecurringBillCandidates(refreshed);

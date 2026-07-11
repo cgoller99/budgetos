@@ -3,6 +3,7 @@ import {
   getSplitPaidAmount,
   getSplitRemainingAmount,
   isSplitFullyPaid,
+  type BillPaymentContext,
 } from "@/lib/finance/billPayments";
 import type { Bill, BillSplit, BillSplitInput, BillStatus } from "@/lib/finance/types";
 import { normalizePaycheckAssignment } from "@/lib/finance/paycheckSplit";
@@ -48,16 +49,16 @@ export function getSplitDueDate(
 export function getSplitStatus(
   split: BillSplit,
   referenceDate = new Date(),
+  context?: BillPaymentContext,
 ): BillStatus {
-  const currentMonth = getCurrentYearMonth(referenceDate);
-  const paidAmount = getSplitPaidAmount(split, referenceDate);
-  const remaining = getSplitRemainingAmount(split, referenceDate);
+  const paidAmount = getSplitPaidAmount(split, referenceDate, context);
+  const remaining = getSplitRemainingAmount(split, referenceDate, context);
 
-  if (split.paidMonth === currentMonth && remaining <= 0) {
+  if (remaining <= 0 && paidAmount > 0) {
     return "paid";
   }
 
-  if (split.paidMonth === currentMonth && paidAmount > 0 && remaining > 0) {
+  if (paidAmount > 0 && remaining > 0) {
     return "partial";
   }
 
@@ -94,9 +95,11 @@ export function getSplitStatus(
 export function areAllSplitsPaid(
   bill: Bill,
   referenceDate = new Date(),
+  context?: BillPaymentContext,
 ): boolean {
+  const paymentContext = context ?? { billId: bill.id };
   return getEffectiveBillSplits(bill).every((split) =>
-    isSplitFullyPaid(split, referenceDate),
+    isSplitFullyPaid(split, referenceDate, paymentContext),
   );
 }
 
