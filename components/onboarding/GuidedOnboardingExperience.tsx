@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { OnboardingConfetti } from "@/components/onboarding/OnboardingConfetti";
+import { OnboardingPlaidConnect } from "@/components/onboarding/OnboardingPlaidConnect";
 import { Button, Card, Input, Select } from "@/components/ui";
 import { cn } from "@/components/ui/cn";
 import { useAuth } from "@/context/AuthContext";
@@ -11,28 +11,31 @@ import { useFinance } from "@/context/FinanceContext";
 import { useHousehold } from "@/context/HouseholdContext";
 import { ANALYTICS_EVENTS, trackEvent } from "@/lib/analytics/client";
 import { ACCOUNT_TYPE_OPTIONS } from "@/lib/finance/accountTypes";
+import type { OnboardingProgress, OnboardingSetupPath } from "@/lib/onboarding/progress";
+import {
+  getOnboardingTotalSteps,
+  MANUAL_ONBOARDING_TOTAL_STEPS,
+} from "@/lib/onboarding/progress";
 import type { IncomePlanSchedule } from "@/lib/incomePlan/types";
 import { INCOME_PLAN_SCHEDULE_LABELS } from "@/lib/incomePlan/types";
 
-const TOTAL_STEPS = 10;
-
-const STEP_TIPS: Record<number, string> = {
-  1: "You can pause anytime — your progress saves automatically.",
-  2: "Your schedule powers paycheck predictions and Safe To Spend.",
-  3: "Use your typical take-home pay, not gross income.",
-  4: "Start with your primary checking account for the best picture.",
-  5: "Recurring bills help forecast your monthly cash flow.",
-  6: "Even a small savings goal keeps you motivated.",
-  7: "Household invites let partners collaborate on shared finances.",
-  8: "Bank sync is optional — you can connect later in Settings.",
-  9: "Your health score improves as you add more financial data.",
-  10: "You're ready to explore your personalized dashboard.",
+const STEP_TIPS: Record<string, string> = {
+  welcome: "You can pause anytime — your progress saves automatically.",
+  setupChoice: "Choose the setup path that fits you. You can change this later.",
+  paySchedule: "Your schedule powers paycheck predictions and Safe To Spend.",
+  incomePlan: "Use your typical take-home pay, not gross income.",
+  account: "Start with your primary checking account, or skip and connect Plaid later.",
+  bill: "Recurring bills help forecast your monthly cash flow.",
+  goal: "Even a small savings goal keeps you motivated.",
+  household: "Household invites let partners collaborate on shared finances.",
+  plaidConnect: "Plaid is the fastest way to import accounts, balances, and transactions.",
+  health: "Your health score improves as you add more financial data.",
+  finish: "You're ready to explore your personalized dashboard.",
 };
 
 const CHECKLIST_ITEMS: Array<{
   key: keyof OnboardingProgress;
   label: string;
-  fallback?: boolean;
 }> = [
   { key: "paySchedule", label: "Paycheck schedule set" },
   { key: "paycheckAmount", label: "Income plan created" },
@@ -48,28 +51,14 @@ const SCHEDULE_OPTIONS: IncomePlanSchedule[] = [
   "monthly",
 ];
 
-type OnboardingProgress = {
-  paySchedule?: IncomePlanSchedule;
-  paycheckAmount?: number;
-  accountName?: string;
-  accountType?: string;
-  accountBalance?: number;
-  billName?: string;
-  billAmount?: number;
-  billDueDay?: number;
-  goalName?: string;
-  goalTarget?: number;
-  inviteEmail?: string;
-};
-
-function ProgressBar({ step }: { step: number }) {
-  const pct = Math.round((step / TOTAL_STEPS) * 100);
+function ProgressBar({ step, total }: { step: number; total: number }) {
+  const pct = Math.round((step / total) * 100);
 
   return (
     <div className="mb-8">
       <div className="mb-2 flex items-center justify-between text-xs text-white/45">
         <span>
-          Step {step} of {TOTAL_STEPS}
+          Step {step} of {total}
         </span>
         <span>{pct}%</span>
       </div>
@@ -78,8 +67,8 @@ function ProgressBar({ step }: { step: number }) {
         role="progressbar"
         aria-valuenow={step}
         aria-valuemin={1}
-        aria-valuemax={TOTAL_STEPS}
-        aria-label={`Onboarding step ${step} of ${TOTAL_STEPS}`}
+        aria-valuemax={total}
+        aria-label={`Onboarding step ${step} of ${total}`}
       >
         <div
           className="h-full rounded-full bg-gradient-to-r from-[#0077ed] to-[#4da3ff] transition-all duration-500"
@@ -90,8 +79,8 @@ function ProgressBar({ step }: { step: number }) {
   );
 }
 
-function StepTip({ step }: { step: number }) {
-  const tip = STEP_TIPS[step];
+function StepTip({ tipKey }: { tipKey: string }) {
+  const tip = STEP_TIPS[tipKey];
 
   if (!tip) {
     return null;
@@ -107,29 +96,78 @@ function StepTip({ step }: { step: number }) {
   );
 }
 
+function SetupChoiceCard({
+  title,
+  description,
+  bullets,
+  selected,
+  recommended,
+  onClick,
+}: {
+  title: string;
+  description: string;
+  bullets: string[];
+  selected: boolean;
+  recommended?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "w-full rounded-2xl border px-5 py-5 text-left transition-colors",
+        selected
+          ? "border-[#0077ed]/40 bg-[#0077ed]/10"
+          : "border-white/[0.08] bg-white/[0.02] hover:border-[#0077ed]/25",
+      )}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-base font-semibold text-white">{title}</p>
+        {recommended ? (
+          <span className="shrink-0 rounded-full bg-[#0077ed]/20 px-2.5 py-1 text-xs font-medium text-[#4da3ff]">
+            Recommended
+          </span>
+        ) : null}
+      </div>
+      <p className="mt-2 text-sm text-white/50">{description}</p>
+      <ul className="mt-4 space-y-1.5 text-sm text-white/45">
+        {bullets.map((bullet) => (
+          <li key={bullet}>{bullet}</li>
+        ))}
+      </ul>
+    </button>
+  );
+}
+
+function SkipForNowButton({
+  disabled,
+  onClick,
+}: {
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <Button className="w-full sm:w-auto" variant="secondary" size="md" disabled={disabled} onClick={onClick}>
+      Skip for Now
+    </Button>
+  );
+}
+
 export function GuidedOnboardingExperience() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAuth();
-  const { addAccount, addBill, createGoal, saveIncomePlan, completeOnboarding } = useFinance();
+  const { addAccount, addBill, createGoal, saveIncomePlan, completeGuidedOnboarding, refreshFinance } =
+    useFinance();
   const { inviteMember } = useHousehold();
   const [step, setStep] = useState(1);
   const [progress, setProgress] = useState<OnboardingProgress>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const loadProgress = useCallback(async () => {
-    const response = await fetch("/api/onboarding/progress");
-    if (!response.ok) return;
-    const payload = (await response.json()) as {
-      step?: number;
-      progress?: OnboardingProgress;
-    };
-    if (payload.step) setStep(payload.step);
-    if (payload.progress) setProgress(payload.progress);
-  }, []);
-
-  useEffect(() => {
-    void loadProgress();
-  }, [loadProgress]);
+  const totalSteps = getOnboardingTotalSteps(progress);
+  const isPlaidPath = progress.setupPath === "plaid";
+  const isManualPath = progress.setupPath === "manual";
 
   const persistProgress = useCallback(
     async (nextStep: number, nextProgress: OnboardingProgress) => {
@@ -152,6 +190,34 @@ export function GuidedOnboardingExperience() {
     [persistProgress, progress],
   );
 
+  const loadProgress = useCallback(async () => {
+    const response = await fetch("/api/onboarding/progress");
+    if (!response.ok) return;
+    const payload = (await response.json()) as {
+      step?: number;
+      progress?: OnboardingProgress;
+    };
+    if (payload.progress) setProgress(payload.progress);
+    if (payload.step) setStep(payload.step);
+  }, []);
+
+  useEffect(() => {
+    void loadProgress();
+  }, [loadProgress]);
+
+  useEffect(() => {
+    if (searchParams.get("plaid") !== "resume") {
+      return;
+    }
+
+    void (async () => {
+      await refreshFinance();
+      if (progress.setupPath === "plaid" && step < 4) {
+        await goToStep(4);
+      }
+    })();
+  }, [goToStep, progress.setupPath, refreshFinance, searchParams, step]);
+
   const healthScore = useMemo(() => {
     let score = 42;
     if (progress.accountName) score += 15;
@@ -161,20 +227,43 @@ export function GuidedOnboardingExperience() {
     return Math.min(score, 82);
   }, [progress]);
 
-  async function handleFinish() {
-    setIsSubmitting(true);
+  const finishOnboarding = useCallback(
+    async (patch: Partial<OnboardingProgress> = {}) => {
+      setIsSubmitting(true);
 
-    try {
-      await completeOnboarding("fresh");
-      trackEvent(
-        ANALYTICS_EVENTS.COMPLETED_ONBOARDING,
-        { steps_completed: TOTAL_STEPS },
-        { once: true, dedupeKey: `onboarding-${user?.id ?? "anon"}` },
-      );
-      router.push("/dashboard");
-    } finally {
-      setIsSubmitting(false);
-    }
+      try {
+        const nextProgress = {
+          ...progress,
+          ...patch,
+          showPlaidConnectBanner:
+            patch.showPlaidConnectBanner ??
+            progress.showPlaidConnectBanner ??
+            (progress.setupPath === "plaid" ||
+              patch.skippedManualAccounts === true ||
+              progress.skippedManualAccounts === true),
+        };
+
+        await persistProgress(step, nextProgress);
+        await completeGuidedOnboarding();
+        trackEvent(
+          ANALYTICS_EVENTS.COMPLETED_ONBOARDING,
+          {
+            steps_completed: step,
+            setup_path: nextProgress.setupPath ?? "unknown",
+            skipped_manual_accounts: Boolean(nextProgress.skippedManualAccounts),
+          },
+          { once: true, dedupeKey: `onboarding-${user?.id ?? "anon"}` },
+        );
+        router.push("/dashboard");
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [completeGuidedOnboarding, persistProgress, progress, router, step, user?.id],
+  );
+
+  async function chooseSetupPath(setupPath: OnboardingSetupPath) {
+    await goToStep(setupPath === "plaid" ? 3 : 3, { setupPath });
   }
 
   async function handleCreateIncomePlan() {
@@ -205,7 +294,7 @@ export function GuidedOnboardingExperience() {
         ],
       });
       trackEvent(ANALYTICS_EVENTS.CREATED_INCOME_PLAN, { source: "onboarding" });
-      await goToStep(4);
+      await goToStep(5);
     } finally {
       setIsSubmitting(false);
     }
@@ -223,10 +312,14 @@ export function GuidedOnboardingExperience() {
         balance: progress.accountBalance ?? 0,
       });
       trackEvent(ANALYTICS_EVENTS.ADDED_ACCOUNT, { source: "onboarding" });
-      await goToStep(5);
+      await goToStep(6, { skippedManualAccounts: false });
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  async function handleSkipAccountSetup() {
+    await finishOnboarding({ skippedManualAccounts: true, showPlaidConnectBanner: true });
   }
 
   async function handleCreateBill() {
@@ -243,7 +336,7 @@ export function GuidedOnboardingExperience() {
         category: "Bills",
       });
       trackEvent(ANALYTICS_EVENTS.ADDED_BILL, { source: "onboarding" });
-      await goToStep(6);
+      await goToStep(7);
     } finally {
       setIsSubmitting(false);
     }
@@ -261,11 +354,36 @@ export function GuidedOnboardingExperience() {
         target: progress.goalTarget,
       });
       trackEvent(ANALYTICS_EVENTS.CREATED_GOAL, { source: "onboarding" });
-      await goToStep(7);
+      await goToStep(8);
     } finally {
       setIsSubmitting(false);
     }
   }
+
+  async function handlePlaidConnected() {
+    await finishOnboarding({ showPlaidConnectBanner: false });
+  }
+
+  async function handlePlaidSkipped() {
+    await finishOnboarding({ showPlaidConnectBanner: true });
+  }
+
+  const tipKey = useMemo(() => {
+    if (step === 1) return "welcome";
+    if (step === 2) return "setupChoice";
+    if (isPlaidPath) {
+      if (step === 3) return "plaidConnect";
+      return "finish";
+    }
+    if (step === 3) return "paySchedule";
+    if (step === 4) return "incomePlan";
+    if (step === 5) return "account";
+    if (step === 6) return "bill";
+    if (step === 7) return "goal";
+    if (step === 8) return "household";
+    if (step === 9) return "health";
+    return "finish";
+  }, [isPlaidPath, step]);
 
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[#0a0f1a] px-5 py-12 pb-[calc(3rem+env(safe-area-inset-bottom))] font-sans text-white">
@@ -275,8 +393,8 @@ export function GuidedOnboardingExperience() {
       />
 
       <div className="relative z-10 mx-auto w-full max-w-xl">
-        <ProgressBar step={step} />
-        <StepTip step={step} />
+        <ProgressBar step={step} total={totalSteps} />
+        <StepTip tipKey={tipKey} />
 
         {step === 1 && (
           <div className="onboarding-step-enter text-center">
@@ -296,6 +414,74 @@ export function GuidedOnboardingExperience() {
 
         {step === 2 && (
           <Card padding="lg" className="onboarding-step-enter">
+            <h2 className="text-xl font-semibold">How would you like to get started?</h2>
+            <p className="mt-2 text-sm text-white/45">
+              Pick the setup path that works best for you. You can always connect Plaid or add manual
+              accounts later.
+            </p>
+            <div className="mt-6 space-y-4">
+              <SetupChoiceCard
+                title="📱 Connect my bank"
+                description="Uses Plaid"
+                bullets={[
+                  "Automatically imports accounts, balances, and transactions",
+                  "Fastest setup",
+                ]}
+                selected={progress.setupPath === "plaid"}
+                recommended
+                onClick={() => void chooseSetupPath("plaid")}
+              />
+              <SetupChoiceCard
+                title="✍️ Enter everything manually"
+                description="Create accounts yourself"
+                bullets={["Create accounts manually", "Track balances yourself"]}
+                selected={progress.setupPath === "manual"}
+                onClick={() => void chooseSetupPath("manual")}
+              />
+            </div>
+          </Card>
+        )}
+
+        {isPlaidPath && step === 3 && (
+          <Card padding="lg" className="onboarding-step-enter">
+            <h2 className="text-xl font-semibold">Connect your bank</h2>
+            <p className="mt-2 text-sm text-white/45">
+              Link your accounts with Plaid to import balances and transactions automatically.
+            </p>
+            <div className="mt-6">
+              <OnboardingPlaidConnect
+                isSubmitting={isSubmitting}
+                onConnected={() => void handlePlaidConnected()}
+                onSkip={() => void handlePlaidSkipped()}
+              />
+            </div>
+          </Card>
+        )}
+
+        {isPlaidPath && step === 4 && (
+          <>
+            <OnboardingConfetti />
+            <Card padding="lg" className="onboarding-step-enter text-center">
+              <div className="success-pop mx-auto mb-4 text-4xl">🎉</div>
+              <h2 className="text-2xl font-semibold">You&apos;re all set!</h2>
+              <p className="mx-auto mt-3 max-w-sm text-sm text-white/45">
+                Your bank is connected. Explore your dashboard to review imported accounts and
+                transactions.
+              </p>
+              <Button
+                className="mt-8"
+                size="md"
+                disabled={isSubmitting}
+                onClick={() => void finishOnboarding({ showPlaidConnectBanner: false })}
+              >
+                {isSubmitting ? "Finishing..." : "Go to dashboard"}
+              </Button>
+            </Card>
+          </>
+        )}
+
+        {isManualPath && step === 3 && (
+          <Card padding="lg" className="onboarding-step-enter">
             <h2 className="text-xl font-semibold">Choose your paycheck schedule</h2>
             <p className="mt-2 text-sm text-white/45">This powers Income Plans and Safe To Spend.</p>
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
@@ -303,7 +489,7 @@ export function GuidedOnboardingExperience() {
                 <button
                   key={schedule}
                   type="button"
-                  onClick={() => void goToStep(3, { paySchedule: schedule })}
+                  onClick={() => void goToStep(4, { paySchedule: schedule })}
                   className={cn(
                     "rounded-2xl border px-4 py-4 text-left transition-colors",
                     progress.paySchedule === schedule
@@ -318,7 +504,7 @@ export function GuidedOnboardingExperience() {
           </Card>
         )}
 
-        {step === 3 && (
+        {isManualPath && step === 4 && (
           <Card padding="lg" className="onboarding-step-enter">
             <h2 className="text-xl font-semibold">Create your first Income Plan</h2>
             <label className="mt-6 block text-sm">
@@ -338,7 +524,7 @@ export function GuidedOnboardingExperience() {
               />
             </label>
             <div className="mt-6 flex justify-end gap-2">
-              <Button variant="secondary" size="md" onClick={() => void goToStep(2)}>
+              <Button variant="secondary" size="md" onClick={() => void goToStep(3)}>
                 Back
               </Button>
               <Button size="md" disabled={isSubmitting} onClick={() => void handleCreateIncomePlan()}>
@@ -348,9 +534,12 @@ export function GuidedOnboardingExperience() {
           </Card>
         )}
 
-        {step === 4 && (
+        {isManualPath && step === 5 && (
           <Card padding="lg" className="onboarding-step-enter">
             <h2 className="text-xl font-semibold">Add your first account</h2>
+            <p className="mt-2 text-sm text-white/45">
+              Enter a manual account, or skip and connect Plaid from your dashboard later.
+            </p>
             <div className="mt-6 space-y-4">
               <label className="block text-sm">
                 <span className="mb-2 block text-white/45">Account name</span>
@@ -393,18 +582,24 @@ export function GuidedOnboardingExperience() {
                 />
               </label>
             </div>
-            <div className="mt-6 flex justify-end gap-2">
-              <Button variant="secondary" size="md" onClick={() => void goToStep(3)}>
-                Back
-              </Button>
-              <Button size="md" disabled={isSubmitting} onClick={() => void handleCreateAccount()}>
-                Continue
-              </Button>
+            <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <SkipForNowButton
+                disabled={isSubmitting}
+                onClick={() => void handleSkipAccountSetup()}
+              />
+              <div className="flex gap-2">
+                <Button variant="secondary" size="md" onClick={() => void goToStep(4)}>
+                  Back
+                </Button>
+                <Button size="md" disabled={isSubmitting} onClick={() => void handleCreateAccount()}>
+                  Continue
+                </Button>
+              </div>
             </div>
           </Card>
         )}
 
-        {step === 5 && (
+        {isManualPath && step === 6 && (
           <Card padding="lg" className="onboarding-step-enter">
             <h2 className="text-xl font-semibold">Add your first bill</h2>
             <div className="mt-6 space-y-4">
@@ -438,7 +633,7 @@ export function GuidedOnboardingExperience() {
               />
             </div>
             <div className="mt-6 flex justify-end gap-2">
-              <Button variant="secondary" size="md" onClick={() => void goToStep(4)}>
+              <Button variant="secondary" size="md" onClick={() => void goToStep(5)}>
                 Back
               </Button>
               <Button size="md" disabled={isSubmitting} onClick={() => void handleCreateBill()}>
@@ -448,7 +643,7 @@ export function GuidedOnboardingExperience() {
           </Card>
         )}
 
-        {step === 6 && (
+        {isManualPath && step === 7 && (
           <Card padding="lg" className="onboarding-step-enter">
             <h2 className="text-xl font-semibold">Create your first savings goal</h2>
             <div className="mt-6 space-y-4">
@@ -472,7 +667,7 @@ export function GuidedOnboardingExperience() {
               />
             </div>
             <div className="mt-6 flex justify-end gap-2">
-              <Button variant="secondary" size="md" onClick={() => void goToStep(5)}>
+              <Button variant="secondary" size="md" onClick={() => void goToStep(6)}>
                 Back
               </Button>
               <Button size="md" disabled={isSubmitting} onClick={() => void handleCreateGoal()}>
@@ -482,7 +677,7 @@ export function GuidedOnboardingExperience() {
           </Card>
         )}
 
-        {step === 7 && (
+        {isManualPath && step === 8 && (
           <Card padding="lg" className="onboarding-step-enter">
             <h2 className="text-xl font-semibold">Invite your household</h2>
             <p className="mt-2 text-sm text-white/45">Optional — collaborate on shared finances.</p>
@@ -496,7 +691,7 @@ export function GuidedOnboardingExperience() {
               placeholder="partner@email.com"
             />
             <div className="mt-6 flex flex-wrap justify-end gap-2">
-              <Button variant="ghost" size="md" onClick={() => void goToStep(8)}>
+              <Button variant="ghost" size="md" onClick={() => void goToStep(9)}>
                 Skip
               </Button>
               <Button
@@ -515,7 +710,7 @@ export function GuidedOnboardingExperience() {
                         setIsSubmitting(false);
                       }
                     }
-                    void goToStep(8);
+                    void goToStep(9);
                   })();
                 }}
               >
@@ -525,39 +720,20 @@ export function GuidedOnboardingExperience() {
           </Card>
         )}
 
-        {step === 8 && (
-          <Card padding="lg" className="onboarding-step-enter">
-            <h2 className="text-xl font-semibold">Connect your bank</h2>
-            <p className="mt-2 text-sm text-white/45">
-              Optional — sync accounts automatically with Plaid from Settings later.
-            </p>
-            <div className="mt-6 flex flex-wrap gap-2">
-              <Link href="/settings">
-                <Button variant="secondary" size="md">
-                  Open bank settings
-                </Button>
-              </Link>
-              <Button variant="ghost" size="md" onClick={() => void goToStep(9)}>
-                Skip for now
-              </Button>
-            </div>
-          </Card>
-        )}
-
-        {step === 9 && (
+        {isManualPath && step === 9 && (
           <Card padding="lg" className="onboarding-step-enter text-center">
             <p className="text-sm text-[#4da3ff]">Financial Health</p>
             <p className="mt-4 text-5xl font-semibold tabular-nums">{healthScore}</p>
             <p className="mx-auto mt-4 max-w-sm text-sm text-white/45">
               Your score will improve as you track accounts, bills, goals, and income plans.
             </p>
-            <Button className="mt-8" size="md" onClick={() => void goToStep(10)}>
+            <Button className="mt-8" size="md" onClick={() => void goToStep(MANUAL_ONBOARDING_TOTAL_STEPS)}>
               Continue
             </Button>
           </Card>
         )}
 
-        {step === 10 && (
+        {isManualPath && step === MANUAL_ONBOARDING_TOTAL_STEPS && (
           <>
             <OnboardingConfetti />
             <Card padding="lg" className="onboarding-step-enter text-center">
@@ -592,7 +768,11 @@ export function GuidedOnboardingExperience() {
                 className="mt-8"
                 size="md"
                 disabled={isSubmitting}
-                onClick={() => void handleFinish()}
+                onClick={() =>
+                  void finishOnboarding({
+                    showPlaidConnectBanner: !progress.accountName,
+                  })
+                }
               >
                 {isSubmitting ? "Finishing..." : "Go to dashboard"}
               </Button>

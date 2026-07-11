@@ -4,8 +4,10 @@ import dynamic from "next/dynamic";
 import { MobileSafeToSpendCard } from "@/components/dashboard/MobileSafeToSpendCard";
 import { RecentActivityCard } from "@/components/dashboard/RecentActivityCard";
 import { SmartSuggestionsCard } from "@/components/automation/SmartSuggestionsCard";
+import { PlaidConnectBanner } from "@/components/guidance/PlaidConnectBanner";
 import { RecommendedSteps } from "@/components/guidance/RecommendedSteps";
 import { WelcomeChecklist } from "@/components/guidance/WelcomeChecklist";
+import { useOnboardingProgress } from "@/hooks/useOnboardingProgress";
 import { HealthScoreCard } from "@/components/HealthScoreCard";
 import { NextPaycheckCard } from "@/components/incomePlan/NextPaycheckCard";
 import { TopGoalsCard } from "@/components/dashboard/TopGoalsCard";
@@ -38,6 +40,7 @@ const SmartInsights = dynamic(
 
 export function DashboardContent() {
   const { isLoading } = useFinance();
+  const { progress: onboardingProgress } = useOnboardingProgress();
 
   if (isLoading) {
     return <DashboardSkeleton />;
@@ -45,6 +48,7 @@ export function DashboardContent() {
 
   return (
     <div className={cn(pageContainerWideClassName)}>
+      <PlaidConnectBanner onboardingProgress={onboardingProgress} className="mb-4 lg:mb-6" />
       {/* Mobile: priority stack */}
       <div className="space-y-4 lg:hidden">
         <MobileSafeToSpendCard />
