@@ -21,6 +21,15 @@ import { diagnoseIncomeCalculation } from "@/lib/finance/personalIncomeScope";
 import { getPlaidClient } from "@/lib/plaid/plaidClient";
 import { decryptConnectionAccessToken } from "@/lib/plaid/plaidService";
 import { syncPlaidForUser } from "@/lib/plaid/syncService";
+import {
+  getOverdueBillDiagnostics,
+  type BillCycleDiagnostic,
+} from "@/lib/bills/reconcileBillPayments";
+import {
+  loadBillPaymentDiagnosticsForUser,
+  reconcileBillPaymentsForUser,
+} from "@/lib/bills/persistBillReconciliation";
+import { getBillProgressList } from "@/lib/finance/bills";
 import type { BuxmeSupabaseClient } from "@/lib/supabase/client";
 import { FinanceService } from "@/lib/supabase/services/financeService";
 
@@ -45,6 +54,17 @@ export type FinanceAuditResult = {
   plaidConnectionsSynced: number;
   metrics: FinanceAuditMetric[];
   issues: FinanceAuditIssue[];
+  billDiagnostics?: BillCycleDiagnostic[];
+  overdueBills?: Array<{
+    billId: string;
+    billName: string;
+    splitId: string;
+    dueDate: string | null;
+    amount: number;
+    cycleMonth: string;
+    linkedPaymentTotal: number;
+    unpaidReason: string;
+  }>;
   recomputedAt: string;
 };
 
@@ -157,6 +177,23 @@ export async function auditUserFinance(
   const moneyFlow = calculateMoneyFlow(financeData);
   const incomeDiagnostics = diagnoseIncomeCalculation(financeData);
   const plaidSnapshots = await fetchPlaidBalances(adminSupabase, userId);
+  const billProgress = getBillProgressList(financeData);
+  const overdueBills = billProgress.filter((bill) => bill.status === "overdue");
+  const overdueAmount = overdueBills.reduce(
+    (total, bill) => total + bill.remainingAmount,
+    0,
+  );
+  const billsDue = billProgress
+    .filter((bill) => bill.status !== "paid")
+    .reduce((total, bill) => total + bill.remainingAmount, 0);
+  const billsPaid = billProgress
+    .filter((bill) => bill.status === "paid")
+    .reduce((total, bill) => total + bill.paidAmount, 0);
+  const billPaymentDiagnostics = await loadBillPaymentDiagnosticsForUser(
+    adminSupabase,
+    userId,
+  );
+  const overdueDiagnostics = getOverdueBillDiagnostics(financeData);
 
   const cashItems = collectCashAccounts(financeData);
   const debtItems = collectUniqueDebtBalances(financeData);
@@ -254,6 +291,20 @@ export async function auditUserFinance(
     }
   }
 
+  if (overdueBills.length > 0) {
+    issues.push({
+      severity: "warning",
+      code: "overdue_bills",
+      message: `${overdueBills.length} bill${overdueBills.length === 1 ? "" : "s"} marked overdue`,
+      details: overdueBills.map((bill) => ({
+        billId: bill.billId,
+        name: bill.name,
+        amount: round(bill.remainingAmount),
+        dueDate: bill.formattedDueDate,
+      })),
+    });
+  }
+
   const metrics: FinanceAuditMetric[] = [
     {
       id: "cash",
@@ -323,6 +374,27 @@ export async function auditUserFinance(
         "min(income - bills - debts - goals - investments, available cash) when Plaid cash linked",
       displayed: round(moneyFlow.safeToSpend),
     },
+    {
+      id: "bills_due",
+      label: "Bills Due (unpaid)",
+      rawSources: billProgress.filter((bill) => bill.status !== "paid"),
+      formula: "sum(remainingAmount for non-paid bill cycles)",
+      displayed: round(billsDue),
+    },
+    {
+      id: "bills_paid",
+      label: "Bills Paid (current cycles)",
+      rawSources: billProgress.filter((bill) => bill.status === "paid"),
+      formula: "sum(paidAmount for paid bill cycles)",
+      displayed: round(billsPaid),
+    },
+    {
+      id: "overdue_amount",
+      label: "Overdue Amount",
+      rawSources: overdueBills,
+      formula: "sum(remainingAmount where status=overdue)",
+      displayed: round(overdueAmount),
+    },
   ];
 
   return {
@@ -331,6 +403,10 @@ export async function auditUserFinance(
     plaidConnectionsSynced: 0,
     metrics,
     issues,
+    billDiagnostics: billPaymentDiagnostics.filter(
+      (entry) => entry.statusAfter === "unpaid" || entry.matchedTransactionId,
+    ),
+    overdueBills: overdueDiagnostics,
     recomputedAt: new Date().toISOString(),
   };
 }
@@ -363,6 +439,12 @@ export async function refreshUserFinanceAudit(
         error,
       });
     }
+  }
+
+  try {
+    await reconcileBillPaymentsForUser(adminSupabase, userId);
+  } catch (error) {
+    console.error("[finance-audit] bill reconciliation failed", { userId, error });
   }
 
   const result = await auditUserFinance(adminSupabase, userId);

@@ -5,6 +5,7 @@ import { isCashAccountType } from "@/lib/finance/accountTypes";
 import {
   getSplitPaidAmount,
   getSplitRemainingAmount,
+  type BillPaymentContext,
 } from "@/lib/finance/billPayments";
 import {
   getEffectiveBillSplits,
@@ -68,6 +69,20 @@ export function getDueDateForMonth(
   return new Date(year, month, day);
 }
 
+function billPaymentContext(
+  bill: Bill,
+  data?: FinanceData,
+): BillPaymentContext | undefined {
+  if (!data) {
+    return { billId: bill.id };
+  }
+
+  return {
+    billId: bill.id,
+    transactions: data.transactions ?? [],
+  };
+}
+
 function getBillDueDate(
   bill: Bill,
   referenceDate: Date,
@@ -95,11 +110,15 @@ function getBillDueDate(
 export function getBillStatus(
   bill: Bill,
   referenceDate = new Date(),
+  data?: FinanceData,
 ): BillStatus {
+  const paymentContext = billPaymentContext(bill, data);
   const splits = getEffectiveBillSplits(bill);
 
   if (splits.length > 1 || (bill.splits ?? []).length > 0) {
-    const statuses = splits.map((split) => getSplitStatus(split, referenceDate));
+    const statuses = splits.map((split) =>
+      getSplitStatus(split, referenceDate, paymentContext),
+    );
 
     if (statuses.every((status) => status === "paid")) {
       return "paid";
@@ -127,13 +146,20 @@ export function getBillStatus(
 
     const today = startOfDay(referenceDate);
     const nextDue = startOfDay(parseDateString(bill.schedule.nextOccurrence));
+    const linkedPaid =
+      paymentContext?.transactions?.some(
+        (transaction) =>
+          transaction.billId === bill.id &&
+          transaction.type === "expense" &&
+          transaction.amount >= bill.amount * 0.95,
+      ) ?? false;
 
     if (bill.schedule.lastProcessedDate) {
       const lastProcessed = startOfDay(
         parseDateString(bill.schedule.lastProcessedDate),
       );
 
-      if (isSameDay(lastProcessed, today)) {
+      if (isSameDay(lastProcessed, today) || linkedPaid) {
         return "paid";
       }
     }
@@ -143,6 +169,9 @@ export function getBillStatus(
     }
 
     if (nextDue < today) {
+      if (linkedPaid) {
+        return "paid";
+      }
       return isActivityDue(bill.schedule, referenceDate) ? "overdue" : "paid";
     }
 
@@ -157,7 +186,7 @@ export function getBillStatus(
     return "upcoming";
   }
 
-  return getSplitStatus(splits[0], referenceDate);
+  return getSplitStatus(splits[0], referenceDate, paymentContext);
 }
 
 export function formatBillDueDate(
@@ -182,13 +211,15 @@ export function enrichBillSplit(
   bill: Bill,
   split: BillSplit,
   referenceDate = new Date(),
+  data?: FinanceData,
 ): BillProgress {
   const splits = getEffectiveBillSplits(bill);
+  const paymentContext = billPaymentContext(bill, data);
   const dueDate = getSplitDueDate(split, referenceDate);
-  const status = getSplitStatus(split, referenceDate);
+  const status = getSplitStatus(split, referenceDate, paymentContext);
   const displayName = getSplitDisplayName(bill.name, split, splits.length);
-  const paidAmount = getSplitPaidAmount(split, referenceDate);
-  const remainingAmount = getSplitRemainingAmount(split, referenceDate);
+  const paidAmount = getSplitPaidAmount(split, referenceDate, paymentContext);
+  const remainingAmount = getSplitRemainingAmount(split, referenceDate, paymentContext);
 
   return {
     id: split.id,
@@ -215,9 +246,10 @@ export function enrichBillSplit(
 export function enrichBill(
   bill: Bill,
   referenceDate = new Date(),
+  data?: FinanceData,
 ): BillProgress {
   const split = getEffectiveBillSplits(bill)[0];
-  return enrichBillSplit(bill, split, referenceDate);
+  return enrichBillSplit(bill, split, referenceDate, data);
 }
 
 function billStartDateFromDueDay(dueDay: number, referenceDate: Date): Date {
@@ -309,7 +341,7 @@ export function getBillProgressList(
 ): BillProgress[] {
   return (data.bills ?? []).flatMap((bill) =>
     getEffectiveBillSplits(bill).map((split) =>
-      enrichBillSplit(bill, split, referenceDate),
+      enrichBillSplit(bill, split, referenceDate, data),
     ),
   );
 }
