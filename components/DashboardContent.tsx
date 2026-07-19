@@ -3,7 +3,6 @@
 import { AchievementsCard } from "@/components/dashboard/AchievementsCard";
 import { DashboardHero } from "@/components/dashboard/DashboardHero";
 import { DashboardMoreSection } from "@/components/dashboard/DashboardMoreSection";
-import { DashboardSectionFocus } from "@/components/dashboard/DashboardSectionFocus";
 import { FinancialTrendsCard } from "@/components/dashboard/FinancialTrendsCard";
 import { RecentTransactionsCard } from "@/components/dashboard/RecentTransactionsCard";
 import { SpendingBreakdownCard } from "@/components/dashboard/SpendingBreakdownCard";
@@ -30,7 +29,6 @@ export function DashboardContent() {
 
   return (
     <div className={cn(pageContainerWideClassName)}>
-      <DashboardSectionFocus />
       <DashboardHero />
       <WelcomeChecklist />
 

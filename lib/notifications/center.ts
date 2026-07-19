@@ -1,6 +1,10 @@
 import type { FinanceEventType } from "@/lib/events/types";
 import type { NotificationItem } from "@/lib/events/types";
 import { buildTransactionsHref } from "@/lib/transactions/filterParams";
+import {
+  getWeeklyPlanHref,
+  isWeeklySummaryNotification,
+} from "@/lib/ui/dashboardSections";
 
 export type NotificationCategory =
   | "bill_due"
@@ -193,12 +197,8 @@ export function resolveNotificationHref(notification: NotificationItem): string 
     return notification.detailHref;
   }
 
-  if (notification.eventType === "weekly_summary_ready") {
-    return "/dashboard#weekly-plan";
-  }
-
-  if (notification.title.includes("Weekly Summary")) {
-    return "/dashboard#weekly-plan";
+  if (isWeeklySummaryNotification(notification)) {
+    return getWeeklyPlanHref();
   }
 
   switch (notification.entityType) {

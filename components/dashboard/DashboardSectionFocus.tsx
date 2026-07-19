@@ -1,10 +1,15 @@
 "use client";
 
 import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { useFinance } from "@/context/FinanceContext";
-import { scrollToDashboardSection } from "@/lib/ui/dashboardSections";
+import {
+  DASHBOARD_SECTIONS,
+  retryScrollToDashboardSection,
+} from "@/lib/ui/dashboardSections";
 
 export function DashboardSectionFocus() {
+  const pathname = usePathname();
   const {
     isLoading,
     dashboardSectionRequest,
@@ -12,21 +17,23 @@ export function DashboardSectionFocus() {
   } = useFinance();
 
   useEffect(() => {
-    if (!dashboardSectionRequest || isLoading) {
+    if (pathname !== "/dashboard" || !dashboardSectionRequest || isLoading) {
       return;
     }
 
     const { section } = dashboardSectionRequest;
-    const timeout = window.setTimeout(() => {
-      scrollToDashboardSection(section);
-      consumeDashboardSectionRequest();
-    }, 100);
 
-    return () => window.clearTimeout(timeout);
+    if (section === DASHBOARD_SECTIONS.weeklyPlan) {
+      window.history.replaceState(null, "", `/dashboard#${section}`);
+    }
+
+    retryScrollToDashboardSection(section);
+    consumeDashboardSectionRequest();
   }, [
     consumeDashboardSectionRequest,
     dashboardSectionRequest,
     isLoading,
+    pathname,
   ]);
 
   return null;

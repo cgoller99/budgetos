@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button, OverlayPortal } from "@/components/ui";
 import { cn } from "@/components/ui/cn";
@@ -21,7 +22,13 @@ import {
   sortNotificationsNewestFirst,
 } from "@/lib/notifications/center";
 import { markReleaseSeen } from "@/lib/whatsNew/clientApi";
-import { DASHBOARD_SECTIONS } from "@/lib/ui/dashboardSections";
+import {
+  DASHBOARD_SECTIONS,
+  focusWeeklyPlanSection,
+  getWeeklyPlanHref,
+  isWeeklySummaryNotification,
+  retryScrollToDashboardSection,
+} from "@/lib/ui/dashboardSections";
 
 const INITIAL_VISIBLE = 12;
 const LOAD_MORE_STEP = 12;
@@ -73,7 +80,7 @@ function NotificationRow({
   onMarkRead: () => void;
   onDelete: () => void;
   onNavigate: () => void;
-  onViewDetails: (href: string) => void;
+  onViewDetails: (notification: EnrichedNotification) => void;
   onCompleteAutomation?: () => void;
   onDismissAutomation?: () => void;
 }) {
@@ -146,16 +153,31 @@ function NotificationRow({
             ) : null}
 
             {notification.href ? (
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onViewDetails(notification.href!);
-                }}
-                className="inline-flex min-h-9 items-center rounded-[var(--radius-button)] px-3 text-sm font-medium text-[var(--accent)] transition-colors hover:bg-[var(--accent-muted)]"
-              >
-                View details
-              </button>
+              isWeeklySummaryNotification(notification) ? (
+                <Link
+                  href={getWeeklyPlanHref()}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onViewDetails(notification);
+                  }}
+                  className="inline-flex min-h-9 items-center rounded-[var(--radius-button)] px-3 text-sm font-medium text-[var(--accent)] transition-colors hover:bg-[var(--accent-muted)]"
+                >
+                  View details
+                </Link>
+              ) : (
+                <Link
+                  href={notification.href}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onViewDetails(notification);
+                  }}
+                  className="inline-flex min-h-9 items-center rounded-[var(--radius-button)] px-3 text-sm font-medium text-[var(--accent)] transition-colors hover:bg-[var(--accent-muted)]"
+                >
+                  View details
+                </Link>
+              )
             ) : null}
 
             {!notification.read && !notification.actions ? (
@@ -266,8 +288,8 @@ export function NotificationCenter() {
       }
     }
 
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
   }, [isOpen]);
 
   useEffect(() => {
@@ -295,7 +317,7 @@ export function NotificationCenter() {
     (notification: EnrichedNotification) => {
       if (
         notification.isVirtual &&
-        notification.eventType === "weekly_summary_ready"
+        isWeeklySummaryNotification(notification)
       ) {
         acknowledgeWeeklySummary();
         return;
@@ -307,21 +329,31 @@ export function NotificationCenter() {
   );
 
   const handleViewDetails = useCallback(
-    (notification: EnrichedNotification, href: string) => {
+    (notification: EnrichedNotification) => {
+      const isWeeklyPlan = isWeeklySummaryNotification(notification);
+
       handleMarkRead(notification);
       setIsOpen(false);
 
-      if (
-        href.includes("#weekly-plan") ||
-        notification.eventType === "weekly_summary_ready" ||
-        notification.title.includes("Weekly Summary")
-      ) {
+      if (isWeeklyPlan) {
         requestDashboardSection(DASHBOARD_SECTIONS.weeklyPlan);
-        router.push("/dashboard");
+
+        if (window.location.pathname !== "/dashboard") {
+          router.push(getWeeklyPlanHref());
+        } else {
+          focusWeeklyPlanSection();
+        }
+
+        window.setTimeout(() => {
+          retryScrollToDashboardSection(DASHBOARD_SECTIONS.weeklyPlan);
+        }, 200);
+
         return;
       }
 
-      router.push(href);
+      if (notification.href) {
+        router.push(notification.href);
+      }
     },
     [handleMarkRead, requestDashboardSection, router],
   );
@@ -390,7 +422,7 @@ export function NotificationCenter() {
           <button
             type="button"
             aria-label="Close notifications"
-            className="notification-backdrop-enter pointer-events-auto fixed inset-0 bg-black/45 backdrop-blur-[2px] lg:bg-black/30"
+            className="notification-backdrop-enter pointer-events-auto fixed inset-0 z-0 bg-black/45 backdrop-blur-[2px] lg:bg-black/30"
             onClick={() => setIsOpen(false)}
           />
 
@@ -399,8 +431,10 @@ export function NotificationCenter() {
             role="dialog"
             aria-label="Notifications"
             aria-modal="true"
+            onMouseDown={(event) => event.stopPropagation()}
+            onClick={(event) => event.stopPropagation()}
             className={cn(
-              "notification-panel-enter pointer-events-auto fixed z-[1] flex flex-col overflow-hidden",
+              "notification-panel-enter pointer-events-auto fixed z-10 flex flex-col overflow-hidden",
               "border border-[var(--surface-border)] bg-[var(--background)] shadow-2xl shadow-black/50",
               "max-lg:inset-x-3 max-lg:top-[calc(4.25rem+env(safe-area-inset-top))]",
               "max-lg:max-h-[calc(100dvh-5.5rem-env(safe-area-inset-top))] max-lg:rounded-[var(--radius-card)]",
@@ -483,9 +517,7 @@ export function NotificationCenter() {
                               onMarkRead={() => handleMarkRead(notification)}
                               onDelete={() => handleDelete(notification)}
                               onNavigate={() => setIsOpen(false)}
-                              onViewDetails={(href) =>
-                                handleViewDetails(notification, href)
-                              }
+                              onViewDetails={() => handleViewDetails(notification)}
                               onCompleteAutomation={() => {
                                 const suggestion = automationSuggestions.find(
                                   (item) =>

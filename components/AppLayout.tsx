@@ -6,6 +6,7 @@ import { RecurringBillsPrompt } from "@/components/bills/RecurringBillsPrompt";
 import { FeedbackCenter } from "@/components/feedback/FeedbackCenter";
 import { FinanceSyncAlert } from "@/components/FinanceSyncAlert";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
+import { DashboardSectionFocus } from "@/components/dashboard/DashboardSectionFocus";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import { PageTransition } from "@/components/PageTransition";
 import { Sidebar } from "@/components/Sidebar";
@@ -22,6 +23,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <div className="app-shell flex min-h-full flex-1 font-sans text-[var(--foreground)]">
+      <DashboardSectionFocus />
       <Sidebar className="hidden lg:flex" activeHref={pathname} />
 
       <div className="flex min-w-0 flex-1 flex-col">
