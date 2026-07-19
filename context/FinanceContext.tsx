@@ -134,6 +134,7 @@ import {
   getSupabaseConfig,
 } from "@/lib/supabase";
 import { syncNotificationPreferencesFromServer } from "@/lib/notifications/preferences";
+import type { DashboardSectionId } from "@/lib/ui/dashboardSections";
 import { ProfilesRepository } from "@/lib/supabase/repositories/profilesRepository";
 
 type FinanceRepositoryLike = FinanceService;
@@ -150,6 +151,11 @@ function applyOnboardingState(
   setters.setOnboardingMode(state.mode);
   setters.setDemoProfileId(state.demoProfileId);
 }
+
+type DashboardSectionRequest = {
+  section: DashboardSectionId;
+  token: number;
+};
 
 export type FinanceContextValue = FinanceData & {
   snapshot: FinancialSnapshot;
@@ -243,6 +249,9 @@ export type FinanceContextValue = FinanceData & {
   markAllNotificationsRead: () => void;
   deleteNotification: (notificationId: string) => void;
   clearAllNotifications: () => void;
+  dashboardSectionRequest: DashboardSectionRequest | null;
+  requestDashboardSection: (section: DashboardSectionId) => void;
+  consumeDashboardSectionRequest: () => void;
 };
 
 type RunMutationOptions = {
@@ -316,6 +325,8 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
   >([]);
   const [showRecurringBillsModal, setShowRecurringBillsModal] = useState(false);
   const [isApplyingRecurringBills, setIsApplyingRecurringBills] = useState(false);
+  const [dashboardSectionRequest, setDashboardSectionRequest] =
+    useState<DashboardSectionRequest | null>(null);
   const repositoryRef = useRef<FinanceService | null>(null);
   const userIdRef = useRef<string | null>(null);
   const dataRef = useRef<FinanceData>(emptyFinanceData);
@@ -627,6 +638,14 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
 
       return next;
     });
+  }, []);
+
+  const requestDashboardSection = useCallback((section: DashboardSectionId) => {
+    setDashboardSectionRequest({ section, token: Date.now() });
+  }, []);
+
+  const consumeDashboardSectionRequest = useCallback(() => {
+    setDashboardSectionRequest(null);
   }, []);
 
   const completeOnboarding = useCallback(
@@ -1954,6 +1973,9 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
       markAllNotificationsRead,
       deleteNotification,
       clearAllNotifications,
+      dashboardSectionRequest,
+      requestDashboardSection,
+      consumeDashboardSectionRequest,
     }),
     [
       addAccount,
@@ -2012,6 +2034,9 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
       markAllNotificationsRead,
       deleteNotification,
       clearAllNotifications,
+      dashboardSectionRequest,
+      requestDashboardSection,
+      consumeDashboardSectionRequest,
       markBillPaid,
       markBillSplitPaid,
       markIncomeReceived,

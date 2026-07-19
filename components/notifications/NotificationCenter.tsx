@@ -21,6 +21,7 @@ import {
   sortNotificationsNewestFirst,
 } from "@/lib/notifications/center";
 import { markReleaseSeen } from "@/lib/whatsNew/clientApi";
+import { DASHBOARD_SECTIONS } from "@/lib/ui/dashboardSections";
 
 const INITIAL_VISIBLE = 12;
 const LOAD_MORE_STEP = 12;
@@ -147,7 +148,10 @@ function NotificationRow({
             {notification.href ? (
               <button
                 type="button"
-                onClick={() => onViewDetails(notification.href!)}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onViewDetails(notification.href!);
+                }}
                 className="inline-flex min-h-9 items-center rounded-[var(--radius-button)] px-3 text-sm font-medium text-[var(--accent)] transition-colors hover:bg-[var(--accent-muted)]"
               >
                 View details
@@ -189,6 +193,7 @@ export function NotificationCenter() {
     markAllNotificationsRead,
     deleteNotification,
     clearAllNotifications,
+    requestDashboardSection,
     dismissAutomationSuggestion,
     completeAutomationSuggestion,
   } = useFinance();
@@ -305,9 +310,20 @@ export function NotificationCenter() {
     (notification: EnrichedNotification, href: string) => {
       handleMarkRead(notification);
       setIsOpen(false);
+
+      if (
+        href.includes("#weekly-plan") ||
+        notification.eventType === "weekly_summary_ready" ||
+        notification.title.includes("Weekly Summary")
+      ) {
+        requestDashboardSection(DASHBOARD_SECTIONS.weeklyPlan);
+        router.push("/dashboard");
+        return;
+      }
+
       router.push(href);
     },
-    [handleMarkRead, router],
+    [handleMarkRead, requestDashboardSection, router],
   );
 
   const handleDelete = useCallback(
