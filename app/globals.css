@@ -33,6 +33,10 @@
   --radius-card: 14px;
   --radius-button: 8px;
   --radius-input: 10px;
+  --z-dropdown: 50;
+  --z-notification: 55;
+  --z-modal: 60;
+  --z-toast: 100;
   --app-shell-gradient: none;
 }
 
@@ -176,6 +180,12 @@ select.select-themed option:checked {
 [data-theme="light"] .bg-\[\#090b10\],
 [data-theme="light"] .bg-\[\#0f1419\] {
   background-color: var(--surface);
+}
+
+.expandable-panel {
+  transition:
+    grid-template-rows 250ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 250ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @keyframes fade-in-up {

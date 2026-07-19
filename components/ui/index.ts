@@ -1,3 +1,4 @@
+export { ExpandableCard } from "./ExpandableCard";
 export { IconBadge } from "./IconBadge";
 export { PageHeader } from "./PageHeader";
 export { PanelLink } from "./PanelLink";

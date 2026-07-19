@@ -17,6 +17,8 @@ type DonutChartProps = {
   className?: string;
   size?: number;
   strokeWidth?: number;
+  compact?: boolean;
+  maxLegendItems?: number;
 };
 
 function polarToCartesian(
@@ -60,17 +62,33 @@ export function DonutChart({
   segments,
   emptyMessage = "No data yet",
   className,
-  size = 120,
-  strokeWidth = 14,
+  size,
+  strokeWidth,
+  compact = false,
+  maxLegendItems,
 }: DonutChartProps) {
   const visible = segments.filter((segment) => segment.value > 0);
   const total = visible.reduce((sum, segment) => sum + segment.value, 0);
-  const center = size / 2;
-  const radius = (size - strokeWidth) / 2;
+  const resolvedSize = size ?? (compact ? 56 : 120);
+  const resolvedStroke = strokeWidth ?? (compact ? 8 : 14);
+  const center = resolvedSize / 2;
+  const radius = (resolvedSize - resolvedStroke) / 2;
+  const legendItems =
+    maxLegendItems === undefined
+      ? compact
+        ? []
+        : visible
+      : visible.slice(0, maxLegendItems);
 
   if (visible.length === 0 || total <= 0) {
     return (
-      <p className={cn("py-6 text-center text-sm text-[var(--text-muted)]", className)}>
+      <p
+        className={cn(
+          compact ? "py-2 text-xs" : "py-6 text-sm",
+          "text-center text-[var(--text-muted)]",
+          className,
+        )}
+      >
         {emptyMessage}
       </p>
     );
@@ -79,16 +97,31 @@ export function DonutChart({
   let currentAngle = 0;
 
   return (
-    <div className={cn("flex flex-col gap-5 sm:flex-row sm:items-center", className)}>
-      <div className="relative mx-auto shrink-0 sm:mx-0" style={{ width: size, height: size }}>
-        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden>
+    <div
+      className={cn(
+        compact
+          ? "flex items-center gap-3"
+          : "flex flex-col gap-5 sm:flex-row sm:items-center",
+        className,
+      )}
+    >
+      <div
+        className="relative shrink-0"
+        style={{ width: resolvedSize, height: resolvedSize }}
+      >
+        <svg
+          width={resolvedSize}
+          height={resolvedSize}
+          viewBox={`0 0 ${resolvedSize} ${resolvedSize}`}
+          aria-hidden
+        >
           <circle
             cx={center}
             cy={center}
             r={radius}
             fill="none"
             stroke="var(--surface-border)"
-            strokeWidth={strokeWidth}
+            strokeWidth={resolvedStroke}
           />
           {visible.map((segment, index) => {
             const sweep = (segment.value / total) * 360;
@@ -108,7 +141,7 @@ export function DonutChart({
                   r={radius}
                   fill="none"
                   stroke={color}
-                  strokeWidth={strokeWidth}
+                  strokeWidth={resolvedStroke}
                 />
               );
             }
@@ -119,7 +152,7 @@ export function DonutChart({
                 d={describeArc(center, radius, startAngle, endAngle)}
                 fill="none"
                 stroke={color}
-                strokeWidth={strokeWidth}
+                strokeWidth={resolvedStroke}
                 strokeLinecap="round"
               />
             );
@@ -127,31 +160,35 @@ export function DonutChart({
         </svg>
       </div>
 
-      <ul className="min-w-0 flex-1 space-y-2.5">
-        {visible.map((segment, index) => {
-          const color =
-            segment.color ??
-            CHART_COLORS.palette[index % CHART_COLORS.palette.length];
+      {legendItems.length > 0 ? (
+        <ul className="min-w-0 flex-1 space-y-2">
+          {legendItems.map((segment, index) => {
+            const color =
+              segment.color ??
+              CHART_COLORS.palette[index % CHART_COLORS.palette.length];
 
-          return (
-            <li key={segment.label} className="flex items-center justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-2">
-                <span
-                  className="h-2 w-2 shrink-0 rounded-full"
-                  style={{ backgroundColor: color }}
-                />
-                <span className="truncate text-sm text-[var(--text-secondary)]">
-                  {segment.label}
+            return (
+              <li
+                key={segment.label}
+                className="flex items-center justify-between gap-3"
+              >
+                <div className="flex min-w-0 items-center gap-2">
+                  <span
+                    className="h-2 w-2 shrink-0 rounded-full"
+                    style={{ backgroundColor: color }}
+                  />
+                  <span className="truncate text-sm text-[var(--text-secondary)]">
+                    {segment.label}
+                  </span>
+                </div>
+                <span className="shrink-0 text-xs tabular-nums text-[var(--text-muted)]">
+                  {formatCurrency(segment.value)} · {Math.round(segment.percent)}%
                 </span>
-              </div>
-              <span className="shrink-0 text-xs tabular-nums text-[var(--text-muted)]">
-                {formatCurrency(segment.value)} ·{" "}
-                {Math.round(segment.percent)}%
-              </span>
-            </li>
-          );
-        })}
-      </ul>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
     </div>
   );
 }

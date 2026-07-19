@@ -16,6 +16,7 @@ type BarTrendChartProps = {
   emptyMessage?: string;
   className?: string;
   barClassName?: string;
+  compact?: boolean;
 };
 
 function getMaxValue(points: BarTrendPoint[]): number {
@@ -28,13 +29,21 @@ export function BarTrendChart({
   emptyMessage = "No data yet",
   className,
   barClassName,
+  compact = false,
 }: BarTrendChartProps) {
   const hasData = points.some((point) => point.value > 0);
   const maxValue = getMaxValue(points);
+  const barHeight = compact ? "h-14" : "h-28";
 
   if (!hasData) {
     return (
-      <p className={cn("py-8 text-center text-sm text-[var(--text-muted)]", className)}>
+      <p
+        className={cn(
+          compact ? "py-2 text-xs" : "py-8 text-sm",
+          "text-center text-[var(--text-muted)]",
+          className,
+        )}
+      >
         {emptyMessage}
       </p>
     );
@@ -57,7 +66,7 @@ export function BarTrendChart({
             <span className="text-[10px] tabular-nums text-[var(--text-muted)] opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
               {point.value > 0 ? formatCurrency(point.value) : "—"}
             </span>
-            <div className={cn("flex h-28 w-full items-end justify-center", barClassName)}>
+            <div className={cn("flex w-full items-end justify-center", barHeight, barClassName)}>
               <div
                 className="w-full max-w-9 rounded-t-xl transition-all duration-500 ease-out"
                 style={{

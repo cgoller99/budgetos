@@ -75,7 +75,13 @@ export const dashboardSectionClassName =
   "grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-5";
 
 export const dashboardKpiGridClassName =
-  "grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-5 xl:gap-4";
+  "grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4 xl:gap-4";
+
+export const dashboardMediumSectionClassName =
+  "grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-5";
+
+export const dashboardCompactSectionClassName =
+  "grid grid-cols-1 gap-3 sm:grid-cols-2 lg:gap-4";
 
 export const listRowClassName =
   "flex items-center justify-between gap-3 rounded-[10px] px-2 py-2.5 transition-colors hover:bg-[var(--surface-hover)]";

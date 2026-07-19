@@ -114,20 +114,11 @@ export function DashboardHero() {
         sparkColor: CHART_COLORS.debt,
       },
       {
-        label: "Savings Rate",
-        value: savingsRate?.value ?? "—",
-        change: "",
-        positive: savingsRate?.tone === "emerald",
-        mutedChange: true,
-        icon: "savings" as const,
-        tone: "purple" as const,
-        sparkline: sparklines.savings,
-        sparkColor: CHART_COLORS.savings,
-      },
-      {
         label: "Financial Health",
         value: String(health.score),
-        change: health.metrics[0]?.value ?? "",
+        change: savingsRate?.value
+          ? `${savingsRate.value} savings rate`
+          : health.metrics[0]?.value ?? "",
         positive: health.score >= 60,
         mutedChange: true,
         icon: "health" as const,
@@ -148,6 +139,7 @@ export function DashboardHero() {
           change={metric.change}
           positive={metric.positive}
           mutedChange={metric.mutedChange ?? false}
+          prominent
           icon={
             <IconBadge tone={metric.tone}>
               <MetricIcon name={metric.icon} />

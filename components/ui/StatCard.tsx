@@ -17,6 +17,7 @@ type StatCardProps = {
   positive?: boolean;
   mutedChange?: boolean;
   variant?: "card" | "inline";
+  prominent?: boolean;
   className?: string;
   tooltip?: ReactNode;
   icon?: ReactNode;
@@ -30,6 +31,7 @@ export function StatCard({
   positive = true,
   mutedChange = false,
   variant = "card",
+  prominent = false,
   className,
   tooltip,
   icon,
@@ -63,7 +65,9 @@ export function StatCard({
               "mt-1.5 tracking-tight tabular-nums",
               variant === "inline"
                 ? "text-2xl font-semibold text-[var(--foreground)] sm:text-3xl"
-                : metricValueClassName,
+                : prominent
+                  ? "text-2xl font-semibold sm:text-[1.75rem] lg:text-[2rem] lg:leading-none"
+                  : metricValueClassName,
               isAnimating && "kpi-value-animate text-[var(--foreground)]",
             )}
           >
@@ -97,7 +101,7 @@ export function StatCard({
     <Card
       hover
       variant="subtle"
-      padding="compact"
+      padding={prominent ? "default" : "compact"}
       className={cn(
         "h-full",
         isAnimating && "border-[color-mix(in_srgb,var(--accent)_30%,transparent)]",
