@@ -25,6 +25,7 @@ export {
   buildWeeklySummaryEvent,
   deriveEvents,
   deriveWeeklySummaryEvent,
+  acknowledgeWeeklySummaryEvent,
   markAllEventsRead,
   markEventRead,
   deleteEvent,

@@ -193,6 +193,10 @@ export function resolveNotificationHref(notification: NotificationItem): string 
     return notification.detailHref;
   }
 
+  if (notification.eventType === "weekly_summary_ready") {
+    return "/dashboard#weekly-plan";
+  }
+
   switch (notification.entityType) {
     case "bill":
       return notification.entityId ? `/bills` : "/bills";

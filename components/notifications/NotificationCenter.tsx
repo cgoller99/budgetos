@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button, OverlayPortal } from "@/components/ui";
 import { cn } from "@/components/ui/cn";
 import { useFinance } from "@/context/FinanceContext";
@@ -64,6 +64,7 @@ function NotificationRow({
   onMarkRead,
   onDelete,
   onNavigate,
+  onViewDetails,
   onCompleteAutomation,
   onDismissAutomation,
 }: {
@@ -71,6 +72,7 @@ function NotificationRow({
   onMarkRead: () => void;
   onDelete: () => void;
   onNavigate: () => void;
+  onViewDetails: (href: string) => void;
   onCompleteAutomation?: () => void;
   onDismissAutomation?: () => void;
 }) {
@@ -143,16 +145,13 @@ function NotificationRow({
             ) : null}
 
             {notification.href ? (
-              <Link
-                href={notification.href}
-                onClick={() => {
-                  onMarkRead();
-                  onNavigate();
-                }}
+              <button
+                type="button"
+                onClick={() => onViewDetails(notification.href!)}
                 className="inline-flex min-h-9 items-center rounded-[var(--radius-button)] px-3 text-sm font-medium text-[var(--accent)] transition-colors hover:bg-[var(--accent-muted)]"
               >
                 View details
-              </Link>
+              </button>
             ) : null}
 
             {!notification.read && !notification.actions ? (
@@ -180,11 +179,13 @@ function NotificationRow({
 }
 
 export function NotificationCenter() {
+  const router = useRouter();
   const {
     notifications,
     unreadNotificationCount,
     automationSuggestions,
     markNotificationRead,
+    acknowledgeWeeklySummary,
     markAllNotificationsRead,
     deleteNotification,
     clearAllNotifications,
@@ -284,6 +285,30 @@ export function NotificationCenter() {
     lockBodyScroll();
     return () => unlockBodyScroll();
   }, [isOpen]);
+
+  const handleMarkRead = useCallback(
+    (notification: EnrichedNotification) => {
+      if (
+        notification.isVirtual &&
+        notification.eventType === "weekly_summary_ready"
+      ) {
+        acknowledgeWeeklySummary();
+        return;
+      }
+
+      markNotificationRead(notification.id);
+    },
+    [acknowledgeWeeklySummary, markNotificationRead],
+  );
+
+  const handleViewDetails = useCallback(
+    (notification: EnrichedNotification, href: string) => {
+      handleMarkRead(notification);
+      setIsOpen(false);
+      router.push(href);
+    },
+    [handleMarkRead, router],
+  );
 
   const handleDelete = useCallback(
     (notification: EnrichedNotification) => {
@@ -439,9 +464,12 @@ export function NotificationCenter() {
                           <li key={notification.id}>
                             <NotificationRow
                               notification={notification}
-                              onMarkRead={() => markNotificationRead(notification.id)}
+                              onMarkRead={() => handleMarkRead(notification)}
                               onDelete={() => handleDelete(notification)}
                               onNavigate={() => setIsOpen(false)}
+                              onViewDetails={(href) =>
+                                handleViewDetails(notification, href)
+                              }
                               onCompleteAutomation={() => {
                                 const suggestion = automationSuggestions.find(
                                   (item) =>

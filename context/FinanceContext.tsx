@@ -57,6 +57,7 @@ import type {
 import type { ActivityItem, FinanceEvent, NotificationItem } from "@/lib/events/types";
 import {
   appendEvents,
+  acknowledgeWeeklySummaryEvent,
   buildAccountAddedEvent,
   buildActivityAppliedEvent,
   buildBillAddedEvent,
@@ -238,6 +239,7 @@ export type FinanceContextValue = FinanceData & {
   ignoreSelectedRecurringBills: (selected: RecurringBillCandidate[]) => Promise<void>;
   snoozeRecurringBillsPrompt: () => Promise<void>;
   markNotificationRead: (notificationId: string) => void;
+  acknowledgeWeeklySummary: () => void;
   markAllNotificationsRead: () => void;
   deleteNotification: (notificationId: string) => void;
   clearAllNotifications: () => void;
@@ -565,6 +567,20 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
 
       if (repository && userId) {
         void repository.markNotificationRead(userId, notificationId);
+      }
+
+      return next;
+    });
+  }, []);
+
+  const acknowledgeWeeklySummary = useCallback(() => {
+    setData((previous) => {
+      const next = acknowledgeWeeklySummaryEvent(previous);
+      const repository = repositoryRef.current;
+      const userId = userIdRef.current;
+
+      if (repository && userId && next.events !== previous.events) {
+        void repository.saveEvents(userId, next.events);
       }
 
       return next;
@@ -1934,6 +1950,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
       ignoreSelectedRecurringBills,
       snoozeRecurringBillsPrompt: snoozeRecurringBillsPromptHandler,
       markNotificationRead,
+      acknowledgeWeeklySummary,
       markAllNotificationsRead,
       deleteNotification,
       clearAllNotifications,
@@ -2000,6 +2017,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
       markIncomeReceived,
       makeDebtPayment,
       markNotificationRead,
+      acknowledgeWeeklySummary,
       onboardingComplete,
       onboardingMode,
       pauseIncome,

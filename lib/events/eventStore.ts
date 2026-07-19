@@ -362,6 +362,31 @@ export function deriveWeeklySummaryEvent(data: FinanceData): FinanceEvent | null
   return buildWeeklySummaryEvent(plan.length);
 }
 
+export function acknowledgeWeeklySummaryEvent(data: FinanceData): FinanceData {
+  const plan = generateWeeklyPlan(data);
+
+  if (plan.length === 0) {
+    return data;
+  }
+
+  const now = new Date();
+  const events = data.events ?? [];
+  const existingIndex = events.findIndex(
+    (event) =>
+      event.type === "weekly_summary_ready" && isSameWeek(event.timestamp, now),
+  );
+
+  if (existingIndex >= 0) {
+    const nextEvents = [...events];
+    nextEvents[existingIndex] = { ...nextEvents[existingIndex], read: true };
+    return { ...data, events: nextEvents };
+  }
+
+  return appendEvents(data, [
+    { ...buildWeeklySummaryEvent(plan.length), read: true },
+  ]);
+}
+
 function hasStoredNotificationForEntity(
   events: FinanceEvent[],
   entityId: string,
