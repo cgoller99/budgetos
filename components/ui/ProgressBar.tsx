@@ -9,8 +9,8 @@ type ProgressBarProps = {
 };
 
 const fillClasses: Record<ProgressBarVariant, string> = {
-  primary: "bg-[#0077ed]",
-  muted: "bg-white/30",
+  primary: "bg-gradient-to-r from-[#0077ed] to-[#4da3ff]",
+  muted: "bg-[var(--text-muted)]",
 };
 
 export function ProgressBar({
@@ -23,7 +23,7 @@ export function ProgressBar({
   return (
     <div
       className={cn(
-        "h-2 overflow-hidden rounded-full bg-white/[0.06]",
+        "h-1.5 overflow-hidden rounded-full bg-[var(--surface-border)]",
         className,
       )}
     >

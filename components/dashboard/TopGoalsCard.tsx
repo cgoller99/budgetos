@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Button, Card, CardContent, CardHeader, ProgressRing } from "@/components/ui";
+import { Button, Card, CardContent, CardHeader, PanelLink, ProgressBar } from "@/components/ui";
 import { useFinance } from "@/context/FinanceContext";
 import { formatCurrency } from "@/lib/finance/format";
 import { formatGoalDate, getTopGoals } from "@/lib/finance/goals";
@@ -21,13 +21,12 @@ export function TopGoalsCard() {
 
   if (topGoals.length === 0) {
     return (
-      <Card>
-        <CardHeader title="Goals" description="Your top active goals" />
+      <Card variant="subtle">
+        <CardHeader title="Savings Goals" />
         <CardContent>
           <p className="text-sm text-[var(--text-muted)]">
-            All goals complete.{" "}
             <Link href="/savings" className="text-[#0077ed] hover:underline">
-              Create a new goal
+              Create a goal
             </Link>
           </p>
         </CardContent>
@@ -37,57 +36,42 @@ export function TopGoalsCard() {
 
   return (
     <>
-      <Card hover>
+      <Card hover variant="subtle">
         <CardHeader
-          title="Goals"
-          description="Your top active goals"
-          action={
-            <Link
-              href="/savings"
-              className="text-sm text-[#0077ed] transition-colors hover:underline"
-            >
-              View all
-            </Link>
-          }
+          title="Savings Goals"
+          action={<PanelLink href="/savings">View all</PanelLink>}
         />
         <CardContent className="space-y-4">
           {topGoals.map((goal) => (
-            <div
-              key={goal.id}
-              className="flex flex-col gap-4 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-subtle)] p-4 sm:flex-row sm:items-center"
-            >
-              <ProgressRing
-                value={goal.percentComplete}
-                size={76}
-                strokeWidth={7}
-                accentColor={goal.accentColor}
-              >
-                <div className="text-center">
-                  <span className="text-base">{goal.icon}</span>
-                  <p className="text-[10px] font-semibold tabular-nums">
-                    {goal.percentComplete}%
+            <div key={goal.id} className="space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="text-base" aria-hidden>
+                    {goal.icon}
+                  </span>
+                  <p className="truncate text-sm font-medium text-[var(--foreground)]">
+                    {goal.name}
                   </p>
                 </div>
-              </ProgressRing>
-
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-medium text-[var(--foreground)]">
-                  {goal.name}
-                </p>
-                <p className="mt-1 text-sm text-[var(--text-muted)]">
-                  {formatCurrency(goal.remaining)} remaining ·{" "}
+                <span className="shrink-0 text-xs tabular-nums text-[var(--text-muted)]">
+                  {goal.percentComplete}%
+                </span>
+              </div>
+              <ProgressBar value={goal.percentComplete} />
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[10px] text-[var(--text-muted)]">
+                  {formatCurrency(goal.remaining)} left ·{" "}
                   {formatGoalDate(goal.estimatedCompletionDate)}
                 </p>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setMoneyGoal(findGoal(goal.id))}
+                  disabled={goal.isComplete}
+                >
+                  Add
+                </Button>
               </div>
-
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => setMoneyGoal(findGoal(goal.id))}
-                disabled={goal.isComplete}
-              >
-                Add
-              </Button>
             </div>
           ))}
         </CardContent>

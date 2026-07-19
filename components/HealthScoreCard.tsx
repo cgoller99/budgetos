@@ -1,6 +1,5 @@
 "use client";
 
-import { InfoTooltip } from "@/components/guidance/InfoTooltip";
 import { Card, CardContent, CardHeader } from "@/components/ui";
 import { useFinance } from "@/context/FinanceContext";
 import { healthScoreToneClasses } from "@/lib/finance/format";
@@ -10,16 +9,11 @@ export function HealthScoreCard() {
   const { financialHealthScore } = dashboard;
 
   return (
-    <Card padding="lg" hover>
-      <CardHeader
-        title="Financial health"
-        action={
-          <InfoTooltip label="A quick score based on cash flow, bills, goals, and debt signals." />
-        }
-      />
+    <Card variant="subtle" hover>
+      <CardHeader title="Financial health" />
 
-      <CardContent className="flex items-center gap-8">
-        <div className="relative flex h-32 w-32 shrink-0 items-center justify-center">
+      <CardContent className="flex items-center gap-6">
+        <div className="relative flex h-28 w-28 shrink-0 items-center justify-center">
           <svg
             className="h-full w-full -rotate-90"
             viewBox="0 0 100 100"
@@ -46,20 +40,20 @@ export function HealthScoreCard() {
               className="transition-all duration-500 ease-out"
             />
           </svg>
-          <span className="absolute text-3xl font-semibold tabular-nums text-[var(--foreground)]">
+          <span className="absolute text-2xl font-semibold tabular-nums text-[var(--foreground)]">
             {financialHealthScore.score}
           </span>
         </div>
 
-        <div className="space-y-4 text-base">
+        <div className="space-y-3 text-sm">
           {financialHealthScore.metrics.map((metric) => (
             <div
               key={metric.label}
-              className="flex items-center justify-between gap-8"
+              className="flex items-center justify-between gap-6"
             >
               <span className="text-[var(--text-muted)]">{metric.label}</span>
               <span
-                className={`font-medium ${healthScoreToneClasses[metric.tone]}`}
+                className={`font-medium tabular-nums ${healthScoreToneClasses[metric.tone]}`}
               >
                 {metric.value}
               </span>

@@ -213,7 +213,7 @@ function TransactionsContentInner() {
         </Link>
       </div>
 
-      <section className="rounded-3xl border border-white/[0.04] bg-white/[0.015] p-7 sm:p-8">
+      <section className="rounded-[1.35rem] border border-[var(--surface-border)] bg-[var(--surface-subtle)] p-6 sm:p-7">
         <TransactionFilters filters={filters} onChange={handleFiltersChange} />
       </section>
 

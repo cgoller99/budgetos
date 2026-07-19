@@ -44,7 +44,7 @@ export function InvestmentsContent() {
         <StatCard
           label="Monthly contributions"
           value={formatCurrency(snapshot.moneyFlow.investments)}
-          change="Planned from recurring settings"
+          change="Planned"
           positive
         />
         <StatCard

@@ -2,11 +2,15 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import { Badge, Card, CardContent, CardHeader } from "@/components/ui";
+import { Badge, Card, CardContent, CardHeader, PanelLink } from "@/components/ui";
 import { useFinance } from "@/context/FinanceContext";
 import { getBillStatusVariant, getBillsDueThisWeek } from "@/lib/finance/bills";
 import { formatCurrency } from "@/lib/finance/format";
-import { buildTransactionsHref } from "@/lib/transactions/filterParams";
+import {
+  listRowAmountClassName,
+  listRowClassName,
+  listRowLabelClassName,
+} from "@/components/ui/tokens";
 
 const MAX_BILLS = 4;
 
@@ -24,39 +28,30 @@ export function UpcomingBillsCard({ embedded = false }: UpcomingBillsCardProps) 
 
   const content =
     bills.length === 0 ? (
-      <p className="text-base text-white/38">
+      <p className="py-2 text-sm text-[var(--text-muted)]">
         Nothing due this week.{" "}
-        <Link href="/bills" className="text-white/60 hover:text-white">
+        <Link href="/bills" className="text-[#0077ed] hover:underline">
           Bills
         </Link>
       </p>
     ) : (
-      <ul className="space-y-4">
+      <ul className="space-y-0.5">
         {bills.map((bill) => (
-          <li key={bill.id}>
-            <Link
-              href={buildTransactionsHref({
-                search: bill.name,
-                type: "expense",
-                filterLabel: `${bill.name} payments`,
-              })}
-              className="focus-ring flex min-h-12 items-center justify-between gap-4 rounded-2xl py-1 transition-colors hover:bg-white/[0.03]"
-            >
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2.5">
-                  <p className="truncate text-base font-medium text-white">
-                    {bill.name}
-                  </p>
-                  <Badge variant={getBillStatusVariant(bill.status)}>
-                    {bill.statusLabel}
-                  </Badge>
-                </div>
-                <p className="mt-1 text-sm text-white/38">{bill.formattedDueDate}</p>
+          <li key={bill.id} className={listRowClassName}>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className={listRowLabelClassName}>{bill.name}</p>
+                <Badge variant={getBillStatusVariant(bill.status)}>
+                  {bill.statusLabel}
+                </Badge>
               </div>
-              <p className="shrink-0 text-base font-semibold tabular-nums text-white">
-                {formatCurrency(bill.amount)}
+              <p className="text-[10px] text-[var(--text-muted)]">
+                {bill.formattedDueDate}
               </p>
-            </Link>
+            </div>
+            <span className={listRowAmountClassName}>
+              {formatCurrency(bill.amount)}
+            </span>
           </li>
         ))}
       </ul>
@@ -65,16 +60,11 @@ export function UpcomingBillsCard({ embedded = false }: UpcomingBillsCardProps) 
   if (embedded) {
     return (
       <div>
-        <div className="mb-6 flex items-center justify-between gap-4">
-          <h2 className="text-lg font-semibold tracking-tight text-white">
-            Upcoming bills
+        <div className="mb-5 flex items-center justify-between gap-4">
+          <h2 className="text-base font-semibold tracking-tight text-[var(--foreground)] sm:text-lg">
+            Bills Due Soon
           </h2>
-          <Link
-            href="/bills"
-            className="text-sm text-white/40 transition-colors hover:text-[#4da3ff]"
-          >
-            View all
-          </Link>
+          <PanelLink href="/bills">View all</PanelLink>
         </div>
         {content}
       </div>
@@ -82,17 +72,10 @@ export function UpcomingBillsCard({ embedded = false }: UpcomingBillsCardProps) 
   }
 
   return (
-    <Card hover>
+    <Card hover variant="subtle">
       <CardHeader
-        title="Upcoming bills"
-        action={
-          <Link
-            href="/bills"
-            className="text-sm text-white/40 transition-colors hover:text-[#4da3ff]"
-          >
-            View all
-          </Link>
-        }
+        title="Bills Due Soon"
+        action={<PanelLink href="/bills">View all</PanelLink>}
       />
       <CardContent>{content}</CardContent>
     </Card>

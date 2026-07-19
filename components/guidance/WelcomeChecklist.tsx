@@ -8,9 +8,9 @@ import {
 } from "@/lib/guidance/checklist";
 
 const CHECKLIST_ITEMS = [
-  "Add accounts so balances have a home.",
-  "Add income and bills to unlock cash flow.",
-  "Set one savings goal to make progress visible.",
+  "Add accounts",
+  "Add income & bills",
+  "Set a savings goal",
 ];
 
 export function WelcomeChecklist() {
@@ -30,24 +30,16 @@ export function WelcomeChecklist() {
   }
 
   return (
-    <Card padding="default" className="border-[#0077ed]/20 bg-[#0077ed]/8">
-      <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <p className="text-base font-semibold text-[var(--foreground)]">
-            Welcome to Buxme
-          </p>
-          <p className="mt-1 text-sm leading-relaxed text-[var(--text-muted)]">
-            Start with the basics. You can come back to each area anytime.
-          </p>
-          <ul className="mt-4 grid gap-2 text-sm text-[var(--text-secondary)] sm:grid-cols-3">
-            {CHECKLIST_ITEMS.map((item) => (
-              <li key={item} className="flex gap-2">
-                <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-[#0077ed]" />
-                <span>{item}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
+    <Card padding="compact" variant="subtle" className="border-[#0077ed]/20 bg-[#0077ed]/6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-[var(--text-secondary)]">
+          {CHECKLIST_ITEMS.map((item) => (
+            <li key={item} className="flex items-center gap-2">
+              <span className="size-1.5 shrink-0 rounded-full bg-[#0077ed]" />
+              {item}
+            </li>
+          ))}
+        </ul>
         <Button variant="ghost" size="sm" onClick={handleDismiss}>
           Dismiss
         </Button>

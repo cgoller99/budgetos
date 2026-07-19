@@ -115,7 +115,7 @@ function TimelineChart({ points, range, activeSeries }: TimelineChartProps) {
   const baselineY = yAt(0);
 
   return (
-    <div className="timeline-chart-enter relative w-full overflow-hidden rounded-3xl border border-white/[0.04] bg-white/[0.015]">
+    <div className="timeline-chart-enter relative w-full overflow-hidden rounded-[1.35rem] border border-[var(--surface-border)] bg-[var(--surface-subtle)]">
       <svg
         key={range}
         viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}

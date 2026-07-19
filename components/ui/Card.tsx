@@ -4,6 +4,7 @@ import {
   cardBaseClassName,
   cardHoverClassName,
   cardPaddingClassName,
+  cardPaddingCompactClassName,
   cardPaddingLgClassName,
   cardSubtleHoverClassName,
   panelDescriptionClassName,
@@ -15,7 +16,7 @@ type CardVariant = "default" | "dashed" | "subtle" | "ghost";
 type CardProps = HTMLAttributes<HTMLDivElement> & {
   children: ReactNode;
   hover?: boolean;
-  padding?: "default" | "lg" | "none";
+  padding?: "default" | "lg" | "compact" | "none";
   variant?: CardVariant;
 };
 
@@ -30,6 +31,7 @@ const variantClasses: Record<CardVariant, string> = {
 
 const paddingClasses = {
   default: cardPaddingClassName,
+  compact: cardPaddingCompactClassName,
   lg: cardPaddingLgClassName,
   none: "",
 };
@@ -74,17 +76,17 @@ export function CardHeader({
   return (
     <div
       className={cn(
-        "mb-7 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between",
+        "mb-5 flex items-center justify-between gap-4",
         className,
       )}
     >
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0">
         <h2 className={panelTitleClassName}>{title}</h2>
-        {description && (
+        {description ? (
           <p className={panelDescriptionClassName}>{description}</p>
-        )}
+        ) : null}
       </div>
-      {action ? <div className="w-full shrink-0 sm:w-auto">{action}</div> : null}
+      {action}
     </div>
   );
 }

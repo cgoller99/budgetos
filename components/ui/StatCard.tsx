@@ -4,7 +4,11 @@ import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { Card } from "./Card";
 import { cn } from "./cn";
-import { metricLabelClassName, metricValueClassName } from "./tokens";
+import {
+  metricChangeClassName,
+  metricLabelClassName,
+  metricValueClassName,
+} from "./tokens";
 
 type StatCardProps = {
   label: string;
@@ -50,7 +54,7 @@ export function StatCard({
       </div>
       <p
         className={cn(
-          "mt-3 tracking-tight tabular-nums",
+          "mt-2 tracking-tight tabular-nums",
           variant === "inline"
             ? "text-2xl font-semibold text-[var(--foreground)] sm:text-3xl"
             : metricValueClassName,
@@ -62,12 +66,8 @@ export function StatCard({
       {change && (
         <p
           className={cn(
-            "mt-2.5 text-sm leading-snug tabular-nums",
-            mutedChange
-              ? "text-[var(--text-muted)]"
-              : positive
-                ? "text-[#4da3ff]/90"
-                : "text-rose-400/90",
+            metricChangeClassName,
+            !mutedChange && (positive ? "text-emerald-400/85" : "text-rose-400/85"),
           )}
         >
           {change}

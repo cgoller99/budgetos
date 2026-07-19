@@ -11,6 +11,7 @@ import {
   calculateMonthlySpending,
   calculateNetWorthBreakdown,
 } from "@/lib/calculations";
+import { getIncomeCalculationMode } from "@/lib/calculations/cashFlow";
 import {
   calculateMonthlySpendingFromLedger,
   recurringBillMonthlyTotal,

@@ -1,20 +1,18 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { MobileSafeToSpendCard } from "@/components/dashboard/MobileSafeToSpendCard";
-import { RecentActivityCard } from "@/components/dashboard/RecentActivityCard";
-import { SmartSuggestionsCard } from "@/components/automation/SmartSuggestionsCard";
-import { PlaidConnectBanner } from "@/components/guidance/PlaidConnectBanner";
-import { RecommendedSteps } from "@/components/guidance/RecommendedSteps";
-import { WelcomeChecklist } from "@/components/guidance/WelcomeChecklist";
-import { useOnboardingProgress } from "@/hooks/useOnboardingProgress";
-import { HealthScoreCard } from "@/components/HealthScoreCard";
-import { NextPaycheckCard } from "@/components/incomePlan/NextPaycheckCard";
+import { AchievementsCard } from "@/components/dashboard/AchievementsCard";
+import { DashboardHero } from "@/components/dashboard/DashboardHero";
+import { DashboardMoreSection } from "@/components/dashboard/DashboardMoreSection";
+import { DebtOverviewCard } from "@/components/dashboard/DebtOverviewCard";
+import { FinancialTrendsCard } from "@/components/dashboard/FinancialTrendsCard";
+import { RecentTransactionsCard } from "@/components/dashboard/RecentTransactionsCard";
+import { SpendingBreakdownCard } from "@/components/dashboard/SpendingBreakdownCard";
 import { TopGoalsCard } from "@/components/dashboard/TopGoalsCard";
 import { UpcomingBillsCard } from "@/components/dashboard/UpcomingBillsCard";
-import { DashboardHero } from "@/components/dashboard/DashboardHero";
-import { DashboardSkeleton, SkeletonCard } from "@/components/ui";
-import { MobileCollapsibleSection } from "@/components/ui/MobileCollapsibleSection";
+import { WeeklyCashFlowCard } from "@/components/dashboard/WeeklyCashFlowCard";
+import { WelcomeChecklist } from "@/components/guidance/WelcomeChecklist";
+import { DashboardSkeleton } from "@/components/ui";
 import {
   dashboardSectionClassName,
   pageContainerWideClassName,
@@ -22,25 +20,8 @@ import {
 import { useFinance } from "@/context/FinanceContext";
 import { cn } from "@/components/ui/cn";
 
-const MoneyFlowCard = dynamic(
-  () =>
-    import("@/components/MoneyFlowCard").then((module) => ({
-      default: module.MoneyFlowCard,
-    })),
-  { loading: () => <SkeletonCard className="min-h-[220px]" /> },
-);
-
-const SmartInsights = dynamic(
-  () =>
-    import("@/components/SmartInsights").then((module) => ({
-      default: module.SmartInsights,
-    })),
-  { loading: () => <SkeletonCard className="min-h-[180px]" /> },
-);
-
 export function DashboardContent() {
   const { isLoading } = useFinance();
-  const { progress: onboardingProgress } = useOnboardingProgress();
 
   if (isLoading) {
     return <DashboardSkeleton />;
@@ -48,79 +29,30 @@ export function DashboardContent() {
 
   return (
     <div className={cn(pageContainerWideClassName)}>
-      <PlaidConnectBanner onboardingProgress={onboardingProgress} className="mb-4 lg:mb-6" />
-      {/* Mobile: priority stack */}
-      <div className="space-y-4 lg:hidden">
-        <MobileSafeToSpendCard />
-        <NextPaycheckCard />
+      <DashboardHero />
+      <WelcomeChecklist />
+
+      <div className={dashboardSectionClassName}>
+        <WeeklyCashFlowCard />
+        <SpendingBreakdownCard />
+      </div>
+
+      <div className={dashboardSectionClassName}>
         <UpcomingBillsCard />
         <TopGoalsCard />
-        <RecentActivityCard />
-
-        <MobileCollapsibleSection
-          title="Getting started"
-          description="Checklist and recommended next steps"
-        >
-          <div className="space-y-4">
-            <WelcomeChecklist />
-            <RecommendedSteps />
-          </div>
-        </MobileCollapsibleSection>
-
-        <MobileCollapsibleSection
-          title="Money flow"
-          description="Income, spending, and safe-to-spend breakdown"
-        >
-          <MoneyFlowCard />
-        </MobileCollapsibleSection>
-
-        <MobileCollapsibleSection title="Financial health" description="Score and metrics">
-          <HealthScoreCard />
-        </MobileCollapsibleSection>
-
-        <MobileCollapsibleSection
-          title="Smart suggestions"
-          description="Automation ideas from your data"
-        >
-          <SmartSuggestionsCard />
-        </MobileCollapsibleSection>
-
-        <MobileCollapsibleSection title="Insights" description="Trends and recommendations">
-          <SmartInsights />
-        </MobileCollapsibleSection>
       </div>
 
-      {/* Desktop: full dashboard */}
-      <div className="hidden lg:block">
-        <DashboardHero />
-        <div className="mt-6 grid gap-4">
-          <WelcomeChecklist />
-          <RecommendedSteps />
-        </div>
-
-        <div className={cn(dashboardSectionClassName, "mt-8")}>
-          <MoneyFlowCard />
-          <HealthScoreCard />
-        </div>
-
-        <div className={dashboardSectionClassName}>
-          <NextPaycheckCard />
-          <SmartSuggestionsCard />
-        </div>
-
-        <div className={dashboardSectionClassName}>
-          <UpcomingBillsCard />
-        </div>
-
-        <div className={dashboardSectionClassName}>
-          <TopGoalsCard />
-          <RecentActivityCard />
-        </div>
-
-        <div className={dashboardSectionClassName}>
-          <SmartInsights />
-        </div>
+      <div className={dashboardSectionClassName}>
+        <DebtOverviewCard />
+        <RecentTransactionsCard />
       </div>
+
+      <div className={dashboardSectionClassName}>
+        <FinancialTrendsCard />
+        <AchievementsCard />
+      </div>
+
+      <DashboardMoreSection />
     </div>
   );
 }

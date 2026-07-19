@@ -31,34 +31,34 @@ export function ThisWeeksPlanCard() {
   }
 
   return (
-    <section>
-      <h2 className="mb-7 text-lg font-semibold tracking-tight text-white sm:text-xl">
-        This week
-      </h2>
-      <ul
-        key={signature}
-        className={cn("space-y-4", isAnimating && "plan-list-animate")}
-      >
-        {weeklyPlan.map((recommendation, index) => (
-          <li
-            key={recommendation.id}
-            className="plan-rec-enter flex gap-4 rounded-2xl px-1 py-3"
-            style={{ animationDelay: `${index * 90}ms` }}
-          >
-            <span
-              className={cn(
-                "mt-2 h-2 w-2 shrink-0 rounded-full",
-                planPriorityClasses[recommendation.priority],
-                isAnimating && "scale-110",
-              )}
-              aria-hidden
-            />
-            <p className="text-base leading-relaxed text-white/65">
-              {recommendation.message}
-            </p>
-          </li>
-        ))}
-      </ul>
-    </section>
+    <Card variant="subtle">
+      <CardHeader title="This week" />
+      <CardContent>
+        <ul
+          key={signature}
+          className={cn("space-y-3", isAnimating && "plan-list-animate")}
+        >
+          {weeklyPlan.map((recommendation, index) => (
+            <li
+              key={recommendation.id}
+              className="plan-rec-enter flex gap-3"
+              style={{ animationDelay: `${index * 90}ms` }}
+            >
+              <span
+                className={cn(
+                  "mt-2 h-1.5 w-1.5 shrink-0 rounded-full",
+                  planPriorityClasses[recommendation.priority],
+                  isAnimating && "scale-110",
+                )}
+                aria-hidden
+              />
+              <p className="text-sm leading-relaxed text-[var(--text-secondary)]">
+                {recommendation.message}
+              </p>
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
   );
 }

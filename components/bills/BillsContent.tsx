@@ -72,7 +72,9 @@ function BillSection({
 
   return (
     <section className="space-y-6">
-      <h3 className="text-xl font-semibold tracking-tight text-white">{title}</h3>
+      <h3 className="text-base font-semibold tracking-tight text-[var(--foreground)] sm:text-lg">
+        {title}
+      </h3>
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
         {groups.map(({ bill, splits }) => (
           <BillCard

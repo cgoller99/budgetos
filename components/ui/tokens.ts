@@ -25,9 +25,11 @@ export const cardHoverClassName =
 export const cardSubtleHoverClassName =
   "hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-hover)] hover:shadow-[var(--card-shadow-hover)]";
 
-export const cardPaddingClassName = "p-7 sm:p-8";
+export const cardPaddingClassName = "p-6 sm:p-7";
 
-export const cardPaddingLgClassName = "p-8 sm:p-10";
+export const cardPaddingLgClassName = "p-7 sm:p-8";
+
+export const cardPaddingCompactClassName = "p-5 sm:p-6";
 
 export const buttonPrimaryClassName =
   "bg-gradient-to-b from-[#0088ff] to-[#0077ed] text-[#ffffff] shadow-[0_1px_2px_rgba(0,119,237,0.35),0_4px_16px_rgba(0,119,237,0.2)] hover:from-[#0099ff] hover:to-[#0066d6] hover:shadow-[0_4px_24px_rgba(0,119,237,0.38)] hover:scale-[1.02] active:scale-[0.98]";
@@ -39,27 +41,44 @@ export const labelClassName =
   "mb-2 block text-sm font-medium text-[var(--text-muted)]";
 
 export const panelTitleClassName =
-  "text-lg font-semibold tracking-tight text-[var(--foreground)] sm:text-xl";
+  "text-base font-semibold tracking-tight text-[var(--foreground)] sm:text-lg";
 
 export const panelDescriptionClassName =
-  "mt-1.5 text-sm leading-relaxed text-[var(--text-muted)]";
+  "mt-1 text-sm text-[var(--text-muted)]";
+
+export const panelLinkClassName =
+  "text-xs font-medium text-[#0077ed] transition-colors hover:text-[#4da3ff] hover:underline";
 
 export const pageContainerClassName =
-  "mx-auto flex w-full max-w-5xl flex-col gap-10 lg:gap-12";
+  "mx-auto flex w-full max-w-5xl flex-col gap-8 lg:gap-10";
 
 export const pageContainerWideClassName =
-  "mx-auto flex w-full max-w-6xl flex-col gap-10 lg:gap-12";
+  "mx-auto flex w-full max-w-6xl flex-col gap-8 lg:gap-10";
 
 export const dashboardSectionClassName = "grid grid-cols-1 gap-5 lg:grid-cols-2 lg:gap-6";
+
+export const dashboardKpiGridClassName =
+  "grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5 lg:gap-5";
+
+export const listRowClassName =
+  "flex items-center justify-between gap-4 rounded-xl px-1 py-2.5 transition-colors hover:bg-[var(--surface-hover)]";
+
+export const listRowAmountClassName =
+  "shrink-0 text-sm font-semibold tabular-nums text-[var(--foreground)]";
+
+export const listRowLabelClassName =
+  "truncate text-sm text-[var(--text-secondary)]";
 
 export const sectionTitleClassName =
   "text-xl font-semibold tracking-tight text-[var(--foreground)] sm:text-2xl";
 
 export const metricLabelClassName =
-  "text-sm font-medium tracking-wide text-[var(--text-muted)]";
+  "text-xs font-medium tracking-wide text-[var(--text-muted)] uppercase";
 
 export const metricValueClassName =
-  "text-3xl font-semibold tracking-tight tabular-nums text-[var(--foreground)] sm:text-[2.125rem] lg:text-[2.65rem] lg:leading-none";
+  "text-2xl font-semibold tracking-tight tabular-nums text-[var(--foreground)] sm:text-[1.875rem] lg:text-[2.125rem] lg:leading-none";
+
+export const metricChangeClassName = "mt-2 text-xs tabular-nums text-[var(--text-muted)]";
 
 export const sidebarActiveClassName =
   "border border-[#0077ed]/25 bg-[#0077ed]/10 text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(0,119,237,0.12)]";
