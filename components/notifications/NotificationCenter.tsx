@@ -1,9 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import Link from "next/link";
-import { Button } from "@/components/ui";
+import { Button, OverlayPortal } from "@/components/ui";
 import { cn } from "@/components/ui/cn";
 import { useFinance } from "@/context/FinanceContext";
 import { useWhatsNewOptional } from "@/context/WhatsNewContext";
@@ -25,8 +24,6 @@ import { markReleaseSeen } from "@/lib/whatsNew/clientApi";
 
 const INITIAL_VISIBLE = 12;
 const LOAD_MORE_STEP = 12;
-const PANEL_Z = 55;
-const BACKDROP_Z = 54;
 
 function NotificationSearchInput({
   value,
@@ -196,7 +193,6 @@ export function NotificationCenter() {
   } = useFinance();
   const whatsNew = useWhatsNewOptional();
   const [isOpen, setIsOpen] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
   const [dismissedVirtualIds, setDismissedVirtualIds] = useState<Set<string>>(
@@ -210,10 +206,6 @@ export function NotificationCenter() {
     triggerRef,
     panelWidth: 384,
   });
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
 
   useEffect(() => {
     setDismissedVirtualIds(readDismissedVirtualNotificationIds());
@@ -289,11 +281,9 @@ export function NotificationCenter() {
   useEffect(() => {
     if (!isOpen) return;
 
-    if (isMobile) {
-      lockBodyScroll();
-      return () => unlockBodyScroll();
-    }
-  }, [isOpen, isMobile]);
+    lockBodyScroll();
+    return () => unlockBodyScroll();
+  }, [isOpen]);
 
   const handleDelete = useCallback(
     (notification: EnrichedNotification) => {
@@ -330,156 +320,6 @@ export function NotificationCenter() {
     });
   };
 
-  const panelContent = isOpen ? (
-    <>
-      <button
-        type="button"
-        aria-label="Close notifications"
-        className={cn(
-          "notification-backdrop-enter fixed inset-0 bg-black/40 backdrop-blur-[1px]",
-          isMobile ? "opacity-100" : "opacity-100 lg:bg-black/20",
-        )}
-        style={{ zIndex: BACKDROP_Z }}
-        onClick={() => setIsOpen(false)}
-      />
-
-      <div
-        ref={panelRef}
-        role="dialog"
-        aria-label="Notifications"
-        aria-modal="true"
-        className={cn(
-          "notification-panel-enter fixed flex flex-col overflow-hidden border border-[var(--surface-border)] bg-[var(--background)] shadow-2xl shadow-black/40",
-          isMobile
-            ? "inset-x-3 top-[calc(4.25rem+env(safe-area-inset-top))] max-h-[calc(100vh-5.5rem-env(safe-area-inset-top))] rounded-[var(--radius-card)]"
-            : "rounded-[var(--radius-card)]",
-        )}
-        style={{
-          zIndex: PANEL_Z,
-          ...(isMobile
-            ? undefined
-            : desktopStyle),
-        }}
-      >
-        <div className="border-b border-[var(--surface-border)] bg-[var(--surface-soft)] px-4 py-3.5 sm:px-5">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-[var(--foreground)]">
-                Notifications
-              </p>
-              <p className="mt-0.5 text-xs text-[var(--text-muted)]">
-                {mergedUnreadCount > 0
-                  ? `${mergedUnreadCount} unread`
-                  : "You're all caught up"}
-              </p>
-            </div>
-            <div className="flex items-center gap-1">
-              {mergedUnreadCount > 0 ? (
-                <button
-                  type="button"
-                  onClick={markAllNotificationsRead}
-                  className="focus-ring rounded-[var(--radius-button)] px-2.5 py-1.5 text-xs font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)]"
-                >
-                  Mark all read
-                </button>
-              ) : null}
-              {mergedNotifications.length > 0 ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    clearAllNotifications();
-                    setDismissedVirtualIds(readDismissedVirtualNotificationIds());
-                  }}
-                  className="focus-ring rounded-[var(--radius-button)] px-2.5 py-1.5 text-xs font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--danger)]"
-                >
-                  Clear all
-                </button>
-              ) : null}
-            </div>
-          </div>
-
-          <div className="mt-3">
-            <NotificationSearchInput value={searchQuery} onChange={setSearchQuery} />
-          </div>
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3 sm:px-4">
-          {filteredNotifications.length === 0 ? (
-            <div className="flex flex-col items-center justify-center px-4 py-12 text-center">
-              <span
-                className="flex h-12 w-12 items-center justify-center rounded-[var(--radius-card)] bg-[var(--surface-soft)] text-xl"
-                aria-hidden
-              >
-                {searchQuery.trim() ? "🔍" : "✓"}
-              </span>
-              <p className="mt-3 text-sm font-medium text-[var(--foreground)]">
-                {searchQuery.trim() ? "No matching notifications" : "You're all caught up."}
-              </p>
-              <p className="mt-1 text-xs text-[var(--text-muted)]">
-                {searchQuery.trim()
-                  ? "Try a different search term."
-                  : "No new notifications."}
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {groupedNotifications.map((group) => (
-                <section key={group.key} aria-label={group.label}>
-                  <p className="sticky top-0 z-10 mb-2 bg-[var(--background)] px-1 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-subtle)]">
-                    {group.label}
-                  </p>
-                  <ul className="space-y-2" role="list">
-                    {group.items.map((notification) => (
-                      <li key={notification.id}>
-                        <NotificationRow
-                          notification={notification}
-                          onMarkRead={() => markNotificationRead(notification.id)}
-                          onDelete={() => handleDelete(notification)}
-                          onNavigate={() => setIsOpen(false)}
-                          onCompleteAutomation={() => {
-                            const suggestion = automationSuggestions.find(
-                              (item) =>
-                                item.id ===
-                                (notification.automationSuggestionId ?? notification.id),
-                            );
-
-                            if (suggestion) {
-                              void completeAutomationSuggestion(suggestion);
-                            }
-                          }}
-                          onDismissAutomation={() =>
-                            dismissAutomationSuggestion(
-                              notification.automationSuggestionId ?? notification.id,
-                            )
-                          }
-                        />
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              ))}
-
-              {visibleCount < filteredNotifications.length ? (
-                <div className="pt-1">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    fullWidth
-                    onClick={() =>
-                      setVisibleCount((current) => current + LOAD_MORE_STEP)
-                    }
-                  >
-                    Load older notifications
-                  </Button>
-                </div>
-              ) : null}
-            </div>
-          )}
-        </div>
-      </div>
-    </>
-  ) : null;
-
   return (
     <>
       <button
@@ -504,9 +344,148 @@ export function NotificationCenter() {
         ) : null}
       </button>
 
-      {isMounted && panelContent
-        ? createPortal(panelContent, document.body)
-        : null}
+      {isOpen ? (
+        <OverlayPortal>
+          <button
+            type="button"
+            aria-label="Close notifications"
+            className="notification-backdrop-enter pointer-events-auto fixed inset-0 bg-black/45 backdrop-blur-[2px] lg:bg-black/30"
+            onClick={() => setIsOpen(false)}
+          />
+
+          <div
+            ref={panelRef}
+            role="dialog"
+            aria-label="Notifications"
+            aria-modal="true"
+            className={cn(
+              "notification-panel-enter pointer-events-auto fixed z-[1] flex flex-col overflow-hidden",
+              "border border-[var(--surface-border)] bg-[var(--background)] shadow-2xl shadow-black/50",
+              "max-lg:inset-x-3 max-lg:top-[calc(4.25rem+env(safe-area-inset-top))]",
+              "max-lg:max-h-[calc(100dvh-5.5rem-env(safe-area-inset-top))] max-lg:rounded-[var(--radius-card)]",
+              "lg:rounded-[var(--radius-card)]",
+            )}
+            style={isMobile ? undefined : desktopStyle}
+          >
+            <div className="border-b border-[var(--surface-border)] bg-[var(--surface-soft)] px-4 py-3.5 sm:px-5">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-[var(--foreground)]">
+                    Notifications
+                  </p>
+                  <p className="mt-0.5 text-xs text-[var(--text-muted)]">
+                    {mergedUnreadCount > 0
+                      ? `${mergedUnreadCount} unread`
+                      : "You're all caught up"}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1">
+                  {mergedUnreadCount > 0 ? (
+                    <button
+                      type="button"
+                      onClick={markAllNotificationsRead}
+                      className="focus-ring rounded-[var(--radius-button)] px-2.5 py-1.5 text-xs font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)]"
+                    >
+                      Mark all read
+                    </button>
+                  ) : null}
+                  {mergedNotifications.length > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        clearAllNotifications();
+                        setDismissedVirtualIds(readDismissedVirtualNotificationIds());
+                      }}
+                      className="focus-ring rounded-[var(--radius-button)] px-2.5 py-1.5 text-xs font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--danger)]"
+                    >
+                      Clear all
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="mt-3">
+                <NotificationSearchInput value={searchQuery} onChange={setSearchQuery} />
+              </div>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3 sm:px-4">
+              {filteredNotifications.length === 0 ? (
+                <div className="flex flex-col items-center justify-center px-4 py-12 text-center">
+                  <span
+                    className="flex h-12 w-12 items-center justify-center rounded-[var(--radius-card)] bg-[var(--surface-soft)] text-xl"
+                    aria-hidden
+                  >
+                    {searchQuery.trim() ? "🔍" : "✓"}
+                  </span>
+                  <p className="mt-3 text-sm font-medium text-[var(--foreground)]">
+                    {searchQuery.trim() ? "No matching notifications" : "You're all caught up."}
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">
+                    {searchQuery.trim()
+                      ? "Try a different search term."
+                      : "No new notifications."}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {groupedNotifications.map((group) => (
+                    <section key={group.key} aria-label={group.label}>
+                      <p className="sticky top-0 z-10 mb-2 bg-[var(--background)] px-1 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-subtle)]">
+                        {group.label}
+                      </p>
+                      <ul className="space-y-2" role="list">
+                        {group.items.map((notification) => (
+                          <li key={notification.id}>
+                            <NotificationRow
+                              notification={notification}
+                              onMarkRead={() => markNotificationRead(notification.id)}
+                              onDelete={() => handleDelete(notification)}
+                              onNavigate={() => setIsOpen(false)}
+                              onCompleteAutomation={() => {
+                                const suggestion = automationSuggestions.find(
+                                  (item) =>
+                                    item.id ===
+                                    (notification.automationSuggestionId ??
+                                      notification.id),
+                                );
+
+                                if (suggestion) {
+                                  void completeAutomationSuggestion(suggestion);
+                                }
+                              }}
+                              onDismissAutomation={() =>
+                                dismissAutomationSuggestion(
+                                  notification.automationSuggestionId ?? notification.id,
+                                )
+                              }
+                            />
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+                  ))}
+
+                  {visibleCount < filteredNotifications.length ? (
+                    <div className="pt-1">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        fullWidth
+                        onClick={() =>
+                          setVisibleCount((current) => current + LOAD_MORE_STEP)
+                        }
+                      >
+                        Load older notifications
+                      </Button>
+                    </div>
+                  ) : null}
+                </div>
+              )}
+            </div>
+          </div>
+        </OverlayPortal>
+      ) : null}
     </>
   );
 }

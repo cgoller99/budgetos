@@ -55,7 +55,7 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
   if (!isMounted || typeof document === "undefined") return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[60] flex items-end justify-center p-0 sm:items-center sm:p-6">
+    <div className="fixed inset-0 z-[10050] flex items-end justify-center p-0 sm:items-center sm:p-6">
       <button
         type="button"
         aria-label="Close modal"

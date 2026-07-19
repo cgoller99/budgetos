@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type CSSProperties, type RefObject } from "react";
+import { useLayoutEffect, useState, type CSSProperties, type RefObject } from "react";
 
 type FloatingPanelOptions = {
   isOpen: boolean;
@@ -9,6 +9,14 @@ type FloatingPanelOptions = {
   gap?: number;
   mobileBreakpoint?: number;
 };
+
+function getIsMobile(breakpoint: number): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return window.innerWidth < breakpoint;
+}
 
 export function useFloatingPanelPosition({
   isOpen,
@@ -20,14 +28,16 @@ export function useFloatingPanelPosition({
   isMobile: boolean;
   desktopStyle: CSSProperties;
 } {
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => getIsMobile(mobileBreakpoint));
   const [desktopStyle, setDesktopStyle] = useState<CSSProperties>({});
 
-  useEffect(() => {
-    if (!isOpen) return;
+  useLayoutEffect(() => {
+    if (!isOpen) {
+      return;
+    }
 
     function update() {
-      const mobile = window.innerWidth < mobileBreakpoint;
+      const mobile = getIsMobile(mobileBreakpoint);
       setIsMobile(mobile);
 
       if (mobile || !triggerRef.current) {
@@ -45,7 +55,6 @@ export function useFloatingPanelPosition({
       const maxHeight = Math.min(512, window.innerHeight - top - 16);
 
       setDesktopStyle({
-        position: "fixed",
         top,
         left,
         width,

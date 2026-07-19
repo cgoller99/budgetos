@@ -34,9 +34,9 @@
   --radius-button: 8px;
   --radius-input: 10px;
   --z-dropdown: 50;
-  --z-notification: 55;
-  --z-modal: 60;
-  --z-toast: 100;
+  --z-notification: 9999;
+  --z-modal: 10050;
+  --z-toast: 10100;
   --app-shell-gradient: none;
 }
 

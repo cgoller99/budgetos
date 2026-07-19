@@ -1,3 +1,4 @@
+export { OverlayPortal } from "./OverlayPortal";
 export { ExpandableCard } from "./ExpandableCard";
 export { IconBadge } from "./IconBadge";
 export { PageHeader } from "./PageHeader";
