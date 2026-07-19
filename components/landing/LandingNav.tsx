@@ -33,24 +33,12 @@ export function LandingNav() {
               {link.label}
             </a>
           ))}
-          <Link
-            href="/beta"
-            className="text-sm text-[var(--text-muted)] transition-colors duration-200 hover:text-[var(--foreground)]"
-          >
-            Beta
-          </Link>
         </nav>
 
         <div className="flex items-center gap-3">
           <SecondaryLink
-            href="/beta"
-            className="hidden min-h-10 px-4 py-2 text-sm sm:inline-flex"
-          >
-            Join Beta
-          </SecondaryLink>
-          <SecondaryLink
             href="/login"
-            className="hidden min-h-10 px-4 py-2 text-sm md:inline-flex"
+            className="hidden min-h-10 px-4 py-2 text-sm sm:inline-flex"
           >
             Log in
           </SecondaryLink>

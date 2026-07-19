@@ -26,10 +26,10 @@ export function useFloatingPanelPosition({
   mobileBreakpoint = 1024,
 }: FloatingPanelOptions): {
   isMobile: boolean;
-  desktopStyle: CSSProperties;
+  panelStyle: CSSProperties;
 } {
   const [isMobile, setIsMobile] = useState(() => getIsMobile(mobileBreakpoint));
-  const [desktopStyle, setDesktopStyle] = useState<CSSProperties>({});
+  const [panelStyle, setPanelStyle] = useState<CSSProperties>({});
 
   useLayoutEffect(() => {
     if (!isOpen) {
@@ -40,12 +40,22 @@ export function useFloatingPanelPosition({
       const mobile = getIsMobile(mobileBreakpoint);
       setIsMobile(mobile);
 
-      if (mobile || !triggerRef.current) {
-        setDesktopStyle({});
+      if (!triggerRef.current) {
+        setPanelStyle({});
         return;
       }
 
       const rect = triggerRef.current.getBoundingClientRect();
+
+      if (mobile) {
+        setPanelStyle({
+          top: rect.bottom + gap,
+          right: 12,
+          width: "min(14rem, calc(100vw - 24px))",
+        });
+        return;
+      }
+
       const width = Math.min(panelWidth, window.innerWidth - 24);
       const left = Math.max(
         12,
@@ -54,7 +64,7 @@ export function useFloatingPanelPosition({
       const top = rect.bottom + gap;
       const maxHeight = Math.min(512, window.innerHeight - top - 16);
 
-      setDesktopStyle({
+      setPanelStyle({
         top,
         left,
         width,
@@ -72,5 +82,5 @@ export function useFloatingPanelPosition({
     };
   }, [gap, isOpen, mobileBreakpoint, panelWidth, triggerRef]);
 
-  return { isMobile, desktopStyle };
+  return { isMobile, panelStyle };
 }

@@ -15,7 +15,7 @@ export function ProfileMenu() {
   const panelRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
-  const { isMobile, desktopStyle } = useFloatingPanelPosition({
+  const { panelStyle } = useFloatingPanelPosition({
     isOpen: open,
     triggerRef,
     panelWidth: 224,
@@ -91,18 +91,8 @@ export function ProfileMenu() {
           <div
             ref={panelRef}
             role="menu"
-            className="notification-panel-enter pointer-events-auto fixed z-[1] overflow-hidden rounded-[var(--radius-card)] border border-[var(--surface-border)] bg-[var(--background)] shadow-2xl shadow-black/50"
-            style={
-              isMobile
-                ? {
-                    top: triggerRef.current
-                      ? triggerRef.current.getBoundingClientRect().bottom + 8
-                      : 64,
-                    right: 12,
-                    width: "min(14rem, calc(100vw - 24px))",
-                  }
-                : desktopStyle
-            }
+            className="notification-panel-enter pointer-events-auto fixed z-10 overflow-hidden rounded-[var(--radius-card)] border border-[var(--surface-border)] bg-[var(--background)] shadow-2xl shadow-black/50"
+            style={panelStyle}
           >
             <div className="border-b border-[var(--surface-border)] px-4 py-3">
               <p className="truncate text-sm font-medium text-[var(--foreground)]">

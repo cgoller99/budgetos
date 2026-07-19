@@ -20,6 +20,15 @@ export async function POST(request: Request) {
     return NextResponse.json(access);
   } catch (error) {
     console.error("[beta/access] Failed", error);
-    return NextResponse.json({ allowed: true, inviteOnly: false, isFull: false, waitlistEnabled: true });
+    return NextResponse.json(
+      {
+        allowed: false,
+        inviteOnly: true,
+        isFull: false,
+        waitlistEnabled: true,
+        reason: "service_unavailable",
+      },
+      { status: 503 },
+    );
   }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { SmartSuggestionsCard } from "@/components/automation/SmartSuggestionsCard";
 import { NextPaycheckCard } from "@/components/incomePlan/NextPaycheckCard";
 import { UpcomingIncomeCard } from "@/components/dashboard/UpcomingIncomeCard";

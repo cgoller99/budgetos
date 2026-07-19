@@ -475,7 +475,7 @@ export async function syncPlaidConnection(params: {
 
     const accountContextMap = buildAccountContextMap(mappedAccounts);
 
-    let transactionResult = await syncPlaidTransactions({
+    const transactionResult = await syncPlaidTransactions({
       accessToken,
       connection,
       repository,

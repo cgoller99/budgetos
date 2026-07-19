@@ -4,6 +4,8 @@ export type StripeConfig = {
   webhookSecret: string | undefined;
   proPriceId: string | undefined;
   proPlusPriceId: string | undefined;
+  proYearlyPriceId: string | undefined;
+  proPlusYearlyPriceId: string | undefined;
   proProductId: string | undefined;
   proPlusProductId: string | undefined;
   publishableKey: string | undefined;
@@ -74,6 +76,8 @@ export function getStripeConfig(): StripeConfig {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET?.trim();
   const proPriceId = process.env.STRIPE_PRO_PRICE_ID?.trim();
   const proPlusPriceId = process.env.STRIPE_PRO_PLUS_PRICE_ID?.trim();
+  const proYearlyPriceId = process.env.STRIPE_PRO_YEARLY_PRICE_ID?.trim();
+  const proPlusYearlyPriceId = process.env.STRIPE_PRO_PLUS_YEARLY_PRICE_ID?.trim();
   const proProductId = process.env.STRIPE_PRO_PRODUCT_ID?.trim();
   const proPlusProductId = process.env.STRIPE_PRO_PLUS_PRODUCT_ID?.trim();
   const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY?.trim();
@@ -98,6 +102,8 @@ export function getStripeConfig(): StripeConfig {
     webhookSecret,
     proPriceId,
     proPlusPriceId,
+    proYearlyPriceId,
+    proPlusYearlyPriceId,
     proProductId,
     proPlusProductId,
     publishableKey,

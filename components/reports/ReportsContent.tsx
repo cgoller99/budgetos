@@ -6,6 +6,7 @@ import { CategoryBars } from "@/components/charts/CategoryBars";
 import { CHART_COLORS } from "@/components/charts/constants";
 import { BillsOverviewCard } from "@/components/dashboard/BillsOverviewCard";
 import { NetWorthTimeline } from "@/components/dashboard/NetWorthTimeline";
+import { ProUpgradeBanner } from "@/components/subscription/ProUpgradeBanner";
 import { EventHistoryList } from "@/components/events/EventHistoryList";
 import { HealthScoreCard } from "@/components/HealthScoreCard";
 import { SmartInsights } from "@/components/SmartInsights";
@@ -193,6 +194,7 @@ export function ReportsContent() {
 
   return (
     <div className={cn(pageContainerWideClassName, "space-y-5")}>
+      <ProUpgradeBanner requiredPlan="pro_plus" featureLabel="Advanced reports" />
       <NetWorthTimeline />
 
       {/* Mobile: trends first, details behind View more */}

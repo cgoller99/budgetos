@@ -1,5 +1,6 @@
 "use client";
 
+import type { BillingInterval } from "@/lib/stripe/billingInterval";
 import type { PaidSubscriptionPlan, UserSubscription } from "@/lib/subscription/types";
 
 type ApiErrorBody = {
@@ -33,11 +34,12 @@ export async function fetchUserSubscription(options?: {
 
 export async function startStripeCheckout(
   plan: PaidSubscriptionPlan,
+  billing: BillingInterval = "month",
 ): Promise<string> {
   const response = await fetch("/api/stripe/checkout", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ plan }),
+    body: JSON.stringify({ plan, billing }),
   });
   const body = await parseApiResponse<{ url: string }>(response);
   return body.url;

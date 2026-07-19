@@ -1,22 +1,46 @@
 import "server-only";
 
 import type Stripe from "stripe";
+import type { BillingInterval } from "@/lib/stripe/billingInterval";
 import { getStripeConfig } from "@/lib/stripe/config";
 import { getStripeClient } from "@/lib/stripe/stripeClient";
 
-const resolvedPriceCache: Partial<Record<"pro" | "pro_plus", string>> = {};
+const resolvedPriceCache: Partial<
+  Record<`${"pro" | "pro_plus"}:${BillingInterval}`, string>
+> = {};
 
 function getProductIdForPlan(plan: "pro" | "pro_plus"): string | undefined {
   const config = getStripeConfig();
   return plan === "pro_plus" ? config.proPlusProductId : config.proProductId;
 }
 
-function getConfiguredPriceId(plan: "pro" | "pro_plus"): string | undefined {
+function getConfiguredPriceId(
+  plan: "pro" | "pro_plus",
+  interval: BillingInterval,
+): string | undefined {
   const config = getStripeConfig();
+
+  if (interval === "year") {
+    return plan === "pro_plus"
+      ? config.proPlusYearlyPriceId
+      : config.proYearlyPriceId;
+  }
+
   return plan === "pro_plus" ? config.proPlusPriceId : config.proPriceId;
 }
 
-function pickDefaultRecurringPrice(prices: Stripe.Price[]): Stripe.Price | undefined {
+function pickRecurringPrice(
+  prices: Stripe.Price[],
+  interval: BillingInterval,
+): Stripe.Price | undefined {
+  const matchingInterval = prices.find(
+    (price) => price.recurring?.interval === interval && price.active,
+  );
+
+  if (matchingInterval) {
+    return matchingInterval;
+  }
+
   const monthly = prices.find(
     (price) => price.recurring?.interval === "month" && price.active,
   );
@@ -26,16 +50,18 @@ function pickDefaultRecurringPrice(prices: Stripe.Price[]): Stripe.Price | undef
 
 export async function resolvePriceIdForPlan(
   plan: "pro" | "pro_plus",
+  interval: BillingInterval = "month",
 ): Promise<string> {
-  const configuredPriceId = getConfiguredPriceId(plan);
+  const cacheKey = `${plan}:${interval}` as const;
+  const configuredPriceId = getConfiguredPriceId(plan, interval);
 
   if (configuredPriceId) {
-    resolvedPriceCache[plan] = configuredPriceId;
+    resolvedPriceCache[cacheKey] = configuredPriceId;
     return configuredPriceId;
   }
 
-  if (resolvedPriceCache[plan]) {
-    return resolvedPriceCache[plan]!;
+  if (resolvedPriceCache[cacheKey]) {
+    return resolvedPriceCache[cacheKey]!;
   }
 
   const productId = getProductIdForPlan(plan);
@@ -53,25 +79,26 @@ export async function resolvePriceIdForPlan(
     product: productId,
     active: true,
     type: "recurring",
-    limit: 10,
+    limit: 20,
   });
-  const selected = pickDefaultRecurringPrice(prices.data);
+  const selected = pickRecurringPrice(prices.data, interval);
 
   if (!selected?.id) {
     throw new Error(
-      `No active recurring price found for Stripe product ${productId}.`,
+      `No active ${interval}ly recurring price found for Stripe product ${productId}.`,
     );
   }
 
-  resolvedPriceCache[plan] = selected.id;
+  resolvedPriceCache[cacheKey] = selected.id;
   return selected.id;
 }
 
 export function rememberResolvedPriceId(
   plan: "pro" | "pro_plus",
   priceId: string,
+  interval: BillingInterval = "month",
 ): void {
-  resolvedPriceCache[plan] = priceId;
+  resolvedPriceCache[`${plan}:${interval}`] = priceId;
 }
 
 export function resolvePlanFromStripePrice(
@@ -90,17 +117,26 @@ export function resolvePlanFromStripePrice(
         ? price.product
         : price.product?.id;
 
-  if (priceId === config.proPlusPriceId || priceId === resolvedPriceCache.pro_plus) {
-    return "pro_plus";
-  }
+  const knownPriceIds: Array<[string | undefined, "pro" | "pro_plus"]> = [
+    [config.proPriceId, "pro"],
+    [config.proYearlyPriceId, "pro"],
+    [config.proPlusPriceId, "pro_plus"],
+    [config.proPlusYearlyPriceId, "pro_plus"],
+    [resolvedPriceCache["pro:month"], "pro"],
+    [resolvedPriceCache["pro:year"], "pro"],
+    [resolvedPriceCache["pro_plus:month"], "pro_plus"],
+    [resolvedPriceCache["pro_plus:year"], "pro_plus"],
+  ];
 
-  if (priceId === config.proPriceId || priceId === resolvedPriceCache.pro) {
-    return "pro";
+  for (const [knownPriceId, plan] of knownPriceIds) {
+    if (knownPriceId && priceId === knownPriceId) {
+      return plan;
+    }
   }
 
   if (productId && productId === config.proPlusProductId) {
     if (priceId) {
-      resolvedPriceCache.pro_plus = priceId;
+      resolvedPriceCache["pro_plus:month"] = priceId;
     }
 
     return "pro_plus";
@@ -108,7 +144,7 @@ export function resolvePlanFromStripePrice(
 
   if (productId && productId === config.proProductId) {
     if (priceId) {
-      resolvedPriceCache.pro = priceId;
+      resolvedPriceCache["pro:month"] = priceId;
     }
 
     return "pro";

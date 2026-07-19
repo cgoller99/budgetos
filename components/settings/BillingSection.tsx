@@ -13,9 +13,11 @@ import {
   getPlanDisplayName,
   getStatusDisplayLabel,
   hasActiveSubscription,
+  parsePaidPlan,
   type PaidSubscriptionPlan,
   type SubscriptionPlan,
 } from "@/lib/subscription/types";
+import { parseBillingInterval, type BillingInterval } from "@/lib/stripe/billingInterval";
 import {
   cancelStripeSubscription,
   changeStripePlan,
@@ -71,10 +73,12 @@ export function BillingSection() {
     refreshSubscription,
     hasProAccess: userHasPro,
     hasProPlusAccess: userHasProPlus,
+    hasMinimumPlan,
   } = useSubscription();
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const checkoutTrackedRef = useRef(false);
+  const upgradePlan = parsePaidPlan(searchParams.get("upgrade") ?? undefined);
 
   const runAction = useCallback(
     async (key: string, action: () => Promise<void>) => {
@@ -132,10 +136,13 @@ export function BillingSection() {
     }
   }, [refreshSubscription, searchParams, showToast, subscription.plan]);
 
-  async function handleCheckout(plan: PaidSubscriptionPlan) {
+  async function handleCheckout(
+    plan: PaidSubscriptionPlan,
+    billing: BillingInterval = "month",
+  ) {
     await runAction(`checkout-${plan}`, async () => {
-      trackEvent(ANALYTICS_EVENTS.STRIPE_CHECKOUT_STARTED, { plan });
-      const url = await startStripeCheckout(plan);
+      trackEvent(ANALYTICS_EVENTS.STRIPE_CHECKOUT_STARTED, { plan, billing });
+      const url = await startStripeCheckout(plan, billing);
       window.location.assign(url);
     });
   }
@@ -244,6 +251,17 @@ export function BillingSection() {
         }
       />
       <CardContent className="space-y-5">
+        {upgradePlan && !isFounder && !hasMinimumPlan(upgradePlan) ? (
+          <div className="rounded-2xl border border-[var(--accent)]/20 bg-[var(--accent-muted)] px-5 py-4">
+            <p className="text-sm font-medium text-[var(--foreground)]">
+              Upgrade to {getPlanDisplayName(upgradePlan)} to unlock this feature
+            </p>
+            <p className="mt-2 text-sm text-[var(--text-muted)]">
+              Choose a plan below to continue. Checkout opens securely through Stripe.
+            </p>
+          </div>
+        ) : null}
+
         {isFounder && (
           <div className="rounded-2xl border border-[var(--accent)]/20 bg-[var(--accent)]/10 px-5 py-4">
             <p className="text-sm font-medium text-[var(--accent-light)]">Founder access</p>

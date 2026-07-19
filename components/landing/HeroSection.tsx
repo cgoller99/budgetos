@@ -26,7 +26,7 @@ export function HeroSection() {
 
           <div className="landing-fade-in landing-delay-3 mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row lg:justify-start">
             <PrimaryLink href="/register">Get Started Free</PrimaryLink>
-            <SecondaryLink href="/register">View Demo</SecondaryLink>
+            <SecondaryLink href="#showcase">See the product</SecondaryLink>
           </div>
 
           <p className="landing-fade-in landing-delay-4 mt-5 text-sm text-[var(--text-subtle)]">

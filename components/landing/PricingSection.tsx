@@ -65,6 +65,11 @@ function getDisplayPrice(
   };
 }
 
+function buildBillingSettingsPath(plan: string, period: BillingPeriod): string {
+  const billing = period === "yearly" ? "year" : "month";
+  return `/settings?plan=${plan}&billing=${billing}#billing`;
+}
+
 function PlanCheck({ included }: { included: boolean }) {
   return (
     <span
@@ -182,14 +187,14 @@ export function PricingSection() {
                     </PrimaryLink>
                   ) : stripeEnabled ? (
                     <PrimaryLink
-                      href={`/login?redirect=${encodeURIComponent("/settings#billing")}&plan=${plan.id}`}
+                      href={`/login?redirect=${encodeURIComponent(buildBillingSettingsPath(plan.id, period))}`}
                       className="w-full"
                     >
                       Subscribe to {plan.name}
                     </PrimaryLink>
                   ) : (
                     <Link
-                      href={`/login?redirect=${encodeURIComponent("/settings#billing")}&plan=${plan.id}`}
+                      href={`/login?redirect=${encodeURIComponent(buildBillingSettingsPath(plan.id, period))}`}
                       className="flex min-h-12 w-full items-center justify-center rounded-2xl border border-dashed border-[var(--surface-border)] text-sm text-[var(--text-subtle)] transition-colors hover:border-[var(--surface-border-strong)] hover:text-[var(--text-muted)]"
                     >
                       Get started with {plan.name}

@@ -4,8 +4,12 @@ import { assertStripeConfigured, getStripeConfig } from "@/lib/stripe/config";
 import { createCheckoutSession } from "@/lib/stripe/subscriptionService";
 import { parsePaidPlan } from "@/lib/subscription/types";
 
+import type { BillingInterval } from "@/lib/stripe/billingInterval";
+import { parseBillingInterval } from "@/lib/stripe/billingInterval";
+
 type CheckoutRequestBody = {
   plan?: string;
+  billing?: string;
 };
 
 export async function POST(request: Request) {
@@ -31,6 +35,7 @@ export async function POST(request: Request) {
 
     const body = (await request.json().catch(() => ({}))) as CheckoutRequestBody;
     const targetPlan = parsePaidPlan(body.plan) ?? "pro";
+    const billingInterval = parseBillingInterval(body.billing);
 
     const url = await createCheckoutSession({
       supabase: auth.supabase,
@@ -38,6 +43,7 @@ export async function POST(request: Request) {
       email: auth.profile?.email ?? auth.user.email ?? null,
       fullName: auth.profile?.full_name ?? null,
       targetPlan,
+      billingInterval,
     });
 
     return NextResponse.json({ url });

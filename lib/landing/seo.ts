@@ -57,7 +57,7 @@ export function getLandingJsonLd() {
         url,
         contactPoint: {
           "@type": "ContactPoint",
-          email: "support@buxme.com",
+          email: "support@buxme.co",
           contactType: "customer support",
         },
       },

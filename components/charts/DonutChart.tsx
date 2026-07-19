@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { formatCurrency } from "@/lib/finance/format";
 import { cn } from "@/components/ui/cn";
 import { CHART_COLORS } from "./constants";
@@ -80,6 +81,35 @@ export function DonutChart({
         : visible
       : visible.slice(0, maxLegendItems);
 
+  const arcSegments = useMemo(() => {
+    let angle = 0;
+    const segments: Array<{
+      segment: DonutSegment;
+      sweep: number;
+      startAngle: number;
+      endAngle: number;
+      color: string;
+    }> = [];
+
+    for (const [index, segment] of visible.entries()) {
+      const sweep = (segment.value / total) * 360;
+      const startAngle = angle;
+      const endAngle = angle + sweep;
+      angle = endAngle;
+      segments.push({
+        segment,
+        sweep,
+        startAngle,
+        endAngle,
+        color:
+          segment.color ??
+          CHART_COLORS.palette[index % CHART_COLORS.palette.length],
+      });
+    }
+
+    return segments;
+  }, [total, visible]);
+
   if (visible.length === 0 || total <= 0) {
     return (
       <p
@@ -93,8 +123,6 @@ export function DonutChart({
       </p>
     );
   }
-
-  let currentAngle = 0;
 
   return (
     <div
@@ -123,15 +151,7 @@ export function DonutChart({
             stroke="var(--surface-border)"
             strokeWidth={resolvedStroke}
           />
-          {visible.map((segment, index) => {
-            const sweep = (segment.value / total) * 360;
-            const startAngle = currentAngle;
-            const endAngle = currentAngle + sweep;
-            currentAngle = endAngle;
-            const color =
-              segment.color ??
-              CHART_COLORS.palette[index % CHART_COLORS.palette.length];
-
+          {arcSegments.map(({ segment, sweep, startAngle, endAngle, color }) => {
             if (sweep >= 359.9) {
               return (
                 <circle

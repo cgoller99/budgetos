@@ -10,6 +10,7 @@ import {
   getStripeConfig,
 } from "@/lib/stripe/config";
 import { resolvePriceIdForPlan } from "@/lib/stripe/priceResolver";
+import type { BillingInterval } from "@/lib/stripe/billingInterval";
 import {
   getSubscriptionPeriodEndIso,
   mapProfileToSubscription,
@@ -204,6 +205,7 @@ export async function createCheckoutSession(input: {
   email: string | null;
   fullName: string | null;
   targetPlan: PaidSubscriptionPlan;
+  billingInterval?: BillingInterval;
 }): Promise<string> {
   assertStripeConfigured();
   const config = getStripeConfig();
@@ -222,7 +224,10 @@ export async function createCheckoutSession(input: {
     );
   }
 
-  const priceId = await resolvePriceIdForPlan(input.targetPlan);
+  const priceId = await resolvePriceIdForPlan(
+    input.targetPlan,
+    input.billingInterval ?? "month",
+  );
 
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",

@@ -52,13 +52,13 @@ export function LandingFooter() {
             </Link>
           ))}
           <a
-            href="mailto:support@buxme.com"
+            href="mailto:support@buxme.co"
             className="text-sm text-[var(--text-muted)] transition-colors hover:text-[var(--foreground)]"
           >
             Support
           </a>
           <a
-            href="mailto:support@buxme.com"
+            href="mailto:support@buxme.co"
             className="text-sm text-[var(--text-muted)] transition-colors hover:text-[var(--foreground)]"
           >
             Contact

@@ -18,7 +18,7 @@ const FAQ_ITEMS = [
   {
     question: "Can I connect my bank?",
     answer:
-      "Yes. Buxme supports bank sync via Plaid on supported plans. You can also track everything manually if you prefer full control over your data.",
+      "Yes. Buxme supports optional bank sync via Plaid when enabled for your account. You can also track everything manually if you prefer full control over your data.",
   },
   {
     question: "How secure is Buxme?",
@@ -43,7 +43,7 @@ const FAQ_ITEMS = [
   {
     question: "Can I import spreadsheets?",
     answer:
-      "Manual entry is supported today across accounts, transactions, and bills. Spreadsheet import is on our roadmap — contact support if you need help migrating existing data.",
+      "Manual entry is supported today across accounts, transactions, and bills. Contact support@buxme.co if you need help migrating existing spreadsheet data.",
   },
 ] as const;
 
