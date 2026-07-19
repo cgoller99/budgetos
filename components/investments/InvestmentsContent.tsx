@@ -37,7 +37,7 @@ export function InvestmentsContent() {
           change={
             investmentKpi
               ? formatMonthlyChange(investmentKpi.monthlyChange)
-              : "Connect accounts or add holdings"
+              : ""
           }
           positive={(investmentKpi?.monthlyChange ?? 0) >= 0}
         />
@@ -50,7 +50,7 @@ export function InvestmentsContent() {
         <StatCard
           label="Safe To Spend impact"
           value={formatCurrency(snapshot.safeToSpend)}
-          change="After all planned outflows"
+          change="After outflows"
           positive={snapshot.safeToSpend > 0}
         />
       </div>
