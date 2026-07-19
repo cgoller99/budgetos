@@ -245,8 +245,8 @@ export function BillingSection() {
       />
       <CardContent className="space-y-5">
         {isFounder && (
-          <div className="rounded-2xl border border-[#0077ed]/20 bg-[#0077ed]/10 px-5 py-4">
-            <p className="text-sm font-medium text-[#4da3ff]">Founder access</p>
+          <div className="rounded-2xl border border-[var(--accent)]/20 bg-[var(--accent)]/10 px-5 py-4">
+            <p className="text-sm font-medium text-[var(--accent-light)]">Founder access</p>
             <p className="mt-2 text-sm leading-relaxed text-white/55">
               All premium features are unlocked on this account. Stripe checkout is
               optional — use the tools below to test billing flows in Test Mode.
@@ -286,7 +286,7 @@ export function BillingSection() {
                   className={cn(
                     "flex flex-col rounded-2xl border px-4 py-4",
                     isCurrent
-                      ? "border-[#0077ed]/30 bg-[#0077ed]/10"
+                      ? "border-[var(--accent)]/30 bg-[var(--accent)]/10"
                       : "border-white/[0.06] bg-white/[0.02]",
                   )}
                 >
@@ -438,7 +438,7 @@ export function BillingSection() {
         {!isFounder && !userHasPro && (
           <p className="text-xs text-white/35">
             Household collaboration requires{" "}
-            <Link href="#billing" className="text-[#4da3ff] hover:text-[#0077ed]">
+            <Link href="#billing" className="text-[var(--accent-light)] hover:text-[var(--accent)]">
               Buxme Pro
             </Link>
             .
@@ -448,7 +448,7 @@ export function BillingSection() {
         {!isFounder && !userHasProPlus && (
           <p className="text-xs text-white/35">
             Advanced reports require{" "}
-            <Link href="#billing" className="text-[#4da3ff] hover:text-[#0077ed]">
+            <Link href="#billing" className="text-[var(--accent-light)] hover:text-[var(--accent)]">
               Buxme Pro+
             </Link>
             .

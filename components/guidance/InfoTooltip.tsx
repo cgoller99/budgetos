@@ -8,7 +8,7 @@ export function InfoTooltip({ label, className = "" }: InfoTooltipProps) {
     <span className={`group relative inline-flex ${className}`}>
       <button
         type="button"
-        className="flex size-5 min-h-11 min-w-11 items-center justify-center rounded-full border border-[var(--surface-border)] bg-[var(--surface-subtle)] text-[11px] font-semibold text-[var(--text-muted)] transition-colors hover:border-[#0077ed]/30 hover:text-[#0077ed] focus:outline-none focus:ring-2 focus:ring-[#0077ed]/30 sm:size-5 sm:min-h-0 sm:min-w-0"
+        className="flex size-5 min-h-11 min-w-11 items-center justify-center rounded-full border border-[var(--surface-border)] bg-[var(--surface-subtle)] text-[11px] font-semibold text-[var(--text-muted)] transition-colors hover:border-[var(--accent)]/30 hover:text-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 sm:size-5 sm:min-h-0 sm:min-w-0"
         aria-label={label}
       >
         ?

@@ -234,7 +234,7 @@ function SearchResultRow({
         className={cn(
           "flex items-center gap-3 rounded-2xl px-4 py-3 transition-colors",
           isSelected
-            ? "bg-[#0077ed]/15 text-white"
+            ? "bg-[var(--accent)]/15 text-white"
             : "text-white/70 hover:bg-white/[0.04] hover:text-white",
         )}
       >

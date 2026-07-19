@@ -17,7 +17,7 @@ export function ProgressRing({
   value,
   size = 112,
   strokeWidth = 8,
-  accentColor = "#0077ed",
+  accentColor = "var(--accent)",
   className,
   children,
 }: ProgressRingProps) {

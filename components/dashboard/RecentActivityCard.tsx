@@ -16,7 +16,7 @@ export function RecentActivityCard() {
         action={
           <Link
             href="/transactions"
-            className="text-xs font-medium text-[#0077ed] hover:underline"
+            className="text-xs font-medium text-[var(--accent)] hover:underline"
           >
             View all
           </Link>

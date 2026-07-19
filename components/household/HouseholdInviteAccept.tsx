@@ -71,7 +71,7 @@ export function HouseholdInviteAccept({
     return (
       <AuthShell title="Household invite" subtitle="Loading invite details...">
         <div className="flex justify-center py-8">
-          <div className="h-8 w-8 animate-pulse rounded-full bg-[#0077ed]/30" />
+          <div className="h-8 w-8 animate-pulse rounded-full bg-[var(--accent)]/30" />
         </div>
       </AuthShell>
     );
@@ -87,7 +87,7 @@ export function HouseholdInviteAccept({
             Already have an account?{" "}
             <Link
               href={getLoginUrlForInvite(token)}
-              className="text-[#0077ed] hover:underline"
+              className="text-[var(--accent)] hover:underline"
             >
               Sign in
             </Link>
@@ -104,7 +104,7 @@ export function HouseholdInviteAccept({
             href={getLoginUrlForInvite(token)}
             className={cn(
               linkButtonClassName,
-              "bg-[#0077ed] text-white hover:bg-[#0066d6]",
+              "bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)]",
             )}
           >
             Sign in to accept
@@ -139,7 +139,7 @@ export function HouseholdInviteAccept({
             href={getLoginUrlForInvite(token)}
             className={cn(
               linkButtonClassName,
-              "bg-[#0077ed] text-white hover:bg-[#0066d6]",
+              "bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)]",
             )}
           >
             Switch account

@@ -19,6 +19,8 @@ type StatCardProps = {
   variant?: "card" | "inline";
   className?: string;
   tooltip?: ReactNode;
+  icon?: ReactNode;
+  trailing?: ReactNode;
 };
 
 export function StatCard({
@@ -30,6 +32,8 @@ export function StatCard({
   variant = "card",
   className,
   tooltip,
+  icon,
+  trailing,
 }: StatCardProps) {
   const previousValue = useRef(value);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -48,46 +52,55 @@ export function StatCard({
 
   const content = (
     <>
-      <div className="flex items-center gap-2">
-        <p className={metricLabelClassName}>{label}</p>
-        {tooltip}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <p className={metricLabelClassName}>{label}</p>
+            {tooltip}
+          </div>
+          <p
+            className={cn(
+              "mt-1.5 tracking-tight tabular-nums",
+              variant === "inline"
+                ? "text-2xl font-semibold text-[var(--foreground)] sm:text-3xl"
+                : metricValueClassName,
+              isAnimating && "kpi-value-animate text-[var(--foreground)]",
+            )}
+          >
+            {value}
+          </p>
+          {change ? (
+            <p
+              className={cn(
+                metricChangeClassName,
+                !mutedChange &&
+                  (positive
+                    ? "text-[var(--success)]"
+                    : "text-[var(--danger)]"),
+              )}
+            >
+              {change}
+            </p>
+          ) : null}
+        </div>
+        {icon ? <div className="shrink-0">{icon}</div> : null}
       </div>
-      <p
-        className={cn(
-          "mt-2 tracking-tight tabular-nums",
-          variant === "inline"
-            ? "text-2xl font-semibold text-[var(--foreground)] sm:text-3xl"
-            : metricValueClassName,
-          isAnimating && "kpi-value-animate text-[var(--foreground)]",
-        )}
-      >
-        {value}
-      </p>
-      {change && (
-        <p
-          className={cn(
-            metricChangeClassName,
-            !mutedChange && (positive ? "text-emerald-400/85" : "text-rose-400/85"),
-          )}
-        >
-          {change}
-        </p>
-      )}
+      {trailing ? <div className="mt-3">{trailing}</div> : null}
     </>
   );
 
   if (variant === "inline") {
-    return <div>{content}</div>;
+    return <div className={className}>{content}</div>;
   }
 
   return (
     <Card
       hover
       variant="subtle"
+      padding="compact"
       className={cn(
         "h-full",
-        isAnimating &&
-          "border-[#0077ed]/25 shadow-[0_2px_4px_rgba(0,0,0,0.24),0_16px_40px_rgba(0,119,237,0.12)]",
+        isAnimating && "border-[color-mix(in_srgb,var(--accent)_30%,transparent)]",
         className,
       )}
     >

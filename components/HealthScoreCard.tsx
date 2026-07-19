@@ -13,7 +13,7 @@ export function HealthScoreCard() {
       <CardHeader title="Financial health" />
 
       <CardContent className="flex items-center gap-6">
-        <div className="relative flex h-28 w-28 shrink-0 items-center justify-center">
+        <div className="relative flex h-24 w-24 shrink-0 items-center justify-center">
           <svg
             className="h-full w-full -rotate-90"
             viewBox="0 0 100 100"
@@ -32,7 +32,7 @@ export function HealthScoreCard() {
               cy="50"
               r="42"
               fill="none"
-              stroke="#0077ed"
+              stroke="var(--accent)"
               strokeWidth="8"
               strokeLinecap="round"
               strokeDasharray={financialHealthScore.strokeDasharray}
@@ -45,7 +45,7 @@ export function HealthScoreCard() {
           </span>
         </div>
 
-        <div className="space-y-3 text-sm">
+        <div className="space-y-2.5 text-sm">
           {financialHealthScore.metrics.map((metric) => (
             <div
               key={metric.label}

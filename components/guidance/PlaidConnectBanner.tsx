@@ -47,7 +47,7 @@ export function PlaidConnectBanner({
   return (
     <div
       className={cn(
-        "rounded-2xl border border-[#0077ed]/25 bg-[#0077ed]/10 px-4 py-4 sm:px-5 sm:py-5",
+        "rounded-2xl border border-[var(--accent)]/25 bg-[var(--accent)]/10 px-4 py-4 sm:px-5 sm:py-5",
         className,
       )}
     >

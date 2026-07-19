@@ -22,7 +22,7 @@ export const DEMO_PROFILES: DemoProfile[] = [
       "Moderate income",
       "Weekly budgeting",
     ],
-    accent: "#0077ed",
+    accent: "var(--accent)",
   },
   {
     id: "young_professional",

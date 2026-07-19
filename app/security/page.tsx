@@ -91,7 +91,7 @@ export default function SecurityPage() {
           to{" "}
           <a
             href={`mailto:${LEGAL_CONTACT_EMAIL}`}
-            className="text-[#0077ed] hover:underline"
+            className="text-[var(--accent)] hover:underline"
           >
             {LEGAL_CONTACT_EMAIL}
           </a>{" "}

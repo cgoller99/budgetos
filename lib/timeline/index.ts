@@ -14,8 +14,8 @@ export {
 } from "./generateMilestones";
 
 export const TIMELINE_SERIES: TimelineSeries[] = [
-  { key: "netWorth", label: "Net Worth", color: "#0077ed" },
-  { key: "cash", label: "Cash", color: "#4da3ff" },
-  { key: "debt", label: "Debt", color: "#2563eb" },
-  { key: "investments", label: "Investments", color: "#1d4ed8" },
+  { key: "netWorth", label: "Net Worth", color: "#3B82F6" },
+  { key: "cash", label: "Cash", color: "#60A5FA" },
+  { key: "debt", label: "Debt", color: "#EF4444" },
+  { key: "investments", label: "Investments", color: "#8B5CF6" },
 ];

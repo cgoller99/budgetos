@@ -19,10 +19,10 @@ export function MobileBottomNav({ activeHref }: { activeHref: string }) {
   return (
     <>
       <nav
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--surface-border)] bg-[var(--background)]/95 px-1 pb-[calc(0.625rem+env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--surface-border)] bg-[var(--background)]/98 px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-1.5 backdrop-blur-xl lg:hidden"
         aria-label="Primary navigation"
       >
-        <div className="mx-auto flex max-w-lg items-stretch justify-between gap-0.5">
+        <div className="mx-auto flex max-w-lg items-stretch justify-between gap-1">
           {MOBILE_PRIMARY_NAV.map((route) => {
             const isActive = route.href === path;
 
@@ -32,20 +32,20 @@ export function MobileBottomNav({ activeHref }: { activeHref: string }) {
                 href={route.href}
                 aria-current={isActive ? "page" : undefined}
                 className={cn(
-                  "focus-ring flex min-h-11 min-w-[44px] flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-[10px] font-medium transition-all duration-200 ease-out",
+                  "focus-ring flex min-h-12 min-w-[48px] flex-1 flex-col items-center justify-center gap-1 rounded-[10px] px-1 py-1.5 text-[10px] font-medium transition-colors duration-200 ease-out",
                   isActive ? sidebarActiveClassName : sidebarInactiveClassName,
                 )}
               >
                 <span
                   className={cn(
-                    "flex size-7 items-center justify-center rounded-lg transition-all duration-200",
+                    "flex size-8 items-center justify-center rounded-lg transition-colors duration-200",
                     isActive
-                      ? "bg-[#0077ed]/20 text-[#4da3ff]"
+                      ? "bg-[var(--accent-muted)] text-[var(--accent-light)]"
                       : "text-[var(--text-muted)]",
                   )}
                   aria-hidden
                 >
-                  <NavIcon name={route.icon} />
+                  <NavIcon name={route.icon} className="h-[18px] w-[18px]" />
                 </span>
                 <span className="truncate">{route.label}</span>
               </Link>
@@ -59,15 +59,15 @@ export function MobileBottomNav({ activeHref }: { activeHref: string }) {
             aria-haspopup="dialog"
             onClick={() => setMoreOpen(true)}
             className={cn(
-              "focus-ring flex min-h-11 min-w-[44px] flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-[10px] font-medium transition-all duration-200 ease-out",
+              "focus-ring flex min-h-12 min-w-[48px] flex-1 flex-col items-center justify-center gap-1 rounded-[10px] px-1 py-1.5 text-[10px] font-medium transition-colors duration-200 ease-out",
               isMoreActive ? sidebarActiveClassName : sidebarInactiveClassName,
             )}
           >
             <span
               className={cn(
-                "flex size-7 items-center justify-center rounded-lg transition-all duration-200",
+                "flex size-8 items-center justify-center rounded-lg transition-colors duration-200",
                 isMoreActive
-                  ? "bg-[#0077ed]/20 text-[#4da3ff]"
+                  ? "bg-[var(--accent-muted)] text-[var(--accent-light)]"
                   : "text-[var(--text-muted)]",
               )}
               aria-hidden

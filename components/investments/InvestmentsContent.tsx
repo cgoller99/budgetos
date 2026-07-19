@@ -63,7 +63,7 @@ export function InvestmentsContent() {
           action={
             <a
               href="/settings#connections"
-              className="focus-ring inline-flex min-h-11 items-center rounded-xl bg-[#0077ed] px-5 text-sm font-medium text-white"
+              className="focus-ring inline-flex min-h-11 items-center rounded-xl bg-[var(--accent)] px-5 text-sm font-medium text-white"
             >
               Connect investments
             </a>

@@ -128,7 +128,7 @@ function PreferenceToggle({
       className={cn(
         "relative inline-flex h-7 w-12 shrink-0 rounded-full border transition-all duration-200 ease-out",
         checked
-          ? "border-[#0077ed]/40 bg-[#0077ed]/30"
+          ? "border-[var(--accent)]/40 bg-[var(--accent)]/30"
           : "border-white/[0.08] bg-white/[0.04]",
         disabled && "cursor-not-allowed opacity-60",
       )}
@@ -343,7 +343,7 @@ export function SettingsContent() {
             <div className="flex items-center gap-4">
               <div
                 aria-hidden
-                className="flex size-14 shrink-0 items-center justify-center rounded-2xl border border-white/[0.08] bg-[#0077ed]/10 text-lg font-semibold text-[#4da3ff]"
+                className="flex size-14 shrink-0 items-center justify-center rounded-2xl border border-white/[0.08] bg-[var(--accent)]/10 text-lg font-semibold text-[var(--accent-light)]"
               >
                 {initials}
               </div>
@@ -382,7 +382,7 @@ export function SettingsContent() {
         <CardContent>
           <Link
             href="/whats-new"
-            className="focus-ring inline-flex min-h-11 items-center rounded-xl bg-[#0077ed]/10 px-4 text-sm font-medium text-[#4da3ff] transition-colors hover:bg-[#0077ed]/20"
+            className="focus-ring inline-flex min-h-11 items-center rounded-xl bg-[var(--accent)]/10 px-4 text-sm font-medium text-[var(--accent-light)] transition-colors hover:bg-[var(--accent)]/20"
           >
             View release notes
           </Link>
@@ -406,7 +406,7 @@ export function SettingsContent() {
                 className={cn(
                   "rounded-2xl border px-5 py-4 text-left transition-all duration-200 ease-out",
                   theme === option.value
-                    ? "border-[#0077ed]/30 bg-[#0077ed]/10 text-[var(--foreground)]"
+                    ? "border-[var(--accent)]/30 bg-[var(--accent)]/10 text-[var(--foreground)]"
                     : "border-[var(--surface-border)] bg-[var(--surface-subtle)] text-[var(--text-muted)] hover:border-[var(--surface-border-strong)] hover:text-[var(--foreground)]",
                 )}
               >
@@ -468,7 +468,7 @@ export function SettingsContent() {
             </div>
             <Link
               href="/forgot-password"
-              className="inline-flex text-sm text-[#4da3ff] transition-colors hover:text-[#0077ed]"
+              className="inline-flex text-sm text-[var(--accent-light)] transition-colors hover:text-[var(--accent)]"
             >
               Reset password via email
             </Link>
@@ -567,7 +567,7 @@ export function SettingsContent() {
                     className={cn(
                       "min-h-[4.5rem] rounded-2xl border px-5 py-4 text-left transition-all duration-200 ease-out",
                       isActive
-                        ? "border-[#0077ed]/30 bg-[#0077ed]/10"
+                        ? "border-[var(--accent)]/30 bg-[var(--accent)]/10"
                         : "border-white/[0.04] bg-white/[0.02] hover:border-white/[0.07] hover:bg-white/[0.03]",
                       isSwitching && "opacity-70",
                     )}

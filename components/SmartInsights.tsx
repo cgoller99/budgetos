@@ -24,7 +24,7 @@ export function SmartInsights() {
                 <p className="text-base leading-relaxed text-white/58">
                   {insight.before}
                   {insight.highlight && (
-                    <span className="font-medium text-[#4da3ff]">
+                    <span className="font-medium text-[var(--accent-light)]">
                       {insight.highlight}
                     </span>
                   )}

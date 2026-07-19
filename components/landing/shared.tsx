@@ -46,7 +46,7 @@ export function SecondaryLink({ href, children, className }: LandingLinkProps) {
 
 export function SectionLabel({ children }: { children: ReactNode }) {
   return (
-    <p className="text-sm font-medium tracking-wide text-[#0077ed] uppercase">
+    <p className="text-sm font-medium tracking-wide text-[var(--accent)] uppercase">
       {children}
     </p>
   );

@@ -42,7 +42,7 @@ export function SmartSuggestionsCard() {
                       : suggestion.tone === "negative"
                         ? "text-rose-300/90"
                         : suggestion.tone === "accent"
-                          ? "text-[#0077ed]"
+                          ? "text-[var(--accent)]"
                           : "text-[var(--foreground)]",
                   )}
                 >

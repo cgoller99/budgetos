@@ -51,7 +51,7 @@ export function PasswordInput({
         aria-controls={inputId}
         onPointerDown={handlePointerDown}
         onClick={handleToggle}
-        className="absolute inset-y-0 right-0 z-10 flex w-12 min-w-11 touch-manipulation items-center justify-center rounded-r-2xl text-white/35 transition-colors hover:text-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0077ed]/40"
+        className="absolute inset-y-0 right-0 z-10 flex w-12 min-w-11 touch-manipulation items-center justify-center rounded-r-2xl text-white/35 transition-colors hover:text-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40"
       >
         {visible ? (
           <svg

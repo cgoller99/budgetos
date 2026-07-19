@@ -66,7 +66,7 @@ export function ResetPasswordForm() {
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#0a0f1a]">
-        <div className="h-8 w-8 animate-pulse rounded-full bg-[#0077ed]/30" />
+        <div className="h-8 w-8 animate-pulse rounded-full bg-[var(--accent)]/30" />
       </div>
     );
   }
@@ -78,7 +78,7 @@ export function ResetPasswordForm() {
         subtitle="Request a new password reset link to continue."
         footer={
           <>
-            <Link href="/forgot-password" className="text-[#0077ed] hover:underline">
+            <Link href="/forgot-password" className="text-[var(--accent)] hover:underline">
               Request reset link
             </Link>
           </>
@@ -97,7 +97,7 @@ export function ResetPasswordForm() {
       subtitle="Choose a new password for your account"
       footer={
         <>
-          <Link href="/login" className="text-[#0077ed] hover:underline">
+          <Link href="/login" className="text-[var(--accent)] hover:underline">
             Back to sign in
           </Link>
         </>

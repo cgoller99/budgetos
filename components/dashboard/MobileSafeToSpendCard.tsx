@@ -21,7 +21,7 @@ export function MobileSafeToSpendCard() {
       })}
       className="focus-ring block rounded-3xl"
     >
-      <section className="rounded-3xl border border-[#0077ed]/25 bg-gradient-to-br from-[#0077ed]/15 to-transparent p-6 transition-colors hover:border-[#0077ed]/35">
+      <section className="rounded-3xl border border-[var(--accent)]/25 bg-gradient-to-br from-[var(--accent)]/15 to-transparent p-6 transition-colors hover:border-[var(--accent)]/35">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-sm font-medium uppercase tracking-wide text-white/55">

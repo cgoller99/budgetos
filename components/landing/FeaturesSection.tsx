@@ -59,7 +59,7 @@ export function FeaturesSection() {
               "p-7 sm:p-8",
             )}
           >
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#0077ed]/20 bg-[#0077ed]/10 text-base text-[#4da3ff]">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--accent)]/20 bg-[var(--accent)]/10 text-base text-[var(--accent-light)]">
               {feature.icon}
             </span>
             <h3 className="mt-5 text-lg font-semibold tracking-tight text-white">

@@ -11,7 +11,7 @@ export function HeroSection() {
 
       <div className="relative mx-auto grid max-w-6xl items-center gap-12 lg:grid-cols-[1fr_1.05fr] lg:gap-16">
         <div className="text-center lg:text-left">
-          <p className="landing-fade-in text-sm font-medium tracking-wide text-[#4da3ff] uppercase">
+          <p className="landing-fade-in text-sm font-medium tracking-wide text-[var(--accent-light)] uppercase">
             Buxme
           </p>
 

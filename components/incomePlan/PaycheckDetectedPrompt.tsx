@@ -39,7 +39,7 @@ export function PaycheckDetectedPrompt({
   }
 
   return (
-    <Card padding="lg" className="border-[#0077ed]/30 bg-[#0077ed]/5">
+    <Card padding="lg" className="border-[var(--accent)]/30 bg-[var(--accent)]/5">
       <CardHeader
         title={suggestion.title}
         description={suggestion.description}

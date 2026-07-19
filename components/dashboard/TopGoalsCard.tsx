@@ -25,7 +25,7 @@ export function TopGoalsCard() {
         <CardHeader title="Savings Goals" />
         <CardContent>
           <p className="text-sm text-[var(--text-muted)]">
-            <Link href="/savings" className="text-[#0077ed] hover:underline">
+            <Link href="/savings" className="text-[var(--accent)] hover:underline">
               Create a goal
             </Link>
           </p>

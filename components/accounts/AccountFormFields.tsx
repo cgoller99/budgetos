@@ -291,7 +291,7 @@ export function AccountFormFields({
               className={cn(
                 "focus-ring flex min-h-11 min-w-11 items-center justify-center rounded-2xl border text-xl transition-colors",
                 form.icon === icon
-                  ? "border-[#0077ed]/40 bg-[#0077ed]/15"
+                  ? "border-[var(--accent)]/40 bg-[var(--accent)]/15"
                   : "border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.05]",
               )}
               aria-label={`Select ${icon}`}
@@ -312,7 +312,7 @@ export function AccountFormFields({
               className={cn(
                 "focus-ring flex min-h-11 items-center justify-center gap-2 rounded-2xl border px-3 text-xs font-medium text-white/80",
                 form.color === option.value
-                  ? "border-[#0077ed]/40 bg-[#0077ed]/10"
+                  ? "border-[var(--accent)]/40 bg-[var(--accent)]/10"
                   : "border-white/[0.06] bg-white/[0.02]",
               )}
             >

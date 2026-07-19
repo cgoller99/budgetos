@@ -31,7 +31,7 @@ export function EmptyState({
       className={cn("empty-state-enter text-center", className)}
     >
       <div
-        className="success-pop mx-auto flex size-14 items-center justify-center rounded-2xl border border-[var(--surface-border)] bg-[#0077ed]/10 text-2xl"
+        className="success-pop mx-auto flex size-14 items-center justify-center rounded-2xl border border-[var(--surface-border)] bg-[var(--accent)]/10 text-2xl"
         aria-hidden
       >
         {icon}
@@ -44,7 +44,7 @@ export function EmptyState({
         <ul className="mx-auto mt-5 max-w-md space-y-2 text-left text-sm text-[var(--text-secondary)]">
           {nextSteps.map((step) => (
             <li key={step} className="flex gap-2">
-              <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-[#0077ed]" />
+              <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-[var(--accent)]" />
               <span>{step}</span>
             </li>
           ))}

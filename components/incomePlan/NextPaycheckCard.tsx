@@ -44,7 +44,7 @@ export function NextPaycheckCard() {
           action={
             <Link
               href="/income?tab=plan"
-              className="text-sm text-[#0077ed] transition-colors hover:underline"
+              className="text-sm text-[var(--accent)] transition-colors hover:underline"
             >
               Set up
             </Link>
@@ -84,7 +84,7 @@ export function NextPaycheckCard() {
         action={
           <Link
             href="/income?tab=plan"
-            className="text-sm text-[#0077ed] transition-colors hover:underline"
+            className="text-sm text-[var(--accent)] transition-colors hover:underline"
           >
             Edit plan
           </Link>
@@ -111,7 +111,7 @@ export function NextPaycheckCard() {
         </div>
 
         {extraMonth && paycheckIndex >= 3 && (
-          <div className="rounded-xl border border-[#0077ed]/30 bg-[#0077ed]/10 px-4 py-3">
+          <div className="rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-4 py-3">
             <p className="text-sm font-medium text-[var(--foreground)]">
               Extra paycheck month
             </p>
@@ -204,7 +204,7 @@ export function MonthlyAllocationProgress() {
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-[var(--surface-border)]">
                   <div
-                    className="h-full rounded-full bg-[#0077ed] transition-all"
+                    className="h-full rounded-full bg-[var(--accent)] transition-all"
                     style={{ width: `${percent}%` }}
                   />
                 </div>

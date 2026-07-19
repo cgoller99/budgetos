@@ -131,13 +131,13 @@ export function RegisterForm() {
           {betaClosedMessage ? (
             <p className="mb-3 text-sm text-white/45">
               {betaClosedMessage}{" "}
-              <Link href="/beta" className="text-[#0077ed] hover:underline">
+              <Link href="/beta" className="text-[var(--accent)] hover:underline">
                 Join the beta waitlist
               </Link>
             </p>
           ) : null}
           Already have an account?{" "}
-          <Link href={loginHref} className="text-[#0077ed] hover:underline">
+          <Link href={loginHref} className="text-[var(--accent)] hover:underline">
             Sign in
           </Link>
         </>

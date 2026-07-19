@@ -1,3 +1,4 @@
+export { IconBadge } from "./IconBadge";
 export { PageHeader } from "./PageHeader";
 export { PanelLink } from "./PanelLink";
 export { AnimatedNumber } from "./AnimatedNumber";

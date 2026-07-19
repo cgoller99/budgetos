@@ -39,7 +39,7 @@ export function MobileCollapsibleSection({
             <p className="mt-1 text-sm text-white/45">{description}</p>
           ) : null}
         </div>
-        <span className="shrink-0 text-sm font-medium text-[#4da3ff]">
+        <span className="shrink-0 text-sm font-medium text-[var(--accent-light)]">
           {open ? "Hide" : "View more"}
         </span>
       </button>

@@ -100,14 +100,14 @@ function StrategyToggle({
       className={cn(
         "flex min-w-[220px] flex-1 items-start gap-3 rounded-2xl border px-4 py-4 text-left transition-colors duration-200",
         selected
-          ? "border-[#0077ed]/40 bg-[#0077ed]/10"
+          ? "border-[var(--accent)]/40 bg-[var(--accent)]/10"
           : "border-white/[0.06] bg-white/[0.02] hover:border-white/[0.1]",
       )}
     >
       <span
         className={cn(
           "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border",
-          selected ? "border-[#0077ed] bg-[#0077ed]" : "border-white/20",
+          selected ? "border-[var(--accent)] bg-[var(--accent)]" : "border-white/20",
         )}
       >
         {selected ? <span className="h-2 w-2 rounded-full bg-white" /> : null}

@@ -119,7 +119,7 @@ export default function PrivacyPage() {
         <p>
           We implement administrative, technical, and organizational safeguards
           designed to protect your information. See our{" "}
-          <a href="/security" className="text-[#0077ed] hover:underline">
+          <a href="/security" className="text-[var(--accent)] hover:underline">
             Security page
           </a>{" "}
           for more detail on how we protect Buxme.
@@ -141,7 +141,7 @@ export default function PrivacyPage() {
           request deletion by emailing{" "}
           <a
             href={`mailto:${LEGAL_CONTACT_EMAIL}`}
-            className="text-[#0077ed] hover:underline"
+            className="text-[var(--accent)] hover:underline"
           >
             {LEGAL_CONTACT_EMAIL}
           </a>
@@ -155,7 +155,7 @@ export default function PrivacyPage() {
           Questions about this Privacy Policy? Contact us at{" "}
           <a
             href={`mailto:${LEGAL_CONTACT_EMAIL}`}
-            className="text-[#0077ed] hover:underline"
+            className="text-[var(--accent)] hover:underline"
           >
             {LEGAL_CONTACT_EMAIL}
           </a>

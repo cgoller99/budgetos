@@ -30,7 +30,7 @@ export function UpcomingBillsCard({ embedded = false }: UpcomingBillsCardProps) 
     bills.length === 0 ? (
       <p className="py-2 text-sm text-[var(--text-muted)]">
         Nothing due this week.{" "}
-        <Link href="/bills" className="text-[#0077ed] hover:underline">
+        <Link href="/bills" className="text-[var(--accent)] hover:underline">
           Bills
         </Link>
       </p>

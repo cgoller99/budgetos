@@ -72,7 +72,7 @@ export function GoalMilestoneConfetti({
           className="goal-confetti-piece absolute left-1/2 top-1/2 block h-2 w-2 rounded-full"
           style={{
             backgroundColor:
-              index % 3 === 0 ? "#0077ed" : index % 3 === 1 ? "#4da3ff" : "#34c759",
+              index % 3 === 0 ? "var(--accent)" : index % 3 === 1 ? "var(--accent-light)" : "#34c759",
             animationDelay: `${index * 40}ms`,
             transform: `rotate(${index * 20}deg) translateY(-${20 + (index % 5) * 8}px)`,
           }}

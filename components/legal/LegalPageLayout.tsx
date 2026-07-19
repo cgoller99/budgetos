@@ -26,7 +26,7 @@ export function LegalPageLayout({
           </Link>
           <Link
             href="/login"
-            className="text-sm text-[#0077ed] transition-colors hover:underline"
+            className="text-sm text-[var(--accent)] transition-colors hover:underline"
           >
             Log in
           </Link>
@@ -35,7 +35,7 @@ export function LegalPageLayout({
 
       <main className="px-6 py-12 sm:py-16">
         <article className="mx-auto max-w-3xl">
-          <p className="text-sm font-medium uppercase tracking-wide text-[#0077ed]">
+          <p className="text-sm font-medium uppercase tracking-wide text-[var(--accent)]">
             Legal
           </p>
           <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">

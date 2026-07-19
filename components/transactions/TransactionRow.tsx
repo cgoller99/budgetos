@@ -1,13 +1,15 @@
 "use client";
 
-import { Badge, Button } from "@/components/ui";
+import { Button } from "@/components/ui";
 import { cn } from "@/components/ui/cn";
+import {
+  listRowAmountClassName,
+  listRowClassName,
+  listRowLabelClassName,
+} from "@/components/ui/tokens";
 import { formatCurrency } from "@/lib/finance/format";
 import type { FinanceData, Transaction } from "@/lib/finance/types";
-import {
-  formatTransactionDate,
-  getTransactionTypeLabel,
-} from "@/lib/transactions";
+import { formatTransactionDate } from "@/lib/transactions";
 import { getLinkedAccountName } from "@/lib/transactions/accountLookup";
 
 type TransactionRowProps = {
@@ -17,21 +19,6 @@ type TransactionRowProps = {
   onEdit: () => void;
   onDelete: () => void;
 };
-
-function getTypeVariant(
-  type: Transaction["type"],
-): "success" | "danger" | "accent" | "default" {
-  switch (type) {
-    case "income":
-      return "success";
-    case "expense":
-      return "danger";
-    case "transfer":
-      return "accent";
-    default:
-      return "default";
-  }
-}
 
 export function TransactionRow({
   transaction,
@@ -55,52 +42,43 @@ export function TransactionRow({
     <article
       id={`transaction-${transaction.id}`}
       className={cn(
-        "bill-card-enter flex flex-col gap-5 rounded-3xl border bg-white/[0.015] p-5 transition-colors duration-200 sm:flex-row sm:items-center sm:justify-between sm:p-6",
-        highlighted
-          ? "border-[#0077ed]/40 bg-[#0077ed]/10 ring-2 ring-[#0077ed]/25"
-          : "border-white/[0.04] hover:border-white/[0.07]",
+        "bill-card-enter flex flex-col gap-3 rounded-[var(--radius-card)] border border-[var(--surface-border)] bg-[var(--surface-soft)] px-4 py-3.5 transition-colors duration-200 sm:flex-row sm:items-center sm:justify-between",
+        highlighted &&
+          "border-[color-mix(in_srgb,var(--accent)_35%,transparent)] bg-[var(--accent-muted)]",
       )}
     >
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2.5">
-          <Badge variant={getTypeVariant(transaction.type)}>
-            {getTransactionTypeLabel(transaction.type)}
-          </Badge>
-          <Badge variant="default">{transaction.category}</Badge>
+      <div className={cn("min-w-0 flex-1 sm:contents", listRowClassName)}>
+        <div className="min-w-0 flex-1">
+          <p className={listRowLabelClassName}>
+            {transaction.notes || transaction.category}
+          </p>
+          <p className="text-[11px] text-[var(--text-muted)]">
+            {formatTransactionDate(transaction.date)} · {accountName}
+            {transferName ? ` → ${transferName}` : ""}
+          </p>
         </div>
 
-        <p className="mt-4 truncate text-base font-medium text-white">
-          {transaction.notes || transaction.category}
-        </p>
-
-        <p className="mt-1.5 text-sm text-white/38">
-          {formatTransactionDate(transaction.date)} · {accountName}
-          {transferName ? ` → ${transferName}` : ""}
-        </p>
-      </div>
-
-      <div className="flex items-center gap-4 sm:shrink-0">
         <p
           className={cn(
-            "text-lg font-semibold tabular-nums",
-            transaction.type === "income" && "text-emerald-400/90",
-            transaction.type === "expense" && "text-rose-300/90",
-            transaction.type === "transfer" && "text-[#0077ed]",
+            listRowAmountClassName,
+            transaction.type === "income" && "text-[var(--success)]",
+            transaction.type === "expense" && "text-[var(--danger)]",
+            transaction.type === "transfer" && "text-[var(--accent-light)]",
           )}
         >
           {transaction.type === "transfer"
             ? formatCurrency(transaction.amount)
-            : formatCurrency(signedAmount)}
+            : `${signedAmount >= 0 ? "+" : ""}${formatCurrency(Math.abs(signedAmount))}`}
         </p>
+      </div>
 
-        <div className="flex gap-2">
-          <Button type="button" variant="ghost" size="sm" onClick={onEdit}>
-            Edit
-          </Button>
-          <Button type="button" variant="secondary" size="sm" onClick={onDelete}>
-            Delete
-          </Button>
-        </div>
+      <div className="flex gap-2 sm:shrink-0">
+        <Button type="button" variant="ghost" size="sm" onClick={onEdit}>
+          Edit
+        </Button>
+        <Button type="button" variant="secondary" size="sm" onClick={onDelete}>
+          Delete
+        </Button>
       </div>
     </article>
   );

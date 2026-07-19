@@ -498,7 +498,7 @@ export function IncomePlanContent({ embedded = false }: { embedded?: boolean }) 
             key={value}
             className={cn(
               "h-1.5 flex-1 rounded-full",
-              step >= value ? "bg-[#0077ed]" : "bg-[var(--surface-border)]",
+              step >= value ? "bg-[var(--accent)]" : "bg-[var(--surface-border)]",
             )}
           />
         ))}
@@ -519,7 +519,7 @@ export function IncomePlanContent({ embedded = false }: { embedded?: boolean }) 
                 className={cn(
                   "rounded-2xl border px-4 py-4 text-left transition-colors",
                   paySchedule === option
-                    ? "border-[#0077ed] bg-[#0077ed]/10"
+                    ? "border-[var(--accent)] bg-[var(--accent)]/10"
                     : "border-[var(--surface-border)] bg-[var(--surface-subtle)] hover:border-[var(--surface-border-strong)]",
                 )}
               >
@@ -547,7 +547,7 @@ export function IncomePlanContent({ embedded = false }: { embedded?: boolean }) 
                 step="0.01"
                 value={paycheckAmount}
                 onChange={(event) => setPaycheckAmount(event.target.value)}
-                className="w-full rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-subtle)] px-4 py-3 text-[var(--foreground)] outline-none focus:border-[#0077ed]"
+                className="w-full rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-subtle)] px-4 py-3 text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
                 placeholder="880.66"
               />
             </FormField>
@@ -558,7 +558,7 @@ export function IncomePlanContent({ embedded = false }: { embedded?: boolean }) 
                 type="date"
                 value={anchorDate}
                 onChange={(event) => setAnchorDate(event.target.value)}
-                className="w-full rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-subtle)] px-4 py-3 text-[var(--foreground)] outline-none focus:border-[#0077ed]"
+                className="w-full rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-subtle)] px-4 py-3 text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
               />
             </FormField>
 
@@ -570,7 +570,7 @@ export function IncomePlanContent({ embedded = false }: { embedded?: boolean }) 
                   onChange={(event) =>
                     setWeeklyDayOfWeek(Number.parseInt(event.target.value, 10))
                   }
-                  className="w-full rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-subtle)] px-4 py-3 text-[var(--foreground)] outline-none focus:border-[#0077ed]"
+                  className="w-full rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-subtle)] px-4 py-3 text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
                 >
                   {WEEKDAY_LABELS.map((label, index) => (
                     <option key={label} value={index}>
@@ -709,7 +709,7 @@ export function IncomePlanContent({ embedded = false }: { embedded?: boolean }) 
                         updateAllocation(index, { name: event.target.value })
                       }
                       placeholder="Category name"
-                      className="min-w-0 flex-1 rounded-xl border border-[var(--surface-border)] bg-[var(--background)] px-4 py-3 text-[var(--foreground)] outline-none focus:border-[#0077ed]"
+                      className="min-w-0 flex-1 rounded-xl border border-[var(--surface-border)] bg-[var(--background)] px-4 py-3 text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
                     />
                   </div>
 
@@ -744,7 +744,7 @@ export function IncomePlanContent({ embedded = false }: { embedded?: boolean }) 
                           }
                           placeholder="0"
                           aria-label={`Fixed amount for ${allocation.name}`}
-                          className="w-full rounded-xl border border-[var(--surface-border)] bg-[var(--background)] py-3 pl-8 pr-4 text-right tabular-nums text-[var(--foreground)] outline-none focus:border-[#0077ed]"
+                          className="w-full rounded-xl border border-[var(--surface-border)] bg-[var(--background)] py-3 pl-8 pr-4 text-right tabular-nums text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
                         />
                       </div>
                     </div>

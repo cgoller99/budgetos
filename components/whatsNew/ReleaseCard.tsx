@@ -31,13 +31,13 @@ export function ReleaseCard({
       className={cn(
         "page-enter rounded-3xl border bg-[var(--surface-soft)]/60 p-6 transition-all duration-300",
         highlight
-          ? "border-[#0077ed]/30 shadow-[0_0_40px_rgba(0,119,237,0.08)]"
+          ? "border-[var(--accent)]/30 shadow-[0_0_40px_rgba(0,119,237,0.08)]"
           : "border-[var(--surface-border)]",
       )}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-[#4da3ff]">
+          <p className="text-xs font-medium uppercase tracking-wide text-[var(--accent-light)]">
             Version {release.version}
           </p>
           <h2 className="mt-1 text-xl font-semibold text-[var(--foreground)]">
@@ -48,7 +48,7 @@ export function ReleaseCard({
           </p>
         </div>
         {release.featured ? (
-          <span className="rounded-full border border-[#0077ed]/25 bg-[#0077ed]/10 px-3 py-1 text-xs font-medium text-[#4da3ff]">
+          <span className="rounded-full border border-[var(--accent)]/25 bg-[var(--accent)]/10 px-3 py-1 text-xs font-medium text-[var(--accent-light)]">
             Featured
           </span>
         ) : null}

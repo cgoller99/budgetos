@@ -96,7 +96,7 @@ export function GoalCard({ goal, onAddMoney, onEdit }: GoalCardProps) {
             {goal.suggestions.map((suggestion) => (
               <span
                 key={suggestion.id}
-                className="rounded-full border border-[#0077ed]/20 bg-[#0077ed]/8 px-3 py-1.5 text-xs text-[var(--text-secondary)]"
+                className="rounded-full border border-[var(--accent)]/20 bg-[var(--accent)]/8 px-3 py-1.5 text-xs text-[var(--text-secondary)]"
               >
                 {suggestion.message}
               </span>

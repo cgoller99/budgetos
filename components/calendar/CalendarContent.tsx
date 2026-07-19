@@ -53,7 +53,7 @@ function CalendarDayCell({
       className={cn(
         "flex min-h-[4rem] flex-col rounded-xl border p-1.5 text-left transition-colors sm:min-h-[5.5rem] sm:rounded-2xl sm:p-3",
         isSelected
-          ? "border-[#0077ed]/40 bg-[#0077ed]/10"
+          ? "border-[var(--accent)]/40 bg-[var(--accent)]/10"
           : "border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04]",
       )}
     >
@@ -64,7 +64,7 @@ function CalendarDayCell({
             className={cn(
               "mt-0.5 h-2 w-2 shrink-0 rounded-full",
               variant === "success" && "bg-emerald-400",
-              variant === "accent" && "bg-[#0077ed]",
+              variant === "accent" && "bg-[var(--accent)]",
               variant === "warning" && "bg-amber-400",
               variant === "danger" && "bg-rose-400",
               variant === "default" && "bg-white/30",
@@ -207,7 +207,7 @@ export function CalendarContent() {
                 Paid
               </span>
               <span className="inline-flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-[#0077ed]" />
+                <span className="h-2 w-2 rounded-full bg-[var(--accent)]" />
                 Due today
               </span>
               <span className="inline-flex items-center gap-2">

@@ -48,7 +48,7 @@ export function DashboardPreview() {
       <div
         className={cn(
           landingCardStaticClassName,
-          "landing-slide-in-right relative overflow-hidden border-[#0077ed]/15 p-4 sm:p-5",
+          "landing-slide-in-right relative overflow-hidden border-[var(--accent)]/15 p-4 sm:p-5",
         )}
       >
         <div className="mb-4 flex items-center justify-between border-b border-[var(--surface-border)] pb-3">
@@ -56,7 +56,7 @@ export function DashboardPreview() {
             <p className="text-xs font-medium text-[var(--text-muted)]">Dashboard</p>
             <p className="text-sm font-semibold text-[var(--foreground)]">Good morning</p>
           </div>
-          <span className="rounded-full border border-[#0077ed]/25 bg-[#0077ed]/10 px-2.5 py-1 text-xs font-medium text-[#4da3ff]">
+          <span className="rounded-full border border-[var(--accent)]/25 bg-[var(--accent)]/10 px-2.5 py-1 text-xs font-medium text-[var(--accent-light)]">
             Live preview
           </span>
         </div>
@@ -67,9 +67,9 @@ export function DashboardPreview() {
               key={item.label}
               className={cn(
                 "rounded-xl border border-[var(--surface-border)] bg-[var(--surface-subtle)] p-3 transition-all duration-500",
-                activePanel === 0 && index === 0 && "border-[#0077ed]/30 bg-[#0077ed]/5",
-                activePanel === 1 && index === 1 && "border-[#0077ed]/30 bg-[#0077ed]/5",
-                activePanel === 2 && index === 2 && "border-[#0077ed]/30 bg-[#0077ed]/5",
+                activePanel === 0 && index === 0 && "border-[var(--accent)]/30 bg-[var(--accent)]/5",
+                activePanel === 1 && index === 1 && "border-[var(--accent)]/30 bg-[var(--accent)]/5",
+                activePanel === 2 && index === 2 && "border-[var(--accent)]/30 bg-[var(--accent)]/5",
               )}
             >
               <p className="text-[10px] font-medium tracking-wide text-[var(--text-muted)] uppercase">
@@ -110,7 +110,7 @@ export function DashboardPreview() {
                   </div>
                   <div className="h-1 overflow-hidden rounded-full bg-[var(--surface-border)]">
                     <div
-                      className="h-full rounded-full bg-gradient-to-r from-[#0077ed] to-[#4da3ff] transition-all duration-700"
+                      className="h-full rounded-full bg-gradient-to-r from-[var(--accent)] to-[var(--accent-light)] transition-all duration-700"
                       style={{ width: `${item.pct}%` }}
                     />
                   </div>
@@ -131,7 +131,7 @@ export function DashboardPreview() {
                     </div>
                     <div className="h-1 overflow-hidden rounded-full bg-[var(--surface-border)]">
                       <div
-                        className="h-full rounded-full bg-[#0077ed]/70"
+                        className="h-full rounded-full bg-[var(--accent)]/70"
                         style={{ width: `${goal.progress}%` }}
                       />
                     </div>

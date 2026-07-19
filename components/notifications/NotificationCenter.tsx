@@ -51,7 +51,7 @@ function NotificationSearchInput({
           "shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]",
           "transition-all duration-200 ease-out",
           "hover:border-[var(--surface-border-strong)] hover:bg-[var(--focus-surface)]",
-          "focus:border-[#0077ed]/40 focus:bg-[var(--focus-surface)]",
+          "focus:border-[var(--accent)]/40 focus:bg-[var(--focus-surface)]",
         )}
       />
     </div>
@@ -81,7 +81,7 @@ function NotificationRow({
         "group rounded-2xl border px-3.5 py-3.5 transition-colors duration-200 sm:px-4 sm:py-4",
         notification.read
           ? "border-[var(--surface-border)] bg-[var(--surface-soft)]"
-          : "border-[#0077ed]/20 bg-[#0077ed]/10 shadow-[inset_0_1px_0_rgba(77,163,255,0.08)]",
+          : "border-[var(--accent)]/20 bg-[var(--accent)]/10 shadow-[inset_0_1px_0_rgba(77,163,255,0.08)]",
       )}
     >
       <div className="flex items-start gap-3">
@@ -114,7 +114,7 @@ function NotificationRow({
             {!notification.read ? (
               <span
                 aria-hidden
-                className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[#0077ed]"
+                className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[var(--accent)]"
               />
             ) : null}
           </div>
@@ -148,7 +148,7 @@ function NotificationRow({
                   onMarkRead();
                   onNavigate();
                 }}
-                className="inline-flex min-h-10 items-center rounded-xl px-3 text-sm font-medium text-[#0077ed] transition-colors hover:bg-[#0077ed]/10"
+                className="inline-flex min-h-10 items-center rounded-xl px-3 text-sm font-medium text-[var(--accent)] transition-colors hover:bg-[var(--accent)]/10"
               >
                 View details
               </Link>
@@ -331,7 +331,7 @@ export function NotificationCenter() {
         </span>
         {mergedUnreadCount > 0 ? (
           <span
-            className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#0077ed] px-1 text-[10px] font-semibold text-white shadow-[0_2px_8px_rgba(0,119,237,0.45)]"
+            className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--accent)] px-1 text-[10px] font-semibold text-white shadow-[0_2px_8px_rgba(0,119,237,0.45)]"
             aria-hidden
           >
             {mergedUnreadCount > 9 ? "9+" : mergedUnreadCount}

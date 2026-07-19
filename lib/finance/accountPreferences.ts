@@ -15,7 +15,7 @@ export const ACCOUNT_ICON_OPTIONS = [
 ] as const;
 
 export const ACCOUNT_COLOR_OPTIONS = [
-  { value: "blue", label: "Blue", className: "bg-[#0077ed]" },
+  { value: "blue", label: "Blue", className: "bg-[var(--accent)]" },
   { value: "emerald", label: "Green", className: "bg-emerald-500" },
   { value: "amber", label: "Amber", className: "bg-amber-500" },
   { value: "rose", label: "Rose", className: "bg-rose-500" },

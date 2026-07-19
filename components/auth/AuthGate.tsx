@@ -95,7 +95,7 @@ export function AuthGate({ children }: AuthGateProps) {
   if (isLoading || betaAccess === "unknown") {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#0a0f1a]">
-        <div className="h-8 w-8 animate-pulse rounded-full bg-[#0077ed]/30" />
+        <div className="h-8 w-8 animate-pulse rounded-full bg-[var(--accent)]/30" />
       </div>
     );
   }
@@ -122,7 +122,7 @@ export function AuthGate({ children }: AuthGateProps) {
           <p className="mt-3 text-sm text-white/55">
             Your account is waiting for beta approval. We&apos;ll email you when you can access Buxme.
           </p>
-          <Link href="/beta" className="mt-6 inline-block text-sm text-[#4da3ff] hover:underline">
+          <Link href="/beta" className="mt-6 inline-block text-sm text-[var(--accent-light)] hover:underline">
             View beta status
           </Link>
         </div>

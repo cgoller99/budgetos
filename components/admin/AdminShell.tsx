@@ -34,7 +34,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       <header className="border-b border-[var(--surface-border)] bg-[var(--surface-soft)]/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-4">
           <div className="flex items-center gap-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#0077ed]/25 bg-[#0077ed]/10 text-sm">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--accent)]/25 bg-[var(--accent)]/10 text-sm">
               ⚙️
             </span>
             <div>
@@ -57,7 +57,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               className={cn(
                 "rounded-xl px-3 py-2 text-sm whitespace-nowrap transition-colors",
                 pathname === "/admin"
-                  ? "bg-[#0077ed]/10 text-[#4da3ff]"
+                  ? "bg-[var(--accent)]/10 text-[var(--accent-light)]"
                   : "text-[var(--text-muted)] hover:bg-[var(--surface-subtle)] hover:text-[var(--foreground)]",
               )}
             >

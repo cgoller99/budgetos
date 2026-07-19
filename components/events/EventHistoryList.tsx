@@ -15,7 +15,7 @@ const toneClasses: Record<FinanceEventTone, string> = {
   positive: "text-emerald-400/90",
   negative: "text-rose-300/90",
   neutral: "text-white/70",
-  accent: "text-[#0077ed]",
+  accent: "text-[var(--accent)]",
 };
 
 function ActivityListItem({

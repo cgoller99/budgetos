@@ -33,7 +33,7 @@ function FlowStageNode({
       className={cn(
         "group relative w-full rounded-2xl px-5 py-4 text-left transition-all duration-300 ease-out",
         isSelected
-          ? "bg-[#0077ed]/8 ring-1 ring-[#0077ed]/20"
+          ? "bg-[var(--accent)]/8 ring-1 ring-[var(--accent)]/20"
           : "hover:bg-[var(--surface-hover)]",
       )}
     >
@@ -111,7 +111,7 @@ export function MoneyFlowCard() {
           className="mt-8 w-full border-t border-[var(--surface-border)] pt-7 text-left transition-colors hover:opacity-90"
         >
           <p className="text-sm text-[var(--text-muted)]">Safe to spend</p>
-          <p className="mt-2 text-2xl font-semibold tabular-nums text-[#4da3ff] sm:text-3xl">
+          <p className="mt-2 text-2xl font-semibold tabular-nums text-[var(--accent-light)] sm:text-3xl">
             <AnimatedNumber
               value={moneyFlow.safeToSpend}
               format={(value) => formatCurrency(Math.round(value))}

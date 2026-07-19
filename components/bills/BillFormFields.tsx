@@ -285,7 +285,7 @@ export function BillFormFields({ form, onChange }: BillFormFieldsProps) {
             onChange={(event) =>
               onChange({ ...form, recurring: event.target.checked })
             }
-            className="h-4 w-4 rounded border-white/20 bg-white/10 accent-[#0077ed]"
+            className="h-4 w-4 rounded border-white/20 bg-white/10 accent-[var(--accent)]"
           />
           <span className="text-sm font-medium text-white/70">
             Active recurring bill
@@ -299,7 +299,7 @@ export function BillFormFields({ form, onChange }: BillFormFieldsProps) {
             onChange={(event) =>
               onChange({ ...form, autopay: event.target.checked })
             }
-            className="h-4 w-4 rounded border-white/20 bg-white/10 accent-[#0077ed]"
+            className="h-4 w-4 rounded border-white/20 bg-white/10 accent-[var(--accent)]"
           />
           <span className="text-sm font-medium text-white/70">Enable autopay</span>
         </label>

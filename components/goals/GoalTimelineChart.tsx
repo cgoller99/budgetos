@@ -30,7 +30,7 @@ export function GoalTimelineChart({ timeline }: GoalTimelineChartProps) {
     <div className="space-y-3">
       <svg
         viewBox={`0 0 ${width} ${height}`}
-        className="h-20 w-full text-[#0077ed]"
+        className="h-20 w-full text-[var(--accent)]"
         aria-hidden
       >
         <polyline

@@ -18,7 +18,7 @@ function MockSidebar() {
             className={cn(
               "rounded-xl px-3 py-2 text-xs",
               index === 0
-                ? "border border-[#0077ed]/25 bg-[#0077ed]/10 text-white/80"
+                ? "border border-[var(--accent)]/25 bg-[var(--accent)]/10 text-white/80"
                 : "text-white/35",
             )}
           >
@@ -37,7 +37,7 @@ function MockMetric({ label, value, accent }: { label: string; value: string; ac
       <p
         className={cn(
           "mt-1.5 text-xl font-semibold tabular-nums tracking-tight",
-          accent ? "text-[#4da3ff]" : "text-white",
+          accent ? "text-[var(--accent-light)]" : "text-white",
         )}
       >
         {value}
@@ -62,7 +62,7 @@ function DashboardMock() {
               <p className="text-xs text-white/35">Overview</p>
               <p className="mt-1 text-lg font-semibold text-white">Dashboard</p>
             </div>
-            <div className="h-8 w-24 rounded-xl bg-[#0077ed]/20" />
+            <div className="h-8 w-24 rounded-xl bg-[var(--accent)]/20" />
           </div>
 
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -79,7 +79,7 @@ function DashboardMock() {
                 {[40, 65, 45, 80, 55, 70, 90, 60].map((height, index) => (
                   <div
                     key={index}
-                    className="flex-1 rounded-sm bg-gradient-to-t from-[#0077ed]/20 to-[#0077ed]/70"
+                    className="flex-1 rounded-sm bg-gradient-to-t from-[var(--accent)]/20 to-[var(--accent)]/70"
                     style={{ height: `${height}%` }}
                   />
                 ))}
@@ -120,7 +120,7 @@ const PREVIEW_CARDS = [
       <div className="mt-4 space-y-2">
         {[1, 2, 3].map((step) => (
           <div key={step} className="flex items-center gap-3">
-            <div className="h-2 w-2 rounded-full bg-[#0077ed]/60" />
+            <div className="h-2 w-2 rounded-full bg-[var(--accent)]/60" />
             <div className="h-2 flex-1 rounded-full bg-white/[0.08]" style={{ maxWidth: `${100 - step * 15}%` }} />
           </div>
         ))}
@@ -134,10 +134,10 @@ const PREVIEW_CARDS = [
       <div className="mt-4">
         <div className="flex items-end justify-between text-xs text-white/40">
           <span>Paid off</span>
-          <span className="tabular-nums text-[#4da3ff]">62%</span>
+          <span className="tabular-nums text-[var(--accent-light)]">62%</span>
         </div>
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/[0.06]">
-          <div className="h-full w-[62%] rounded-full bg-gradient-to-r from-[#0077ed] to-[#4da3ff]" />
+          <div className="h-full w-[62%] rounded-full bg-gradient-to-r from-[var(--accent)] to-[var(--accent-light)]" />
         </div>
       </div>
     ),
@@ -152,7 +152,7 @@ const PREVIEW_CARDS = [
             key={goal}
             className="rounded-xl border border-white/[0.05] bg-white/[0.02] p-2.5 text-center"
           >
-            <div className="mx-auto h-8 w-8 rounded-full border-2 border-[#0077ed]/40" />
+            <div className="mx-auto h-8 w-8 rounded-full border-2 border-[var(--accent)]/40" />
             <p className="mt-2 truncate text-[10px] text-white/45">{goal}</p>
           </div>
         ))}

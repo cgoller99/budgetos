@@ -87,7 +87,7 @@ export function CreateGoalModal({ isOpen, onClose }: CreateGoalModalProps) {
                 }
                 className={`rounded-xl border px-3 py-3 text-left transition-all duration-200 ${
                   form.type === option.value
-                    ? "border-[#0077ed]/40 bg-[#0077ed]/10"
+                    ? "border-[var(--accent)]/40 bg-[var(--accent)]/10"
                     : "border-white/[0.08] bg-white/[0.03] hover:border-white/[0.12] hover:bg-white/[0.05]"
                 }`}
               >

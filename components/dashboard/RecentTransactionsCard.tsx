@@ -41,7 +41,7 @@ export function RecentTransactionsCard() {
         {transactions.length === 0 ? (
           <p className="py-4 text-sm text-[var(--text-muted)]">
             No transactions yet.{" "}
-            <Link href="/transactions" className="text-[#0077ed] hover:underline">
+            <Link href="/transactions" className="text-[var(--accent)] hover:underline">
               Add one
             </Link>
           </p>

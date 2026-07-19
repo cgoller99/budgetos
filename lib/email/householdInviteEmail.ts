@@ -44,7 +44,7 @@ export async function sendHouseholdInviteEmail(
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#111827;border:1px solid rgba(255,255,255,0.08);border-radius:24px;padding:32px;">
             <tr>
               <td>
-                <p style="margin:0 0 8px;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;color:#0077ed;">Buxme</p>
+                <p style="margin:0 0 8px;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;color:var(--accent);">Buxme</p>
                 <h1 style="margin:0 0 16px;font-size:28px;line-height:1.2;color:#ffffff;">You're invited to a shared household</h1>
                 <p style="margin:0 0 16px;font-size:16px;line-height:1.6;color:rgba(255,255,255,0.72);">
                   ${inviterLabel} invited you to join <strong style="color:#ffffff;">${householdName}</strong> on Buxme.
@@ -52,7 +52,7 @@ export async function sendHouseholdInviteEmail(
                 <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:rgba(255,255,255,0.55);">
                   Accept the invite to share accounts, bills, goals, debts, and dashboard data with your partner.
                 </p>
-                <a href="${inviteUrl}" style="display:inline-block;background:#0077ed;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:14px 22px;border-radius:14px;">
+                <a href="${inviteUrl}" style="display:inline-block;background:var(--accent);color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:14px 22px;border-radius:14px;">
                   View invite
                 </a>
                 <p style="margin:24px 0 0;font-size:13px;line-height:1.6;color:rgba(255,255,255,0.38);">

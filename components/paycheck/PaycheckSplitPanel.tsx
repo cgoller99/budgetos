@@ -51,7 +51,7 @@ export function PaycheckSplitPanel({ compact = false }: PaycheckSplitPanelProps)
           </div>
           <Link
             href="/bills"
-            className="text-sm text-[#0077ed] transition-colors hover:underline"
+            className="text-sm text-[var(--accent)] transition-colors hover:underline"
           >
             Assign bills
           </Link>

@@ -26,9 +26,9 @@ export function RecommendedSteps() {
             <Link
               key={step.href}
               href={step.href}
-              className="rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-subtle)] px-3 py-3 transition-all duration-200 hover:border-[#0077ed]/25 hover:bg-[#0077ed]/8"
+              className="rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-subtle)] px-3 py-3 transition-all duration-200 hover:border-[var(--accent)]/25 hover:bg-[var(--accent)]/8"
             >
-              <span className="text-xs font-semibold text-[#0077ed]">
+              <span className="text-xs font-semibold text-[var(--accent)]">
                 {index + 1}
               </span>
               <span className="mt-1 block text-sm font-medium text-[var(--foreground)]">

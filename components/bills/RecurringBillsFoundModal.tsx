@@ -91,7 +91,7 @@ export function RecurringBillsFoundModal({
               className={cn(
                 "flex cursor-pointer items-start gap-3 rounded-2xl border px-4 py-3 transition-colors",
                 checked
-                  ? "border-[#0077ed]/30 bg-[#0077ed]/10"
+                  ? "border-[var(--accent)]/30 bg-[var(--accent)]/10"
                   : "border-[var(--surface-border)] bg-[var(--surface-subtle)]",
               )}
             >
@@ -99,7 +99,7 @@ export function RecurringBillsFoundModal({
                 type="checkbox"
                 checked={checked}
                 onChange={() => toggleCandidate(key)}
-                className="mt-1 h-4 w-4 rounded border-[var(--surface-border)] accent-[#0077ed]"
+                className="mt-1 h-4 w-4 rounded border-[var(--surface-border)] accent-[var(--accent)]"
               />
               <span className="min-w-0 flex-1">
                 <span className="flex flex-wrap items-center gap-2">
@@ -174,7 +174,7 @@ export function RecurringBillsFoundCard({
   }
 
   return (
-    <div className="rounded-2xl border border-[#0077ed]/25 bg-[#0077ed]/10 px-4 py-4 sm:px-5 sm:py-5">
+    <div className="rounded-2xl border border-[var(--accent)]/25 bg-[var(--accent)]/10 px-4 py-4 sm:px-5 sm:py-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-sm font-medium text-[var(--foreground)]">Recurring bills found</p>

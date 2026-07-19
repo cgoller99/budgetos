@@ -250,7 +250,7 @@ export function NetWorthTimeline() {
                 className={cn(
                   "min-h-10 rounded-xl px-4 py-2 text-sm font-medium transition-all duration-300",
                   range === option.value
-                    ? "bg-[#0077ed] text-white"
+                    ? "bg-[var(--accent)] text-white"
                     : "text-white/45 hover:text-white/70",
                 )}
               >

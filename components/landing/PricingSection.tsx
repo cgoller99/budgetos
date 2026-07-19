@@ -70,7 +70,7 @@ function PlanCheck({ included }: { included: boolean }) {
     <span
       className={cn(
         "text-sm",
-        included ? "text-[#0077ed]" : "text-[var(--text-subtle)]",
+        included ? "text-[var(--accent)]" : "text-[var(--text-subtle)]",
       )}
       aria-hidden
     >
@@ -101,7 +101,7 @@ export function PricingSection() {
               className={cn(
                 "rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200",
                 period === "monthly"
-                  ? "bg-[#0077ed] text-white shadow-[0_2px_12px_rgba(0,119,237,0.3)]"
+                  ? "bg-[var(--accent)] text-white shadow-[0_2px_12px_rgba(0,119,237,0.3)]"
                   : "text-[var(--text-muted)] hover:text-[var(--foreground)]",
               )}
             >
@@ -113,7 +113,7 @@ export function PricingSection() {
               className={cn(
                 "rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200",
                 period === "yearly"
-                  ? "bg-[#0077ed] text-white shadow-[0_2px_12px_rgba(0,119,237,0.3)]"
+                  ? "bg-[var(--accent)] text-white shadow-[0_2px_12px_rgba(0,119,237,0.3)]"
                   : "text-[var(--text-muted)] hover:text-[var(--foreground)]",
               )}
             >
@@ -136,11 +136,11 @@ export function PricingSection() {
                   landingCardClassName,
                   "relative flex h-full flex-col p-8",
                   isHighlighted &&
-                    "border-[#0077ed]/25 shadow-[0_16px_48px_rgba(0,119,237,0.12)] ring-1 ring-[#0077ed]/10",
+                    "border-[var(--accent)]/25 shadow-[0_16px_48px_rgba(0,119,237,0.12)] ring-1 ring-[var(--accent)]/10",
                 )}
               >
                 {isHighlighted ? (
-                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full border border-[#0077ed]/30 bg-[#0077ed]/10 px-3 py-0.5 text-xs font-medium text-[#4da3ff]">
+                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-3 py-0.5 text-xs font-medium text-[var(--accent-light)]">
                     Most popular
                   </span>
                 ) : null}
@@ -155,7 +155,7 @@ export function PricingSection() {
                   </span>
                 </div>
                 {display.savingsNote ? (
-                  <p className="mt-1 text-xs text-[#4da3ff]/80">{display.savingsNote}</p>
+                  <p className="mt-1 text-xs text-[var(--accent-light)]/80">{display.savingsNote}</p>
                 ) : null}
                 <p className="mt-3 text-sm leading-relaxed text-[var(--text-muted)]">
                   {plan.description}
@@ -167,7 +167,7 @@ export function PricingSection() {
                       key={feature}
                       className="flex items-start gap-2.5 text-sm text-[var(--text-secondary)]"
                     >
-                      <span className="mt-0.5 text-[#0077ed]" aria-hidden>
+                      <span className="mt-0.5 text-[var(--accent)]" aria-hidden>
                         ✓
                       </span>
                       {feature}
@@ -209,7 +209,7 @@ export function PricingSection() {
               <tr className="border-b border-[var(--surface-border)]">
                 <th className="pb-4 pr-4 font-medium text-[var(--text-muted)]">Compare plans</th>
                 <th className="pb-4 px-4 text-center font-medium text-[var(--foreground)]">Free</th>
-                <th className="pb-4 px-4 text-center font-medium text-[#4da3ff]">Pro</th>
+                <th className="pb-4 px-4 text-center font-medium text-[var(--accent-light)]">Pro</th>
                 <th className="pb-4 pl-4 text-center font-medium text-[var(--foreground)]">Pro+</th>
               </tr>
             </thead>

@@ -79,7 +79,7 @@ export function FeaturesGridSection() {
                 "group p-7 sm:p-8",
               )}
             >
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#0077ed]/20 bg-[#0077ed]/10 text-base text-[#4da3ff] transition-transform duration-300 group-hover:scale-110">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--accent)]/20 bg-[var(--accent)]/10 text-base text-[var(--accent-light)] transition-transform duration-300 group-hover:scale-110">
                 {feature.icon}
               </span>
               <h3 className="mt-5 text-lg font-semibold tracking-tight text-[var(--foreground)]">

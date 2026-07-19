@@ -26,9 +26,9 @@ export function OnboardingConfetti() {
           style={{
             backgroundColor:
               index % 4 === 0
-                ? "#0077ed"
+                ? "var(--accent)"
                 : index % 4 === 1
-                  ? "#4da3ff"
+                  ? "var(--accent-light)"
                   : index % 4 === 2
                     ? "#34c759"
                     : "#ffd60a",

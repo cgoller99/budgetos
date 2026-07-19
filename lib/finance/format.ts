@@ -19,18 +19,18 @@ export function getKPIDisplay(metric: KPIMetric) {
 }
 
 export const insightToneClasses = {
-  blue: "bg-[#0077ed]",
-  emerald: "bg-[#4da3ff]",
-  amber: "bg-[#2563eb]",
+  blue: "bg-[var(--accent-muted)] text-[var(--accent-light)]",
+  emerald: "bg-[var(--success-muted)] text-[var(--success)]",
+  amber: "bg-[var(--warning-muted)] text-[var(--warning)]",
 } as const;
 
 export const healthScoreToneClasses = {
-  emerald: "text-[#4da3ff]",
-  amber: "text-[#60a5fa]",
+  emerald: "text-[var(--success)]",
+  amber: "text-[var(--warning)]",
 } as const;
 
 export const planPriorityClasses = {
-  critical: "bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.45)]",
-  attention: "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.35)]",
-  positive: "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.35)]",
+  critical: "bg-[var(--danger)]",
+  attention: "bg-[var(--warning)]",
+  positive: "bg-[var(--success)]",
 } as const;

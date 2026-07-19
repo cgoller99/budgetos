@@ -56,7 +56,7 @@ export function AdminChart({
 
       {hoveredIndex !== null && points[hoveredIndex] && (
         <p
-          className="mt-2 text-xs tabular-nums text-[#4da3ff] transition-opacity"
+          className="mt-2 text-xs tabular-nums text-[var(--accent-light)] transition-opacity"
           aria-live="polite"
         >
           {points[hoveredIndex].date}: {valuePrefix}
@@ -78,8 +78,8 @@ export function AdminChart({
                 <button
                   type="button"
                   className={cn(
-                    "w-full max-w-10 rounded-t-lg bg-gradient-to-t from-[#0077ed]/25 to-[#0077ed]/75 transition-all duration-300 ease-out focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0077ed]/50",
-                    isHovered && "from-[#0077ed]/40 to-[#4da3ff] shadow-[0_0_16px_rgba(0,119,237,0.25)]",
+                    "w-full max-w-10 rounded-t-lg bg-gradient-to-t from-[var(--accent)]/25 to-[var(--accent)]/75 transition-all duration-300 ease-out focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]/50",
+                    isHovered && "from-[var(--accent)]/40 to-[var(--accent-light)] shadow-[0_0_16px_rgba(0,119,237,0.25)]",
                   )}
                   style={{ height: `${heightPercent}%` }}
                   aria-label={`${point.date}: ${valuePrefix}${point.value.toLocaleString()}`}

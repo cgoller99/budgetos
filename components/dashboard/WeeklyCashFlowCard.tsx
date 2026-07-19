@@ -5,7 +5,6 @@ import { AnimatedNumber, Card, CardContent, CardHeader, PanelLink } from "@/comp
 import { useFinance } from "@/context/FinanceContext";
 import { formatCurrency } from "@/lib/finance/format";
 import { WEEKS_PER_MONTH } from "@/lib/finance/safeToSpend";
-import { cn } from "@/components/ui/cn";
 
 function toWeekly(amount: number): number {
   return Math.round(amount / WEEKS_PER_MONTH);
@@ -24,7 +23,9 @@ export function WeeklyCashFlowCard() {
     [moneyFlow, snapshot.safeToSpendWeekly],
   );
 
-  const maxFlow = Math.max(weekly.income, weekly.spending, 1);
+  const total = Math.max(weekly.income + weekly.spending, 1);
+  const incomeSweep = (weekly.income / total) * 180;
+  const spendingSweep = (weekly.spending / total) * 180;
 
   return (
     <Card hover variant="subtle">
@@ -33,55 +34,69 @@ export function WeeklyCashFlowCard() {
         action={<PanelLink href="/income">Income</PanelLink>}
       />
       <CardContent>
-        <div className="grid grid-cols-3 gap-4">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
-              In
-            </p>
-            <p className="mt-1 text-xl font-semibold tabular-nums text-emerald-400/90">
-              {formatCurrency(weekly.income)}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
-              Out
-            </p>
-            <p className="mt-1 text-xl font-semibold tabular-nums text-[var(--foreground)]">
-              {formatCurrency(weekly.spending)}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
-              Left
-            </p>
-            <p className="mt-1 text-xl font-semibold tabular-nums text-[#4da3ff]">
-              <AnimatedNumber
-                value={weekly.remaining}
-                format={(value) => formatCurrency(Math.round(value))}
+        <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start">
+          <div className="relative h-28 w-44 shrink-0">
+            <svg viewBox="0 0 176 112" className="h-full w-full" aria-hidden>
+              <path
+                d="M 18 96 A 70 70 0 0 1 158 96"
+                fill="none"
+                stroke="var(--surface-border)"
+                strokeWidth="12"
+                strokeLinecap="round"
               />
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-6 space-y-2">
-          <div className="flex items-center gap-3">
-            <span className="w-8 text-[10px] text-[var(--text-muted)]">In</span>
-            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--surface-border)]">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-emerald-500/70 to-emerald-400"
-                style={{ width: `${(weekly.income / maxFlow) * 100}%` }}
-              />
+              {weekly.income > 0 ? (
+                <path
+                  d="M 18 96 A 70 70 0 0 1 158 96"
+                  fill="none"
+                  stroke="var(--success)"
+                  strokeWidth="12"
+                  strokeLinecap="round"
+                  pathLength={180}
+                  strokeDasharray={`${incomeSweep} 180`}
+                />
+              ) : null}
+              {weekly.spending > 0 ? (
+                <path
+                  d="M 18 96 A 70 70 0 0 1 158 96"
+                  fill="none"
+                  stroke="var(--accent)"
+                  strokeWidth="12"
+                  strokeLinecap="round"
+                  pathLength={180}
+                  strokeDasharray={`${spendingSweep} 180`}
+                  strokeDashoffset={-incomeSweep}
+                />
+              ) : null}
+            </svg>
+            <div className="absolute inset-x-0 bottom-0 text-center">
+              <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
+                Left
+              </p>
+              <p className="text-lg font-semibold tabular-nums text-[var(--accent-light)]">
+                <AnimatedNumber
+                  value={weekly.remaining}
+                  format={(value) => formatCurrency(Math.round(value))}
+                />
+              </p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="w-8 text-[10px] text-[var(--text-muted)]">Out</span>
-            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--surface-border)]">
-              <div
-                className={cn(
-                  "h-full rounded-full bg-gradient-to-r from-[#0077ed]/70 to-[#4da3ff]",
-                )}
-                style={{ width: `${(weekly.spending / maxFlow) * 100}%` }}
-              />
+
+          <div className="grid flex-1 grid-cols-2 gap-4">
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
+                In
+              </p>
+              <p className="mt-1 text-lg font-semibold tabular-nums text-[var(--success)]">
+                {formatCurrency(weekly.income)}
+              </p>
+            </div>
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
+                Out
+              </p>
+              <p className="mt-1 text-lg font-semibold tabular-nums text-[var(--foreground)]">
+                {formatCurrency(weekly.spending)}
+              </p>
             </div>
           </div>
         </div>

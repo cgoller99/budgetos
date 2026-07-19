@@ -96,7 +96,7 @@ function ConnectionAccounts({
                 className="mt-0.5 h-8 w-8 shrink-0 rounded-lg bg-white/10 object-contain p-1"
               />
             ) : (
-              <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#0077ed]/20 text-sm">
+              <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--accent)]/20 text-sm">
                 {item.isDebt ? "💳" : "🏦"}
               </div>
             )}

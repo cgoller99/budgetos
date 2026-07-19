@@ -139,7 +139,7 @@ function PlaidOAuthResumeInner({
             <p>Resuming Plaid Link after bank sign-in…</p>
           )}
           {error && (
-            <Link href="/accounts" className="inline-block text-sm text-[#4da3ff] hover:underline">
+            <Link href="/accounts" className="inline-block text-sm text-[var(--accent-light)] hover:underline">
               Back to Accounts
             </Link>
           )}
@@ -159,7 +159,7 @@ export function PlaidOAuthResumePage() {
   if (!bootstrap) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#0a0f1a]">
-        <div className="h-8 w-8 animate-pulse rounded-full bg-[#0077ed]/30" />
+        <div className="h-8 w-8 animate-pulse rounded-full bg-[var(--accent)]/30" />
       </div>
     );
   }

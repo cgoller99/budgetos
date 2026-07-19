@@ -67,7 +67,7 @@ const SHOWCASES = [
             </div>
             <div className="h-1 rounded-full bg-[var(--surface-border)]">
               <div
-                className="h-full rounded-full bg-[#0077ed]"
+                className="h-full rounded-full bg-[var(--accent)]"
                 style={{ width: `${goal.pct}%` }}
               />
             </div>
@@ -86,7 +86,7 @@ const SHOWCASES = [
             key={index}
             className={cn(
               "aspect-square rounded text-[8px] leading-[1.6] text-[var(--text-muted)]",
-              index === 4 && "bg-[#0077ed]/20 text-[#4da3ff]",
+              index === 4 && "bg-[var(--accent)]/20 text-[var(--accent-light)]",
               index === 11 && "bg-amber-500/15 text-amber-400/90",
             )}
           >
@@ -107,7 +107,7 @@ const SHOWCASES = [
           {[30, 45, 38, 55, 48, 62, 58].map((h, i) => (
             <div
               key={i}
-              className="flex-1 rounded-t bg-[#0077ed]/40"
+              className="flex-1 rounded-t bg-[var(--accent)]/40"
               style={{ height: `${h}%` }}
             />
           ))}
@@ -147,7 +147,7 @@ const SHOWCASES = [
             </div>
             <div className="h-1.5 rounded-full bg-[var(--surface-border)]">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-[#0077ed] to-[#4da3ff]"
+                className="h-full rounded-full bg-gradient-to-r from-[var(--accent)] to-[var(--accent-light)]"
                 style={{ width: `${row.pct}%` }}
               />
             </div>
@@ -169,7 +169,7 @@ const SHOWCASES = [
               cy="18"
               r="14"
               fill="none"
-              stroke="#0077ed"
+              stroke="var(--accent)"
               strokeWidth="3"
               strokeDasharray="66 100"
               strokeLinecap="round"

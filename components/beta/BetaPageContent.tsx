@@ -94,7 +94,7 @@ export function BetaPageContent() {
             className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_50%_-10%,rgba(0,119,237,0.18),transparent)]"
           />
           <div className="relative mx-auto max-w-4xl text-center">
-            <p className="text-sm font-medium tracking-wide text-[#4da3ff] uppercase">Public Beta</p>
+            <p className="text-sm font-medium tracking-wide text-[var(--accent-light)] uppercase">Public Beta</p>
             <h1 className="mt-4 text-4xl font-semibold tracking-tight sm:text-5xl">
               Help shape the future of personal finance
             </h1>

@@ -43,8 +43,8 @@ const CATEGORY_META: Record<
   },
   paycheck_incoming: {
     icon: "💵",
-    accentClass: "text-[#4da3ff]",
-    bgClass: "bg-[#0077ed]/10",
+    accentClass: "text-[var(--accent-light)]",
+    bgClass: "bg-[var(--accent)]/10",
   },
   plaid_sync_complete: {
     icon: "🏦",
@@ -58,8 +58,8 @@ const CATEGORY_META: Record<
   },
   new_transactions: {
     icon: "💳",
-    accentClass: "text-[#4da3ff]",
-    bgClass: "bg-[#0077ed]/10",
+    accentClass: "text-[var(--accent-light)]",
+    bgClass: "bg-[var(--accent)]/10",
   },
   goal_milestone: {
     icon: "🎯",
@@ -78,13 +78,13 @@ const CATEGORY_META: Record<
   },
   subscription: {
     icon: "⭐",
-    accentClass: "text-[#4da3ff]",
-    bgClass: "bg-[#0077ed]/10",
+    accentClass: "text-[var(--accent-light)]",
+    bgClass: "bg-[var(--accent)]/10",
   },
   household: {
     icon: "👥",
-    accentClass: "text-[#4da3ff]",
-    bgClass: "bg-[#0077ed]/10",
+    accentClass: "text-[var(--accent-light)]",
+    bgClass: "bg-[var(--accent)]/10",
   },
   system: {
     icon: "✨",
@@ -98,8 +98,8 @@ const CATEGORY_META: Record<
   },
   automation: {
     icon: "🤖",
-    accentClass: "text-[#4da3ff]",
-    bgClass: "bg-[#0077ed]/10",
+    accentClass: "text-[var(--accent-light)]",
+    bgClass: "bg-[var(--accent)]/10",
   },
   general: {
     icon: "🔔",

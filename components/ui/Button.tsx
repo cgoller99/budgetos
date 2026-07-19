@@ -1,8 +1,14 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { cn } from "./cn";
-import { buttonPrimaryClassName } from "./tokens";
+import {
+  buttonDangerClassName,
+  buttonGhostClassName,
+  buttonPrimaryClassName,
+  buttonSecondaryClassName,
+  buttonTextClassName,
+} from "./tokens";
 
-type ButtonVariant = "primary" | "secondary" | "ghost";
+type ButtonVariant = "primary" | "secondary" | "danger" | "ghost" | "text";
 type ButtonSize = "sm" | "md" | "lg";
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -14,16 +20,16 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 
 const variantClasses: Record<ButtonVariant, string> = {
   primary: buttonPrimaryClassName,
-  secondary:
-    "border border-[var(--surface-border)] bg-[var(--surface-subtle)] text-[var(--text-secondary)] hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)] active:scale-[0.98]",
-  ghost:
-    "border border-transparent bg-transparent text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)] active:scale-[0.98]",
+  secondary: buttonSecondaryClassName,
+  danger: buttonDangerClassName,
+  ghost: buttonGhostClassName,
+  text: buttonTextClassName,
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
-  sm: "min-h-10 rounded-2xl px-4 py-2.5 text-sm",
-  md: "min-h-11 rounded-2xl px-5 py-3 text-base",
-  lg: "min-h-12 rounded-2xl px-6 py-3.5 text-base",
+  sm: "min-h-9 rounded-[var(--radius-button)] px-3.5 py-2 text-xs",
+  md: "min-h-10 rounded-[var(--radius-button)] px-4 py-2.5 text-sm",
+  lg: "min-h-11 rounded-[var(--radius-button)] px-5 py-3 text-sm",
 };
 
 export function Button({

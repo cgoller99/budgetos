@@ -22,7 +22,7 @@ const toastStyles: Record<
     title: "text-amber-200",
   },
   info: {
-    border: "border-[#0077ed]/25",
+    border: "border-[var(--accent)]/25",
     icon: "ℹ",
     title: "text-[var(--foreground)]",
   },
@@ -32,9 +32,9 @@ const toastStyles: Record<
     title: "text-rose-300",
   },
   achievement: {
-    border: "border-[#0077ed]/30",
+    border: "border-[var(--accent)]/30",
     icon: "★",
-    title: "text-[#4da3ff]",
+    title: "text-[var(--accent-light)]",
   },
 };
 

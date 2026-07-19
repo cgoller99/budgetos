@@ -17,8 +17,8 @@ const REASONS = [
           <div
             key={height}
             className={cn(
-              "w-6 rounded-t-md bg-gradient-to-t from-[#0077ed]/20 to-[#0077ed]/60",
-              index === 3 && "from-[#0077ed]/40 to-[#4da3ff]",
+              "w-6 rounded-t-md bg-gradient-to-t from-[var(--accent)]/20 to-[var(--accent)]/60",
+              index === 3 && "from-[var(--accent)]/40 to-[var(--accent-light)]",
             )}
             style={{ height: `${height}%` }}
           />
@@ -33,8 +33,8 @@ const REASONS = [
     illustration: (
       <div className="flex h-28 flex-col items-center justify-center gap-2 px-6">
         <div className="flex w-full items-center gap-2">
-          <div className="h-8 flex-1 rounded-lg border border-[#0077ed]/30 bg-[#0077ed]/10" />
-          <span className="text-lg text-[#4da3ff]">→</span>
+          <div className="h-8 flex-1 rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/10" />
+          <span className="text-lg text-[var(--accent-light)]">→</span>
           <div className="flex gap-1">
             {["$200", "$100", "Rest"].map((label) => (
               <div
@@ -71,7 +71,7 @@ const REASONS = [
               cy="18"
               r="14"
               fill="none"
-              stroke="#0077ed"
+              stroke="var(--accent)"
               strokeWidth="3"
               strokeDasharray="66 100"
               strokeLinecap="round"

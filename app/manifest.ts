@@ -8,8 +8,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Everything about your money.",
     start_url: "/",
     display: "standalone",
-    background_color: "#090b10",
-    theme_color: "#0077ed",
+    background_color: "#0b0f14",
+    theme_color: "#3b82f6",
     icons: [
       {
         src: "/favicon.ico",

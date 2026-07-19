@@ -23,10 +23,10 @@ type CardProps = HTMLAttributes<HTMLDivElement> & {
 const variantClasses: Record<CardVariant, string> = {
   default: cardBaseClassName,
   dashed:
-    "rounded-[1.35rem] border border-dashed border-[var(--surface-border-strong)] bg-transparent shadow-none transition-all duration-300 ease-out",
+    "rounded-[var(--radius-card)] border border-dashed border-[var(--surface-border-strong)] bg-transparent shadow-none transition-colors duration-200 ease-out",
   subtle:
-    "rounded-[1.35rem] border border-[var(--surface-border)] bg-[var(--surface-subtle)] shadow-[var(--card-shadow)] transition-all duration-300 ease-out",
-  ghost: "rounded-[1.35rem] border border-transparent bg-transparent",
+    "rounded-[var(--radius-card)] border border-[var(--surface-border)] bg-[var(--surface-soft)] transition-colors duration-200 ease-out",
+  ghost: "rounded-[var(--radius-card)] border border-transparent bg-transparent",
 };
 
 const paddingClasses = {

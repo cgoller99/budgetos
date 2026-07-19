@@ -42,7 +42,7 @@ export function ProfileMenu() {
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
-        className="focus-ring flex h-11 w-11 items-center justify-center rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-subtle)] text-sm font-semibold text-[#4da3ff] transition-colors hover:bg-[var(--surface-border)]"
+        className="focus-ring flex h-11 w-11 items-center justify-center rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-subtle)] text-sm font-semibold text-[var(--accent-light)] transition-colors hover:bg-[var(--surface-border)]"
         aria-label="Profile menu"
         aria-expanded={open}
         aria-haspopup="menu"

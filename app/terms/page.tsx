@@ -40,7 +40,7 @@ export default function TermsPage() {
           password secure. Notify us immediately at{" "}
           <a
             href={`mailto:${LEGAL_CONTACT_EMAIL}`}
-            className="text-[#0077ed] hover:underline"
+            className="text-[var(--accent)] hover:underline"
           >
             {LEGAL_CONTACT_EMAIL}
           </a>{" "}
@@ -87,7 +87,7 @@ export default function TermsPage() {
           error, contact{" "}
           <a
             href={`mailto:${LEGAL_CONTACT_EMAIL}`}
-            className="text-[#0077ed] hover:underline"
+            className="text-[var(--accent)] hover:underline"
           >
             {LEGAL_CONTACT_EMAIL}
           </a>{" "}
@@ -140,7 +140,7 @@ export default function TermsPage() {
           For questions about these Terms, contact{" "}
           <a
             href={`mailto:${LEGAL_CONTACT_EMAIL}`}
-            className="text-[#0077ed] hover:underline"
+            className="text-[var(--accent)] hover:underline"
           >
             {LEGAL_CONTACT_EMAIL}
           </a>

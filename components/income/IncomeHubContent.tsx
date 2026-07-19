@@ -101,7 +101,7 @@ export function IncomeHubContent() {
               className={cn(
                 "focus-ring min-h-11 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
                 mobileActiveTab === tab.id
-                  ? "bg-[#0077ed]/20 text-[#4da3ff]"
+                  ? "bg-[var(--accent)]/20 text-[var(--accent-light)]"
                   : "text-[var(--text-muted)] hover:text-white",
               )}
             >
@@ -147,7 +147,7 @@ export function IncomeHubContent() {
               className={cn(
                 "focus-ring min-h-11 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
                 activeTab === tab.id
-                  ? "bg-[#0077ed]/20 text-[#4da3ff]"
+                  ? "bg-[var(--accent)]/20 text-[var(--accent-light)]"
                   : "text-[var(--text-muted)] hover:text-white",
               )}
             >

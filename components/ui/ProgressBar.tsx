@@ -9,7 +9,7 @@ type ProgressBarProps = {
 };
 
 const fillClasses: Record<ProgressBarVariant, string> = {
-  primary: "bg-gradient-to-r from-[#0077ed] to-[#4da3ff]",
+  primary: "bg-[var(--accent)]",
   muted: "bg-[var(--text-muted)]",
 };
 

@@ -61,7 +61,7 @@ export function ForgotPasswordForm() {
         footer={
           <>
             Remember your password?{" "}
-            <Link href="/login" className="text-[#0077ed] hover:underline">
+            <Link href="/login" className="text-[var(--accent)] hover:underline">
               Sign in
             </Link>
           </>
@@ -81,7 +81,7 @@ export function ForgotPasswordForm() {
       footer={
         <>
           Remember your password?{" "}
-          <Link href="/login" className="text-[#0077ed] hover:underline">
+          <Link href="/login" className="text-[var(--accent)] hover:underline">
             Sign in
           </Link>
         </>

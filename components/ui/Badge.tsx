@@ -9,10 +9,10 @@ type BadgeProps = HTMLAttributes<HTMLSpanElement> & {
 
 const variantClasses: Record<BadgeVariant, string> = {
   default: "bg-[var(--surface-hover)] text-[var(--text-secondary)]",
-  accent: "bg-[#0077ed]/12 text-[#0077ed]",
-  success: "bg-emerald-400/10 text-emerald-400/90",
-  warning: "bg-amber-400/10 text-amber-400/90",
-  danger: "bg-rose-400/10 text-rose-400/90",
+  accent: "bg-[var(--accent-muted)] text-[var(--accent-light)]",
+  success: "bg-[var(--success-muted)] text-[var(--success)]",
+  warning: "bg-[var(--warning-muted)] text-[var(--warning)]",
+  danger: "bg-[var(--danger-muted)] text-[var(--danger)]",
 };
 
 export function Badge({
@@ -24,7 +24,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center rounded-full px-3 py-1 text-xs font-medium transition-colors duration-200",
+        "inline-flex shrink-0 items-center rounded-md px-2 py-0.5 text-[10px] font-medium transition-colors duration-200",
         variantClasses[variant],
         className,
       )}

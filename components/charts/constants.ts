@@ -1,15 +1,26 @@
 export const CHART_COLORS = {
-  primary: "#0077ed",
-  primaryLight: "#4da3ff",
-  income: "#34d399",
-  spending: "#f87171",
-  savings: "#0077ed",
-  debt: "#fb7185",
-  neutral: "var(--text-muted)",
+  primary: "#3B82F6",
+  primaryLight: "#60A5FA",
+  income: "#22C55E",
+  spending: "#EF4444",
+  savings: "#8B5CF6",
+  debt: "#EF4444",
+  warning: "#F59E0B",
+  neutral: "#64748B",
+  palette: [
+    "#3B82F6",
+    "#8B5CF6",
+    "#F59E0B",
+    "#EF4444",
+    "#22C55E",
+    "#60A5FA",
+    "#A78BFA",
+    "#FB7185",
+  ],
 } as const;
 
 export const CHART_HEIGHT = {
-  sm: "h-24",
-  md: "h-28",
-  lg: "h-36",
+  sm: "h-20",
+  md: "h-24",
+  lg: "h-32",
 } as const;

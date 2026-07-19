@@ -177,7 +177,7 @@ export function AdminReleasesSection() {
                   }))
                 }
                 rows={3}
-                className="w-full rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-subtle)] px-4 py-3 text-sm text-[var(--foreground)] outline-none focus:border-[#0077ed]/40"
+                className="w-full rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-subtle)] px-4 py-3 text-sm text-[var(--foreground)] outline-none focus:border-[var(--accent)]/40"
               />
             </FormField>
 

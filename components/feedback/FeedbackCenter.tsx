@@ -176,7 +176,7 @@ export function FeedbackCenter() {
         className={cn(
           // Sit above the mobile bottom nav (which is ~4rem tall and shown below lg);
           // drop back to the corner on desktop where the nav is hidden.
-          "fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom))] right-4 z-40 hidden h-12 min-w-12 items-center justify-center rounded-full border border-[#0077ed]/30 bg-[#0077ed] px-4 text-sm font-medium text-white shadow-[0_8px_24px_rgba(0,119,237,0.35)] transition-transform hover:scale-[1.02] active:scale-[0.98] lg:bottom-6 lg:right-6 lg:flex",
+          "fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom))] right-4 z-40 hidden h-12 min-w-12 items-center justify-center rounded-full border border-[var(--accent)]/30 bg-[var(--accent)] px-4 text-sm font-medium text-white shadow-[0_8px_24px_rgba(0,119,237,0.35)] transition-transform hover:scale-[1.02] active:scale-[0.98] lg:bottom-6 lg:right-6 lg:flex",
         )}
         aria-label="Open feedback center"
       >
@@ -237,7 +237,7 @@ export function FeedbackCenter() {
               value={message}
               onChange={(event) => setMessage(event.target.value)}
               rows={4}
-              className="w-full rounded-2xl border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-sm text-white outline-none focus:border-[#0077ed]/40"
+              className="w-full rounded-2xl border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-sm text-white outline-none focus:border-[var(--accent)]/40"
               placeholder="Describe your feedback, bug, or feature idea..."
             />
           </label>

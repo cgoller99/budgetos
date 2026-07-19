@@ -4,7 +4,7 @@ export function CTASection() {
   return (
     <section className={landingSectionClassName}>
       <ScrollReveal>
-        <div className="relative mx-auto max-w-4xl overflow-hidden rounded-[1.75rem] border border-[#0077ed]/15 bg-gradient-to-b from-[#0077ed]/10 to-transparent px-8 py-14 text-center sm:px-12 sm:py-16">
+        <div className="relative mx-auto max-w-4xl overflow-hidden rounded-[1.75rem] border border-[var(--accent)]/15 bg-gradient-to-b from-[var(--accent)]/10 to-transparent px-8 py-14 text-center sm:px-12 sm:py-16">
           <div
             aria-hidden
             className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_60%_80%_at_50%_100%,rgba(0,119,237,0.15),transparent)]"

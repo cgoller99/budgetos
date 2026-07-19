@@ -24,7 +24,7 @@ export function UpcomingIncomeCard() {
         action={
           <Link
             href="/income"
-            className="text-sm text-white/40 transition-colors hover:text-[#4da3ff]"
+            className="text-sm text-white/40 transition-colors hover:text-[var(--accent-light)]"
           >
             View all
           </Link>
@@ -35,7 +35,7 @@ export function UpcomingIncomeCard() {
         {income.length === 0 ? (
           <p className="text-base text-white/38">
             No paychecks scheduled.{" "}
-            <Link href="/income" className="text-[#4da3ff] hover:text-white">
+            <Link href="/income" className="text-[var(--accent-light)] hover:text-white">
               Add income
             </Link>
           </p>
@@ -63,7 +63,7 @@ export function UpcomingIncomeCard() {
                     {source.formattedDate}
                   </p>
                 </div>
-                <p className="shrink-0 text-base font-semibold tabular-nums text-[#4da3ff]">
+                <p className="shrink-0 text-base font-semibold tabular-nums text-[var(--accent-light)]">
                   {formatCurrency(source.amount)}
                 </p>
               </li>

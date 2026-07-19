@@ -71,8 +71,8 @@ export function IncomePlansSection() {
             <div className="flex flex-col items-center">
               <div
                 className={cn(
-                  "w-full rounded-2xl border border-[#0077ed]/25 bg-[#0077ed]/10 px-6 py-5 text-center transition-all duration-500",
-                  remaining < PAYCHECK_AMOUNT && "border-[#0077ed]/40 shadow-[0_0_32px_rgba(0,119,237,0.12)]",
+                  "w-full rounded-2xl border border-[var(--accent)]/25 bg-[var(--accent)]/10 px-6 py-5 text-center transition-all duration-500",
+                  remaining < PAYCHECK_AMOUNT && "border-[var(--accent)]/40 shadow-[0_0_32px_rgba(0,119,237,0.12)]",
                 )}
               >
                 <span className="text-2xl">💵</span>
@@ -80,7 +80,7 @@ export function IncomePlansSection() {
                 <p className="mt-1 text-3xl font-semibold tabular-nums text-[var(--foreground)]">
                   ${PAYCHECK_AMOUNT.toLocaleString()}
                 </p>
-                <p className="mt-3 text-xs font-medium tracking-wide text-[#4da3ff] uppercase">
+                <p className="mt-3 text-xs font-medium tracking-wide text-[var(--accent-light)] uppercase">
                   Remaining
                 </p>
                 <p
@@ -98,7 +98,7 @@ export function IncomePlansSection() {
                   <div key={item.label} className="flex flex-col items-center">
                     <span
                       className={cn(
-                        "text-[#4da3ff] transition-opacity duration-300",
+                        "text-[var(--accent-light)] transition-opacity duration-300",
                         index < visibleCount ? "opacity-100" : "opacity-20",
                       )}
                       aria-hidden

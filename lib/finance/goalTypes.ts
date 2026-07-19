@@ -19,14 +19,14 @@ export type GoalTypeMeta = {
 
 export const GOAL_TYPE_OPTIONS: GoalTypeMeta[] = [
   { value: "emergency_fund", label: "Emergency Fund", icon: "🛡️", accent: "#34c759" },
-  { value: "house", label: "House", icon: "🏠", accent: "#0077ed" },
+  { value: "house", label: "House", icon: "🏠", accent: "var(--accent)" },
   { value: "vacation", label: "Vacation", icon: "✈️", accent: "#5ac8fa" },
   { value: "car", label: "Car", icon: "🚗", accent: "#ff9500" },
   { value: "engagement_ring", label: "Engagement Ring", icon: "💍", accent: "#ff6482" },
   { value: "wedding", label: "Wedding", icon: "💒", accent: "#bf5af2" },
   { value: "investments", label: "Investments", icon: "📈", accent: "#64d2ff" },
   { value: "debt_payoff", label: "Debt Payoff", icon: "💳", accent: "#ff453a" },
-  { value: "custom", label: "Custom", icon: "⭐", accent: "#0077ed" },
+  { value: "custom", label: "Custom", icon: "⭐", accent: "var(--accent)" },
 ];
 
 const LEGACY_TYPE_ALIASES: Record<string, GoalType> = {

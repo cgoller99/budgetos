@@ -77,7 +77,7 @@ export function LoginForm() {
       footer={
         <>
           Don&apos;t have an account?{" "}
-          <Link href={registerHref} className="text-[#0077ed] hover:underline">
+          <Link href={registerHref} className="text-[var(--accent)] hover:underline">
             Create one
           </Link>
         </>
@@ -110,7 +110,7 @@ export function LoginForm() {
         <div className="flex justify-end">
           <Link
             href="/forgot-password"
-            className="text-sm text-[#0077ed] hover:underline"
+            className="text-sm text-[var(--accent)] hover:underline"
           >
             Forgot password?
           </Link>

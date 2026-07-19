@@ -94,7 +94,7 @@ export function RoadmapTimeline({
         <p className="text-sm text-white/45">{emptyMessage}</p>
         <Link
           href="/savings"
-          className="mt-4 inline-block text-sm text-[#0077ed] hover:underline"
+          className="mt-4 inline-block text-sm text-[var(--accent)] hover:underline"
         >
           Create your first goal
         </Link>

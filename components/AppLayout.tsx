@@ -30,7 +30,7 @@ export function AppLayout({ children }: AppLayoutProps) {
           title={activeRoute.label}
           notificationCenter={<NotificationCenter />}
         />
-        <main className="flex-1 overflow-x-hidden px-4 py-6 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-8 lg:px-10 lg:py-12 lg:pb-12">
+        <main className="flex-1 overflow-x-hidden px-4 py-5 pb-[calc(5.75rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-7 lg:px-8 lg:py-8 lg:pb-10">
           <DemoModeBanner />
           <FinanceSyncAlert />
           <RecurringBillsPrompt />

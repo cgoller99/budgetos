@@ -19,7 +19,7 @@ export function NextGoalCard() {
         <CardContent>
           <p className="text-sm text-white/45">
             All goals complete.{" "}
-            <Link href="/savings" className="text-[#0077ed] hover:underline">
+            <Link href="/savings" className="text-[var(--accent)] hover:underline">
               Create a new goal
             </Link>
           </p>
@@ -56,7 +56,7 @@ export function NextGoalCard() {
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div>
                 <p className="text-white/40">Complete</p>
-                <p className="mt-1 font-medium tabular-nums text-[#4da3ff]">
+                <p className="mt-1 font-medium tabular-nums text-[var(--accent-light)]">
                   {nextGoal.percentComplete}%
                 </p>
               </div>

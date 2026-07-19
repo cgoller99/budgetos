@@ -19,13 +19,13 @@ export default function HouseholdInviteNotFound() {
           href="/login"
           className={cn(
             linkButtonClassName,
-            "bg-[#0077ed] text-white hover:bg-[#0066d6]",
+            "bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)]",
           )}
         >
           Go to sign in
         </Link>
         <p className="text-center text-sm text-white/40">
-          <Link href="/" className="text-[#0077ed] hover:underline">
+          <Link href="/" className="text-[var(--accent)] hover:underline">
             Back to home
           </Link>
         </p>

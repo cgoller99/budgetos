@@ -71,7 +71,7 @@ function ProgressBar({ step, total }: { step: number; total: number }) {
         aria-label={`Onboarding step ${step} of ${total}`}
       >
         <div
-          className="h-full rounded-full bg-gradient-to-r from-[#0077ed] to-[#4da3ff] transition-all duration-500"
+          className="h-full rounded-full bg-gradient-to-r from-[var(--accent)] to-[var(--accent-light)] transition-all duration-500"
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -87,7 +87,7 @@ function StepTip({ tipKey }: { tipKey: string }) {
   }
 
   return (
-    <p className="mb-6 rounded-2xl border border-[#0077ed]/15 bg-[#0077ed]/5 px-4 py-3 text-sm text-white/55">
+    <p className="mb-6 rounded-2xl border border-[var(--accent)]/15 bg-[var(--accent)]/5 px-4 py-3 text-sm text-white/55">
       <span className="mr-1.5" aria-hidden>
         💡
       </span>
@@ -118,14 +118,14 @@ function SetupChoiceCard({
       className={cn(
         "w-full rounded-2xl border px-5 py-5 text-left transition-colors",
         selected
-          ? "border-[#0077ed]/40 bg-[#0077ed]/10"
-          : "border-white/[0.08] bg-white/[0.02] hover:border-[#0077ed]/25",
+          ? "border-[var(--accent)]/40 bg-[var(--accent)]/10"
+          : "border-white/[0.08] bg-white/[0.02] hover:border-[var(--accent)]/25",
       )}
     >
       <div className="flex items-start justify-between gap-3">
         <p className="text-base font-semibold text-white">{title}</p>
         {recommended ? (
-          <span className="shrink-0 rounded-full bg-[#0077ed]/20 px-2.5 py-1 text-xs font-medium text-[#4da3ff]">
+          <span className="shrink-0 rounded-full bg-[var(--accent)]/20 px-2.5 py-1 text-xs font-medium text-[var(--accent-light)]">
             Recommended
           </span>
         ) : null}
@@ -493,8 +493,8 @@ export function GuidedOnboardingExperience() {
                   className={cn(
                     "rounded-2xl border px-4 py-4 text-left transition-colors",
                     progress.paySchedule === schedule
-                      ? "border-[#0077ed]/40 bg-[#0077ed]/10"
-                      : "border-white/[0.08] bg-white/[0.02] hover:border-[#0077ed]/25",
+                      ? "border-[var(--accent)]/40 bg-[var(--accent)]/10"
+                      : "border-white/[0.08] bg-white/[0.02] hover:border-[var(--accent)]/25",
                   )}
                 >
                   <p className="text-sm font-medium">{INCOME_PLAN_SCHEDULE_LABELS[schedule]}</p>
@@ -722,7 +722,7 @@ export function GuidedOnboardingExperience() {
 
         {isManualPath && step === 9 && (
           <Card padding="lg" className="onboarding-step-enter text-center">
-            <p className="text-sm text-[#4da3ff]">Financial Health</p>
+            <p className="text-sm text-[var(--accent-light)]">Financial Health</p>
             <p className="mt-4 text-5xl font-semibold tabular-nums">{healthScore}</p>
             <p className="mx-auto mt-4 max-w-sm text-sm text-white/45">
               Your score will improve as you track accounts, bills, goals, and income plans.

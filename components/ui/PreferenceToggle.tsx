@@ -26,7 +26,7 @@ export function PreferenceToggle({
       className={cn(
         "relative inline-flex h-7 w-12 shrink-0 rounded-full border transition-all duration-200 ease-out",
         checked
-          ? "border-[#0077ed]/40 bg-[#0077ed]/30"
+          ? "border-[var(--accent)]/40 bg-[var(--accent)]/30"
           : "border-white/[0.08] bg-white/[0.04]",
         disabled && "cursor-not-allowed opacity-60",
       )}

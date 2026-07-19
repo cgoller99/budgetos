@@ -284,7 +284,7 @@ export function HouseholdSection() {
         />
         <CardContent className="space-y-4">
           {incomingInvites.length > 0 && (
-            <div className="space-y-3 rounded-2xl border border-[#0077ed]/20 bg-[#0077ed]/5 p-4">
+            <div className="space-y-3 rounded-2xl border border-[var(--accent)]/20 bg-[var(--accent)]/5 p-4">
               <p className="text-sm font-medium text-white">
                 You have a pending household invite
               </p>

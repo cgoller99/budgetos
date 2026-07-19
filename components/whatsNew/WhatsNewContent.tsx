@@ -147,7 +147,7 @@ export function WhatsNewContent() {
               className="relative pl-10 sm:pl-14"
             >
               <span
-                className="absolute left-3 top-8 flex size-3 rounded-full border-2 border-[#0077ed] bg-[var(--background)] sm:left-4"
+                className="absolute left-3 top-8 flex size-3 rounded-full border-2 border-[var(--accent)] bg-[var(--background)] sm:left-4"
                 aria-hidden
               />
               <ReleaseCard
@@ -190,7 +190,7 @@ function FilterChip({
       className={cn(
         "focus-ring min-h-10 rounded-xl px-3 py-2 text-sm font-medium transition-colors",
         active
-          ? "bg-[#0077ed]/20 text-[#4da3ff]"
+          ? "bg-[var(--accent)]/20 text-[var(--accent-light)]"
           : "bg-[var(--surface-subtle)] text-[var(--text-muted)] hover:text-[var(--foreground)]",
       )}
     >

@@ -183,7 +183,7 @@ function TransactionsContentInner() {
       />
 
       {hasActiveFilters ? (
-        <div className="flex flex-col gap-3 rounded-2xl border border-[#0077ed]/25 bg-[#0077ed]/10 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 rounded-2xl border border-[var(--accent)]/25 bg-[var(--accent)]/10 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-white/75">
             Showing transactions related to:{" "}
             <span className="font-medium text-white">{filterDescription}</span>
