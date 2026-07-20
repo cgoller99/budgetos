@@ -17,7 +17,7 @@ import {
   type PaidSubscriptionPlan,
   type SubscriptionPlan,
 } from "@/lib/subscription/types";
-import { parseBillingInterval, type BillingInterval } from "@/lib/stripe/billingInterval";
+import { type BillingInterval } from "@/lib/stripe/billingInterval";
 import {
   cancelStripeSubscription,
   changeStripePlan,

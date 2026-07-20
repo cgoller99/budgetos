@@ -10,7 +10,7 @@ type AuthShellProps = {
 
 export function AuthShell({ title, subtitle, children, footer }: AuthShellProps) {
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[#090b10] px-6 py-16 font-sans text-white">
+    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[var(--background)] px-6 py-16 font-sans text-white">
       <div className="relative z-10 w-full max-w-md">
         <div className="mb-10 text-center">
           <Link href="/" className="inline-flex flex-col items-center">

@@ -31,7 +31,7 @@ export function RoadmapTimelineItem({
             "relative z-10 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border text-lg",
             milestone.isComplete
               ? "border-emerald-500/30 bg-emerald-500/10"
-              : "border-white/[0.08] bg-[#111827]",
+              : "border-[var(--surface-border)] bg-[var(--surface)]",
           )}
           style={
             !milestone.isComplete
@@ -49,7 +49,7 @@ export function RoadmapTimelineItem({
         )}
       </div>
 
-      <article className="min-w-0 flex-1 rounded-2xl border border-white/[0.06] bg-[#111827]/60 p-5 backdrop-blur-sm transition-colors duration-200 hover:border-white/[0.1]">
+      <article className="min-w-0 flex-1 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-soft)]/80 p-5 backdrop-blur-sm transition-colors duration-200 hover:border-[var(--surface-border-strong)]">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <p
@@ -58,10 +58,10 @@ export function RoadmapTimelineItem({
             >
               {MILESTONE_CATEGORY_LABELS[milestone.category]}
             </p>
-            <h3 className="mt-1 text-base font-semibold text-white">
+            <h3 className="mt-1 text-base font-semibold text-[var(--foreground)]">
               {milestone.title}
             </h3>
-            <p className="mt-1 text-sm text-white/45">{milestone.subtitle}</p>
+            <p className="mt-1 text-sm text-[var(--text-muted)]">{milestone.subtitle}</p>
           </div>
 
           {milestone.isComplete && (
@@ -90,8 +90,8 @@ export function RoadmapTimeline({
 }: RoadmapTimelineProps) {
   if (milestones.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-white/[0.08] bg-white/[0.02] px-6 py-12 text-center">
-        <p className="text-sm text-white/45">{emptyMessage}</p>
+      <div className="rounded-2xl border border-dashed border-[var(--surface-border)] bg-[var(--surface-subtle)] px-6 py-12 text-center">
+        <p className="text-sm text-[var(--text-muted)]">{emptyMessage}</p>
         <Link
           href="/savings"
           className="mt-4 inline-block text-sm text-[var(--accent)] hover:underline"
