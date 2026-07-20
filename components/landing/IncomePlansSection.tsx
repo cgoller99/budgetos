@@ -25,7 +25,17 @@ export function IncomePlansSection() {
 
   useEffect(() => {
     let cancelled = false;
-    let loopTimeout: number | undefined;
+    const activeTimeouts = new Set<number>();
+
+    function scheduleTimeout(callback: () => void, delay: number) {
+      const timeoutId = window.setTimeout(() => {
+        activeTimeouts.delete(timeoutId);
+        if (!cancelled) {
+          callback();
+        }
+      }, delay);
+      activeTimeouts.add(timeoutId);
+    }
 
     function runCycle() {
       if (cancelled) return;
@@ -34,8 +44,7 @@ export function IncomePlansSection() {
       setRemaining(PAYCHECK_AMOUNT);
 
       ALLOCATIONS.forEach((allocation, index) => {
-        window.setTimeout(() => {
-          if (cancelled) return;
+        scheduleTimeout(() => {
           setVisibleCount(index + 1);
           setRemaining(
             PAYCHECK_AMOUNT -
@@ -44,14 +53,15 @@ export function IncomePlansSection() {
         }, 600 + index * 700);
       });
 
-      loopTimeout = window.setTimeout(runCycle, 5200);
+      scheduleTimeout(runCycle, 5200);
     }
 
     runCycle();
 
     return () => {
       cancelled = true;
-      if (loopTimeout) window.clearTimeout(loopTimeout);
+      activeTimeouts.forEach((timeoutId) => window.clearTimeout(timeoutId));
+      activeTimeouts.clear();
     };
   }, []);
 

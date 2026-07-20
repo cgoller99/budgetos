@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { cn } from "@/components/ui/cn";
 import { scheduleAdminHashScroll } from "@/components/admin/adminHashScroll";
 
@@ -18,13 +18,41 @@ const NAV_ITEMS = [
   { href: "/admin#releases", label: "Releases" },
 ] as const;
 
+function getAdminNavHash(): string {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  return window.location.hash.replace(/^#/, "");
+}
+
+function isAdminNavItemActive(href: string, pathname: string, hash: string): boolean {
+  if (pathname !== "/admin") {
+    return false;
+  }
+
+  const itemHash = href.includes("#") ? href.split("#")[1] ?? "" : "";
+
+  if (itemHash) {
+    return hash === itemHash;
+  }
+
+  return hash === "";
+}
+
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [navHash, setNavHash] = useState(getAdminNavHash);
 
   useEffect(() => {
     scheduleAdminHashScroll();
+    setNavHash(getAdminNavHash());
 
-    const onHashChange = () => scheduleAdminHashScroll();
+    const onHashChange = () => {
+      scheduleAdminHashScroll();
+      setNavHash(getAdminNavHash());
+    };
+
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
   }, [pathname]);
@@ -56,7 +84,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               href={item.href}
               className={cn(
                 "rounded-xl px-3 py-2 text-sm whitespace-nowrap transition-colors",
-                pathname === "/admin"
+                isAdminNavItemActive(item.href, pathname, navHash)
                   ? "bg-[var(--accent)]/10 text-[var(--accent-light)]"
                   : "text-[var(--text-muted)] hover:bg-[var(--surface-subtle)] hover:text-[var(--foreground)]",
               )}

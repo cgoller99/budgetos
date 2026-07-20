@@ -191,7 +191,7 @@ function NotificationRow({
             <button
               type="button"
               onClick={onDelete}
-              className="focus-ring ml-auto min-h-9 rounded-[var(--radius-button)] px-3 text-sm text-[var(--text-subtle)] opacity-0 transition-all group-hover:opacity-100 hover:bg-[var(--surface-hover)] hover:text-[var(--danger)]"
+              className="focus-ring ml-auto min-h-9 rounded-[var(--radius-button)] px-3 text-sm text-[var(--text-subtle)] opacity-100 transition-all sm:opacity-0 sm:group-hover:opacity-100 hover:bg-[var(--surface-hover)] hover:text-[var(--danger)]"
             >
               Delete
             </button>

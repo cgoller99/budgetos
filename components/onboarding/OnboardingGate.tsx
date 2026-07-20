@@ -30,7 +30,7 @@ export function OnboardingGate({ children }: { children: React.ReactNode }) {
   }
 
   if (!onboardingComplete) {
-    return null;
+    return <PageLoadingState label="Loading your finances" />;
   }
 
   return children;

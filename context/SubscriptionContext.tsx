@@ -6,10 +6,12 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/context/ToastContext";
 import {
   FREE_SUBSCRIPTION,
   type SubscriptionPlan,
@@ -31,6 +33,8 @@ const SubscriptionContext = createContext<SubscriptionContextValue | null>(null)
 
 export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const { user, isConfigured } = useAuth();
+  const { showToast } = useToast();
+  const hasLoadedOnceRef = useRef(false);
   const [subscription, setSubscription] =
     useState<UserSubscription>(FREE_SUBSCRIPTION);
   const [isFounder, setIsFounder] = useState(false);
@@ -41,6 +45,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const refreshSubscription = useCallback(
     async (options?: { refresh?: boolean }) => {
       if (!user || !isConfigured) {
+        hasLoadedOnceRef.current = false;
         setSubscription(FREE_SUBSCRIPTION);
         setIsFounder(false);
         setHasProAccessFlag(false);
@@ -57,16 +62,24 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         setIsFounder(entitlements.isFounder);
         setHasProAccessFlag(entitlements.hasProAccess);
         setHasProPlusAccessFlag(entitlements.hasProPlusAccess);
+        hasLoadedOnceRef.current = true;
       } catch {
-        setSubscription(FREE_SUBSCRIPTION);
-        setIsFounder(false);
-        setHasProAccessFlag(false);
-        setHasProPlusAccessFlag(false);
+        if (!hasLoadedOnceRef.current) {
+          setSubscription(FREE_SUBSCRIPTION);
+          setIsFounder(false);
+          setHasProAccessFlag(false);
+          setHasProPlusAccessFlag(false);
+        }
+
+        showToast({
+          title: "Couldn't refresh subscription",
+          subtitle: "Your plan status may be outdated. Try again in a moment.",
+        });
       } finally {
         setIsLoading(false);
       }
     },
-    [isConfigured, user],
+    [isConfigured, showToast, user],
   );
 
   useEffect(() => {
