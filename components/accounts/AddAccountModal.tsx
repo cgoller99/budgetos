@@ -107,11 +107,7 @@ export function AddAccountModal({ isOpen, onClose }: AddAccountModalProps) {
             }
           >
             {ACCOUNT_TYPE_OPTIONS.map((option) => (
-              <option
-                key={option.value}
-                value={option.value}
-                className="bg-[#111827] text-white"
-              >
+                <option key={option.value} value={option.value}>
                 {option.label}
               </option>
             ))}

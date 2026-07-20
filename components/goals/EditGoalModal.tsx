@@ -106,11 +106,7 @@ export function EditGoalModal({ goal, onClose }: EditGoalModalProps) {
             }
           >
             {GOAL_TYPE_OPTIONS.map((option) => (
-              <option
-                key={option.value}
-                value={option.value}
-                className="bg-[#111827] text-white"
-              >
+                <option key={option.value} value={option.value}>
                 {option.icon} {option.label}
               </option>
             ))}

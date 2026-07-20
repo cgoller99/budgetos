@@ -6,7 +6,6 @@ import {
   FormField,
   Input,
   Modal,
-  Select,
 } from "@/components/ui";
 import { useFinance } from "@/context/FinanceContext";
 import { useToast } from "@/context/ToastContext";

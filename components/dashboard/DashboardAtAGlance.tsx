@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
 import { EventHistoryList } from "@/components/events/EventHistoryList";
 import { DebtOverviewCard } from "@/components/dashboard/DebtOverviewCard";
 import { UpcomingBillsCard } from "@/components/dashboard/UpcomingBillsCard";

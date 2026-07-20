@@ -38,7 +38,8 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json({ release });
     }
 
-    const { action: _action, ...input } = body;
+    const input = { ...body };
+    delete input.action;
     const release = await updateRelease(auth.adminSupabase, releaseId, input);
     return NextResponse.json({ release });
   } catch (error) {

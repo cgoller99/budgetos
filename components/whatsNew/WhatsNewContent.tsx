@@ -34,7 +34,11 @@ export function WhatsNewContent() {
 
   const loadReleases = useCallback(
     async (nextOffset: number, append: boolean) => {
-      append ? setIsLoadingMore(true) : setIsLoading(true);
+      if (append) {
+        setIsLoadingMore(true);
+      } else {
+        setIsLoading(true);
+      }
       setError(null);
 
       try {

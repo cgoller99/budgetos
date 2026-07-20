@@ -4,7 +4,6 @@ import { assertStripeConfigured, getStripeConfig } from "@/lib/stripe/config";
 import { createCheckoutSession } from "@/lib/stripe/subscriptionService";
 import { parsePaidPlan } from "@/lib/subscription/types";
 
-import type { BillingInterval } from "@/lib/stripe/billingInterval";
 import { parseBillingInterval } from "@/lib/stripe/billingInterval";
 
 type CheckoutRequestBody = {

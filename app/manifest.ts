@@ -1,5 +1,4 @@
 import type { MetadataRoute } from "next";
-import { getSiteUrl } from "@/lib/supabase/authUrls";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {

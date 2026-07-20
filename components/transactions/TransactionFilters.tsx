@@ -1,6 +1,6 @@
 "use client";
 
-import { Badge, FormField, Input, Select } from "@/components/ui";
+import { FormField, Input, Select } from "@/components/ui";
 import { TRANSACTION_CATEGORY_OPTIONS } from "@/lib/finance/transactionCategories";
 import {
   DEFAULT_TRANSACTION_FILTERS,

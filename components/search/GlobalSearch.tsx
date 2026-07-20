@@ -166,7 +166,7 @@ export function GlobalSearch({ className }: GlobalSearchProps) {
             role="dialog"
             aria-modal="true"
             aria-label="Global search"
-            className="relative w-full max-w-xl overflow-hidden rounded-3xl border border-white/[0.05] bg-[#0f1419] shadow-2xl"
+            className="relative w-full max-w-xl overflow-hidden rounded-3xl border border-[var(--surface-border)] bg-[var(--surface-elevated)] shadow-2xl"
           >
             <div className="border-b border-white/[0.04] p-4">
               <input
