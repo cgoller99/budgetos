@@ -22,14 +22,18 @@ export default function OnboardingLayout({
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0a0f1a]">
+      <div className="flex min-h-screen items-center justify-center bg-[var(--background)]">
         <PageLoadingState label="Preparing onboarding" />
       </div>
     );
   }
 
   if (onboardingComplete) {
-    return null;
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[var(--background)]">
+        <PageLoadingState label="Opening your dashboard" />
+      </div>
+    );
   }
 
   return <AuthGate>{children}</AuthGate>;

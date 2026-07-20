@@ -175,12 +175,18 @@ export function SettingsContent() {
   }, [isConfigured]);
 
   useEffect(() => {
-    if (typeof window === "undefined" || !window.location.hash) {
-      return;
+    function scrollToHash() {
+      if (typeof window === "undefined" || !window.location.hash) {
+        return;
+      }
+
+      const target = document.querySelector(window.location.hash);
+      target?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
-    const target = document.querySelector(window.location.hash);
-    target?.scrollIntoView({ behavior: "smooth", block: "start" });
+    scrollToHash();
+    window.addEventListener("hashchange", scrollToHash);
+    return () => window.removeEventListener("hashchange", scrollToHash);
   }, []);
 
   useEffect(() => {

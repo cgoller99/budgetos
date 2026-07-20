@@ -14,6 +14,8 @@ export const MOBILE_MORE_NAV = [
   { href: "/debt", label: "Debt", icon: "debt" as const },
   { href: "/investments", label: "Investments", icon: "reports" as const },
   { href: "/reports", label: "Reports", icon: "reports" as const },
+  { href: "/roadmap", label: "Roadmap", icon: "roadmap" as const },
+  { href: "/whats-new", label: "What's New", icon: "reports" as const },
   { href: "/settings#household", label: "Household", icon: "settings" as const },
   { href: "/settings", label: "Settings", icon: "settings" as const },
   { href: "/support", label: "Support", icon: "settings" as const, action: "feedback" as const },

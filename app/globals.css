@@ -178,7 +178,9 @@ select.select-themed option:checked {
 [data-theme="light"] .bg-\[\#07090d\],
 [data-theme="light"] .bg-\[\#090b10\]\/40,
 [data-theme="light"] .bg-\[\#090b10\],
-[data-theme="light"] .bg-\[\#0f1419\] {
+[data-theme="light"] .bg-\[\#0a0f1a\],
+[data-theme="light"] .bg-\[\#0f1419\],
+[data-theme="light"] .bg-\[\#111827\] {
   background-color: var(--surface);
 }
 

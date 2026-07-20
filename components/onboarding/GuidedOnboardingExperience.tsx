@@ -386,7 +386,7 @@ export function GuidedOnboardingExperience() {
   }, [isPlaidPath, step]);
 
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[#0a0f1a] px-5 py-12 pb-[calc(3rem+env(safe-area-inset-bottom))] font-sans text-white">
+    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[var(--background)] px-5 py-12 pb-[calc(3rem+env(safe-area-inset-bottom))] font-sans text-white">
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(0,119,237,0.18),transparent)]"

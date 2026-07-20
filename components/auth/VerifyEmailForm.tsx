@@ -93,7 +93,7 @@ export function VerifyEmailForm() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0a0f1a]">
+      <div className="flex min-h-screen items-center justify-center bg-[var(--background)]">
         <div className="h-8 w-8 animate-pulse rounded-full bg-[var(--accent)]/30" />
       </div>
     );

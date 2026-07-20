@@ -36,6 +36,7 @@ export function MobileMoreSheet({ open, onClose, activeHref }: MobileMoreSheetPr
       <div
         className="fixed inset-x-0 bottom-0 z-50 max-h-[75vh] overflow-y-auto rounded-t-3xl border border-[var(--surface-border)] bg-[var(--background)] px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 lg:hidden"
         role="dialog"
+        aria-modal="true"
         aria-label="More navigation"
       >
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/15" />

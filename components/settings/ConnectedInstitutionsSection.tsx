@@ -286,10 +286,10 @@ export function ConnectedInstitutionsSection() {
   }
 
   return (
-    <section className="space-y-4">
+    <section id="connections" className="space-y-4 scroll-mt-24">
       <div>
-        <h2 className="text-lg font-semibold text-white">Connected institutions</h2>
-        <p className="mt-1 text-sm text-white/45">
+        <h2 className="text-lg font-semibold text-[var(--foreground)]">Connected institutions</h2>
+        <p className="mt-1 text-sm text-[var(--text-muted)]">
           Linked checking, savings, credit, loan, and investment accounts from Plaid.
         </p>
       </div>

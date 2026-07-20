@@ -9,7 +9,7 @@ import { LandingPage } from "./LandingPage";
 
 function HomeLoading() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#0a0f1a]">
+    <div className="flex min-h-screen items-center justify-center bg-[var(--background)]">
       <PageLoadingState label="Loading Buxme" />
     </div>
   );
