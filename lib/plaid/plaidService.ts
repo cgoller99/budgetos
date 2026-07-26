@@ -33,19 +33,25 @@ export async function createPlaidLinkToken(
 ): Promise<string> {
   const client = getPlaidClient();
   const config = getPlaidConfig();
+  const isUpdateMode = input.mode === "update" && Boolean(input.accessToken);
+
   const request: LinkTokenCreateRequest = {
     user: { client_user_id: input.userId },
     client_name: "Buxme",
-    products: [...PLAID_LINK_REQUIRED_PRODUCTS],
-    additional_consented_products: [...PLAID_LINK_ADDITIONAL_CONSENTED_PRODUCTS],
     country_codes: [...PLAID_COUNTRY_CODES],
     language: "en",
     webhook: resolvePlaidWebhookUrl(config),
     redirect_uri: getPlaidOAuthRedirectUri(),
   };
 
-  if (input.mode === "update" && input.accessToken) {
-    request.access_token = input.accessToken;
+  if (isUpdateMode) {
+    // Plaid update mode: omit products unless adding new credit products.
+    request.access_token = input.accessToken!;
+  } else {
+    request.products = [...PLAID_LINK_REQUIRED_PRODUCTS];
+    request.additional_consented_products = [
+      ...PLAID_LINK_ADDITIONAL_CONSENTED_PRODUCTS,
+    ];
   }
 
   const linkCustomizationName = process.env.PLAID_LINK_CUSTOMIZATION_NAME?.trim();
@@ -53,8 +59,12 @@ export async function createPlaidLinkToken(
     request.link_customization_name = linkCustomizationName;
   }
 
-  const response = await client.linkTokenCreate(request);
-  return response.data.link_token;
+  try {
+    const response = await client.linkTokenCreate(request);
+    return response.data.link_token;
+  } catch (error) {
+    throw new Error(getPlaidErrorMessage(error));
+  }
 }
 
 export async function exchangePlaidPublicToken(

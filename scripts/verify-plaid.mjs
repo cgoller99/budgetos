@@ -207,13 +207,16 @@ function auditProductionModeInCode() {
   }
 
   if (
-    service.includes("products: [...PLAID_LINK_REQUIRED_PRODUCTS]") &&
-    service.includes("additional_consented_products: [...PLAID_LINK_ADDITIONAL_CONSENTED_PRODUCTS]")
+    service.includes("request.products = [...PLAID_LINK_REQUIRED_PRODUCTS]") &&
+    service.includes("additional_consented_products: [") &&
+    service.includes("isUpdateMode")
   ) {
-    recordPass("Link initializes Transactions only; Investments/Liabilities are additional consented");
+    recordPass(
+      "Link token omits products in update mode; create mode requires Transactions with additional consented products",
+    );
   } else {
     recordFail(
-      "Link must require Transactions only — Liabilities in required products restricts Link to credit/loan accounts",
+      "Link token must omit products in update mode and require Transactions only in create mode",
     );
   }
 }

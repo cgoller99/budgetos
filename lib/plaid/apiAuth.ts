@@ -3,8 +3,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { resolveUserHouseholdId } from "@/lib/supabase/householdFinance";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getPlaidErrorMessage } from "@/lib/plaid/plaidService";
-import type { PlaidError } from "plaid";
+import { getPlaidErrorMessage, extractPlaidError } from "@/lib/plaid/plaidClient";
 
 export async function requirePlaidApiUser() {
   const supabase = await createSupabaseServerClient();
@@ -33,9 +32,14 @@ export async function requirePlaidApiUser() {
 }
 
 function resolvePlaidErrorStatus(error: unknown): number {
-  const plaidError = error as PlaidError | undefined;
+  const plaidError = extractPlaidError(error);
 
-  if (plaidError?.error_code === "INVALID_PUBLIC_TOKEN") {
+  if (
+    plaidError?.error_type === "INVALID_REQUEST" ||
+    plaidError?.error_code === "INVALID_ACCESS_TOKEN" ||
+    plaidError?.error_code === "INVALID_PUBLIC_TOKEN" ||
+    plaidError?.error_code === "INVALID_FIELD"
+  ) {
     return 400;
   }
 
@@ -49,21 +53,29 @@ function resolvePlaidErrorStatus(error: unknown): number {
   return 500;
 }
 
+function resolvePlaidErrorCode(error: unknown): string {
+  const plaidError = extractPlaidError(error);
+
+  if (plaidError?.error_code) {
+    return plaidError.error_code;
+  }
+
+  return messageIncludesLoginAgain(error) ? "ITEM_LOGIN_REQUIRED" : "PLAID_ERROR";
+}
+
 function messageIncludesLoginAgain(error: unknown): boolean {
   const message = getPlaidErrorMessage(error);
   return message.includes("ITEM_LOGIN_REQUIRED") || message.includes("login again");
 }
 
 export function plaidErrorResponse(error: unknown, fallback = "Plaid request failed.") {
-  const plaidError = error as PlaidError | undefined;
+  const plaidError = extractPlaidError(error);
   const message = getPlaidErrorMessage(error);
-  const code =
-    plaidError?.error_code ??
-    (messageIncludesLoginAgain(error) ? "ITEM_LOGIN_REQUIRED" : "PLAID_ERROR");
+  const code = resolvePlaidErrorCode(error);
 
   return NextResponse.json(
     {
-      error: message,
+      error: message === "Unexpected Plaid error." ? fallback : message,
       code,
       error_type: plaidError?.error_type ?? null,
       error_code: plaidError?.error_code ?? null,

@@ -65,6 +65,17 @@ export async function POST(request: Request) {
       accessToken = decryptConnectionAccessToken(connection);
     }
 
+    if (mode === "update" && !accessToken) {
+      return NextResponse.json(
+        {
+          error:
+            "This bank connection is missing credentials. Disconnect it and connect again.",
+          code: "MISSING_ACCESS_TOKEN",
+        },
+        { status: 400 },
+      );
+    }
+
     const linkToken = await createPlaidLinkToken({
       userId: auth.user.id,
       mode,
