@@ -23,10 +23,17 @@ function formatApiError(body: ApiErrorBody, status: number): string {
     body.error_message ||
     "Plaid request failed.";
 
+  if (body.code === "ITEM_LOGIN_REQUIRED" || body.error_code === "ITEM_LOGIN_REQUIRED") {
+    return `${message} Please reconnect your bank.`;
+  }
+
+  if (body.code === "MISSING_ACCESS_TOKEN") {
+    return message;
+  }
+
   const details = [
     body.code ? `code=${body.code}` : null,
     body.error_code ? `error_code=${body.error_code}` : null,
-    body.error_type ? `error_type=${body.error_type}` : null,
     body.request_id ? `request_id=${body.request_id}` : null,
     `HTTP ${status}`,
   ]

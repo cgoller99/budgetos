@@ -73,13 +73,27 @@ export const PLAID_LINK_PRODUCTS = [
 export const PLAID_COUNTRY_CODES = [CountryCode.Us] as const;
 
 export function isPlaidItemLoginRequired(error: unknown): boolean {
-  const plaidError = error as PlaidError | undefined;
-  return plaidError?.error_code === "ITEM_LOGIN_REQUIRED";
+  return extractPlaidError(error)?.error_code === "ITEM_LOGIN_REQUIRED";
+}
+
+export function extractPlaidError(error: unknown): PlaidError | undefined {
+  const axiosLike = error as { response?: { data?: PlaidError } };
+
+  if (axiosLike.response?.data?.error_code) {
+    return axiosLike.response.data;
+  }
+
+  const direct = error as PlaidError | undefined;
+
+  if (direct?.error_code) {
+    return direct;
+  }
+
+  return undefined;
 }
 
 export function isPlaidTransactionsPendingError(error: unknown): boolean {
-  const plaidError = error as PlaidError | undefined;
-  const code = plaidError?.error_code;
+  const code = extractPlaidError(error)?.error_code;
 
   return (
     code === "PRODUCT_NOT_READY" ||
@@ -90,7 +104,7 @@ export function isPlaidTransactionsPendingError(error: unknown): boolean {
 }
 
 export function getPlaidErrorMessage(error: unknown): string {
-  const plaidError = error as PlaidError | undefined;
+  const plaidError = extractPlaidError(error);
   const baseMessage =
     plaidError?.display_message ||
     plaidError?.error_message ||
