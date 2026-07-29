@@ -1,6 +1,8 @@
 import { type EmailOtpType } from "@supabase/supabase-js";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { finalizeBetaRegistrationForUser } from "@/lib/beta/register.server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSupabaseConfig } from "@/lib/supabase/config";
 import { sanitizeAuthNextPath } from "@/lib/supabase/authUrls";
 import type { Database } from "@/lib/supabase/database.types";
@@ -38,6 +40,25 @@ function redirectHashAuthToComplete(_request: NextRequest, next: string) {
       headers: { "Content-Type": "text/html; charset=utf-8" },
     },
   );
+}
+
+async function finalizeBetaAfterAuth(
+  supabase: ReturnType<typeof createServerClient<Database>>,
+) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user?.email || !user.email_confirmed_at) {
+    return;
+  }
+
+  try {
+    const admin = createSupabaseAdminClient();
+    await finalizeBetaRegistrationForUser(admin, user.id, user.email);
+  } catch (error) {
+    console.error("[auth/callback] Beta registration failed", error);
+  }
 }
 
 export async function handleAuthCallback(request: NextRequest) {
@@ -100,6 +121,7 @@ export async function handleAuthCallback(request: NextRequest) {
       return redirectToLogin(request, "auth_callback_failed");
     }
 
+    await finalizeBetaAfterAuth(supabase);
     return response;
   }
 
@@ -110,6 +132,7 @@ export async function handleAuthCallback(request: NextRequest) {
       return redirectToLogin(request, "auth_callback_failed");
     }
 
+    await finalizeBetaAfterAuth(supabase);
     return response;
   }
 

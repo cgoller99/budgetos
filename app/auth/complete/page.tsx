@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { sanitizeAuthNextPath } from "@/lib/supabase/authUrls";
+import { ensureBetaRegistration } from "@/lib/beta/register.client";
 
 function AuthCompleteInner() {
   const router = useRouter();
@@ -38,6 +39,14 @@ function AuthCompleteInner() {
           return;
         }
 
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        if (user?.email_confirmed_at) {
+          await ensureBetaRegistration(user.id).catch(() => undefined);
+        }
+
         router.replace(next);
         return;
       }
@@ -51,6 +60,10 @@ function AuthCompleteInner() {
       }
 
       if (session?.user) {
+        if (session.user.email_confirmed_at) {
+          await ensureBetaRegistration(session.user.id).catch(() => undefined);
+        }
+
         router.replace(next);
         return;
       }

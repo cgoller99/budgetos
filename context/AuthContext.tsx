@@ -25,6 +25,7 @@ import {
   resetAnalyticsUser,
   trackEvent,
 } from "@/lib/analytics/client";
+import { ensureBetaRegistration } from "@/lib/beta/register.client";
 
 export type SignUpResult = {
   needsEmailVerification: boolean;
@@ -84,6 +85,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       ).catch(() => {
         // DB trigger creates profile on signup; client upsert is a safety net.
       });
+
+      if (activeUser.email_confirmed_at && activeUser.email) {
+        void ensureBetaRegistration(activeUser.id).catch(() => undefined);
+      }
     }
 
     async function loadSession() {
@@ -205,7 +210,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           data.session.user.email,
           fullName?.trim(),
         ).catch(() => undefined);
-        void fetch("/api/beta/register", { method: "POST" }).catch(() => undefined);
+        void ensureBetaRegistration(data.session.user.id).catch(() => undefined);
       }
 
       return {
@@ -255,6 +260,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
         data.user.email,
         data.user.user_metadata?.full_name as string | undefined,
       ).catch(() => undefined);
+
+      if (data.user.email_confirmed_at && data.user.email) {
+        void ensureBetaRegistration(data.user.id).catch(() => undefined);
+      }
     },
     [isConfigured],
   );
