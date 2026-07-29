@@ -33,3 +33,5 @@ jobs:
           npm run test:onboarding-progress
           npm run test:plaid-credit-mapping
           npm run test:recurring-bill-detection
+          npm run test:profile-privilege-guard
+          npm run test:beta-registration

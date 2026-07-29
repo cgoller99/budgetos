@@ -130,6 +130,9 @@ create policy "Profiles are updatable by owner"
   on public.profiles for update
   using (auth.uid() = id);
 
+-- Privileged columns (subscription, beta, admin, stripe, is_disabled) are
+-- guarded by supabase/migrations/20260730_profile_privilege_guard.sql.
+
 create policy "Accounts are manageable by owner"
   on public.accounts for all
   using (auth.uid() = user_id)

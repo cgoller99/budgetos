@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { resolveBetaStatusForSignup } from "@/lib/beta/access.server";
+import { finalizeBetaRegistrationForUser } from "@/lib/beta/register.server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -15,24 +15,22 @@ export async function POST() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    if (!user.email_confirmed_at) {
+      return NextResponse.json(
+        { error: "Email must be verified before beta registration." },
+        { status: 403 },
+      );
+    }
+
     const email = user.email?.trim();
     if (!email) {
       return NextResponse.json({ error: "Email is required." }, { status: 400 });
     }
 
     const admin = createSupabaseAdminClient();
-    const betaStatus = await resolveBetaStatusForSignup(admin, email);
+    const result = await finalizeBetaRegistrationForUser(admin, user.id, email);
 
-    const { error } = await admin
-      .from("profiles")
-      .update({ beta_status: betaStatus, updated_at: new Date().toISOString() })
-      .eq("id", user.id);
-
-    if (error) {
-      throw error;
-    }
-
-    return NextResponse.json({ betaStatus });
+    return NextResponse.json(result);
   } catch (error) {
     console.error("[beta/register] Failed", error);
     return NextResponse.json({ error: "Unable to finalize beta registration." }, { status: 500 });
