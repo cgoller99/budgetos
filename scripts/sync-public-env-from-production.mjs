@@ -15,6 +15,7 @@ import {
   parseEnvFile,
   writeEnvFile,
 } from "./lib/env-utils.mjs";
+import { fetchRemoteProductionHealth } from "./lib/remote-production-health.mjs";
 
 const DEFAULT_SITE = "https://buxme.co";
 
@@ -30,7 +31,12 @@ const PUBLIC_DEFAULTS = {
   NEXT_PUBLIC_STRIPE_PRO_PLUS_PRICE: "$14.99",
 };
 
-const PUBLIC_KEYS = new Set(Object.keys(PUBLIC_DEFAULTS));
+const PUBLIC_KEYS = new Set([
+  ...Object.keys(PUBLIC_DEFAULTS),
+  "NEXT_PUBLIC_STRIPE_ENABLED",
+  "NEXT_PUBLIC_SUPABASE_URL",
+  "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+]);
 
 async function fetchSiteAssets(siteUrl) {
   const html = await fetch(siteUrl).then((response) => response.text());
@@ -88,8 +94,21 @@ async function main() {
 
   console.log(`Syncing public env from ${siteUrl} ...`);
 
+  let remoteLaunch = {};
+  const discovered = { ...PUBLIC_DEFAULTS };
+
+  try {
+    const remote = await fetchRemoteProductionHealth(siteUrl);
+    remoteLaunch = remote.launch ?? {};
+    if (remoteLaunch.stripeConfigured === true) {
+      discovered.NEXT_PUBLIC_STRIPE_ENABLED = "true";
+    }
+  } catch {
+    // buxme.co may be unreachable during offline dev
+  }
+
   const source = await fetchSiteAssets(siteUrl);
-  const discovered = extractPublicValues(source);
+  Object.assign(discovered, extractPublicValues(source));
   const patch = new Map(Object.entries(discovered));
 
   if (publicOnly) {

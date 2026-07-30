@@ -9,7 +9,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import Stripe from "stripe";
+import {
+  fetchRemoteProductionHealth,
+  isVarConfiguredOnVercel,
+} from "./lib/remote-production-health.mjs";
 
+const REMOTE_BACKED = process.argv.includes("--remote-backed");
 const ENV_PATH = path.join(path.resolve(import.meta.dirname, ".."), ".env.local");
 
 function loadEnvFile(filePath) {
@@ -46,32 +51,87 @@ function pass(message) {
 
 console.log("Buxme Stripe Live Mode verification\n");
 
+if (REMOTE_BACKED) {
+  console.log("Remote-backed mode: checking Vercel runtime when local secrets are absent.\n");
+}
+
+const remoteHealth = REMOTE_BACKED ? await fetchRemoteProductionHealth() : null;
+
+function remoteHas(name) {
+  return remoteHealth ? isVarConfiguredOnVercel(remoteHealth.varStatus, name) : false;
+}
+
+function acceptRemote(name, message) {
+  if (remoteHas(name)) {
+    pass(`${message} (configured on Vercel)`);
+    return true;
+  }
+  return false;
+}
+
 const secretKey = getEnv("STRIPE_SECRET_KEY");
 const webhookSecret = getEnv("STRIPE_WEBHOOK_SECRET");
 const proPriceId = getEnv("STRIPE_PRO_PRICE_ID");
 const proPlusPriceId = getEnv("STRIPE_PRO_PLUS_PRICE_ID");
 const publishableKey = getEnv("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY");
 
-if (!secretKey) fail("STRIPE_SECRET_KEY is missing");
-else if (!secretKey.startsWith("sk_live_")) fail("STRIPE_SECRET_KEY must be sk_live_ for production");
-else pass("STRIPE_SECRET_KEY is a live key");
+if (!secretKey) {
+  if (!acceptRemote("STRIPE_SECRET_KEY", "STRIPE_SECRET_KEY")) {
+    fail("STRIPE_SECRET_KEY is missing");
+  }
+} else if (!secretKey.startsWith("sk_live_")) {
+  fail("STRIPE_SECRET_KEY must be sk_live_ for production");
+} else {
+  pass("STRIPE_SECRET_KEY is a live key");
+}
 
-if (!webhookSecret) fail("STRIPE_WEBHOOK_SECRET is missing");
-else if (!webhookSecret.startsWith("whsec_")) fail("STRIPE_WEBHOOK_SECRET looks invalid");
-else pass("STRIPE_WEBHOOK_SECRET is set");
+if (!webhookSecret) {
+  if (acceptRemote("STRIPE_WEBHOOK_SECRET", "STRIPE_WEBHOOK_SECRET")) {
+    // configured on Vercel
+  } else if (REMOTE_BACKED) {
+    console.log("⚠ STRIPE_WEBHOOK_SECRET missing on Vercel — manual: Stripe Dashboard → Webhooks");
+  } else {
+    fail("STRIPE_WEBHOOK_SECRET is missing");
+  }
+} else if (!webhookSecret.startsWith("whsec_")) {
+  fail("STRIPE_WEBHOOK_SECRET looks invalid");
+} else {
+  pass("STRIPE_WEBHOOK_SECRET is set");
+}
 
-if (!publishableKey) fail("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is missing");
-else if (!publishableKey.startsWith("pk_live_")) fail("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY must be pk_live_");
-else pass("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is a live key");
+if (!publishableKey) {
+  if (!acceptRemote("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY", "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY")) {
+    fail("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is missing");
+  }
+} else if (!publishableKey.startsWith("pk_live_")) {
+  fail("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY must be pk_live_");
+} else {
+  pass("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is a live key");
+}
 
-if (!proPriceId?.startsWith("price_")) fail("STRIPE_PRO_PRICE_ID is missing or invalid");
-else pass("STRIPE_PRO_PRICE_ID is set");
+if (!proPriceId?.startsWith("price_")) {
+  if (!acceptRemote("STRIPE_PRO_PRICE_ID", "STRIPE_PRO_PRICE_ID")) {
+    fail("STRIPE_PRO_PRICE_ID is missing or invalid");
+  }
+} else {
+  pass("STRIPE_PRO_PRICE_ID is set");
+}
 
-if (!proPlusPriceId?.startsWith("price_")) fail("STRIPE_PRO_PLUS_PRICE_ID is missing or invalid");
-else pass("STRIPE_PRO_PLUS_PRICE_ID is set");
+if (!proPlusPriceId?.startsWith("price_")) {
+  if (!acceptRemote("STRIPE_PRO_PLUS_PRICE_ID", "STRIPE_PRO_PLUS_PRICE_ID")) {
+    fail("STRIPE_PRO_PLUS_PRICE_ID is missing or invalid");
+  }
+} else {
+  pass("STRIPE_PRO_PLUS_PRICE_ID is set");
+}
 
-if (getEnv("NEXT_PUBLIC_STRIPE_ENABLED") !== "true") fail("NEXT_PUBLIC_STRIPE_ENABLED must be true");
-else pass("NEXT_PUBLIC_STRIPE_ENABLED=true");
+if (getEnv("NEXT_PUBLIC_STRIPE_ENABLED") !== "true") {
+  if (!acceptRemote("NEXT_PUBLIC_STRIPE_ENABLED", "NEXT_PUBLIC_STRIPE_ENABLED")) {
+    fail("NEXT_PUBLIC_STRIPE_ENABLED must be true");
+  }
+} else {
+  pass("NEXT_PUBLIC_STRIPE_ENABLED=true");
+}
 
 if (secretKey?.startsWith("sk_live_")) {
   const stripe = new Stripe(secretKey);

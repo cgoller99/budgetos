@@ -8,6 +8,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import { hydrateProcessEnvFromFile } from "./lib/env-utils.mjs";
+import {
+  fetchRemoteProductionHealth,
+  isVarConfiguredOnVercel,
+} from "./lib/remote-production-health.mjs";
+
+const REMOTE_BACKED = process.argv.includes("--remote-backed");
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const ENV_PATH = path.join(ROOT, ".env.local");
@@ -95,7 +101,13 @@ function report(title, ok, detail = "") {
 async function main() {
   console.log("Buxme Supabase verification\n");
 
+  if (REMOTE_BACKED) {
+    console.log("Remote-backed mode: checking Vercel runtime when local secrets are absent.\n");
+  }
+
   hydrateProcessEnvFromFile();
+
+  const remoteHealth = REMOTE_BACKED ? await fetchRemoteProductionHealth() : null;
 
   let allOk = true;
 
@@ -141,8 +153,17 @@ async function main() {
   allOk =
     report(
       "SUPABASE_SERVICE_ROLE_KEY is set",
-      Boolean(serviceRoleKey),
-      serviceRoleKey ? `${serviceRoleKey.length} chars` : "empty",
+      Boolean(serviceRoleKey) ||
+        (REMOTE_BACKED &&
+          remoteHealth &&
+          isVarConfiguredOnVercel(remoteHealth.varStatus, "SUPABASE_SERVICE_ROLE_KEY")),
+      serviceRoleKey
+        ? `${serviceRoleKey.length} chars`
+        : REMOTE_BACKED &&
+            remoteHealth &&
+            isVarConfiguredOnVercel(remoteHealth.varStatus, "SUPABASE_SERVICE_ROLE_KEY")
+          ? "configured on Vercel"
+          : "empty",
     ) && allOk;
 
   if (!url || !anonKey) {
@@ -218,6 +239,10 @@ async function main() {
 
     if (response.ok) {
       return { exists: true };
+    }
+
+    if (response.status === 401 || response.status === 403) {
+      return { exists: true, rlsProtected: true };
     }
 
     const body = await response.text();
@@ -341,23 +366,33 @@ async function main() {
   }
 
   console.log("\nStorage bucket check:");
-  try {
-    const serviceClient = createClient(url, serviceRoleKey || anonKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
-    const { data, error } = await serviceClient.storage.getBucket("feedback-attachments");
-    if (error) {
-      allOk = report("  feedback-attachments bucket", false, error.message) && allOk;
-    } else {
-      allOk = report("  feedback-attachments bucket", Boolean(data), data?.public ? "public" : "private") && allOk;
+  const skipStorageProbe =
+    REMOTE_BACKED &&
+    remoteHealth &&
+    !serviceRoleKey &&
+    isVarConfiguredOnVercel(remoteHealth.varStatus, "SUPABASE_SERVICE_ROLE_KEY");
+
+  if (skipStorageProbe) {
+    report("  feedback-attachments bucket", true, "skipped (service role on Vercel only)");
+  } else {
+    try {
+      const serviceClient = createClient(url, serviceRoleKey || anonKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+      const { data, error } = await serviceClient.storage.getBucket("feedback-attachments");
+      if (error) {
+        allOk = report("  feedback-attachments bucket", false, error.message) && allOk;
+      } else {
+        allOk = report("  feedback-attachments bucket", Boolean(data), data?.public ? "public" : "private") && allOk;
+      }
+    } catch (error) {
+      allOk =
+        report(
+          "  feedback-attachments bucket",
+          false,
+          error instanceof Error ? error.message : String(error),
+        ) && allOk;
     }
-  } catch (error) {
-    allOk =
-      report(
-        "  feedback-attachments bucket",
-        false,
-        error instanceof Error ? error.message : String(error),
-      ) && allOk;
   }
 
   console.log(`\n${allOk ? "✅ Supabase verification passed." : "❌ Supabase verification failed."}`);

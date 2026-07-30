@@ -47,14 +47,22 @@ runStep("1/7 Remote production runtime", "node", [
 ]);
 
 const skipLocalSecrets = process.argv.includes("--remote-only");
+const remoteBackedFlag = skipLocalSecrets ? [] : ["--remote-backed"];
+
 if (skipLocalSecrets) {
   console.log("\nSkipping local secret checks (--remote-only)");
 } else {
-  runStep("2/7 Environment variables", "node", ["scripts/verify-env.mjs"]);
-  runStep("3/7 Supabase connectivity", "node", ["scripts/verify-supabase.mjs"]);
+  runStep("2/7 Environment variables", "node", [
+    "scripts/verify-env.mjs",
+    ...remoteBackedFlag,
+  ]);
+  runStep("3/7 Supabase connectivity", "node", [
+    "scripts/verify-supabase.mjs",
+    ...remoteBackedFlag,
+  ]);
 }
 
-const plaidArgs = ["scripts/verify-plaid.mjs"];
+const plaidArgs = ["scripts/verify-plaid.mjs", ...remoteBackedFlag];
 if (skipRemote) {
   plaidArgs.push("--skip-remote");
 }
@@ -65,8 +73,14 @@ runStep(
 );
 
 if (!skipLocalSecrets) {
-  runStep("5/7 Stripe configuration", "node", ["scripts/verify-stripe.mjs"]);
-  runStep("6/7 Resend configuration", "node", ["scripts/verify-resend.mjs"]);
+  runStep("5/7 Stripe configuration", "node", [
+    "scripts/verify-stripe.mjs",
+    ...remoteBackedFlag,
+  ]);
+  runStep("6/7 Resend configuration", "node", [
+    "scripts/verify-resend.mjs",
+    ...remoteBackedFlag,
+  ]);
 }
 
 if (skipBuild) {
