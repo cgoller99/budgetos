@@ -15,9 +15,14 @@ import {
   hydrateProcessEnvFromFile,
   parseEnvFile,
 } from "./lib/env-utils.mjs";
+import {
+  fetchRemoteProductionHealth,
+  isVarConfiguredOnVercel,
+} from "./lib/remote-production-health.mjs";
 
 hydrateProcessEnvFromFile();
 
+const REMOTE_BACKED = process.argv.includes("--remote-backed");
 const issues = [];
 
 function fail(message) {
@@ -30,6 +35,12 @@ function pass(message) {
 }
 
 console.log("Buxme Resend verification\n");
+
+if (REMOTE_BACKED) {
+  console.log("Remote-backed mode: checking Vercel runtime when local secrets are absent.\n");
+}
+
+const remoteHealth = REMOTE_BACKED ? await fetchRemoteProductionHealth() : null;
 
 if (!fs.existsSync(ENV_PATH)) {
   console.error("✗ .env.local is missing\n");
@@ -50,6 +61,10 @@ function check(name, validator) {
   }
 
   if (status === "absent") {
+    if (name === "RESEND_API_KEY") {
+      validator("");
+      return;
+    }
     fail(`${name} is missing`);
     return;
   }
@@ -63,6 +78,19 @@ function check(name, validator) {
 }
 
 check("RESEND_API_KEY", (apiKey) => {
+  if (!apiKey) {
+    if (
+      REMOTE_BACKED &&
+      remoteHealth &&
+      isVarConfiguredOnVercel(remoteHealth.varStatus, "RESEND_API_KEY")
+    ) {
+      pass("RESEND_API_KEY (configured on Vercel — not exported to .env.local)");
+      return;
+    }
+    fail("RESEND_API_KEY is missing");
+    return;
+  }
+
   if (!apiKey.startsWith("re_") || apiKey.length < 20) {
     fail("RESEND_API_KEY looks invalid (must start with re_ and be at least 20 characters)");
   } else {
@@ -83,7 +111,15 @@ check("RESEND_FROM_NAME", (fromName) => {
 });
 
 const apiKey = getEnv("RESEND_API_KEY");
-if (apiKey && apiKey.startsWith("re_") && apiKey.length >= 20 && !apiKey.includes("xxxx")) {
+const skipApiProbe =
+  REMOTE_BACKED &&
+  remoteHealth &&
+  !apiKey &&
+  isVarConfiguredOnVercel(remoteHealth.varStatus, "RESEND_API_KEY");
+
+if (skipApiProbe) {
+  pass("Resend API probe skipped (secret on Vercel only)");
+} else if (apiKey && apiKey.startsWith("re_") && apiKey.length >= 20 && !apiKey.includes("xxxx")) {
   try {
     const response = await fetch("https://api.resend.com/domains", {
       headers: {
