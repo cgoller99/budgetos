@@ -15,6 +15,10 @@ const MIGRATION_PATH = path.join(
   ROOT,
   "supabase/migrations/20260730_profile_privilege_guard.sql",
 );
+const HEALTH_RPC_MIGRATION_PATH = path.join(
+  ROOT,
+  "supabase/migrations/20260804_profile_privilege_guard_health.sql",
+);
 
 function loadEnvFile(filePath) {
   if (!fs.existsSync(filePath)) {
@@ -98,12 +102,13 @@ async function main() {
     process.exit(1);
   }
 
-  if (!fs.existsSync(MIGRATION_PATH)) {
-    console.error(`Migration file not found: ${MIGRATION_PATH}`);
-    process.exit(1);
+  for (const migrationPath of [MIGRATION_PATH, HEALTH_RPC_MIGRATION_PATH]) {
+    if (!fs.existsSync(migrationPath)) {
+      console.error(`Migration file not found: ${migrationPath}`);
+      process.exit(1);
+    }
   }
 
-  const sql = fs.readFileSync(MIGRATION_PATH, "utf8");
   const client = new pg.Client({
     connectionString: databaseUrl,
     ssl: { rejectUnauthorized: false },
@@ -113,7 +118,10 @@ async function main() {
 
   try {
     await client.connect();
-    await client.query(sql);
+    await client.query(fs.readFileSync(MIGRATION_PATH, "utf8"));
+    console.log("✓ Privilege guard trigger applied.");
+    await client.query(fs.readFileSync(HEALTH_RPC_MIGRATION_PATH, "utf8"));
+    console.log("✓ Privilege guard health RPC applied.");
     console.log("✓ Migration applied successfully.");
   } catch (error) {
     console.error("✗ Migration failed:");

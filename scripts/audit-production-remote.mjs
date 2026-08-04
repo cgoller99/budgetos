@@ -197,6 +197,33 @@ async function main() {
           ? "preference columns present"
           : "run npm run apply:account-management-migration",
       ) && allOk;
+
+    const privilegeGuard = supabaseHealth.body?.profilePrivilegeGuard;
+    if (publicLaunch) {
+      allOk =
+        report(
+          privilegeGuard?.active === true,
+          "Profile privilege guard active",
+          privilegeGuard?.active
+            ? "authenticated privileged updates blocked"
+            : privilegeGuard?.error ??
+                "run npm run apply:profile-privilege-guard",
+        ) && allOk;
+    } else if (privilegeGuard) {
+      if (privilegeGuard.active) {
+        report(
+          true,
+          "Profile privilege guard active",
+          "authenticated privileged updates blocked",
+        );
+      } else {
+        warn(
+          "Profile privilege guard",
+          privilegeGuard.error ??
+            "inactive — run npm run apply:profile-privilege-guard",
+        );
+      }
+    }
   } else {
     allOk =
       report(

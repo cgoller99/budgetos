@@ -1,5 +1,7 @@
 import { checkAccountManagementMigrationApplied } from "@/lib/supabase/applySqlMigration";
 import { verifyAccountPreferencesPersistence } from "@/lib/supabase/accountPreferencesHealth";
+import { checkProfilePrivilegeGuardHealth } from "@/lib/supabase/profilePrivilegeGuardHealth";
+import type { ProfilePrivilegeGuardHealth } from "@/lib/supabase/profilePrivilegeGuardHealth";
 
 const RLS_PROBE_TABLES = [
   "admin_feedback_reports",
@@ -44,6 +46,7 @@ export type SupabaseRlsHealth = {
   accountManagementMigrationApplied: boolean;
   accountPreferencesPersistenceVerified: boolean;
   accountPreferencesPersistenceError: string | null;
+  profilePrivilegeGuard: ProfilePrivilegeGuardHealth;
   probes: Record<string, RlsTableProbe>;
 };
 
@@ -68,6 +71,15 @@ export async function checkSupabaseRlsHealth(): Promise<SupabaseRlsHealth> {
       accountManagementMigrationApplied: false,
       accountPreferencesPersistenceVerified: false,
       accountPreferencesPersistenceError: null,
+      profilePrivilegeGuard: {
+        checked: false,
+        triggerExists: null,
+        privilegedUpdatesBlocked: false,
+        active: false,
+        error: "Supabase is not configured.",
+        applyCommand: "npm run apply:profile-privilege-guard",
+        protectedColumns: [],
+      },
       probes: {},
     };
   }
@@ -135,6 +147,7 @@ export async function checkSupabaseRlsHealth(): Promise<SupabaseRlsHealth> {
           passed: false,
           error: "Migration not applied.",
         };
+  const profilePrivilegeGuard = await checkProfilePrivilegeGuardHealth();
 
   return {
     configured: true,
@@ -146,6 +159,7 @@ export async function checkSupabaseRlsHealth(): Promise<SupabaseRlsHealth> {
     accountManagementMigrationApplied,
     accountPreferencesPersistenceVerified: persistence.passed,
     accountPreferencesPersistenceError: persistence.error,
+    profilePrivilegeGuard,
     probes,
   };
 }

@@ -9,8 +9,15 @@ import {
   assertStripeConfigured,
   getStripeConfig,
 } from "@/lib/stripe/config";
-import { resolvePriceIdForPlan } from "@/lib/stripe/priceResolver";
+import {
+  resolvePriceIdForPlan,
+  resolvePriceIdForPlanStrict,
+} from "@/lib/stripe/priceResolver";
 import type { BillingInterval } from "@/lib/stripe/billingInterval";
+import {
+  detectBillingIntervalFromStripePrice,
+  PLAN_CHANGE_PRORATION_BEHAVIOR,
+} from "@/lib/stripe/planChange";
 import {
   getSubscriptionPeriodEndIso,
   mapProfileToSubscription,
@@ -274,13 +281,31 @@ export async function changeSubscriptionPlan(input: {
     profile.stripe_subscription_id,
     { expand: ["items.data.price.product"] },
   );
-  const itemId = subscription.items.data[0]?.id;
+  const currentItem = subscription.items.data[0];
+  const itemId = currentItem?.id;
+  const currentPrice = currentItem?.price;
 
   if (!itemId) {
     throw new Error("Subscription has no billable items.");
   }
 
-  const priceId = await resolvePriceIdForPlan(input.targetPlan);
+  const currentInterval = detectBillingIntervalFromStripePrice(currentPrice);
+
+  if (!currentInterval) {
+    throw new Error(
+      "Unable to determine your current billing interval. Use the billing portal to change plans, or contact support.",
+    );
+  }
+
+  // Preserve month vs year — never silently switch intervals on Pro ↔ Pro+.
+  const priceId = await resolvePriceIdForPlanStrict(
+    input.targetPlan,
+    currentInterval,
+  );
+
+  if (currentPrice && typeof currentPrice !== "string" && currentPrice.id === priceId) {
+    throw new Error("You are already on that plan.");
+  }
 
   const updated = await stripe.subscriptions.update(subscription.id, {
     items: [
@@ -289,11 +314,13 @@ export async function changeSubscriptionPlan(input: {
         price: priceId,
       },
     ],
-    proration_behavior: "create_prorations",
+    // Intentional: prorate remaining time when switching Pro ↔ Pro+ at the same interval.
+    proration_behavior: PLAN_CHANGE_PRORATION_BEHAVIOR,
     cancel_at_period_end: false,
     metadata: {
       ...subscription.metadata,
       plan: input.targetPlan,
+      billing_interval: currentInterval,
     },
   });
 

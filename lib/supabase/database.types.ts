@@ -904,6 +904,10 @@ export type Database = {
         Args: { p_invite_id: string };
         Returns: undefined;
       };
+      profile_privilege_guard_active: {
+        Args: Record<string, never>;
+        Returns: boolean;
+      };
       user_household_ids: {
         Args: Record<string, never>;
         Returns: string[];

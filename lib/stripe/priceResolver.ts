@@ -3,6 +3,7 @@ import "server-only";
 import type Stripe from "stripe";
 import type { BillingInterval } from "@/lib/stripe/billingInterval";
 import { getStripeConfig } from "@/lib/stripe/config";
+import { missingPlanChangePriceError } from "@/lib/stripe/planChange";
 import { getStripeClient } from "@/lib/stripe/stripeClient";
 
 const resolvedPriceCache: Partial<
@@ -48,9 +49,19 @@ function pickRecurringPrice(
   return monthly ?? prices.find((price) => price.active) ?? prices[0];
 }
 
-export async function resolvePriceIdForPlan(
+function pickExactRecurringPrice(
+  prices: Stripe.Price[],
+  interval: BillingInterval,
+): Stripe.Price | undefined {
+  return prices.find(
+    (price) => price.recurring?.interval === interval && price.active,
+  );
+}
+
+async function resolvePriceIdForPlanInternal(
   plan: "pro" | "pro_plus",
-  interval: BillingInterval = "month",
+  interval: BillingInterval,
+  options: { allowIntervalFallback: boolean },
 ): Promise<string> {
   const cacheKey = `${plan}:${interval}` as const;
   const configuredPriceId = getConfiguredPriceId(plan, interval);
@@ -81,9 +92,11 @@ export async function resolvePriceIdForPlan(
     type: "recurring",
     limit: 20,
   });
-  const selected = pickRecurringPrice(prices.data, interval);
+  const selected = options.allowIntervalFallback
+    ? pickRecurringPrice(prices.data, interval)
+    : pickExactRecurringPrice(prices.data, interval);
 
-  if (!selected?.id) {
+  if (!selected?.id || selected.recurring?.interval !== interval) {
     throw new Error(
       `No active ${interval}ly recurring price found for Stripe product ${productId}.`,
     );
@@ -91,6 +104,32 @@ export async function resolvePriceIdForPlan(
 
   resolvedPriceCache[cacheKey] = selected.id;
   return selected.id;
+}
+
+export async function resolvePriceIdForPlan(
+  plan: "pro" | "pro_plus",
+  interval: BillingInterval = "month",
+): Promise<string> {
+  return resolvePriceIdForPlanInternal(plan, interval, {
+    allowIntervalFallback: true,
+  });
+}
+
+/**
+ * Resolves a price for the exact billing interval only.
+ * Never falls back to monthly/other intervals (used for plan changes).
+ */
+export async function resolvePriceIdForPlanStrict(
+  plan: "pro" | "pro_plus",
+  interval: BillingInterval,
+): Promise<string> {
+  try {
+    return await resolvePriceIdForPlanInternal(plan, interval, {
+      allowIntervalFallback: false,
+    });
+  } catch {
+    throw new Error(missingPlanChangePriceError(plan, interval));
+  }
 }
 
 export function rememberResolvedPriceId(
