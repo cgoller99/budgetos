@@ -120,6 +120,7 @@ function addVercelEnv(name, value) {
       "--value",
       value,
       "--sensitive",
+      "--force",
       "--yes",
     ],
     {
@@ -211,8 +212,16 @@ async function main() {
     }
 
     if (vercelNames.has(name)) {
-      console.log(`  skip ${name} (already on Vercel)`);
-      continue;
+      const isStripeVar = name.startsWith("STRIPE_") || name.startsWith("NEXT_PUBLIC_STRIPE_");
+      const forceStripe =
+        process.argv.includes("--force-stripe") && isStripeVar;
+
+      if (!forceStripe) {
+        console.log(`  skip ${name} (already on Vercel)`);
+        continue;
+      }
+
+      console.log(`  force-update ${name}`);
     }
 
     addVercelEnv(name, value);

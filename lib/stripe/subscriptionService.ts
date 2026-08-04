@@ -27,6 +27,46 @@ import { getStripeClient } from "@/lib/stripe/stripeClient";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { BuxmeSupabaseClient } from "@/lib/supabase/client";
 
+async function assertPriceUsableInCurrentMode(priceId: string): Promise<void> {
+  const stripe = getStripeClient();
+  const usingLiveSecret =
+    getStripeConfig().secretKey?.startsWith("sk_live_") ?? false;
+
+  try {
+    const price = await stripe.prices.retrieve(priceId);
+
+    if (!price.active) {
+      throw new Error(
+        `Stripe price ${priceId} is inactive. Activate it in the Stripe Dashboard or set a different STRIPE_*_PRICE_ID.`,
+      );
+    }
+
+    if (price.livemode !== usingLiveSecret) {
+      throw new Error(
+        usingLiveSecret
+          ? `Stripe price ${priceId} is a test-mode price, but STRIPE_SECRET_KEY is sk_live_. Set live price IDs on Vercel.`
+          : `Stripe price ${priceId} is a live-mode price, but STRIPE_SECRET_KEY is still sk_test_. Set sk_live_ / pk_live_ on Vercel Production and redeploy.`,
+      );
+    }
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("STRIPE_SECRET_KEY")) {
+      throw error;
+    }
+
+    const message = error instanceof Error ? error.message : String(error);
+
+    if (/no such price/i.test(message)) {
+      throw new Error(
+        usingLiveSecret
+          ? `Stripe price ${priceId} was not found in live mode. Update STRIPE_PRO_PRICE_ID / STRIPE_PRO_PLUS_PRICE_ID on Vercel to live price IDs.`
+          : `Stripe price ${priceId} was not found in test mode. Production is still using sk_test_ keys — set sk_live_ / pk_live_ on Vercel (npm run push:stripe-live) and redeploy.`,
+      );
+    }
+
+    throw error;
+  }
+}
+
 type ProfileStripeFields = {
   id: string;
   email: string | null;
@@ -235,6 +275,7 @@ export async function createCheckoutSession(input: {
     input.targetPlan,
     input.billingInterval ?? "month",
   );
+  await assertPriceUsableInCurrentMode(priceId);
 
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",

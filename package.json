@@ -29,6 +29,7 @@
     "test:stripe-plan-change-interval": "node scripts/test-stripe-plan-change-interval.mjs",
     "test:beta-registration": "node scripts/test-beta-registration.mjs",
     "setup:stripe-webhook": "node --env-file=.env.local scripts/setup-stripe-webhook.mjs",
+    "push:stripe-live": "node --env-file=.env.local scripts/push-stripe-live-to-vercel.mjs",
     "setup:production": "node --env-file=.env.local scripts/setup-production.mjs",
     "apply:supabase-sql": "node --env-file=.env.local scripts/apply-supabase-sql-api.mjs",
     "household:migration": "node scripts/print-household-migration.mjs",
