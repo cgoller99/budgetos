@@ -38,7 +38,19 @@ export async function requireStripeApiUser() {
 }
 
 export function stripeErrorResponse(error: unknown, fallback = "Stripe request failed.") {
-  const message = error instanceof Error ? error.message : fallback;
+  let message = fallback;
+
+  if (error instanceof Error && error.message.trim()) {
+    message = error.message;
+  } else if (
+    error &&
+    typeof error === "object" &&
+    "message" in error &&
+    typeof (error as { message: unknown }).message === "string" &&
+    (error as { message: string }).message.trim()
+  ) {
+    message = (error as { message: string }).message;
+  }
 
   return NextResponse.json(
     {

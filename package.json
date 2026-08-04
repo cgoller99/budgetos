@@ -27,6 +27,7 @@
     "test:finance-calculations": "node scripts/test-finance-calculations.mjs",
     "test:profile-privilege-guard": "node scripts/test-profile-privilege-guard.mjs",
     "test:stripe-plan-change-interval": "node scripts/test-stripe-plan-change-interval.mjs",
+    "test:stripe-checkout-privilege": "node scripts/test-stripe-checkout-privilege.mjs",
     "test:beta-registration": "node scripts/test-beta-registration.mjs",
     "setup:stripe-webhook": "node --env-file=.env.local scripts/setup-stripe-webhook.mjs",
     "push:stripe-live": "node --env-file=.env.local scripts/push-stripe-live-to-vercel.mjs",

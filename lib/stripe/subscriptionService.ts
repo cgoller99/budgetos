@@ -231,7 +231,10 @@ export async function getOrCreateStripeCustomer(input: {
     },
   });
 
-  const { error } = await input.supabase
+  // Privilege guard blocks authenticated clients from writing stripe_* fields.
+  // Trusted Stripe server paths must use the service role.
+  const admin = createSupabaseAdminClient();
+  const { error } = await admin
     .from("profiles")
     .update({
       stripe_customer_id: customer.id,
