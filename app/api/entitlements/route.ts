@@ -23,10 +23,18 @@ export async function GET(request: Request) {
 
     let subscription = FREE_SUBSCRIPTION;
 
-    if (isStripeEnabled()) {
-      subscription = shouldRefresh
-        ? await refreshUserSubscriptionFromStripe(auth.supabase, auth.user.id)
-        : await getUserSubscription(auth.supabase, auth.user.id);
+    // Always read profile entitlements so Apple IAP subscribers are recognized.
+    subscription = await getUserSubscription(auth.supabase, auth.user.id);
+
+    if (
+      isStripeEnabled() &&
+      shouldRefresh &&
+      subscription.provider !== "apple"
+    ) {
+      subscription = await refreshUserSubscriptionFromStripe(
+        auth.supabase,
+        auth.user.id,
+      );
     }
 
     const entitlements = getEffectiveEntitlements({

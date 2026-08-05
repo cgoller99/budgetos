@@ -5,6 +5,7 @@ import { FinanceProvider } from "@/context/FinanceContext";
 import { HouseholdProvider } from "@/context/HouseholdContext";
 import { ToastProvider } from "@/context/ToastContext";
 import { AnalyticsProvider } from "@/components/providers/AnalyticsProvider";
+import { CapacitorBootstrap } from "@/components/providers/CapacitorBootstrap";
 import { ThemeInit } from "@/components/providers/ThemeInit";
 
 type AppProvidersProps = {
@@ -15,6 +16,7 @@ export function AppProviders({ children }: AppProvidersProps) {
   return (
     <ToastProvider>
       <ThemeInit />
+      <CapacitorBootstrap />
       <AuthProvider>
         <AnalyticsProvider>
           <HouseholdProvider>

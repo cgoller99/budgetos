@@ -15,6 +15,10 @@ const MIGRATION_PATH = path.join(
   ROOT,
   "supabase/migrations/20260730_profile_privilege_guard.sql",
 );
+const APPLE_IAP_PRIVILEGE_MIGRATION_PATH = path.join(
+  ROOT,
+  "supabase/migrations/20260805_apple_iap_privilege_guard.sql",
+);
 const HEALTH_RPC_MIGRATION_PATH = path.join(
   ROOT,
   "supabase/migrations/20260804_profile_privilege_guard_health.sql",
@@ -102,7 +106,11 @@ async function main() {
     process.exit(1);
   }
 
-  for (const migrationPath of [MIGRATION_PATH, HEALTH_RPC_MIGRATION_PATH]) {
+  for (const migrationPath of [
+    MIGRATION_PATH,
+    APPLE_IAP_PRIVILEGE_MIGRATION_PATH,
+    HEALTH_RPC_MIGRATION_PATH,
+  ]) {
     if (!fs.existsSync(migrationPath)) {
       console.error(`Migration file not found: ${migrationPath}`);
       process.exit(1);
@@ -120,6 +128,8 @@ async function main() {
     await client.connect();
     await client.query(fs.readFileSync(MIGRATION_PATH, "utf8"));
     console.log("✓ Privilege guard trigger applied.");
+    await client.query(fs.readFileSync(APPLE_IAP_PRIVILEGE_MIGRATION_PATH, "utf8"));
+    console.log("✓ Apple IAP privilege columns protected.");
     await client.query(fs.readFileSync(HEALTH_RPC_MIGRATION_PATH, "utf8"));
     console.log("✓ Privilege guard health RPC applied.");
     console.log("✓ Migration applied successfully.");

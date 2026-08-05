@@ -20,7 +20,7 @@ export async function requireStripeApiUser() {
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select(
-      "email, full_name, stripe_customer_id, stripe_subscription_id, subscription_plan, subscription_status, subscription_current_period_end, admin_founder_granted, is_disabled",
+      "email, full_name, stripe_customer_id, stripe_subscription_id, subscription_plan, subscription_status, subscription_current_period_end, subscription_provider, apple_product_id, apple_original_transaction_id, admin_founder_granted, is_disabled",
     )
     .eq("id", user.id)
     .maybeSingle();

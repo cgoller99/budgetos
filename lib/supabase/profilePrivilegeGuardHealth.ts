@@ -12,8 +12,11 @@ const PROBE_PASSWORD = "buxme-privilege-probe-7f3a9c!";
 const PRIVILEGED_UPDATE_ATTEMPTS: Array<Record<string, unknown>> = [
   { subscription_plan: "pro_plus" },
   { subscription_status: "active" },
+  { subscription_provider: "apple" },
   { stripe_customer_id: "cus_privilege_probe" },
   { stripe_subscription_id: "sub_privilege_probe" },
+  { apple_product_id: "co.buxme.app.pro.monthly" },
+  { apple_original_transaction_id: "1000000000000000" },
   { admin_founder_granted: true },
   { beta_status: "approved" },
   { is_disabled: true },
@@ -97,8 +100,11 @@ export async function checkProfilePrivilegeGuardHealth(): Promise<ProfilePrivile
   const protectedColumns = [
     "subscription_plan",
     "subscription_status",
+    "subscription_provider",
     "stripe_customer_id",
     "stripe_subscription_id",
+    "apple_product_id",
+    "apple_original_transaction_id",
     "admin_founder_granted",
     "beta_status",
     "is_disabled",

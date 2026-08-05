@@ -10,24 +10,32 @@ export type SubscriptionStatus =
 
 export type PaidSubscriptionPlan = Exclude<SubscriptionPlan, "free">;
 
+export type SubscriptionProvider = "none" | "stripe" | "apple";
+
 export type UserSubscription = {
   plan: SubscriptionPlan;
   status: SubscriptionStatus;
+  provider: SubscriptionProvider;
   currentPeriodEnd: string | null;
   cancelAtPeriodEnd: boolean;
   stripeCustomerId: string | null;
   stripeSubscriptionId: string | null;
   stripePriceId: string | null;
+  appleProductId: string | null;
+  appleOriginalTransactionId: string | null;
 };
 
 export const FREE_SUBSCRIPTION: UserSubscription = {
   plan: "free",
   status: "none",
+  provider: "none",
   currentPeriodEnd: null,
   cancelAtPeriodEnd: false,
   stripeCustomerId: null,
   stripeSubscriptionId: null,
   stripePriceId: null,
+  appleProductId: null,
+  appleOriginalTransactionId: null,
 };
 
 const PLAN_RANK: Record<SubscriptionPlan, number> = {

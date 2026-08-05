@@ -11,6 +11,8 @@ const REDIRECT_URLS = [
   `${SITE_URL}/auth/confirm`,
   `${SITE_URL}/household/invite/*`,
   `${SITE_URL}/**`,
+  "buxme://auth/callback",
+  "buxme://oauth/plaid",
   "http://localhost:3000/auth/callback",
   "http://localhost:3000/auth/confirm",
   "http://localhost:3000/**",

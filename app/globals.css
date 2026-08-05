@@ -576,6 +576,30 @@ body {
   padding-right: env(safe-area-inset-right);
 }
 
+/* Capacitor iOS: avoid notch / home-indicator clipping and keyboard overlap */
+html[data-native="true"] body {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  min-height: 100dvh;
+}
+
+html[data-native="true"] {
+  --native-safe-top: env(safe-area-inset-top, 0px);
+  --native-safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+html[data-native="true"] .app-shell,
+html[data-native="true"] [data-app-shell] {
+  padding-top: max(0px, var(--native-safe-top));
+  padding-bottom: max(0px, var(--native-safe-bottom));
+}
+
+html[data-native="true"] input,
+html[data-native="true"] textarea,
+html[data-native="true"] select {
+  scroll-margin-bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
+}
+
 @media (max-width: 1023px) {
   table {
     display: block;

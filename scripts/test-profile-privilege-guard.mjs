@@ -34,6 +34,19 @@ const REQUIRED_PROTECTED_COLUMNS = [
   "beta_status",
 ];
 
+const APPLE_IAP_PRIVILEGE_MIGRATION_PATH = path.join(
+  ROOT,
+  "supabase/migrations/20260805_apple_iap_privilege_guard.sql",
+);
+
+const APPLE_PROTECTED_COLUMNS = [
+  "subscription_provider",
+  "apple_product_id",
+  "apple_original_transaction_id",
+  "apple_transaction_id",
+  "apple_environment",
+];
+
 function assert(condition, message) {
   if (!condition) {
     throw new Error(message);
@@ -136,8 +149,26 @@ function main() {
     "Supabase RLS health payload must expose profilePrivilegeGuard",
   );
 
+  assert(
+    fs.existsSync(APPLE_IAP_PRIVILEGE_MIGRATION_PATH),
+    `Missing Apple IAP privilege migration: ${APPLE_IAP_PRIVILEGE_MIGRATION_PATH}`,
+  );
+  const appleSql = fs.readFileSync(APPLE_IAP_PRIVILEGE_MIGRATION_PATH, "utf8");
+  for (const column of APPLE_PROTECTED_COLUMNS) {
+    assert(
+      appleSql.includes(column),
+      `Apple IAP privilege migration must protect: ${column}`,
+    );
+  }
+  assert(
+    healthModule.includes("subscription_provider") &&
+      healthModule.includes("apple_original_transaction_id"),
+    "Health probe must attempt Apple entitlement privilege updates",
+  );
+
   console.log("✅ Profile privilege guard migration checks passed.");
   console.log("  • trigger migration present");
+  console.log("  • Apple IAP privilege columns protected");
   console.log("  • production health RPC migration present");
   console.log("  • behavioral health probe wired into /api/health/supabase");
 }

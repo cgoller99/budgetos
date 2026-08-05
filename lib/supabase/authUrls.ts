@@ -38,6 +38,9 @@ export function getAuthCallbackUrl(nextPath: string): string {
   const next =
     nextPath.startsWith("/") && !nextPath.startsWith("//") ? nextPath : "/onboarding";
 
+  // Email clients open HTTPS. Universal Links (when configured) hand off into
+  // the Capacitor app. Custom-scheme callbacks remain available via deep-link
+  // handling for buxme://auth/callback.
   return `${getSiteUrl()}/auth/callback?next=${encodeURIComponent(next)}`;
 }
 
