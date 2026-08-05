@@ -83,7 +83,7 @@ export async function proxy(request: NextRequest) {
     const { data: profile } = await supabase
       .from("profiles")
       .select(
-        "subscription_plan, subscription_status, stripe_customer_id, stripe_subscription_id, subscription_current_period_end",
+        "subscription_plan, subscription_status, subscription_provider, stripe_customer_id, stripe_subscription_id, subscription_current_period_end, apple_product_id, apple_original_transaction_id",
       )
       .eq("id", user.id)
       .maybeSingle();

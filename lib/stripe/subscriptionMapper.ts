@@ -2,6 +2,7 @@ import type Stripe from "stripe";
 import type {
   PaidSubscriptionPlan,
   SubscriptionPlan,
+  SubscriptionProvider,
   SubscriptionStatus,
   UserSubscription,
 } from "@/lib/subscription/types";
@@ -16,7 +17,21 @@ type SubscriptionProfileFields = Pick<
   | "subscription_plan"
   | "subscription_status"
   | "subscription_current_period_end"
->;
+> & {
+  subscription_provider?: string | null;
+  apple_product_id?: string | null;
+  apple_original_transaction_id?: string | null;
+};
+
+function normalizeProvider(
+  value: string | null | undefined,
+): SubscriptionProvider {
+  if (value === "stripe" || value === "apple") {
+    return value;
+  }
+
+  return "none";
+}
 
 function normalizePlan(value: string | null | undefined): SubscriptionPlan {
   if (value === "pro_plus") {
@@ -53,11 +68,14 @@ export function mapProfileToSubscription(
   return {
     plan: normalizePlan(profile.subscription_plan),
     status: normalizeStatus(profile.subscription_status),
+    provider: normalizeProvider(profile.subscription_provider),
     currentPeriodEnd: profile.subscription_current_period_end,
     cancelAtPeriodEnd: false,
     stripeCustomerId: profile.stripe_customer_id,
     stripeSubscriptionId: profile.stripe_subscription_id,
     stripePriceId: null,
+    appleProductId: profile.apple_product_id ?? null,
+    appleOriginalTransactionId: profile.apple_original_transaction_id ?? null,
   };
 }
 
@@ -108,11 +126,14 @@ export function mapStripeSubscriptionToUserSubscription(
   return {
     plan,
     status,
+    provider: "stripe",
     currentPeriodEnd: getSubscriptionPeriodEndIso(subscription),
     cancelAtPeriodEnd: subscription.cancel_at_period_end ?? false,
     stripeCustomerId: customerId,
     stripeSubscriptionId: subscription.id,
     stripePriceId: priceId,
+    appleProductId: null,
+    appleOriginalTransactionId: null,
   };
 }
 

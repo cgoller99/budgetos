@@ -5,8 +5,18 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { HouseholdSection } from "@/components/household/HouseholdSection";
 import { ConnectedInstitutionsSection } from "@/components/settings/ConnectedInstitutionsSection";
+import { AccountDeletionSection } from "@/components/settings/AccountDeletionSection";
 import { BillingSection } from "@/components/settings/BillingSection";
-import { Button, Card, CardContent, CardHeader, FormField, Input, SettingsSkeleton } from "@/components/ui";
+import {
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  FormField,
+  Input,
+  PreferenceToggle,
+  SettingsSkeleton,
+} from "@/components/ui";
 import { pageContainerClassName } from "@/components/ui/tokens";
 import { cn } from "@/components/ui/cn";
 import { useAuth } from "@/context/AuthContext";
@@ -104,43 +114,6 @@ function formatSessionDate(value: string | number | undefined): string {
     hour: "numeric",
     minute: "2-digit",
   });
-}
-
-function PreferenceToggle({
-  checked,
-  disabled,
-  onChange,
-  label,
-}: {
-  checked: boolean;
-  disabled?: boolean;
-  onChange: (checked: boolean) => void;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className={cn(
-        "relative inline-flex h-7 w-12 shrink-0 rounded-full border transition-all duration-200 ease-out",
-        checked
-          ? "border-[var(--accent)]/40 bg-[var(--accent)]/30"
-          : "border-white/[0.08] bg-white/[0.04]",
-        disabled && "cursor-not-allowed opacity-60",
-      )}
-    >
-      <span
-        className={cn(
-          "absolute top-0.5 size-6 rounded-full bg-white shadow transition-transform duration-200 ease-out",
-          checked ? "translate-x-5" : "translate-x-0.5",
-        )}
-      />
-    </button>
-  );
 }
 
 export function SettingsContent() {
@@ -396,6 +369,8 @@ export function SettingsContent() {
       </Card>
 
       {isConfigured && <BillingSection />}
+
+      {isConfigured && <AccountDeletionSection />}
 
       <Card padding="lg">
         <CardHeader

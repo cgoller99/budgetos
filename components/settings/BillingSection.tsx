@@ -8,6 +8,17 @@ import { cn } from "@/components/ui/cn";
 import { useSubscription } from "@/context/SubscriptionContext";
 import { useToast } from "@/context/ToastContext";
 import { ANALYTICS_EVENTS, trackEvent } from "@/lib/analytics/client";
+import {
+  purchaseAndVerifyNativePlan,
+  restoreAndVerifyNativePurchases,
+} from "@/lib/iap/clientApi";
+import { Browser } from "@capacitor/browser";
+import {
+  APPLE_MANAGE_SUBSCRIPTIONS_URL,
+  IAP_PRODUCTS,
+  type IapPlan,
+} from "@/lib/iap/products";
+import { isNativePlatform, shouldUseNativeStoreBilling } from "@/lib/native/platform";
 import { PLAN_DEFINITIONS } from "@/lib/subscription/plans";
 import {
   getPlanDisplayName,
@@ -62,10 +73,20 @@ function getPlanPriceLabel(plan: SubscriptionPlan): string {
   return "$0/forever";
 }
 
+async function openAppleManageSubscriptions() {
+  if (isNativePlatform()) {
+    await Browser.open({ url: APPLE_MANAGE_SUBSCRIPTIONS_URL });
+    return;
+  }
+
+  window.open(APPLE_MANAGE_SUBSCRIPTIONS_URL, "_blank", "noopener,noreferrer");
+}
+
 export function BillingSection() {
   const { showToast } = useToast();
   const searchParams = useSearchParams();
   const stripeEnabled = isStripeClientEnabled();
+  const nativeStoreBilling = shouldUseNativeStoreBilling();
   const {
     subscription,
     isLoading,
@@ -147,6 +168,52 @@ export function BillingSection() {
     });
   }
 
+  async function handleNativePurchase(plan: IapPlan) {
+    await runAction(`iap-${plan}`, async () => {
+      if (
+        subscription.provider === "stripe" &&
+        hasActiveSubscription(subscription)
+      ) {
+        throw new Error(
+          "You already have a web subscription. Manage it on buxme.co or cancel it before buying in the App Store.",
+        );
+      }
+
+      await purchaseAndVerifyNativePlan(plan);
+      await refreshSubscription({ refresh: true });
+      trackEvent(ANALYTICS_EVENTS.SUBSCRIPTION_PURCHASED, {
+        plan,
+        provider: "apple",
+      });
+      showToast({
+        title: "Subscription updated",
+        subtitle: `Buxme ${getPlanDisplayName(plan)} is now active via the App Store.`,
+      });
+    });
+  }
+
+  async function handleRestorePurchases() {
+    await runAction("restore", async () => {
+      const result = await restoreAndVerifyNativePurchases();
+      await refreshSubscription({ refresh: true });
+
+      if (!result.restored) {
+        showToast({
+          title: "No purchases found",
+          subtitle: "We couldn't find an App Store subscription for this Apple ID.",
+        });
+        return;
+      }
+
+      showToast({
+        title: "Purchases restored",
+        subtitle: result.plan
+          ? `Restored Buxme ${getPlanDisplayName(result.plan)}.`
+          : "Your App Store subscription was restored.",
+      });
+    });
+  }
+
   async function handleChangePlan(plan: PaidSubscriptionPlan) {
     await runAction(`change-${plan}`, async () => {
       const currentPlan = subscription.plan;
@@ -154,9 +221,15 @@ export function BillingSection() {
       await refreshSubscription({ refresh: true });
 
       if (plan === "pro_plus" && currentPlan === "pro") {
-        trackEvent(ANALYTICS_EVENTS.SUBSCRIPTION_UPGRADED, { from: currentPlan, to: plan });
+        trackEvent(ANALYTICS_EVENTS.SUBSCRIPTION_UPGRADED, {
+          from: currentPlan,
+          to: plan,
+        });
       } else if (plan === "pro" && currentPlan === "pro_plus") {
-        trackEvent(ANALYTICS_EVENTS.SUBSCRIPTION_DOWNGRADED, { from: currentPlan, to: plan });
+        trackEvent(ANALYTICS_EVENTS.SUBSCRIPTION_DOWNGRADED, {
+          from: currentPlan,
+          to: plan,
+        });
       }
 
       showToast({
@@ -170,7 +243,9 @@ export function BillingSection() {
     await runAction("cancel", async () => {
       await cancelStripeSubscription({ atPeriodEnd: true });
       await refreshSubscription({ refresh: true });
-      trackEvent(ANALYTICS_EVENTS.SUBSCRIPTION_CANCELLED, { plan: subscription.plan });
+      trackEvent(ANALYTICS_EVENTS.SUBSCRIPTION_CANCELLED, {
+        plan: subscription.plan,
+      });
       showToast({
         title: "Subscription canceled",
         subtitle: "Your plan stays active until the end of the billing period.",
@@ -196,7 +271,7 @@ export function BillingSection() {
     });
   }
 
-  if (!stripeEnabled && !isFounder) {
+  if (!nativeStoreBilling && !stripeEnabled && !isFounder) {
     return (
       <Card padding="lg" id="billing">
         <CardHeader
@@ -213,7 +288,7 @@ export function BillingSection() {
     );
   }
 
-  if (!stripeEnabled && isFounder) {
+  if (!nativeStoreBilling && !stripeEnabled && isFounder) {
     return (
       <Card padding="lg" id="billing">
         <CardHeader
@@ -232,6 +307,8 @@ export function BillingSection() {
 
   const activePaid = hasActiveSubscription(subscription);
   const currentPlan = subscription.plan;
+  const isAppleBilled = subscription.provider === "apple";
+  const isStripeBilled = subscription.provider === "stripe" && activePaid;
 
   return (
     <Card padding="lg" id="billing">
@@ -257,20 +334,46 @@ export function BillingSection() {
               Upgrade to {getPlanDisplayName(upgradePlan)} to unlock this feature
             </p>
             <p className="mt-2 text-sm text-[var(--text-muted)]">
-              Choose a plan below to continue. Checkout opens securely through Stripe.
+              {nativeStoreBilling
+                ? "Choose a plan below. Purchases use Apple In-App Purchase."
+                : "Choose a plan below to continue. Checkout opens securely through Stripe."}
             </p>
           </div>
         ) : null}
 
         {isFounder && (
           <div className="rounded-2xl border border-[var(--accent)]/20 bg-[var(--accent)]/10 px-5 py-4">
-            <p className="text-sm font-medium text-[var(--accent-light)]">Founder access</p>
+            <p className="text-sm font-medium text-[var(--accent-light)]">
+              Founder access
+            </p>
             <p className="mt-2 text-sm leading-relaxed text-white/55">
-              All premium features are unlocked on this account. Stripe checkout is
-              optional — use the tools below to test billing flows in Test Mode.
+              All premium features are unlocked on this account.
+              {nativeStoreBilling
+                ? " App Store purchase tools below are optional for testing."
+                : " Stripe checkout is optional — use the tools below to test billing flows in Test Mode."}
             </p>
           </div>
         )}
+
+        {nativeStoreBilling && isStripeBilled && !isFounder ? (
+          <div className="rounded-2xl border border-[var(--warning)]/25 bg-[var(--warning-muted)] px-5 py-4">
+            <p className="text-sm font-medium text-[var(--foreground)]">
+              Web subscription active
+            </p>
+            <p className="mt-2 text-sm leading-relaxed text-white/55">
+              Your Buxme plan is billed through Stripe on the web. Manage or cancel
+              it at{" "}
+              <a
+                href="https://buxme.co/settings#billing"
+                className="text-[var(--accent-light)] underline-offset-2 hover:underline"
+              >
+                buxme.co/settings
+              </a>
+              . App Store purchases are blocked while this subscription is active
+              to prevent double billing.
+            </p>
+          </div>
+        ) : null}
 
         <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] px-5 py-4">
           <p className="text-sm font-medium text-white/45">Current plan</p>
@@ -281,10 +384,20 @@ export function BillingSection() {
             {isFounder
               ? "Premium access granted via Founder Mode."
               : activePaid
-                ? subscription.cancelAtPeriodEnd
-                  ? `Access until ${formatRenewalDate(subscription.currentPeriodEnd)}`
-                  : `Renews ${formatRenewalDate(subscription.currentPeriodEnd)}`
-                : "Choose a paid plan to unlock household collaboration and advanced reports."}
+                ? `${
+                    isAppleBilled
+                      ? "Billed via App Store. "
+                      : isStripeBilled
+                        ? "Billed via Stripe. "
+                        : ""
+                  }${
+                    subscription.cancelAtPeriodEnd
+                      ? `Access until ${formatRenewalDate(subscription.currentPeriodEnd)}`
+                      : `Renews ${formatRenewalDate(subscription.currentPeriodEnd)}`
+                  }`
+                : nativeStoreBilling
+                  ? "Choose a paid plan to unlock household collaboration and advanced reports. Purchases use Apple In-App Purchase."
+                  : "Choose a paid plan to unlock household collaboration and advanced reports."}
           </p>
         </div>
 
@@ -315,7 +428,9 @@ export function BillingSection() {
                   <p className="mt-2 text-lg font-semibold text-white">
                     {plan.id === "free"
                       ? plan.priceLabel
-                      : getPlanPriceLabel(plan.id)}
+                      : nativeStoreBilling
+                        ? `${IAP_PRODUCTS[plan.id as IapPlan].label} · App Store`
+                        : getPlanPriceLabel(plan.id)}
                   </p>
                   <p className="mt-2 text-xs leading-relaxed text-white/45">
                     {plan.description}
@@ -334,6 +449,25 @@ export function BillingSection() {
                       </p>
                     ) : isCurrent ? (
                       <p className="text-xs text-white/35">Your active paid plan</p>
+                    ) : nativeStoreBilling ? (
+                      isStripeBilled ? (
+                        <p className="text-xs text-white/35">
+                          Manage on the web to avoid duplicate billing
+                        </p>
+                      ) : !activePaid || isAppleBilled ? (
+                        <Button
+                          size="sm"
+                          className="w-full"
+                          disabled={isLoading || pendingAction !== null}
+                          onClick={() =>
+                            void handleNativePurchase(plan.id as IapPlan)
+                          }
+                        >
+                          {pendingAction === `iap-${plan.id}`
+                            ? "Purchasing..."
+                            : `Subscribe to ${plan.name}`}
+                        </Button>
+                      ) : null
                     ) : !activePaid ? (
                       <Button
                         size="sm"
@@ -385,7 +519,28 @@ export function BillingSection() {
         {error && <p className="text-sm text-amber-300">{error}</p>}
 
         <div className="flex flex-wrap gap-2">
-          {!isFounder && activePaid && (
+          {nativeStoreBilling && (
+            <>
+              <Button
+                variant="secondary"
+                size="md"
+                disabled={isLoading || pendingAction !== null}
+                onClick={() => void handleRestorePurchases()}
+              >
+                {pendingAction === "restore" ? "Restoring..." : "Restore Purchases"}
+              </Button>
+              <Button
+                variant="secondary"
+                size="md"
+                disabled={isLoading || pendingAction !== null}
+                onClick={() => void openAppleManageSubscriptions()}
+              >
+                Manage App Store subscription
+              </Button>
+            </>
+          )}
+
+          {!nativeStoreBilling && !isFounder && activePaid && (
             <>
               <Button
                 variant="secondary"
@@ -419,7 +574,8 @@ export function BillingSection() {
               )}
             </>
           )}
-          {isFounder && stripeEnabled && (
+
+          {!nativeStoreBilling && isFounder && stripeEnabled && (
             <>
               <Button
                 variant="secondary"
@@ -427,9 +583,7 @@ export function BillingSection() {
                 disabled={isLoading || pendingAction !== null}
                 onClick={() => void handlePortal()}
               >
-                {pendingAction === "portal"
-                  ? "Opening..."
-                  : "Test Stripe portal"}
+                {pendingAction === "portal" ? "Opening..." : "Test Stripe portal"}
               </Button>
               <Button
                 variant="secondary"
@@ -443,6 +597,7 @@ export function BillingSection() {
               </Button>
             </>
           )}
+
           <Button
             variant="secondary"
             size="md"
@@ -456,7 +611,10 @@ export function BillingSection() {
         {!isFounder && !userHasPro && (
           <p className="text-xs text-white/35">
             Household collaboration requires{" "}
-            <Link href="#billing" className="text-[var(--accent-light)] hover:text-[var(--accent)]">
+            <Link
+              href="#billing"
+              className="text-[var(--accent-light)] hover:text-[var(--accent)]"
+            >
               Buxme Pro
             </Link>
             .
@@ -466,21 +624,30 @@ export function BillingSection() {
         {!isFounder && !userHasProPlus && (
           <p className="text-xs text-white/35">
             Advanced reports require{" "}
-            <Link href="#billing" className="text-[var(--accent-light)] hover:text-[var(--accent)]">
+            <Link
+              href="#billing"
+              className="text-[var(--accent-light)] hover:text-[var(--accent)]"
+            >
               Buxme Pro+
             </Link>
             .
           </p>
         )}
 
-        {!isFounder && (
+        {nativeStoreBilling ? (
+          <p className="text-xs text-white/32">
+            iOS subscriptions use Apple In-App Purchase. Existing Stripe
+            subscribers keep access after login. Payment is charged to your Apple
+            ID. Manage or cancel in Settings → Apple ID → Subscriptions.
+          </p>
+        ) : !isFounder ? (
           <p className="text-xs text-white/32">
             Secure billing powered by Stripe Checkout and Customer Portal. Test
             mode accepts card 4242 4242 4242 4242.
           </p>
-        )}
+        ) : null}
 
-        {isFounder && stripeEnabled && (
+        {!nativeStoreBilling && isFounder && stripeEnabled && (
           <p className="text-xs text-white/32">
             Stripe test tools above are optional and do not affect your Founder
             access.

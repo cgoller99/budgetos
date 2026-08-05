@@ -23,6 +23,11 @@ export type ProfileRow = {
   subscription_plan: string;
   subscription_status: string;
   subscription_current_period_end: string | null;
+  subscription_provider: string;
+  apple_product_id: string | null;
+  apple_original_transaction_id: string | null;
+  apple_transaction_id: string | null;
+  apple_environment: string | null;
   is_disabled: boolean;
   admin_founder_granted: boolean;
   last_active_at: string | null;
@@ -47,6 +52,11 @@ export type ProfileInsert = {
   subscription_plan?: string;
   subscription_status?: string;
   subscription_current_period_end?: string | null;
+  subscription_provider?: string;
+  apple_product_id?: string | null;
+  apple_original_transaction_id?: string | null;
+  apple_transaction_id?: string | null;
+  apple_environment?: string | null;
   is_disabled?: boolean;
   admin_founder_granted?: boolean;
   last_active_at?: string | null;

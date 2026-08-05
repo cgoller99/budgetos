@@ -76,6 +76,9 @@ type ProfileStripeFields = {
   subscription_plan: string;
   subscription_status: string;
   subscription_current_period_end: string | null;
+  subscription_provider: string | null;
+  apple_product_id: string | null;
+  apple_original_transaction_id: string | null;
 };
 
 async function loadProfileByUserId(
@@ -85,7 +88,7 @@ async function loadProfileByUserId(
   const { data, error } = await supabase
     .from("profiles")
     .select(
-      "id, email, full_name, stripe_customer_id, stripe_subscription_id, subscription_plan, subscription_status, subscription_current_period_end",
+      "id, email, full_name, stripe_customer_id, stripe_subscription_id, subscription_plan, subscription_status, subscription_current_period_end, subscription_provider, apple_product_id, apple_original_transaction_id",
     )
     .eq("id", userId)
     .maybeSingle();
@@ -104,7 +107,7 @@ async function loadProfileByCustomerId(
   const { data, error } = await supabase
     .from("profiles")
     .select(
-      "id, email, full_name, stripe_customer_id, stripe_subscription_id, subscription_plan, subscription_status, subscription_current_period_end",
+      "id, email, full_name, stripe_customer_id, stripe_subscription_id, subscription_plan, subscription_status, subscription_current_period_end, subscription_provider, apple_product_id, apple_original_transaction_id",
     )
     .eq("stripe_customer_id", customerId)
     .maybeSingle();
@@ -118,20 +121,18 @@ async function loadProfileByCustomerId(
 
 function persistSubscriptionFields(
   mapped: UserSubscription,
-): Pick<
-  ProfileStripeFields,
-  | "stripe_customer_id"
-  | "stripe_subscription_id"
-  | "subscription_plan"
-  | "subscription_status"
-  | "subscription_current_period_end"
-> {
+): Record<string, string | null> {
   return {
     stripe_customer_id: mapped.stripeCustomerId,
     stripe_subscription_id: mapped.stripeSubscriptionId,
     subscription_plan: mapped.plan,
     subscription_status: mapped.status,
     subscription_current_period_end: mapped.currentPeriodEnd,
+    subscription_provider: "stripe",
+    apple_product_id: null,
+    apple_original_transaction_id: null,
+    apple_transaction_id: null,
+    apple_environment: null,
   };
 }
 
@@ -148,6 +149,11 @@ export async function refreshUserSubscriptionFromStripe(
   userId: string,
 ): Promise<UserSubscription> {
   const profile = await loadProfileByUserId(supabase, userId);
+
+  // Do not overwrite an active Apple entitlement with a Stripe refresh.
+  if (profile?.subscription_provider === "apple") {
+    return mapProfileToSubscription(profile);
+  }
 
   if (!profile?.stripe_customer_id) {
     return mapProfileToSubscription(profile);
@@ -198,12 +204,23 @@ export async function refreshUserSubscriptionFromStripe(
 
 async function clearSubscriptionOnProfile(userId: string): Promise<void> {
   const supabase = createSupabaseAdminClient();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("subscription_provider")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (profile?.subscription_provider === "apple") {
+    return;
+  }
+
   await supabase
     .from("profiles")
     .update({
       stripe_subscription_id: null,
       subscription_plan: "free",
       subscription_status: "none",
+      subscription_provider: "none",
       subscription_current_period_end: null,
       updated_at: new Date().toISOString(),
     })
@@ -262,6 +279,17 @@ export async function createCheckoutSession(input: {
   const customerId = await getOrCreateStripeCustomer(input);
   const stripe = getStripeClient();
   const current = await getUserSubscription(input.supabase, input.userId);
+
+  if (
+    current.provider === "apple" &&
+    (current.status === "active" ||
+      current.status === "trialing" ||
+      current.status === "past_due")
+  ) {
+    throw new Error(
+      "You already have an App Store subscription. Manage it in Settings → Apple ID → Subscriptions, or restore purchases in the iOS app.",
+    );
+  }
 
   if (
     current.stripeSubscriptionId &&
@@ -454,6 +482,20 @@ export async function syncSubscriptionToProfile(
       "[stripe] No profile found for customer",
       customerId,
       subscription.id,
+    );
+    return;
+  }
+
+  // Never clobber an Apple IAP entitlement from a Stripe webhook.
+  if (
+    profile.subscription_provider === "apple" &&
+    (profile.subscription_status === "active" ||
+      profile.subscription_status === "trialing" ||
+      profile.subscription_status === "past_due")
+  ) {
+    console.warn(
+      "[stripe] Skipping Stripe sync for Apple-billed profile",
+      profile.id,
     );
     return;
   }
