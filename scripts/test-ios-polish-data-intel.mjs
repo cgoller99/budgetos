@@ -7,11 +7,8 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
-import { createRequire } from "node:module";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
-const require = createRequire(import.meta.url);
 
 // ─── Currency formatting (mirrors lib/finance/format.ts rules) ───
 function formatCurrency(amount) {
