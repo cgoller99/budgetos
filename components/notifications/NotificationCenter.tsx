@@ -29,6 +29,7 @@ import {
   isWeeklySummaryNotification,
   retryScrollToDashboardSection,
 } from "@/lib/ui/dashboardSections";
+import { useNativeIos } from "@/lib/native/useNativeIos";
 
 const INITIAL_VISIBLE = 12;
 const LOAD_MORE_STEP = 12;
@@ -204,6 +205,7 @@ function NotificationRow({
 
 export function NotificationCenter() {
   const router = useRouter();
+  const nativeIos = useNativeIos();
   const {
     notifications,
     unreadNotificationCount,
@@ -397,17 +399,27 @@ export function NotificationCenter() {
         ref={triggerRef}
         type="button"
         onClick={handleOpen}
-        className="focus-ring relative flex h-11 w-11 items-center justify-center rounded-[var(--radius-card)] border border-[var(--surface-border)] bg-[var(--surface-subtle)] text-[var(--text-muted)] transition-colors hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)]"
+        className={cn(
+          "focus-ring relative flex items-center justify-center text-[var(--text-muted)] transition-colors",
+          nativeIos
+            ? "size-8 rounded-full border-0 bg-transparent text-[var(--text-secondary)] hover:bg-white/[0.06] hover:text-[var(--foreground)]"
+            : "h-11 w-11 rounded-[var(--radius-card)] border border-[var(--surface-border)] bg-[var(--surface-subtle)] hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)]",
+        )}
         aria-label={`Notifications${mergedUnreadCount > 0 ? `, ${mergedUnreadCount} unread` : ""}`}
         aria-expanded={isOpen}
         aria-haspopup="dialog"
       >
-        <span className="text-lg" aria-hidden>
+        <span className={cn(nativeIos ? "text-[15px] leading-none" : "text-lg")} aria-hidden>
           🔔
         </span>
         {mergedUnreadCount > 0 ? (
           <span
-            className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--accent)] px-1 text-[10px] font-semibold text-white"
+            className={cn(
+              "absolute flex items-center justify-center rounded-full bg-[var(--accent)] font-semibold text-white",
+              nativeIos
+                ? "-right-0.5 -top-0.5 h-3.5 min-w-3.5 px-0.5 text-[9px]"
+                : "-right-1 -top-1 h-5 min-w-5 px-1 text-[10px]",
+            )}
             aria-hidden
           >
             {mergedUnreadCount > 9 ? "9+" : mergedUnreadCount}

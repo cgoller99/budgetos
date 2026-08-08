@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { PageIntro } from "@/components/guidance/PageIntro";
+import { IosPageHeader } from "@/components/native/ios/IosPageHeader";
 import { ProfileMenu } from "@/components/navigation/ProfileMenu";
 import { GlobalSearch } from "@/components/search/GlobalSearch";
 import { getNavRoute } from "@/lib/navigation";
@@ -14,6 +15,14 @@ type TopBarProps = {
   notificationCenter?: ReactNode;
 };
 
+function resolveIosTitle(path: string, title: string): string {
+  if (path === "/dashboard") return "Home";
+  if (path === "/transactions") return "Transactions";
+  if (path === "/savings") return "Goals";
+  if (path === "/whats-new") return "What's New";
+  return title;
+}
+
 export function TopBar({
   activeHref = "/dashboard",
   title = "Dashboard",
@@ -23,52 +32,47 @@ export function TopBar({
   const nativeIos = useNativeIos();
   const path = activeHref.split("?")[0] ?? activeHref;
   const isHome = path === "/dashboard";
-  const iosTitle =
-    path === "/dashboard"
-      ? "Home"
-      : path === "/transactions"
-        ? "Transactions"
-        : path === "/savings"
-          ? "Goals"
-          : path === "/whats-new"
-            ? "What's New"
-            : title;
+  const iosTitle = resolveIosTitle(path, title);
+
+  if (nativeIos) {
+    return (
+      <IosPageHeader
+        brand={isHome}
+        title={
+          isHome ? (
+            <>
+              <span className="text-[var(--accent-light)]">bux</span>me
+            </>
+          ) : (
+            iosTitle
+          )
+        }
+        trailing={
+          <>
+            {notificationCenter}
+            {isHome ? null : <ProfileMenu />}
+          </>
+        }
+      />
+    );
+  }
 
   return (
     <header
       className={cn(
         "relative z-30 flex items-start justify-between gap-4 border-b border-[var(--surface-border)] bg-[var(--background)]/40 px-4 py-5 pt-[calc(1.25rem+env(safe-area-inset-top))] backdrop-blur-sm sm:gap-6 sm:px-6 sm:py-6 lg:px-8 lg:py-6 lg:pt-6",
-        nativeIos &&
-          "native-top-bar items-center gap-3 border-b border-white/[0.04] bg-[var(--background)]/92 px-4 py-2.5 pt-[calc(0.35rem+env(safe-area-inset-top))] backdrop-blur-xl",
       )}
-      data-native-top-bar={nativeIos ? "ios" : undefined}
     >
       <div className="min-w-0 flex-1">
-        {nativeIos && isHome ? (
-          <p className="text-[20px] font-semibold leading-none tracking-tight text-[var(--foreground)]">
-            <span className="text-[var(--accent-light)]">bux</span>me
-          </p>
-        ) : (
-          <h1
-            className={cn(
-              "text-lg font-semibold tracking-tight text-[var(--foreground)] sm:text-xl",
-              nativeIos && "text-[17px] font-semibold leading-tight tracking-[-0.01em]",
-            )}
-          >
-            {nativeIos ? iosTitle : title}
-          </h1>
-        )}
-        {!nativeIos ? <PageIntro subtitle={activeRoute?.subtitle} /> : null}
+        <h1 className="text-lg font-semibold tracking-tight text-[var(--foreground)] sm:text-xl">
+          {title}
+        </h1>
+        <PageIntro subtitle={activeRoute?.subtitle} />
       </div>
-      <div
-        className={cn(
-          "flex shrink-0 items-center gap-2 sm:gap-4",
-          nativeIos && "gap-1.5",
-        )}
-      >
-        {!nativeIos ? <GlobalSearch /> : null}
+      <div className="flex shrink-0 items-center gap-2 sm:gap-4">
+        <GlobalSearch />
         {notificationCenter}
-        {nativeIos && isHome ? null : <ProfileMenu />}
+        <ProfileMenu />
       </div>
     </header>
   );

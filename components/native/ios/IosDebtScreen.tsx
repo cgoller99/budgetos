@@ -28,6 +28,7 @@ import {
 } from "@/lib/finance/debts";
 import type { Debt, DebtStrategy } from "@/lib/finance/types";
 import { triggerHaptic } from "@/lib/native/haptics";
+import { cn } from "@/components/ui/cn";
 
 export function IosDebtScreen() {
   const finance = useFinance();
@@ -93,7 +94,14 @@ export function IosDebtScreen() {
               <p className="text-[12px] font-medium text-[var(--text-muted)]">
                 Debt Free Date
               </p>
-              <p className="mt-1 text-[18px] font-semibold tracking-tight text-[var(--foreground)]">
+              <p
+                className={cn(
+                  "mt-1 font-semibold tracking-tight text-[var(--foreground)]",
+                  summary.estimatedDebtFreeDate === "Add payment plan"
+                    ? "text-[15px] leading-snug text-[var(--accent-light)]"
+                    : "text-[18px]",
+                )}
+              >
                 {summary.estimatedDebtFreeDate}
               </p>
             </IosCard>
@@ -123,7 +131,9 @@ export function IosDebtScreen() {
                 {Math.round(summary.debtFreeProgress)}% of total debt paid off
               </p>
               <p className="mt-1 text-[13px] text-[var(--text-muted)]">
-                You’ll be debt free {summary.estimatedDebtFreeDate}
+                {summary.estimatedDebtFreeDate === "Add payment plan"
+                  ? "Add a monthly payment to estimate your debt-free date"
+                  : `You’ll be debt free ${summary.estimatedDebtFreeDate}`}
               </p>
               <IosTextButton
                 className="mt-1 px-0"
@@ -185,15 +195,24 @@ export function IosDebtScreen() {
           </IosSection>
         </>
       ) : (
-        <IosList>
-          <IosListRow
-            title="Add a debt"
-            subtitle="Track balances, APR, and payoff date"
-            leading={<IosAvatar fallback="+" tone="accent" />}
-            onClick={() => setCreateOpen(true)}
-            trailing={<span className="text-[var(--accent-light)]">›</span>}
-          />
-        </IosList>
+        <IosCard padding="md">
+          <p className="text-[15px] font-semibold text-[var(--foreground)]">
+            No debts added
+          </p>
+          <p className="mt-1 text-[13px] text-[var(--text-muted)]">
+            Track balances, APR, and a realistic payoff date.
+          </p>
+          <button
+            type="button"
+            className="mt-4 min-h-11 w-full rounded-[12px] bg-[var(--accent)] text-[15px] font-semibold text-white"
+            onClick={() => {
+              void triggerHaptic("light");
+              setCreateOpen(true);
+            }}
+          >
+            Add debt
+          </button>
+        </IosCard>
       )}
 
       <AddDebtModal isOpen={createOpen} onClose={() => setCreateOpen(false)} />

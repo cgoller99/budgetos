@@ -1,12 +1,41 @@
 import type { KPIMetric } from "./types";
 
+const CURRENCY_FORMATTER = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+function toFiniteNumber(amount: number): number {
+  if (!Number.isFinite(amount)) {
+    return 0;
+  }
+
+  // Guard against floating-point display artifacts (e.g. 3816.1930000001).
+  return Math.round((amount + Number.EPSILON) * 100) / 100;
+}
+
+/** User-facing currency: commas + exactly 2 decimal places (e.g. $3,816.19). */
 export function formatCurrency(amount: number): string {
-  return `$${amount.toLocaleString("en-US")}`;
+  return CURRENCY_FORMATTER.format(toFiniteNumber(amount));
 }
 
 export function formatMonthlyChange(amount: number): string {
-  const sign = amount >= 0 ? "+" : "-";
-  return `${sign}$${Math.abs(amount).toLocaleString("en-US")} this month`;
+  const value = toFiniteNumber(amount);
+  const sign = value >= 0 ? "+" : "-";
+  return `${sign}${formatCurrency(Math.abs(value))} this month`;
+}
+
+export function formatSignedCurrency(amount: number): string {
+  const value = toFiniteNumber(amount);
+  if (value > 0) {
+    return `+${formatCurrency(value)}`;
+  }
+  if (value < 0) {
+    return `−${formatCurrency(Math.abs(value))}`;
+  }
+  return formatCurrency(0);
 }
 
 export function getKPIDisplay(metric: KPIMetric) {

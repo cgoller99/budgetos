@@ -33,6 +33,11 @@ import {
   getTransactionSummary,
   type TransactionFilterState,
 } from "@/lib/transactions";
+import {
+  getDisplayCategory,
+  getDisplayMerchant,
+} from "@/lib/transactions/categoryPresentation";
+import { isConfidentInternalTransfer } from "@/lib/transactions/transferDetection";
 import { hasLinkedFinancialAccounts } from "@/lib/transactions/accountLookup";
 import { isPlaidClientEnabled } from "@/lib/plaid/clientConfig";
 import { triggerHaptic } from "@/lib/native/haptics";
@@ -227,39 +232,50 @@ function IosTransactionsScreenInner() {
       <IosSection title="Transactions">
         {transactions.length === 0 ? (
           <IosCard padding="md">
-            <p className="text-[13px] text-[var(--text-muted)]">
+            <p className="text-[15px] font-semibold text-[var(--foreground)]">
+              {hasActiveFilters ? "No matching transactions" : "No transactions yet"}
+            </p>
+            <p className="mt-1 text-[13px] text-[var(--text-muted)]">
               {hasActiveFilters
-                ? "No matching transactions."
+                ? "Try clearing filters or searching a different merchant."
                 : "Add a transaction or sync linked accounts."}
             </p>
           </IosCard>
         ) : (
           <IosList>
             {transactions.map((transaction) => {
-              const signed =
-                transaction.type === "expense"
-                  ? -transaction.amount
-                  : transaction.amount;
-              const label = transaction.notes || transaction.category;
+              const isTransfer = isConfidentInternalTransfer(finance, transaction);
+              const displayCategory = isTransfer
+                ? "Transfer"
+                : getDisplayCategory(transaction.category);
+              const label = getDisplayMerchant({
+                notes: transaction.notes,
+                category: transaction.category,
+                type: isTransfer ? "transfer" : transaction.type,
+              });
+              const isIncome = transaction.type === "income" && !isTransfer;
+
               return (
                 <IosListRow
                   key={transaction.id}
                   title={label}
-                  subtitle={`${formatTransactionDate(transaction.date)} · ${transaction.category}`}
+                  subtitle={`${formatTransactionDate(transaction.date)} · ${displayCategory}`}
                   leading={
                     <IosAvatar
                       fallback={label.slice(0, 1).toUpperCase()}
-                      tone={signed >= 0 ? "success" : "muted"}
+                      tone={isIncome ? "success" : "muted"}
                     />
                   }
                   trailing={
                     <span
                       className={cn(
-                        signed >= 0 ? "text-[var(--success)]" : "text-[var(--foreground)]",
+                        isIncome
+                          ? "text-[var(--success)]"
+                          : "text-[var(--foreground)]",
                       )}
                     >
-                      {signed >= 0 ? "+" : "−"}
-                      {formatCurrency(Math.abs(signed))}
+                      {isIncome ? "+" : "−"}
+                      {formatCurrency(Math.abs(transaction.amount))}
                     </span>
                   }
                   onClick={() => setEditTransactionId(transaction.id)}

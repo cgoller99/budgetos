@@ -5,9 +5,9 @@ import {
   IosAvatar,
   IosCard,
   IosHeroMetric,
-  IosIconButton,
   IosList,
   IosListRow,
+  IosPrimaryButton,
   IosProgressBar,
   IosScreen,
   IosSection,
@@ -48,40 +48,50 @@ export function IosGoalsScreen() {
 
   return (
     <IosScreen>
-      <div className="flex items-start justify-between gap-3">
-        <IosHeroMetric
-          label="Saved toward goals"
-          value={formatCurrency(totalSaved)}
-          hint={
-            totalTarget > 0
-              ? `of ${formatCurrency(totalTarget)} target`
-              : "Create a goal to track progress"
-          }
-          tone="positive"
-        />
-        <IosIconButton
-          label="Create goal"
-          onClick={() => {
-            void triggerHaptic("light");
-            setIsCreateOpen(true);
-          }}
-        >
-          <span className="text-xl leading-none">+</span>
-        </IosIconButton>
-      </div>
+      <IosHeroMetric
+        label="Saved toward goals"
+        value={formatCurrency(totalSaved)}
+        hint={
+          totalTarget > 0
+            ? `of ${formatCurrency(totalTarget)} target`
+            : "Set targets and track progress over time"
+        }
+        tone="positive"
+      />
 
       {goals.length === 0 ? (
-        <IosList>
-          <IosListRow
-            title="Create your first goal"
-            subtitle="Track progress without cluttering Home"
-            leading={<IosAvatar fallback="+" tone="warning" />}
-            onClick={() => setIsCreateOpen(true)}
-            trailing={<span className="text-[var(--accent-light)]">›</span>}
-          />
-        </IosList>
+        <IosCard padding="md">
+          <p className="text-[15px] font-semibold text-[var(--foreground)]">No goals yet</p>
+          <p className="mt-1 text-[13px] leading-snug text-[var(--text-muted)]">
+            Goals help you save for something specific without cluttering Home.
+          </p>
+          <div className="mt-4">
+            <IosPrimaryButton
+              onClick={() => {
+                void triggerHaptic("light");
+                setIsCreateOpen(true);
+              }}
+            >
+              Create Goal
+            </IosPrimaryButton>
+          </div>
+        </IosCard>
       ) : (
-        <IosSection title="Goals">
+        <IosSection
+          title="Goals"
+          action={
+            <button
+              type="button"
+              className="min-h-11 text-[13px] font-semibold text-[var(--accent-light)]"
+              onClick={() => {
+                void triggerHaptic("light");
+                setIsCreateOpen(true);
+              }}
+            >
+              + New
+            </button>
+          }
+        >
           <div className="space-y-3">
             {goals.map((goal) => (
               <IosCard key={goal.id} padding="md">
@@ -106,8 +116,10 @@ export function IosGoalsScreen() {
                       className="mt-2"
                     />
                     <p className="mt-2 text-[12px] text-[var(--text-muted)]">
-                      {formatCurrency(goal.current)} of {formatCurrency(goal.target)} ·{" "}
-                      {formatGoalDate(goal.estimatedCompletionDate)}
+                      {formatCurrency(goal.current)} of {formatCurrency(goal.target)}
+                      {goal.estimatedCompletionDate
+                        ? ` · target ${formatGoalDate(goal.estimatedCompletionDate)}`
+                        : ""}
                     </p>
                   </div>
                 </button>
@@ -127,6 +139,18 @@ export function IosGoalsScreen() {
             ))}
           </div>
         </IosSection>
+      )}
+
+      {goals.length === 0 ? null : (
+        <IosList>
+          <IosListRow
+            title="Create another goal"
+            subtitle="Emergency fund, trip, or big purchase"
+            leading={<IosAvatar fallback="+" tone="warning" />}
+            onClick={() => setIsCreateOpen(true)}
+            trailing={<span className="text-[var(--accent-light)]">›</span>}
+          />
+        </IosList>
       )}
 
       <CreateGoalModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} />
