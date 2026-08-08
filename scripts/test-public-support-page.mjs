@@ -29,29 +29,28 @@ assert.match(page, /title:\s*"Buxme Support"/);
 assert.match(page, /SupportPageContent/);
 assert.doesNotMatch(page, /\(authenticated\)/);
 
-assert.match(content, /How can we help\?/);
-assert.match(content, /Getting Started/);
-assert.match(content, /Connecting Financial Accounts/);
-assert.match(content, /Income & Paycheck Planning/);
-assert.match(content, /Privacy & Security/);
-assert.match(content, /How do I connect a bank account\?/);
-assert.match(content, /How do I delete my Buxme account\?/);
-assert.match(content, /Is my financial information secure\?/);
+assert.match(content, /Buxme Support/);
+assert.match(content, /Contact Support/);
+assert.match(content, /Account & login help/);
+assert.match(content, /Bank \/ Plaid connection help/);
+assert.match(content, /Subscription & billing help/);
+assert.match(content, /Privacy & security help/);
 assert.match(content, /Plaid/);
 assert.match(content, /never receives or stores your online banking/);
 assert.match(content, /LEGAL_CONTACT_EMAIL/);
 assert.match(content, /mailto:\$\{LEGAL_CONTACT_EMAIL\}/);
-assert.match(content, /Never email passwords/);
+assert.match(content, /Never email passwords|Never include passwords/i);
 assert.match(content, /href="\/privacy"/);
 assert.match(content, /href="\/terms"/);
+assert.match(content, /href="\/security"/);
 assert.match(content, /href="\/"/);
 assert.match(content, /Back to Buxme/);
+assert.match(content, /id="faq"/);
 
 assert.match(constants, /support@buxme\.co/);
 assert.match(sitemap, /\/support/);
 assert.match(footer, /href="\/support"/);
 
-// Must not live under authenticated app segment.
 assert.equal(
   fs.existsSync(path.join(ROOT, "app/(authenticated)/support/page.tsx")),
   false,
