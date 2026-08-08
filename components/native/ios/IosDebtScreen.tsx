@@ -2,10 +2,14 @@
 
 import { useMemo, useState } from "react";
 import {
+  IosAvatar,
+  IosCard,
   IosHeroMetric,
-  IosLink,
+  IosIconButton,
   IosList,
   IosListRow,
+  IosProgressBar,
+  IosRing,
   IosScreen,
   IosSection,
   IosSkeletonScreen,
@@ -24,7 +28,6 @@ import {
 } from "@/lib/finance/debts";
 import type { Debt, DebtStrategy } from "@/lib/finance/types";
 import { triggerHaptic } from "@/lib/native/haptics";
-import { ProgressBar } from "@/components/ui";
 
 export function IosDebtScreen() {
   const finance = useFinance();
@@ -60,72 +63,79 @@ export function IosDebtScreen() {
     <IosScreen>
       <div className="flex items-start justify-between gap-3">
         <IosHeroMetric
-          label="Total debt"
+          label="Total Debt"
           value={formatCurrency(summary.totalDebt)}
-          hint={
-            summary.activeDebtCount > 0
-              ? `${summary.activeDebtCount} active · payoff ${summary.estimatedDebtFreeDate}`
-              : "You’re debt free"
-          }
           tone={summary.totalDebt === 0 ? "positive" : "default"}
         />
-        <IosTextButton
+        <IosIconButton
+          label="Add debt"
           onClick={() => {
             void triggerHaptic("light");
             setCreateOpen(true);
           }}
         >
-          Add
-        </IosTextButton>
+          <span className="text-xl leading-none">+</span>
+        </IosIconButton>
       </div>
 
       {summary.activeDebtCount > 0 ? (
         <>
-          <IosSection title="This month">
-            <IosList>
-              <IosListRow
-                title="Minimum payments"
-                subtitle="Required across debts"
-                trailing={formatCurrency(summary.totalMinimumPayments)}
-              />
-              {summary.nextPayment ? (
-                <IosListRow
-                  title={summary.nextPayment.name}
-                  subtitle={`Next · ${summary.nextPayment.dueDate}`}
-                  trailing={formatCurrency(summary.nextPayment.amount)}
-                />
-              ) : null}
-            </IosList>
-          </IosSection>
-
-          <IosSection title="Payoff progress">
-            <div className="rounded-[12px] bg-[var(--surface-subtle)] px-3.5 py-3.5">
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <p className="text-[14px] font-medium text-[var(--foreground)]">
-                  Debt-free progress
-                </p>
-                <p className="text-[13px] tabular-nums text-[var(--text-muted)]">
-                  {Math.round(summary.debtFreeProgress)}%
-                </p>
-              </div>
-              <ProgressBar value={summary.debtFreeProgress} />
-              <p className="mt-2 text-[12px] text-[var(--text-muted)]">
-                Strategy: {strategy === "avalanche" ? "Avalanche" : "Snowball"} · Est.{" "}
+          <div className="grid grid-cols-2 gap-3">
+            <IosCard padding="md">
+              <p className="text-[12px] font-medium text-[var(--text-muted)]">
+                Monthly Payment
+              </p>
+              <p className="mt-1 text-[18px] font-semibold tabular-nums text-[var(--foreground)]">
+                {formatCurrency(summary.totalMinimumPayments)}
+              </p>
+            </IosCard>
+            <IosCard padding="md">
+              <p className="text-[12px] font-medium text-[var(--text-muted)]">
+                Debt Free Date
+              </p>
+              <p className="mt-1 text-[18px] font-semibold tracking-tight text-[var(--foreground)]">
                 {summary.estimatedDebtFreeDate}
               </p>
-              <div className="mt-2 flex justify-end">
-                <IosTextButton
-                  className="px-0"
-                  onClick={() => {
-                    void triggerHaptic("selection");
-                    setShowDetails((current) => !current);
-                  }}
-                >
-                  {showDetails ? "Hide Details" : "View Details"}
-                </IosTextButton>
-              </div>
+            </IosCard>
+          </div>
+
+          <IosCard padding="md">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <p className="text-[14px] font-semibold text-[var(--foreground)]">
+                Payoff Progress
+              </p>
+              <p className="text-[13px] tabular-nums text-[var(--text-muted)]">
+                {Math.round(summary.debtFreeProgress)}%
+              </p>
             </div>
-          </IosSection>
+            <IosProgressBar value={summary.debtFreeProgress} />
+          </IosCard>
+
+          <IosCard padding="md" className="flex items-center gap-4">
+            <IosRing
+              value={summary.debtFreeProgress}
+              size={72}
+              stroke={7}
+              label={`${Math.round(summary.debtFreeProgress)}%`}
+            />
+            <div className="min-w-0">
+              <p className="text-[15px] font-semibold text-[var(--foreground)]">
+                {Math.round(summary.debtFreeProgress)}% of total debt paid off
+              </p>
+              <p className="mt-1 text-[13px] text-[var(--text-muted)]">
+                You’ll be debt free {summary.estimatedDebtFreeDate}
+              </p>
+              <IosTextButton
+                className="mt-1 px-0"
+                onClick={() => {
+                  void triggerHaptic("selection");
+                  setShowDetails((current) => !current);
+                }}
+              >
+                {showDetails ? "Hide Details" : "View Details"}
+              </IosTextButton>
+            </div>
+          </IosCard>
 
           {showDetails ? (
             <IosSection title="Payoff strategy">
@@ -144,9 +154,18 @@ export function IosDebtScreen() {
                   key={row.id}
                   title={row.name}
                   subtitle={`${row.interestRate}% APR · ${row.accountTypeLabel}`}
+                  leading={
+                    <IosAvatar
+                      fallback={row.name.slice(0, 1).toUpperCase()}
+                      tone="danger"
+                    />
+                  }
                   trailing={
                     <div className="flex flex-col items-end gap-1">
                       <span>{formatCurrency(row.balance)}</span>
+                      <span className="text-[11px] text-[var(--text-muted)]">
+                        {row.progressLabel}
+                      </span>
                       <button
                         type="button"
                         className="text-[12px] font-semibold text-[var(--accent-light)]"
@@ -166,19 +185,15 @@ export function IosDebtScreen() {
           </IosSection>
         </>
       ) : (
-        <IosSection>
-          <IosList>
-            <IosListRow
-              title="Add a debt"
-              subtitle="Track balances, APR, and payoff date"
-              onClick={() => setCreateOpen(true)}
-              trailing={<span className="text-[var(--accent-light)]">›</span>}
-            />
-          </IosList>
-          <div className="mt-3 px-1">
-            <IosLink href="/accounts">Import from Accounts</IosLink>
-          </div>
-        </IosSection>
+        <IosList>
+          <IosListRow
+            title="Add a debt"
+            subtitle="Track balances, APR, and payoff date"
+            leading={<IosAvatar fallback="+" tone="accent" />}
+            onClick={() => setCreateOpen(true)}
+            trailing={<span className="text-[var(--accent-light)]">›</span>}
+          />
+        </IosList>
       )}
 
       <AddDebtModal isOpen={createOpen} onClose={() => setCreateOpen(false)} />

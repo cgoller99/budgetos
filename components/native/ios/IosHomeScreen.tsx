@@ -2,45 +2,41 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
+import { Sparkline } from "@/components/charts/Sparkline";
+import { CHART_COLORS } from "@/components/charts/constants";
 import {
+  IosAvatar,
   IosBanner,
-  IosHeroMetric,
+  IosCard,
   IosLink,
   IosList,
   IosListRow,
+  IosProgressBar,
+  IosRing,
   IosScreen,
   IosSection,
   IosSkeletonScreen,
 } from "@/components/native/ios/IosPrimitives";
 import { useFinance } from "@/context/FinanceContext";
 import { getBillsDueThisWeek } from "@/lib/finance/bills";
-import { formatCurrency } from "@/lib/finance/format";
-import { getTopGoals } from "@/lib/finance/goals";
+import { formatCurrency, formatMonthlyChange } from "@/lib/finance/format";
 import { formatTransactionDate } from "@/lib/transactions";
 import { getPlaidConnectionUiState } from "@/lib/native/plaidConnectionUi";
 import { isPlaidClientEnabled } from "@/lib/plaid/clientConfig";
 import { cn } from "@/components/ui/cn";
-
-type AttentionItem = {
-  id: string;
-  title: string;
-  subtitle: string;
-  href: string;
-  tone?: "warning" | "danger";
-};
 
 export function IosHomeScreen() {
   const finance = useFinance();
   const {
     isLoading,
     dashboard,
+    snapshot,
     transactions,
     bankConnections,
     accounts,
     debts,
     bills,
     income,
-    savingsGoals,
   } = finance;
 
   const connection = useMemo(
@@ -67,76 +63,147 @@ export function IosHomeScreen() {
     [transactions],
   );
 
-  const topGoal = useMemo(() => getTopGoals(finance, 1)[0] ?? null, [finance]);
-
-  const attention = useMemo(() => {
-    const items: AttentionItem[] = [];
-
-    for (const connectionItem of connection.reconnectConnections) {
-      items.push({
-        id: `reconnect-${connectionItem.id}`,
-        title: "Bank needs reconnect",
-        subtitle: connectionItem.institutionName ?? "Linked institution",
-        href: "/accounts",
-        tone: "danger",
-      });
-    }
-
-    const overdueCount = getBillsDueThisWeek(finance).filter(
-      (bill) => bill.status === "overdue",
-    ).length;
-    if (overdueCount > 0) {
-      items.push({
-        id: "overdue-bills",
-        title: `${overdueCount} overdue bill${overdueCount === 1 ? "" : "s"}`,
-        subtitle: "Review and mark paid",
-        href: "/bills",
-        tone: "danger",
-      });
-    }
-
-    return items.slice(0, 3);
-  }, [connection.reconnectConnections, finance]);
+  const netWorthSpark = useMemo(
+    () => snapshot.monthlyTrends.map((point) => point.income - point.spending),
+    [snapshot.monthlyTrends],
+  );
 
   if (isLoading) {
-    return <IosSkeletonScreen rows={5} />;
+    return <IosSkeletonScreen rows={4} />;
   }
 
-  const safeToSpend = dashboard.moneyFlow.safeToSpend;
+  const netWorth = dashboard.kpiMetrics.find((metric) => metric.label === "Net Worth");
+  const cash = dashboard.kpiMetrics.find((metric) => metric.label === "Cash");
+  const debt = dashboard.kpiMetrics.find((metric) => metric.label === "Debt");
+  const moneyFlow = dashboard.moneyFlow;
+  const safeToSpend = moneyFlow.safeToSpend;
+  const plannedBudget = Math.max(moneyFlow.income, 1);
+  const safeProgress = Math.max(
+    0,
+    Math.min(100, (Math.max(safeToSpend, 0) / plannedBudget) * 100),
+  );
+  const health = dashboard.financialHealthScore;
   const nextPaycheck = dashboard.nextPaycheck;
+
+  const checking = accounts
+    .filter((account) => account.type === "checking")
+    .reduce((sum, account) => sum + account.balance, 0);
+  const savings = accounts
+    .filter((account) => account.type === "savings")
+    .reduce((sum, account) => sum + account.balance, 0);
+
   const showConnectCue =
     isPlaidClientEnabled() &&
     connection.phase === "empty" &&
     accounts.length === 0 &&
     debts.length === 0;
 
-  const showIncomeCue = income.length === 0 && bills.length === 0;
-  const showGoalCue = savingsGoals.length === 0;
+  const flowSegments = [
+    { label: "Income", value: Math.max(moneyFlow.income, 0), color: "bg-[var(--success)]" },
+    { label: "Bills", value: Math.max(moneyFlow.bills, 0), color: "bg-[var(--accent)]" },
+    {
+      label: "Expenses",
+      value: Math.max(moneyFlow.debts + moneyFlow.goals + moneyFlow.investments, 0),
+      color: "bg-[var(--warning)]",
+    },
+    {
+      label: "Left",
+      value: Math.max(safeToSpend, 0),
+      color: "bg-white/25",
+    },
+  ];
+  const flowTotal = Math.max(moneyFlow.income, 1);
 
   return (
     <IosScreen>
-      <IosHeroMetric
-        label="Safe to Spend"
-        value={formatCurrency(safeToSpend)}
-        hint="Left after bills, debt, and planned savings"
-        tone={safeToSpend >= 0 ? "default" : "danger"}
-      />
+      <IosCard padding="lg" className="bg-gradient-to-br from-[var(--accent)]/16 via-[var(--surface)] to-[var(--surface)]">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[13px] font-medium text-[var(--text-muted)]">Net Worth</p>
+            <p className="mt-1.5 text-[34px] font-semibold leading-none tracking-tight tabular-nums text-[var(--foreground)]">
+              {netWorth ? formatCurrency(netWorth.value) : "—"}
+            </p>
+            {netWorth ? (
+              <p
+                className={cn(
+                  "mt-2 text-[13px] font-medium",
+                  (netWorth.monthlyChange ?? 0) >= 0
+                    ? "text-[var(--success)]"
+                    : "text-[var(--danger)]",
+                )}
+              >
+                {formatMonthlyChange(netWorth.monthlyChange)}
+              </p>
+            ) : null}
+          </div>
+          <Sparkline
+            values={netWorthSpark.length > 1 ? netWorthSpark : [0, 2, 1, 4, 3, 5]}
+            color={CHART_COLORS.primary}
+            width={112}
+            height={48}
+            className="mt-1 opacity-90"
+          />
+        </div>
+      </IosCard>
 
-      {attention.length > 0 ? (
-        <IosSection title="Needs Attention">
-          <IosList>
-            {attention.map((item) => (
-              <IosListRow
-                key={item.id}
-                title={item.title}
-                subtitle={item.subtitle}
-                href={item.href}
-                danger={item.tone === "danger"}
-                trailing={<span className="text-[var(--accent-light)]">›</span>}
-              />
-            ))}
-          </IosList>
-        </IosSection>
+      <div className="grid grid-cols-2 gap-3">
+        <IosCard padding="md">
+          <p className="text-[12px] font-medium text-[var(--text-muted)]">Cash</p>
+          <p className="mt-1 text-[20px] font-semibold tabular-nums text-[var(--foreground)]">
+            {cash ? formatCurrency(cash.value) : formatCurrency(0)}
+          </p>
+          <p className="mt-2 text-[11px] leading-snug text-[var(--text-subtle)]">
+            Checking {formatCurrency(checking)} · Savings {formatCurrency(savings)}
+          </p>
+        </IosCard>
+
+        <IosCard padding="md">
+          <p className="text-[12px] font-medium text-[var(--text-muted)]">Debt</p>
+          <p className="mt-1 text-[20px] font-semibold tabular-nums text-[var(--foreground)]">
+            {debt ? formatCurrency(debt.value) : formatCurrency(0)}
+          </p>
+          <p className="mt-2 text-[11px] text-[var(--text-subtle)]">
+            {debt ? formatMonthlyChange(debt.monthlyChange) : "No balances"}
+          </p>
+        </IosCard>
+
+        <IosCard padding="md">
+          <p className="text-[12px] font-medium text-[var(--text-muted)]">Safe to Spend</p>
+          <p className="mt-1 text-[20px] font-semibold tabular-nums text-[var(--foreground)]">
+            {formatCurrency(safeToSpend)}
+          </p>
+          <IosProgressBar value={safeProgress} className="mt-3" />
+        </IosCard>
+
+        <IosCard padding="md" className="flex items-center justify-between gap-2">
+          <div>
+            <p className="text-[12px] font-medium text-[var(--text-muted)]">Health</p>
+            <p className="mt-1 text-[20px] font-semibold tabular-nums text-[var(--foreground)]">
+              {health.score}
+              <span className="text-[12px] font-medium text-[var(--text-muted)]">/100</span>
+            </p>
+          </div>
+          <IosRing value={health.score} label={`${health.score}`} size={52} />
+        </IosCard>
+      </div>
+
+      {connection.reconnectConnections.length > 0 ? (
+        <IosBanner
+          tone="warning"
+          title="Bank needs reconnect"
+          subtitle={
+            connection.reconnectConnections[0]?.institutionName ??
+            "Keep balances in sync"
+          }
+          action={
+            <Link
+              href="/accounts"
+              className="min-h-11 shrink-0 px-2 text-[13px] font-semibold text-[var(--accent-light)]"
+            >
+              Fix
+            </Link>
+          }
+        />
       ) : null}
 
       {showConnectCue ? (
@@ -154,25 +221,27 @@ export function IosHomeScreen() {
         />
       ) : null}
 
-      <IosSection title="Coming Up">
+      <IosSection title="Upcoming" action={<IosLink href="/bills">See All</IosLink>}>
         <IosList>
           {nextPaycheck ? (
             <IosListRow
               title={nextPaycheck.name}
               subtitle={`Paycheck · ${nextPaycheck.formattedDate}`}
+              leading={<IosAvatar fallback="$" tone="success" />}
               trailing={
-                <span className="text-emerald-400">
+                <span className="text-[var(--success)]">
                   +{formatCurrency(nextPaycheck.amount)}
                 </span>
               }
               href="/income"
             />
-          ) : showIncomeCue ? (
+          ) : income.length === 0 ? (
             <IosListRow
               title="Add income"
-              subtitle="So paycheck timing shows here"
-              href="/income"
+              subtitle="Show your next paycheck here"
+              leading={<IosAvatar fallback="+" tone="muted" />}
               trailing={<span className="text-[var(--accent-light)]">›</span>}
+              href="/income"
             />
           ) : null}
 
@@ -182,6 +251,12 @@ export function IosHomeScreen() {
                 key={bill.id}
                 title={bill.name}
                 subtitle={`${bill.statusLabel} · ${bill.formattedDueDate}`}
+                leading={
+                  <IosAvatar
+                    fallback={bill.name.slice(0, 1).toUpperCase()}
+                    tone={bill.status === "overdue" ? "danger" : "accent"}
+                  />
+                }
                 trailing={formatCurrency(bill.amount)}
                 href="/bills"
                 danger={bill.status === "overdue"}
@@ -191,22 +266,19 @@ export function IosHomeScreen() {
             <IosListRow
               title="Add bills"
               subtitle="Track what’s due next"
-              href="/bills"
+              leading={<IosAvatar fallback="B" tone="muted" />}
               trailing={<span className="text-[var(--accent-light)]">›</span>}
+              href="/bills"
             />
           ) : (
             <IosListRow
               title="No bills due this week"
               subtitle="You’re clear for now"
+              leading={<IosAvatar fallback="✓" tone="success" />}
               href="/bills"
             />
           )}
         </IosList>
-        {(upcomingBills.length > 0 || nextPaycheck) && (
-          <div className="mt-2 flex justify-end px-1">
-            <IosLink href="/bills">See All</IosLink>
-          </div>
-        )}
       </IosSection>
 
       <IosSection
@@ -214,9 +286,11 @@ export function IosHomeScreen() {
         action={<IosLink href="/transactions">See All</IosLink>}
       >
         {recentTxns.length === 0 ? (
-          <p className="px-1 text-[13px] text-[var(--text-muted)]">
-            Transactions appear after you connect a bank or add activity.
-          </p>
+          <IosCard padding="md">
+            <p className="text-[13px] text-[var(--text-muted)]">
+              Transactions appear after you connect a bank or add activity.
+            </p>
+          </IosCard>
         ) : (
           <IosList>
             {recentTxns.map((transaction) => {
@@ -224,15 +298,22 @@ export function IosHomeScreen() {
                 transaction.type === "expense"
                   ? -transaction.amount
                   : transaction.amount;
+              const label = transaction.notes || transaction.category;
               return (
                 <IosListRow
                   key={transaction.id}
-                  title={transaction.notes || transaction.category}
+                  title={label}
                   subtitle={formatTransactionDate(transaction.date)}
+                  leading={
+                    <IosAvatar
+                      fallback={label.slice(0, 1).toUpperCase()}
+                      tone={signed >= 0 ? "success" : "muted"}
+                    />
+                  }
                   trailing={
                     <span
                       className={cn(
-                        signed >= 0 ? "text-emerald-400" : "text-[var(--text-secondary)]",
+                        signed >= 0 ? "text-[var(--success)]" : "text-[var(--foreground)]",
                       )}
                     >
                       {signed >= 0 ? "+" : "−"}
@@ -247,32 +328,33 @@ export function IosHomeScreen() {
         )}
       </IosSection>
 
-      {topGoal ? (
-        <IosSection
-          title="Goal"
-          action={<IosLink href="/savings">View Details</IosLink>}
-        >
-          <IosList>
-            <IosListRow
-              title={topGoal.name}
-              subtitle={`${topGoal.percentComplete}% · ${formatCurrency(topGoal.remaining)} left`}
-              trailing={`${topGoal.percentComplete}%`}
-              href="/savings"
-            />
-          </IosList>
-        </IosSection>
-      ) : showGoalCue && !showConnectCue ? (
-        <IosSection title="Goal">
-          <IosList>
-            <IosListRow
-              title="Set a savings goal"
-              subtitle="Optional — keep Home focused"
-              href="/savings"
-              trailing={<span className="text-[var(--accent-light)]">›</span>}
-            />
-          </IosList>
-        </IosSection>
-      ) : null}
+      <IosSection title="Cash Flow">
+        <IosCard padding="md">
+          <div className="flex h-3 overflow-hidden rounded-full bg-white/[0.06]">
+            {flowSegments.map((segment) => (
+              <div
+                key={segment.label}
+                className={cn(segment.color)}
+                style={{ width: `${(segment.value / flowTotal) * 100}%` }}
+                title={segment.label}
+              />
+            ))}
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5">
+            {flowSegments.map((segment) => (
+              <div key={segment.label} className="flex items-center justify-between gap-2">
+                <span className="flex items-center gap-1.5 text-[12px] text-[var(--text-muted)]">
+                  <span className={cn("size-2 rounded-full", segment.color)} />
+                  {segment.label}
+                </span>
+                <span className="text-[12px] font-medium tabular-nums text-[var(--text-secondary)]">
+                  {formatCurrency(segment.value)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </IosCard>
+      </IosSection>
     </IosScreen>
   );
 }

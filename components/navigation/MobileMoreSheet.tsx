@@ -16,6 +16,24 @@ import {
 } from "@/lib/mobile/navigation";
 import { triggerHaptic } from "@/lib/native/haptics";
 import { useNativeIos } from "@/lib/native/useNativeIos";
+import { IosTintIcon } from "@/components/native/ios/IosPrimitives";
+
+const IOS_MORE_ICON_TONE: Record<
+  string,
+  "accent" | "success" | "warning" | "danger" | "purple" | "muted"
+> = {
+  Income: "success",
+  Goals: "warning",
+  Investments: "purple",
+  Transactions: "accent",
+  Reports: "accent",
+  Calendar: "warning",
+  Household: "muted",
+  Settings: "muted",
+  "What's New": "accent",
+  Roadmap: "purple",
+  Support: "success",
+};
 
 type MobileMoreSheetProps = {
   open: boolean;
@@ -129,17 +147,22 @@ export function MobileMoreSheet({
                   {group.items.map((route) => {
                     const active = isActive(route.href);
 
+                    const tone = IOS_MORE_ICON_TONE[route.label] ?? "muted";
+                    const icon = (
+                      <IosTintIcon tone={tone}>
+                        <NavIcon name={route.icon} className="h-4 w-4" />
+                      </IosTintIcon>
+                    );
+
                     if ("action" in route && route.action === "feedback") {
                       return (
                         <li key={route.label}>
                           <button
                             type="button"
                             onClick={openFeedback}
-                            className="flex min-h-11 w-full items-center gap-3 border-b border-white/[0.06] px-3.5 py-2.5 text-left last:border-b-0 active:bg-white/[0.05]"
+                            className="flex min-h-[52px] w-full items-center gap-3 border-b border-white/[0.06] px-3.5 py-2.5 text-left last:border-b-0 active:bg-white/[0.05]"
                           >
-                            <span className="flex size-7 shrink-0 items-center justify-center text-[var(--text-muted)]">
-                              <NavIcon name={route.icon} className="h-4 w-4" />
-                            </span>
+                            {icon}
                             <span className="flex-1 text-[16px] text-[var(--foreground)]">
                               {route.label}
                             </span>
@@ -158,16 +181,19 @@ export function MobileMoreSheet({
                             onClose();
                           }}
                           className={cn(
-                            "flex min-h-11 items-center gap-3 border-b border-white/[0.06] px-3.5 py-2.5 last:border-b-0 active:bg-white/[0.05]",
+                            "flex min-h-[52px] items-center gap-3 border-b border-white/[0.06] px-3.5 py-2.5 last:border-b-0 active:bg-white/[0.05]",
                             active && "bg-[var(--accent-muted)]/40",
                           )}
                         >
-                          <span className="flex size-7 shrink-0 items-center justify-center text-[var(--text-muted)]">
-                            <NavIcon name={route.icon} className="h-4 w-4" />
-                          </span>
+                          {icon}
                           <span className="flex-1 text-[16px] text-[var(--foreground)]">
                             {route.label}
                           </span>
+                          {route.label === "What's New" ? (
+                            <span className="rounded-full bg-[var(--accent)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                              New
+                            </span>
+                          ) : null}
                           <span className="text-[var(--text-subtle)]">›</span>
                         </Link>
                       </li>

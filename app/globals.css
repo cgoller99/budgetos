@@ -610,9 +610,10 @@ html[data-native-platform="ios"] .native-ios-shell {
 }
 
 html[data-native-platform="ios"] .native-tab-bar {
-  border-top-color: color-mix(in srgb, var(--surface-border) 80%, transparent);
-  background: color-mix(in srgb, var(--background) 92%, transparent);
-  box-shadow: 0 -1px 0 rgba(255, 255, 255, 0.04);
+  border-top-color: rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, #060b14 88%, transparent);
+  box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(20px);
 }
 
 html[data-native-platform="ios"] .native-top-bar {
@@ -749,17 +750,25 @@ html[data-native-platform="ios"] .native-main [aria-busy="true"] {
   min-height: 4.5rem;
 }
 
-/* Dedicated iOS presentation layer — list density, not web cards */
+/* Dedicated iOS presentation layer — mockup-aligned surfaces */
+html[data-native-platform="ios"] .native-ios-shell {
+  background: #060b14;
+}
+
 html[data-native-platform="ios"] .ios-screen {
-  gap: 1.1rem;
+  gap: 1rem;
+}
+
+html[data-native-platform="ios"] .ios-card {
+  background: #11161d;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 html[data-native-platform="ios"] .ios-hero-metric {
-  padding-top: 0.15rem;
+  padding-top: 0.1rem;
 }
 
 html[data-native-platform="ios"] .ios-list {
-  border: 0;
   box-shadow: none;
 }
 
@@ -767,13 +776,8 @@ html[data-native-platform="ios"] .ios-list-row {
   background: transparent;
 }
 
-html[data-native-platform="ios"] .ios-connect-panel .rounded-3xl,
-html[data-native-platform="ios"] .ios-connect-panel [class*="rounded-"] {
-  border-radius: 12px;
-}
-
 html[data-native-platform="ios"] .ios-more-sheet {
-  background: color-mix(in srgb, var(--background) 96%, #000);
+  background: #0b0f14;
 }
 
 /* Suppress desktop page chrome inside native shell */

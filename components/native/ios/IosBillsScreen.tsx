@@ -2,11 +2,15 @@
 
 import { useMemo, useState } from "react";
 import {
+  IosAvatar,
   IosBanner,
+  IosCard,
   IosList,
   IosListRow,
+  IosProgressBar,
   IosScreen,
   IosSection,
+  IosSegmentedControl,
   IosSkeletonScreen,
   IosTextButton,
 } from "@/components/native/ios/IosPrimitives";
@@ -23,6 +27,8 @@ import { formatCurrency } from "@/lib/finance/format";
 import type { Bill, BillProgress } from "@/lib/finance/types";
 import { triggerHaptic } from "@/lib/native/haptics";
 
+type BillsTab = "due_soon" | "overdue" | "paid";
+
 function BillRows({
   items,
   empty,
@@ -36,7 +42,9 @@ function BillRows({
 }) {
   if (items.length === 0) {
     return empty ? (
-      <p className="px-1 text-[13px] text-[var(--text-muted)]">{empty}</p>
+      <IosCard padding="md">
+        <p className="text-[13px] text-[var(--text-muted)]">{empty}</p>
+      </IosCard>
     ) : null;
   }
 
@@ -47,6 +55,18 @@ function BillRows({
           key={`${bill.billId}-${bill.splitId}`}
           title={bill.name}
           subtitle={`${bill.statusLabel} · ${bill.formattedDueDate}`}
+          leading={
+            <IosAvatar
+              fallback={bill.name.slice(0, 1).toUpperCase()}
+              tone={
+                bill.status === "overdue"
+                  ? "danger"
+                  : bill.status === "paid"
+                    ? "success"
+                    : "accent"
+              }
+            />
+          }
           trailing={
             <div className="flex flex-col items-end gap-1">
               <span>{formatCurrency(bill.remainingAmount || bill.amount)}</span>
@@ -81,6 +101,7 @@ export function IosBillsScreen() {
   const { showToast } = useToast();
   const [createOpen, setCreateOpen] = useState(false);
   const [editBillId, setEditBillId] = useState<string | null>(null);
+  const [tab, setTab] = useState<BillsTab>("due_soon");
 
   const upcoming = useMemo(() => getUpcomingBills(finance), [finance]);
   const overdue = useMemo(
@@ -93,22 +114,23 @@ export function IosBillsScreen() {
         (bill) =>
           bill.status === "due_soon" ||
           bill.status === "due_today" ||
-          bill.status === "partial",
+          bill.status === "partial" ||
+          bill.status === "upcoming",
       ),
     [upcoming],
   );
-  const later = useMemo(
-    () => upcoming.filter((bill) => bill.status === "upcoming"),
+  const paid = useMemo(() => getPaidBills(finance), [finance]);
+
+  const paidTotal = useMemo(
+    () => paid.reduce((sum, bill) => sum + bill.amount, 0),
+    [paid],
+  );
+  const dueTotal = useMemo(
+    () => upcoming.reduce((sum, bill) => sum + (bill.remainingAmount || bill.amount), 0),
     [upcoming],
   );
-  const paid = useMemo(() => getPaidBills(finance).slice(0, 6), [finance]);
-  const recurring = useMemo(
-    () =>
-      getBillProgressList(finance)
-        .filter((bill) => bill.recurring)
-        .slice(0, 6),
-    [finance],
-  );
+  const overviewTotal = paidTotal + dueTotal || 1;
+  const paidProgress = (paidTotal / overviewTotal) * 100;
 
   if (isLoading) {
     return <IosSkeletonScreen rows={6} />;
@@ -137,17 +159,20 @@ export function IosBillsScreen() {
     }
   }
 
+  const tabItems =
+    tab === "overdue" ? overdue : tab === "paid" ? paid : dueSoon;
+
   return (
     <IosScreen>
-      <div className="flex items-end justify-between gap-3 px-1">
+      <div className="flex items-end justify-between gap-3 px-0.5">
         <div>
-          <p className="text-[13px] font-medium text-[var(--text-muted)]">
-            What do I have to pay?
-          </p>
+          <p className="text-[13px] font-medium text-[var(--text-muted)]">Bills</p>
           <p className="mt-1 text-[28px] font-semibold tracking-tight text-[var(--foreground)]">
-            {overdue.length + dueSoon.length > 0
-              ? `${overdue.length + dueSoon.length} due soon`
-              : "All clear"}
+            {overdue.length > 0
+              ? `${overdue.length} overdue`
+              : dueSoon.length > 0
+                ? `${dueSoon.length} due soon`
+                : "All clear"}
           </p>
         </div>
         <IosTextButton
@@ -160,6 +185,19 @@ export function IosBillsScreen() {
         </IosTextButton>
       </div>
 
+      <IosSegmentedControl
+        value={tab}
+        onChange={(value) => {
+          void triggerHaptic("selection");
+          setTab(value);
+        }}
+        options={[
+          { value: "due_soon", label: "Due Soon" },
+          { value: "overdue", label: "Overdue" },
+          { value: "paid", label: "Paid" },
+        ]}
+      />
+
       {recurringBillCandidates.length > 0 ? (
         <IosBanner
           title={`We found ${recurringBillCandidates.length} possible bill${
@@ -169,7 +207,7 @@ export function IosBillsScreen() {
           action={
             <button
               type="button"
-              className="min-h-11 shrink-0 px-2 text-[13px] font-semibold text-[var(--accent-light)]"
+              className="min-h-10 shrink-0 rounded-full bg-[var(--accent)] px-3.5 text-[13px] font-semibold text-white"
               onClick={() => {
                 void triggerHaptic("light");
                 openRecurringBillsModal();
@@ -182,80 +220,50 @@ export function IosBillsScreen() {
       ) : null}
 
       {bills.length === 0 ? (
-        <IosSection>
-          <IosList>
-            <IosListRow
-              title="Add your first bill"
-              subtitle="Due dates and monthly totals appear here"
-              onClick={() => setCreateOpen(true)}
-              trailing={<span className="text-[var(--accent-light)]">›</span>}
-            />
-          </IosList>
-        </IosSection>
+        <IosList>
+          <IosListRow
+            title="Add your first bill"
+            subtitle="Due dates and monthly totals appear here"
+            leading={<IosAvatar fallback="+" tone="accent" />}
+            onClick={() => setCreateOpen(true)}
+            trailing={<span className="text-[var(--accent-light)]">›</span>}
+          />
+        </IosList>
       ) : (
-        <>
-          {overdue.length > 0 ? (
-            <IosSection title="Overdue">
-              <BillRows
-                items={overdue}
-                onEdit={setEditBillId}
-                onMarkPaid={(billId, splitId) => void handleMarkPaid(billId, splitId)}
-              />
-            </IosSection>
-          ) : null}
-
-          <IosSection title="Due soon">
-            <BillRows
-              items={dueSoon}
-              empty="Nothing due in the next few days."
-              onEdit={setEditBillId}
-              onMarkPaid={(billId, splitId) => void handleMarkPaid(billId, splitId)}
-            />
-          </IosSection>
-
-          {later.length > 0 ? (
-            <IosSection title="Upcoming">
-              <BillRows
-                items={later.slice(0, 5)}
-                onEdit={setEditBillId}
-                onMarkPaid={(billId, splitId) => void handleMarkPaid(billId, splitId)}
-              />
-            </IosSection>
-          ) : null}
-
-          {paid.length > 0 ? (
-            <IosSection title="Paid this month">
-              <IosList>
-                {paid.map((bill) => (
-                  <IosListRow
-                    key={`${bill.billId}-${bill.splitId}`}
-                    title={bill.name}
-                    subtitle={bill.formattedDueDate}
-                    trailing={formatCurrency(bill.amount)}
-                    onClick={() => setEditBillId(bill.billId)}
-                  />
-                ))}
-              </IosList>
-            </IosSection>
-          ) : null}
-
-          {recurring.length > 0 ? (
-            <IosSection title="Recurring">
-              <IosList>
-                {recurring.map((bill) => (
-                  <IosListRow
-                    key={`${bill.billId}-${bill.splitId}-recurring`}
-                    title={bill.name}
-                    subtitle={bill.statusLabel}
-                    trailing={formatCurrency(bill.amount)}
-                    onClick={() => setEditBillId(bill.billId)}
-                  />
-                ))}
-              </IosList>
-            </IosSection>
-          ) : null}
-        </>
+        <BillRows
+          items={tabItems}
+          empty={
+            tab === "overdue"
+              ? "Nothing overdue."
+              : tab === "paid"
+                ? "No paid bills this month yet."
+                : "Nothing due soon."
+          }
+          onEdit={setEditBillId}
+          onMarkPaid={(billId, splitId) => void handleMarkPaid(billId, splitId)}
+        />
       )}
+
+      <IosCard padding="md" className="border-[var(--success)]/20 bg-[var(--success)]/10">
+        <p className="text-[12px] font-medium text-[var(--success)]">Paid This Month</p>
+        <p className="mt-1 text-[28px] font-semibold tabular-nums text-[var(--foreground)]">
+          {formatCurrency(paidTotal)}
+        </p>
+      </IosCard>
+
+      <IosSection title="Bills Overview">
+        <IosCard padding="md">
+          <div className="mb-2 flex items-center justify-between gap-3 text-[12px]">
+            <span className="text-[var(--text-muted)]">
+              Total due {formatCurrency(dueTotal)}
+            </span>
+            <span className="text-[var(--success)]">
+              Paid {formatCurrency(paidTotal)}
+            </span>
+          </div>
+          <IosProgressBar value={paidProgress} tone="success" />
+        </IosCard>
+      </IosSection>
 
       <AddBillModal isOpen={createOpen} onClose={() => setCreateOpen(false)} />
       <EditBillModal bill={editBill as Bill | null} onClose={() => setEditBillId(null)} />

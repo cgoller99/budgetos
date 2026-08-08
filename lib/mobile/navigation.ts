@@ -8,7 +8,7 @@ export const MOBILE_PRIMARY_NAV = [
 
 /** iOS Capacitor primary tabs — app-first IA (web unchanged). */
 export const IOS_PRIMARY_NAV = [
-  { href: "/dashboard", label: "Home", icon: "dashboard" as const },
+  { href: "/dashboard", label: "Home", icon: "home" as const },
   { href: "/accounts", label: "Accounts", icon: "accounts" as const },
   { href: "/bills", label: "Bills", icon: "bills" as const },
   { href: "/debt", label: "Debt", icon: "debt" as const },
