@@ -154,6 +154,8 @@ export function AdminDashboard() {
   const [logFilter, setLogFilter] = useState("all");
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [actionPending, setActionPending] = useState(false);
+  const [appReviewBusy, setAppReviewBusy] = useState(false);
+  const [appReviewMessage, setAppReviewMessage] = useState<string | null>(null);
 
   const loadDashboard = useCallback(async () => {
     setLoading(true);
@@ -409,6 +411,97 @@ export function AdminDashboard() {
         description="Search users and perform privileged account actions."
         loadError={sectionErrors.users}
       >
+        <Card padding="lg" className="border-[var(--accent)]/20 bg-[var(--accent)]/5">
+          <CardHeader
+            title="App Review demo seed"
+            description="Idempotently seeds goals/bills/income plan/debts/demo transactions for christiangoller11@gmail.com only. Never modifies Pro subscription, password, investments, or Plaid connections."
+          />
+          <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <Button
+              size="md"
+              disabled={appReviewBusy}
+              onClick={() => {
+                void (async () => {
+                  setAppReviewBusy(true);
+                  setAppReviewMessage(null);
+                  try {
+                    const response = await fetch("/api/admin/seed-app-review", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ dryRun: false }),
+                    });
+                    const payload = (await response.json().catch(() => ({}))) as {
+                      error?: string;
+                      message?: string;
+                      result?: {
+                        actions?: Array<{ action: string; entity: string; detail: string }>;
+                        subscriptionUnchanged?: boolean;
+                      };
+                    };
+                    if (!response.ok) {
+                      throw new Error(payload.error ?? "Seed failed");
+                    }
+                    const added =
+                      payload.result?.actions?.filter((item) => item.action === "added")
+                        .length ?? 0;
+                    const skipped =
+                      payload.result?.actions?.filter((item) => item.action === "skipped")
+                        .length ?? 0;
+                    setAppReviewMessage(
+                      `${payload.message ?? "Seed complete."} Added ${added}, skipped ${skipped}. Subscription unchanged: ${payload.result?.subscriptionUnchanged ? "yes" : "NO"}`,
+                    );
+                  } catch (seedError) {
+                    setAppReviewMessage(
+                      seedError instanceof Error ? seedError.message : "Seed failed",
+                    );
+                  } finally {
+                    setAppReviewBusy(false);
+                  }
+                })();
+              }}
+            >
+              {appReviewBusy ? "Seeding…" : "Seed App Review account"}
+            </Button>
+            <Button
+              size="md"
+              variant="secondary"
+              disabled={appReviewBusy}
+              onClick={() => {
+                void (async () => {
+                  setAppReviewBusy(true);
+                  setAppReviewMessage(null);
+                  try {
+                    const response = await fetch("/api/admin/seed-app-review", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ dryRun: true }),
+                    });
+                    const payload = (await response.json().catch(() => ({}))) as {
+                      error?: string;
+                      message?: string;
+                    };
+                    if (!response.ok) {
+                      throw new Error(payload.error ?? "Dry run failed");
+                    }
+                    setAppReviewMessage(payload.message ?? "Dry run complete.");
+                  } catch (seedError) {
+                    setAppReviewMessage(
+                      seedError instanceof Error ? seedError.message : "Dry run failed",
+                    );
+                  } finally {
+                    setAppReviewBusy(false);
+                  }
+                })();
+              }}
+            >
+              Dry run
+            </Button>
+            {appReviewMessage ? (
+              <p className="text-sm text-[var(--text-secondary)]">{appReviewMessage}</p>
+            ) : null}
+          </CardContent>
+        </Card>
+
         <div className="flex flex-col gap-3 sm:flex-row">
           <Input
             value={search}
