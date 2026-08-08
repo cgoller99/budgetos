@@ -21,6 +21,11 @@ import { useFinance } from "@/context/FinanceContext";
 import { getBillsDueThisWeek } from "@/lib/finance/bills";
 import { formatCurrency, formatMonthlyChange } from "@/lib/finance/format";
 import { formatTransactionDate } from "@/lib/transactions";
+import {
+  getDisplayCategory,
+  getDisplayMerchant,
+} from "@/lib/transactions/categoryPresentation";
+import { isConfidentInternalTransfer } from "@/lib/transactions/transferDetection";
 import { getPlaidConnectionUiState } from "@/lib/native/plaidConnectionUi";
 import { isPlaidClientEnabled } from "@/lib/plaid/clientConfig";
 import { cn } from "@/components/ui/cn";
@@ -294,30 +299,35 @@ export function IosHomeScreen() {
         ) : (
           <IosList>
             {recentTxns.map((transaction) => {
-              const signed =
-                transaction.type === "expense"
-                  ? -transaction.amount
-                  : transaction.amount;
-              const label = transaction.notes || transaction.category;
+              const isTransfer = isConfidentInternalTransfer(finance, transaction);
+              const isIncome = transaction.type === "income" && !isTransfer;
+              const label = getDisplayMerchant({
+                notes: transaction.notes,
+                category: transaction.category,
+                type: isTransfer ? "transfer" : transaction.type,
+              });
+              const category = isTransfer
+                ? "Transfer"
+                : getDisplayCategory(transaction.category);
               return (
                 <IosListRow
                   key={transaction.id}
                   title={label}
-                  subtitle={formatTransactionDate(transaction.date)}
+                  subtitle={`${formatTransactionDate(transaction.date)} · ${category}`}
                   leading={
                     <IosAvatar
                       fallback={label.slice(0, 1).toUpperCase()}
-                      tone={signed >= 0 ? "success" : "muted"}
+                      tone={isIncome ? "success" : "muted"}
                     />
                   }
                   trailing={
                     <span
                       className={cn(
-                        signed >= 0 ? "text-[var(--success)]" : "text-[var(--foreground)]",
+                        isIncome ? "text-[var(--success)]" : "text-[var(--foreground)]",
                       )}
                     >
-                      {signed >= 0 ? "+" : "−"}
-                      {formatCurrency(Math.abs(signed))}
+                      {isIncome ? "+" : "−"}
+                      {formatCurrency(Math.abs(transaction.amount))}
                     </span>
                   }
                   href="/transactions"

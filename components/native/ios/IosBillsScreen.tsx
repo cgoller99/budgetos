@@ -220,15 +220,24 @@ export function IosBillsScreen() {
       ) : null}
 
       {bills.length === 0 ? (
-        <IosList>
-          <IosListRow
-            title="Add your first bill"
-            subtitle="Due dates and monthly totals appear here"
-            leading={<IosAvatar fallback="+" tone="accent" />}
-            onClick={() => setCreateOpen(true)}
-            trailing={<span className="text-[var(--accent-light)]">›</span>}
-          />
-        </IosList>
+        <IosCard padding="md">
+          <p className="text-[15px] font-semibold text-[var(--foreground)]">
+            No upcoming bills
+          </p>
+          <p className="mt-1 text-[13px] text-[var(--text-muted)]">
+            Add bills to track due dates and monthly totals.
+          </p>
+          <button
+            type="button"
+            className="mt-4 min-h-11 w-full rounded-[12px] bg-[var(--accent)] text-[15px] font-semibold text-white"
+            onClick={() => {
+              void triggerHaptic("light");
+              setCreateOpen(true);
+            }}
+          >
+            Add bill
+          </button>
+        </IosCard>
       ) : (
         <BillRows
           items={tabItems}

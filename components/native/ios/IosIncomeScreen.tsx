@@ -137,15 +137,24 @@ export function IosIncomeScreen() {
 
       {tab === "sources" ? (
         rows.length === 0 ? (
-          <IosList>
-            <IosListRow
-              title="Add an income source"
-              subtitle="Paychecks show up on Home automatically"
-              leading={<IosAvatar fallback="+" tone="success" />}
-              onClick={() => setIsCreateOpen(true)}
-              trailing={<span className="text-[var(--accent-light)]">›</span>}
-            />
-          </IosList>
+          <IosCard padding="md">
+            <p className="text-[15px] font-semibold text-[var(--foreground)]">
+              No income sources
+            </p>
+            <p className="mt-1 text-[13px] text-[var(--text-muted)]">
+              Add a paycheck so Home can show your next deposit and Plan can allocate it.
+            </p>
+            <button
+              type="button"
+              className="mt-4 min-h-11 w-full rounded-[12px] bg-[var(--accent)] text-[15px] font-semibold text-white"
+              onClick={() => {
+                void triggerHaptic("light");
+                setIsCreateOpen(true);
+              }}
+            >
+              Add income
+            </button>
+          </IosCard>
         ) : (
           <IosSection title="Sources">
             <IosList>

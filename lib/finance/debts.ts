@@ -208,12 +208,41 @@ function pickStrategyTarget(
   )[0];
 }
 
+export type PayoffEstimate = PayoffSimulation & {
+  /** False when payments are insufficient / missing to estimate a payoff date. */
+  isReliable: boolean;
+};
+
+export function canEstimateDebtFreeDate(
+  debts: Debt[],
+  extraMonthly = 0,
+): boolean {
+  const active = (debts ?? []).filter((debt) => debt.balance > 0.01);
+  if (active.length === 0) {
+    return true;
+  }
+
+  const totalPaymentCapacity =
+    sum(active.map((debt) => Math.max(debt.minimumPayment, 0))) +
+    Math.max(extraMonthly, 0);
+
+  if (totalPaymentCapacity <= 0) {
+    return false;
+  }
+
+  // If every active debt's monthly payment can't cover its interest, payoff never converges.
+  return active.some((debt) => {
+    const monthlyInterest = debt.balance * (Math.max(debt.interestRate, 0) / 100 / 12);
+    return debt.minimumPayment + extraMonthly > monthlyInterest + 0.01;
+  });
+}
+
 export function simulateDebtPayoff(
   debts: Debt[],
   strategy: DebtStrategy,
   extraMonthly = 0,
   referenceDate = new Date(),
-): PayoffSimulation {
+): PayoffEstimate {
   const state = (debts ?? [])
     .filter((debt) => debt.balance > 0)
     .map(toSimulationDebt);
@@ -223,6 +252,16 @@ export function simulateDebtPayoff(
       months: 0,
       totalInterest: 0,
       debtFreeDate: startOfDay(referenceDate),
+      isReliable: true,
+    };
+  }
+
+  if (!canEstimateDebtFreeDate(debts, extraMonthly)) {
+    return {
+      months: MAX_SIMULATION_MONTHS,
+      totalInterest: 0,
+      debtFreeDate: addMonths(referenceDate, MAX_SIMULATION_MONTHS),
+      isReliable: false,
     };
   }
 
@@ -261,10 +300,13 @@ export function simulateDebtPayoff(
     }
   }
 
+  const paidOff = !state.some((debt) => debt.balance > 0.01);
+
   return {
     months,
     totalInterest,
     debtFreeDate: addMonths(referenceDate, months),
+    isReliable: paidOff && months < MAX_SIMULATION_MONTHS,
   };
 }
 
@@ -273,6 +315,17 @@ export function formatDebtFreeDate(date: Date): string {
     month: "short",
     year: "numeric",
   });
+}
+
+/** User-facing payoff label; never invent extreme fake dates. */
+export function formatEstimatedDebtFreeLabel(
+  simulation: Pick<PayoffEstimate, "debtFreeDate" | "isReliable">,
+): string {
+  if (!simulation.isReliable) {
+    return "Add payment plan";
+  }
+
+  return formatDebtFreeDate(simulation.debtFreeDate);
 }
 
 export function getRecommendedDebt(
@@ -322,10 +375,16 @@ export function getDebtStrategyInsight(
         }
       : null,
     extraPayment: extraMonthly,
-    monthsSaved: Math.max(0, baseline.months - accelerated.months),
-    interestSaved: Math.max(0, baseline.totalInterest - accelerated.totalInterest),
-    estimatedPayoffDate: formatDebtFreeDate(accelerated.debtFreeDate),
-    baselinePayoffDate: formatDebtFreeDate(baseline.debtFreeDate),
+    monthsSaved:
+      baseline.isReliable && accelerated.isReliable
+        ? Math.max(0, baseline.months - accelerated.months)
+        : 0,
+    interestSaved:
+      baseline.isReliable && accelerated.isReliable
+        ? Math.max(0, baseline.totalInterest - accelerated.totalInterest)
+        : 0,
+    estimatedPayoffDate: formatEstimatedDebtFreeLabel(accelerated),
+    baselinePayoffDate: formatEstimatedDebtFreeLabel(baseline),
   };
 }
 
@@ -390,7 +449,7 @@ export function getDebtsDashboardSummary(
   return {
     totalDebt: getTotalDebtBalance(data),
     totalMinimumPayments: getTotalMinimumPayments(data),
-    estimatedDebtFreeDate: formatDebtFreeDate(baseline.debtFreeDate),
+    estimatedDebtFreeDate: formatEstimatedDebtFreeLabel(baseline),
     interestPaidThisYear: estimateInterestPaidThisYear(debts, referenceDate),
     nextPayment: getNextDebtPayment(data, referenceDate),
     debtFreeProgress: getDebtFreeProgress(data),

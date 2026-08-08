@@ -18,10 +18,20 @@ import {
 import { AddAccountModal } from "@/components/accounts/AddAccountModal";
 import { BankSyncConnect } from "@/components/accounts/BankSyncPlaceholder";
 import { useFinance } from "@/context/FinanceContext";
+import {
+  calculateCash,
+  calculateDebt,
+  calculateInvestments,
+  calculateNetWorth,
+} from "@/lib/calculations/netWorth";
 import { formatCurrency } from "@/lib/finance/format";
 import { isAccountVisible } from "@/lib/finance/accountPreferences";
 import { getPlaidConnectionUiState } from "@/lib/native/plaidConnectionUi";
 import { isPlaidClientEnabled } from "@/lib/plaid/clientConfig";
+import {
+  getDisplayCategory,
+  getDisplayMerchant,
+} from "@/lib/transactions/categoryPresentation";
 import { formatTransactionDate } from "@/lib/transactions";
 import { cn } from "@/components/ui/cn";
 import { triggerHaptic } from "@/lib/native/haptics";
@@ -73,10 +83,13 @@ export function IosAccountsScreen() {
     [accounts],
   );
 
-  const totalBalance = useMemo(
-    () => visibleAccounts.reduce((sum, account) => sum + account.balance, 0),
-    [visibleAccounts],
+  const cashTotal = useMemo(() => calculateCash(finance).value, [finance]);
+  const debtTotal = useMemo(() => calculateDebt(finance).value, [finance]);
+  const investmentTotal = useMemo(
+    () => calculateInvestments(finance).value,
+    [finance],
   );
+  const netWorth = useMemo(() => calculateNetWorth(finance).value, [finance]);
 
   const groups = useMemo(() => {
     const cash = visibleAccounts.filter(
@@ -91,7 +104,7 @@ export function IosAccountsScreen() {
     );
     return [
       { key: "cash", label: "Cash", items: cash },
-      { key: "cards", label: "Credit Cards", items: cards },
+      { key: "cards", label: "Credit / Debt", items: cards },
       { key: "investments", label: "Investments", items: investments },
     ].filter((group) => group.items.length > 0);
   }, [visibleAccounts]);
@@ -120,12 +133,12 @@ export function IosAccountsScreen() {
     <IosScreen>
       <div className="flex items-start justify-between gap-3 px-0.5">
         <IosHeroMetric
-          label="Total Balance"
-          value={formatCurrency(totalBalance)}
+          label="Net Worth"
+          value={formatCurrency(netWorth)}
           hint={
             connection.phase === "connected"
               ? `Updated ${formatSyncLabel(latestSync)}`
-              : "Cash and linked accounts"
+              : "Assets minus liabilities"
           }
         />
         <IosIconButton
@@ -137,6 +150,27 @@ export function IosAccountsScreen() {
         >
           <span className="text-xl leading-none">+</span>
         </IosIconButton>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2">
+        <IosCard padding="sm">
+          <p className="text-[11px] font-medium text-[var(--text-muted)]">Cash</p>
+          <p className="mt-1 text-[14px] font-semibold tabular-nums text-[var(--foreground)]">
+            {formatCurrency(cashTotal)}
+          </p>
+        </IosCard>
+        <IosCard padding="sm">
+          <p className="text-[11px] font-medium text-[var(--text-muted)]">Credit / Debt</p>
+          <p className="mt-1 text-[14px] font-semibold tabular-nums text-[var(--danger)]">
+            {formatCurrency(debtTotal)}
+          </p>
+        </IosCard>
+        <IosCard padding="sm">
+          <p className="text-[11px] font-medium text-[var(--text-muted)]">Investments</p>
+          <p className="mt-1 text-[14px] font-semibold tabular-nums text-[var(--foreground)]">
+            {formatCurrency(investmentTotal)}
+          </p>
+        </IosCard>
       </div>
 
       {plaidEnabled && connection.phase === "empty" ? (
@@ -171,6 +205,17 @@ export function IosAccountsScreen() {
             />
           ))}
         </IosSection>
+      ) : null}
+
+      {groups.length === 0 && connection.phase !== "empty" ? (
+        <IosCard padding="md">
+          <p className="text-[15px] font-semibold text-[var(--foreground)]">
+            No accounts yet
+          </p>
+          <p className="mt-1 text-[13px] text-[var(--text-muted)]">
+            Add a cash, credit, or investment account to get started.
+          </p>
+        </IosCard>
       ) : null}
 
       {groups.map((group) => (
@@ -264,29 +309,44 @@ export function IosAccountsScreen() {
         ) : (
           <IosList>
             {recentTxns.map((transaction) => {
+              const isTransfer =
+                transaction.type === "transfer" ||
+                getDisplayCategory(transaction.category) === "Transfers";
               const signed =
-                transaction.type === "expense"
+                transaction.type === "expense" ||
+                (isTransfer && transaction.type !== "income")
                   ? -transaction.amount
                   : transaction.amount;
-              const label = transaction.notes || transaction.category;
+              const label = getDisplayMerchant(transaction);
+              const category = isTransfer
+                ? "Transfer"
+                : getDisplayCategory(transaction.category);
               return (
                 <IosListRow
                   key={transaction.id}
                   title={label}
-                  subtitle={formatTransactionDate(transaction.date)}
+                  subtitle={`${formatTransactionDate(transaction.date)} · ${category}`}
                   leading={
                     <IosAvatar
                       fallback={label.slice(0, 1).toUpperCase()}
-                      tone={signed >= 0 ? "success" : "muted"}
+                      tone={
+                        transaction.type === "income"
+                          ? "success"
+                          : isTransfer
+                            ? "muted"
+                            : "muted"
+                      }
                     />
                   }
                   trailing={
                     <span
                       className={cn(
-                        signed >= 0 ? "text-[var(--success)]" : "text-[var(--foreground)]",
+                        transaction.type === "income"
+                          ? "text-[var(--success)]"
+                          : "text-[var(--foreground)]",
                       )}
                     >
-                      {signed >= 0 ? "+" : "−"}
+                      {transaction.type === "income" ? "+" : "−"}
                       {formatCurrency(Math.abs(signed))}
                     </span>
                   }

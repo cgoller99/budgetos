@@ -7,7 +7,11 @@ import {
   calculateMonthlySpendingForMoneyFlow,
   calculateMonthlySpendingFromLedger,
 } from "@/lib/calculations/spending";
-import { filterRealIncomeTransactions } from "@/lib/transactions/transferDetection";
+import { getDisplayCategory } from "@/lib/transactions/categoryPresentation";
+import {
+  filterRealExpenseTransactions,
+  filterRealIncomeTransactions,
+} from "@/lib/transactions/transferDetection";
 import { withEffectiveIncome } from "@/lib/finance/effectiveIncome";
 
 export type MonthlyTrendPoint = {
@@ -104,13 +108,16 @@ export function computeCategoryBreakdown(
   data: FinanceData,
 ): CategoryBreakdownItem[] {
   const totals = new Map<string, number>();
+  const realExpenses = filterRealExpenseTransactions(
+    data,
+    (data.transactions ?? []).filter(
+      (transaction) => transaction.type === "expense" && !transaction.goalId,
+    ),
+  );
 
-  for (const transaction of data.transactions) {
-    if (transaction.type !== "expense" || transaction.goalId) {
-      continue;
-    }
-
-    const category = transaction.category.trim() || "Other";
+  for (const transaction of realExpenses) {
+    // Presentation label only — raw category remains on the transaction.
+    const category = getDisplayCategory(transaction.category);
     totals.set(category, (totals.get(category) ?? 0) + transaction.amount);
   }
 
