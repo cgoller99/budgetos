@@ -5,20 +5,38 @@ import { AccountCard } from "@/components/accounts/AccountCard";
 import { AddAccountModal } from "@/components/accounts/AddAccountModal";
 import { DeleteAccountModal } from "@/components/accounts/DeleteAccountModal";
 import { EditAccountModal } from "@/components/accounts/EditAccountModal";
-import { BankSyncPlaceholder } from "@/components/accounts/BankSyncPlaceholder";
+import { BankSyncConnect, BankSyncPlaceholder } from "@/components/accounts/BankSyncPlaceholder";
+import { IosAccountsScreen } from "@/components/native/ios/IosAccountsScreen";
 import { Button, EmptyState, PageHeader, SkeletonGrid } from "@/components/ui";
 import { PreferenceToggle } from "@/components/ui/PreferenceToggle";
 import { pageContainerWideClassName } from "@/components/ui/tokens";
 import { useFinance } from "@/context/FinanceContext";
 import { isAccountVisible } from "@/lib/finance/accountPreferences";
+import { getPlaidConnectionUiState } from "@/lib/native/plaidConnectionUi";
+import { useNativeIos } from "@/lib/native/useNativeIos";
+import { isPlaidClientEnabled } from "@/lib/plaid/clientConfig";
 import { cn } from "@/components/ui/cn";
 
 export function AccountsContent() {
-  const { accounts, isLoading } = useFinance();
+  const finance = useFinance();
+  const { accounts, isLoading, bankConnections, debts } = finance;
+  const nativeIos = useNativeIos();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editAccountId, setEditAccountId] = useState<string | null>(null);
   const [deleteAccountId, setDeleteAccountId] = useState<string | null>(null);
   const [showHidden, setShowHidden] = useState(false);
+  const plaidEnabled = isPlaidClientEnabled();
+
+  const connection = useMemo(
+    () =>
+      getPlaidConnectionUiState({
+        isLoading,
+        bankConnections,
+        accounts,
+        debts,
+      }),
+    [accounts, bankConnections, debts, isLoading],
+  );
 
   const editAccount =
     editAccountId !== null
@@ -40,7 +58,11 @@ export function AccountsContent() {
 
   const hiddenCount = accounts.length - accounts.filter(isAccountVisible).length;
 
-  if (isLoading) {
+  if (nativeIos) {
+    return <IosAccountsScreen />;
+  }
+
+  if (isLoading || connection.phase === "loading") {
     return <SkeletonGrid count={3} />;
   }
 
@@ -52,7 +74,35 @@ export function AccountsContent() {
         }
       />
 
-      <BankSyncPlaceholder />
+      {/* Connect Bank only when no healthy/linked Plaid connection exists. */}
+      {plaidEnabled && connection.phase === "empty" ? <BankSyncPlaceholder /> : null}
+
+      {plaidEnabled && connection.reconnectConnections.length > 0 ? (
+        <div className="mb-5 space-y-3 rounded-2xl border border-amber-500/25 bg-amber-500/10 px-4 py-4">
+          <p className="text-sm font-medium text-white">Reconnect needed</p>
+          {connection.reconnectConnections.map((item) => (
+            <div
+              key={item.id}
+              className="flex flex-wrap items-center justify-between gap-3"
+            >
+              <div>
+                <p className="text-sm text-white/90">
+                  {item.institutionName ?? "Linked institution"}
+                </p>
+                <p className="text-xs text-white/45">
+                  {item.errorMessage ?? "Sign in again to resume syncing."}
+                </p>
+              </div>
+              <BankSyncConnect
+                connectionId={item.id}
+                mode="update"
+                compact
+                buttonLabel="Reconnect"
+              />
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       {hiddenCount > 0 && (
         <div className="mb-5 flex items-center justify-between gap-4 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-4 py-4">
@@ -78,7 +128,9 @@ export function AccountsContent() {
           description={
             accounts.length > 0
               ? "Turn on hidden accounts or add a new account to continue."
-              : "Add your first account to start tracking your finances."
+              : connection.phase === "empty"
+                ? "Connect a bank or add your first account to start tracking."
+                : "Add an account or wait for the next bank sync."
           }
           actionLabel="Add account"
           onAction={() => setIsModalOpen(true)}

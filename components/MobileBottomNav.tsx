@@ -56,21 +56,31 @@ export function MobileBottomNav({ activeHref }: { activeHref: string }) {
                 }}
                 className={cn(
                   "focus-ring flex min-h-11 min-w-[44px] flex-1 flex-col items-center justify-center gap-0.5 rounded-[10px] px-1 py-1 text-[10px] font-medium transition-colors duration-200 ease-out",
-                  nativeIos && "rounded-none gap-1 py-1.5 text-[11px] font-semibold tracking-tight",
-                  isActive ? sidebarActiveClassName : sidebarInactiveClassName,
+                  nativeIos &&
+                    "rounded-none gap-1 py-1.5 text-[10px] font-medium tracking-tight",
+                  !nativeIos && (isActive ? sidebarActiveClassName : sidebarInactiveClassName),
+                  nativeIos &&
+                    (isActive
+                      ? "text-[var(--accent-light)]"
+                      : "text-[var(--text-muted)]"),
                 )}
               >
                 <span
                   className={cn(
                     "flex size-8 items-center justify-center rounded-lg transition-colors duration-200",
                     nativeIos && "size-7 rounded-md",
-                    isActive
-                      ? "bg-[var(--accent-muted)] text-[var(--accent-light)]"
-                      : "text-[var(--text-muted)]",
+                    !nativeIos &&
+                      (isActive
+                        ? "bg-[var(--accent-muted)] text-[var(--accent-light)]"
+                        : "text-[var(--text-muted)]"),
+                    nativeIos &&
+                      (isActive
+                        ? "text-[var(--accent-light)] drop-shadow-[0_0_8px_rgba(59,130,246,0.65)]"
+                        : "text-[var(--text-muted)]"),
                   )}
                   aria-hidden
                 >
-                  <NavIcon name={route.icon} className="h-[18px] w-[18px]" />
+                  <NavIcon name={route.icon} className="h-[20px] w-[20px]" />
                 </span>
                 <span className="truncate">{route.label}</span>
               </Link>
@@ -88,21 +98,31 @@ export function MobileBottomNav({ activeHref }: { activeHref: string }) {
             }}
             className={cn(
               "focus-ring flex min-h-11 min-w-[44px] flex-1 flex-col items-center justify-center gap-0.5 rounded-[10px] px-1 py-1 text-[10px] font-medium transition-colors duration-200 ease-out",
-              nativeIos && "rounded-none gap-1 py-1.5 text-[11px] font-semibold tracking-tight",
-              isMoreActive ? sidebarActiveClassName : sidebarInactiveClassName,
+              nativeIos &&
+                "rounded-none gap-1 py-1.5 text-[10px] font-medium tracking-tight",
+              !nativeIos && (isMoreActive ? sidebarActiveClassName : sidebarInactiveClassName),
+              nativeIos &&
+                (isMoreActive
+                  ? "text-[var(--accent-light)]"
+                  : "text-[var(--text-muted)]"),
             )}
           >
             <span
               className={cn(
                 "flex size-8 items-center justify-center rounded-lg transition-colors duration-200",
-                nativeIos && "size-7 rounded-md text-lg leading-none",
-                isMoreActive
-                  ? "bg-[var(--accent-muted)] text-[var(--accent-light)]"
-                  : "text-[var(--text-muted)]",
+                nativeIos && "size-7 rounded-md",
+                !nativeIos &&
+                  (isMoreActive
+                    ? "bg-[var(--accent-muted)] text-[var(--accent-light)]"
+                    : "text-[var(--text-muted)]"),
+                nativeIos &&
+                  (isMoreActive
+                    ? "text-[var(--accent-light)] drop-shadow-[0_0_8px_rgba(59,130,246,0.65)]"
+                    : "text-[var(--text-muted)]"),
               )}
               aria-hidden
             >
-              ⋯
+              <NavIcon name="more" className="h-[20px] w-[20px]" />
             </span>
             <span className="truncate">More</span>
           </button>

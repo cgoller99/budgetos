@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 type NavIconName =
   | "dashboard"
+  | "home"
   | "accounts"
   | "income"
   | "bills"
@@ -11,7 +12,8 @@ type NavIconName =
   | "roadmap"
   | "debt"
   | "reports"
-  | "settings";
+  | "settings"
+  | "more";
 
 type NavIconProps = {
   name: NavIconName;
@@ -26,6 +28,11 @@ export function NavIcon({ name, className = "h-[18px] w-[18px]" }: NavIconProps)
         <rect x="14" y="3" width="7" height="7" rx="1.5" />
         <rect x="3" y="14" width="7" height="7" rx="1.5" />
         <rect x="14" y="14" width="7" height="7" rx="1.5" />
+      </>
+    ),
+    home: (
+      <>
+        <path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1z" />
       </>
     ),
     accounts: (
@@ -76,8 +83,9 @@ export function NavIcon({ name, className = "h-[18px] w-[18px]" }: NavIconProps)
     ),
     debt: (
       <>
-        <rect x="3" y="6" width="18" height="12" rx="2" />
-        <path d="M7 12h4" />
+        <path d="M12 3 4.5 7v5.5c0 4.4 3.1 7.5 7.5 8.5 4.4-1 7.5-4.1 7.5-8.5V7L12 3z" />
+        <path d="M9.5 12h5" />
+        <path d="M12 9.5v5" />
       </>
     ),
     reports: (
@@ -98,6 +106,13 @@ export function NavIcon({ name, className = "h-[18px] w-[18px]" }: NavIconProps)
         <path d="M20 12h2" />
         <path d="M4.93 19.07l1.41-1.41" />
         <path d="M17.66 6.34l1.41-1.41" />
+      </>
+    ),
+    more: (
+      <>
+        <circle cx="6" cy="12" r="1.4" fill="currentColor" stroke="none" />
+        <circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none" />
+        <circle cx="18" cy="12" r="1.4" fill="currentColor" stroke="none" />
       </>
     ),
   };
