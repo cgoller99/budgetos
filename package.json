@@ -32,6 +32,7 @@
     "test:capacitor-deep-links": "node scripts/test-capacitor-deep-links.mjs",
     "test:ios-native-nav": "node scripts/test-ios-native-nav.mjs",
     "test:ios-polish-data-intel": "node scripts/test-ios-polish-data-intel.mjs",
+    "test:public-support-page": "node scripts/test-public-support-page.mjs",
     "cap:sync": "npx cap sync ios",
     "cap:open:ios": "npx cap open ios",
     "cap:copy": "npx cap copy ios",
