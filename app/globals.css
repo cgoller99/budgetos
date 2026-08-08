@@ -576,28 +576,177 @@ body {
   padding-right: env(safe-area-inset-right);
 }
 
-/* Capacitor iOS: avoid notch / home-indicator clipping and keyboard overlap */
-html[data-native="true"] body {
-  padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
-  min-height: 100dvh;
-}
-
+/* Capacitor: safe-area vars (TopBar + tab bar own insets; avoid double padding) */
 html[data-native="true"] {
   --native-safe-top: env(safe-area-inset-top, 0px);
   --native-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --radius-card: 12px;
+  --radius-button: 10px;
+  --radius-input: 12px;
 }
 
-html[data-native="true"] .app-shell,
-html[data-native="true"] [data-app-shell] {
-  padding-top: max(0px, var(--native-safe-top));
-  padding-bottom: max(0px, var(--native-safe-bottom));
+html[data-native="true"] body {
+  min-height: 100dvh;
+  /* Horizontal only — vertical insets handled by chrome */
+  padding-top: 0;
+  padding-bottom: 0;
+  overscroll-behavior-y: none;
+  -webkit-overflow-scrolling: touch;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
 }
 
 html[data-native="true"] input,
 html[data-native="true"] textarea,
-html[data-native="true"] select {
-  scroll-margin-bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
+html[data-native="true"] select,
+html[data-native="true"] [contenteditable="true"] {
+  user-select: text;
+  scroll-margin-bottom: calc(env(safe-area-inset-bottom, 0px) + 88px);
+}
+
+/* ── iOS native shell polish (Capacitor only; web unchanged) ── */
+html[data-native-platform="ios"] .native-ios-shell {
+  background: var(--background);
+}
+
+html[data-native-platform="ios"] .native-tab-bar {
+  border-top-color: color-mix(in srgb, var(--surface-border) 80%, transparent);
+  background: color-mix(in srgb, var(--background) 92%, transparent);
+  box-shadow: 0 -1px 0 rgba(255, 255, 255, 0.04);
+}
+
+html[data-native-platform="ios"] .native-top-bar {
+  min-height: calc(44px + env(safe-area-inset-top, 0px));
+}
+
+html[data-native-platform="ios"] .native-main {
+  max-width: 100%;
+}
+
+/* Tighter page containers / cards / lists */
+html[data-native-platform="ios"] .mx-auto.flex.w-full.max-w-5xl,
+html[data-native-platform="ios"] .mx-auto.flex.w-full.max-w-6xl {
+  max-width: 100%;
+  gap: 0.75rem;
+}
+
+html[data-native-platform="ios"] [class*="rounded-[var(--radius-card)]"],
+html[data-native-platform="ios"] [class*="rounded-2xl"],
+html[data-native-platform="ios"] [class*="rounded-3xl"] {
+  border-radius: 12px;
+}
+
+html[data-native-platform="ios"] .native-main > * {
+  max-width: 100%;
+}
+
+html[data-native-platform="ios"] .native-main .space-y-5,
+html[data-native-platform="ios"] .native-main .space-y-6,
+html[data-native-platform="ios"] .native-main .space-y-8 {
+  row-gap: 0.75rem;
+}
+
+html[data-native-platform="ios"] .native-main .gap-6,
+html[data-native-platform="ios"] .native-main .gap-8,
+html[data-native-platform="ios"] .native-main .lg\:gap-8 {
+  gap: 0.75rem;
+}
+
+html[data-native-platform="ios"] .native-main .p-5,
+html[data-native-platform="ios"] .native-main .p-6,
+html[data-native-platform="ios"] .native-main .p-7,
+html[data-native-platform="ios"] .native-main .sm\:p-6,
+html[data-native-platform="ios"] .native-main .sm\:p-7 {
+  padding: 0.875rem;
+}
+
+html[data-native-platform="ios"] .native-main .px-5,
+html[data-native-platform="ios"] .native-main .px-6 {
+  padding-left: 0.875rem;
+  padding-right: 0.875rem;
+}
+
+html[data-native-platform="ios"] .native-main .py-4,
+html[data-native-platform="ios"] .native-main .py-5 {
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+}
+
+html[data-native-platform="ios"] .native-main .mb-5 {
+  margin-bottom: 0.75rem;
+}
+
+html[data-native-platform="ios"] .native-main .mt-7 {
+  margin-top: 1rem;
+}
+
+/* Full-bleed list rows feel more app-like */
+html[data-native-platform="ios"] .native-main ul,
+html[data-native-platform="ios"] .native-main ol {
+  padding-inline: 0;
+}
+
+html[data-native-platform="ios"] .native-main button,
+html[data-native-platform="ios"] .native-main a[role="button"],
+html[data-native-platform="ios"] .native-main [role="switch"] {
+  min-height: 44px;
+}
+
+html[data-native-platform="ios"] .native-main input,
+html[data-native-platform="ios"] .native-main select,
+html[data-native-platform="ios"] .native-main textarea {
+  min-height: 44px;
+  font-size: 16px; /* prevent iOS zoom on focus */
+}
+
+/* Hide web-ish marketing / chrome chrome inside shell */
+html[data-native-platform="ios"] .landing-float,
+html[data-native-platform="ios"] .landing-pulse-glow {
+  animation: none;
+}
+
+/* Compact KPI / grid density */
+html[data-native-platform="ios"] .native-main .grid {
+  gap: 0.65rem;
+}
+
+html[data-native-platform="ios"] .native-page-enter {
+  animation: native-page-enter 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes native-page-enter {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes native-modal-panel-enter {
+  from {
+    transform: translateY(100%);
+  }
+
+  to {
+    transform: translateY(0);
+  }
+}
+
+.native-modal-panel-enter {
+  animation: native-modal-panel-enter 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+html[data-native-platform="ios"] .native-sheet {
+  box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.35);
+}
+
+/* Skeleton preference over blank regions while loading */
+html[data-native-platform="ios"] .native-main [aria-busy="true"] {
+  min-height: 4.5rem;
 }
 
 @media (max-width: 1023px) {

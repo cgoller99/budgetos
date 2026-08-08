@@ -32,10 +32,15 @@ export async function configureNativeChrome(): Promise<void> {
   document.documentElement.dataset.nativePlatform = isNativeIos()
     ? "ios"
     : "android";
+  document.documentElement.classList.add("native-app");
+  if (isNativeIos()) {
+    document.documentElement.classList.add("native-ios");
+  }
 
   try {
     await StatusBar.setStyle({ style: Style.Dark });
     if (isNativeIos()) {
+      // Overlay so TopBar/tab bar own safe-area insets (no double body padding).
       await StatusBar.setOverlaysWebView({ overlay: true });
     }
   } catch {
