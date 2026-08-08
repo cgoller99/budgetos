@@ -5,6 +5,7 @@ import {
   RecurringBillsFoundCard,
   RecurringBillsFoundModal,
 } from "@/components/bills/RecurringBillsFoundModal";
+import { useNativeIos } from "@/lib/native/useNativeIos";
 
 export function RecurringBillsPrompt() {
   const {
@@ -17,6 +18,7 @@ export function RecurringBillsPrompt() {
     ignoreSelectedRecurringBills,
     snoozeRecurringBillsPrompt,
   } = useFinance();
+  const nativeIos = useNativeIos();
 
   if (recurringBillCandidates.length === 0) {
     return null;
@@ -24,7 +26,8 @@ export function RecurringBillsPrompt() {
 
   return (
     <>
-      {!showRecurringBillsModal ? (
+      {/* iOS shows a compact “Review” cue on Bills instead of a global card. */}
+      {!nativeIos && !showRecurringBillsModal ? (
         <RecurringBillsFoundCard
           candidates={recurringBillCandidates}
           onReview={openRecurringBillsModal}

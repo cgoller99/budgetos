@@ -7,6 +7,7 @@ import { EditDebtModal } from "@/components/debt/EditDebtModal";
 import { DebtRow } from "@/components/debt/DebtRow";
 import { DebtStrategyPanel } from "@/components/debt/DebtStrategyPanel";
 import { MakePaymentModal } from "@/components/debt/MakePaymentModal";
+import { IosDebtScreen } from "@/components/native/ios/IosDebtScreen";
 import {
   Button,
   EmptyState,
@@ -22,11 +23,13 @@ import {
   getDebtTableRows,
 } from "@/lib/finance/debts";
 import type { Debt, DebtStrategy } from "@/lib/finance/types";
+import { useNativeIos } from "@/lib/native/useNativeIos";
 import { cn } from "@/components/ui/cn";
 
 export function DebtContent() {
   const finance = useFinance();
   const { isLoading } = finance;
+  const nativeIos = useNativeIos();
   const [strategy, setStrategy] = useState<DebtStrategy>("avalanche");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editDebtId, setEditDebtId] = useState<string | null>(null);
@@ -38,6 +41,10 @@ export function DebtContent() {
     [finance],
   );
   const rows = useMemo(() => getDebtTableRows(finance), [finance]);
+
+  if (nativeIos) {
+    return <IosDebtScreen />;
+  }
 
   if (isLoading) {
     return <SkeletonGrid count={4} />;

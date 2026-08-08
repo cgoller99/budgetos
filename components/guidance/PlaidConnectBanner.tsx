@@ -19,21 +19,28 @@ export function PlaidConnectBanner({
   onboardingProgress = {},
   className,
 }: PlaidConnectBannerProps) {
-  const { bankConnections, accounts } = useFinance();
+  const { bankConnections, accounts, debts, isLoading } = useFinance();
   const [dismissed, setDismissed] = useState(true);
 
   useEffect(() => {
     setDismissed(window.localStorage.getItem(DISMISS_STORAGE_KEY) === "1");
   }, []);
 
-  const hasPlaidConnection = bankConnections.length > 0;
+  // Prefer active (non-disconnected) links — never infer from transactions.
+  const hasPlaidConnection = bankConnections.some(
+    (connection) => connection.status !== "disconnected",
+  ) ||
+    accounts.some((account) => account.isPlaidLinked) ||
+    debts.some((debt) => debt.isPlaidLinked);
 
-  const visible = shouldShowPlaidConnectBanner({
-    dismissed,
-    hasPlaidConnection,
-    progress: onboardingProgress,
-    accountCount: accounts.length,
-  });
+  const visible =
+    !isLoading &&
+    shouldShowPlaidConnectBanner({
+      dismissed,
+      hasPlaidConnection,
+      progress: onboardingProgress,
+      accountCount: accounts.length,
+    });
 
   const dismiss = useCallback(() => {
     window.localStorage.setItem(DISMISS_STORAGE_KEY, "1");

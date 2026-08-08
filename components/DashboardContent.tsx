@@ -11,6 +11,7 @@ import { TopGoalsCard } from "@/components/dashboard/TopGoalsCard";
 import { UpcomingBillsCard } from "@/components/dashboard/UpcomingBillsCard";
 import { WeeklyCashFlowCard } from "@/components/dashboard/WeeklyCashFlowCard";
 import { WelcomeChecklist } from "@/components/guidance/WelcomeChecklist";
+import { IosHomeScreen } from "@/components/native/ios/IosHomeScreen";
 import { DashboardSkeleton } from "@/components/ui";
 import {
   dashboardCompactSectionClassName,
@@ -18,13 +19,19 @@ import {
   pageContainerWideClassName,
 } from "@/components/ui/tokens";
 import { useFinance } from "@/context/FinanceContext";
+import { useNativeIos } from "@/lib/native/useNativeIos";
 import { cn } from "@/components/ui/cn";
 
 export function DashboardContent() {
   const { isLoading, dashboard } = useFinance();
+  const nativeIos = useNativeIos();
 
   if (isLoading) {
-    return <DashboardSkeleton />;
+    return nativeIos ? <IosHomeScreen /> : <DashboardSkeleton />;
+  }
+
+  if (nativeIos) {
+    return <IosHomeScreen />;
   }
 
   return (

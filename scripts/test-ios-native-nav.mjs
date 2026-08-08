@@ -14,10 +14,11 @@ const src = fs.readFileSync(navPath, "utf8");
 
 assert.match(src, /export const IOS_PRIMARY_NAV/);
 assert.match(src, /export const IOS_MORE_NAV/);
-assert.match(src, /href: "\/transactions"/);
 assert.match(src, /href: "\/dashboard"/);
 assert.match(src, /href: "\/accounts"/);
 assert.match(src, /href: "\/bills"/);
+assert.match(src, /href: "\/debt"/);
+assert.match(src, /href: "\/transactions"/);
 
 // Web primary should still include Income (unchanged web mobile IA)
 const webPrimary = src.slice(
@@ -30,12 +31,24 @@ const iosPrimary = src.slice(
   src.indexOf("IOS_PRIMARY_NAV"),
   src.indexOf("MOBILE_MORE_NAV"),
 );
-assert.match(iosPrimary, /\/transactions/);
+assert.match(iosPrimary, /label: "Home"/);
+assert.match(iosPrimary, /label: "Accounts"/);
+assert.match(iosPrimary, /label: "Bills"/);
+assert.match(iosPrimary, /label: "Debt"/);
+assert.match(iosPrimary, /\/debt/);
+assert.doesNotMatch(iosPrimary, /\/transactions/);
+assert.doesNotMatch(iosPrimary, /Activity/);
 assert.doesNotMatch(iosPrimary, /\/income/);
 
 const iosMore = src.slice(src.indexOf("IOS_MORE_NAV"));
 assert.match(iosMore, /\/income/);
+assert.match(iosMore, /\/transactions/);
 assert.match(iosMore, /\/settings/);
 assert.match(iosMore, /Household/);
+assert.match(iosMore, /What's New/);
+assert.match(iosMore, /Roadmap/);
+assert.match(iosMore, /Support/);
+// Debt is a primary tab — must not appear again in More
+assert.doesNotMatch(iosMore, /label: "Debt"/);
 
 console.log("✅ iOS native navigation IA checks passed.");

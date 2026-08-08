@@ -5,6 +5,7 @@ import { AddBillModal } from "@/components/bills/AddBillModal";
 import { BillCard } from "@/components/bills/BillCard";
 import { DeleteBillModal } from "@/components/bills/DeleteBillModal";
 import { EditBillModal } from "@/components/bills/EditBillModal";
+import { IosBillsScreen } from "@/components/native/ios/IosBillsScreen";
 import { PaycheckSplitPanel } from "@/components/paycheck/PaycheckSplitPanel";
 import { Button, EmptyState, PageHeader, SkeletonGrid, StatCard } from "@/components/ui";
 import { MobileCollapsibleSection } from "@/components/ui/MobileCollapsibleSection";
@@ -19,6 +20,7 @@ import {
 } from "@/lib/finance/bills";
 import { formatCurrency } from "@/lib/finance/format";
 import type { Bill, BillProgress, FinanceData } from "@/lib/finance/types";
+import { useNativeIos } from "@/lib/native/useNativeIos";
 import { cn } from "@/components/ui/cn";
 
 type BillGroup = {
@@ -98,6 +100,7 @@ export function BillsContent() {
   const finance = useFinance();
   const { markBillSplitPaid, isLoading } = finance;
   const { showToast } = useToast();
+  const nativeIos = useNativeIos();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editBillId, setEditBillId] = useState<string | null>(null);
   const [deleteBillId, setDeleteBillId] = useState<string | null>(null);
@@ -115,6 +118,10 @@ export function BillsContent() {
     [finance],
   );
   const summary = finance.dashboard.billsSummary;
+
+  if (nativeIos) {
+    return <IosBillsScreen />;
+  }
 
   if (isLoading) {
     return <SkeletonGrid count={3} />;

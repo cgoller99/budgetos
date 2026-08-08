@@ -21,6 +21,13 @@ export function TopBar({
 }: TopBarProps) {
   const activeRoute = getNavRoute(activeHref);
   const nativeIos = useNativeIos();
+  const path = activeHref.split("?")[0] ?? activeHref;
+  const iosTitle =
+    path === "/dashboard"
+      ? "Home"
+      : path === "/transactions"
+        ? "Transactions"
+        : title;
 
   return (
     <header
@@ -38,7 +45,7 @@ export function TopBar({
             nativeIos && "text-[17px] font-semibold leading-tight tracking-[-0.01em]",
           )}
         >
-          {title}
+          {nativeIos ? iosTitle : title}
         </h1>
         {!nativeIos ? <PageIntro subtitle={activeRoute?.subtitle} /> : null}
       </div>
