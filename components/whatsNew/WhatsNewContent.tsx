@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { IosWhatsNewScreen } from "@/components/native/ios/IosWhatsNewScreen";
 import { Button, Input, SkeletonGrid } from "@/components/ui";
 import { ReleaseCard } from "@/components/whatsNew/ReleaseCard";
 import { pageContainerWideClassName } from "@/components/ui/tokens";
 import { cn } from "@/components/ui/cn";
 import { useWhatsNewOptional } from "@/context/WhatsNewContext";
+import { useNativeIos } from "@/lib/native/useNativeIos";
 import {
   fetchLatestRelease,
   fetchReleaseList,
@@ -20,6 +22,7 @@ import type { AppRelease, ReleaseChangeCategory } from "@/lib/whatsNew/types";
 const PAGE_SIZE = 5;
 
 export function WhatsNewContent() {
+  const nativeIos = useNativeIos();
   const whatsNew = useWhatsNewOptional();
   const [releases, setReleases] = useState<AppRelease[]>([]);
   const [offset, setOffset] = useState(0);
@@ -92,6 +95,10 @@ export function WhatsNewContent() {
     () => releases.find((release) => release.featured) ?? releases[0] ?? null,
     [releases],
   );
+
+  if (nativeIos) {
+    return <IosWhatsNewScreen />;
+  }
 
   return (
     <div className={cn(pageContainerWideClassName, "space-y-8")}>

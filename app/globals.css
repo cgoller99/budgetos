@@ -780,6 +780,40 @@ html[data-native-platform="ios"] .ios-more-sheet {
   background: #0b0f14;
 }
 
+html[data-native-platform="ios"] .ios-embedded-panel {
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+html[data-native-platform="ios"] .ios-settings-embed h2,
+html[data-native-platform="ios"] .ios-settings-embed .text-lg {
+  font-size: 15px !important;
+  font-weight: 600;
+}
+
+html[data-native-platform="ios"] .ios-settings-embed p.text-sm {
+  font-size: 13px;
+}
+
+html[data-native-platform="ios"] .ios-settings-embed [class*="rounded-3xl"],
+html[data-native-platform="ios"] .ios-settings-embed [class*="rounded-2xl"] {
+  border-radius: 14px;
+}
+
+html[data-native-platform="ios"] .ios-embedded-panel .page-header,
+html[data-native-platform="ios"] .native-main .text-2xl.font-semibold,
+html[data-native-platform="ios"] .native-main .text-3xl {
+  font-size: 22px !important;
+  letter-spacing: -0.02em;
+}
+
+/* Kill leftover purple-heavy accents inside native shell */
+html[data-native-platform="ios"] .native-main .bg-purple-500,
+html[data-native-platform="ios"] .native-main .text-purple-400,
+html[data-native-platform="ios"] .native-main .border-purple-500\/30 {
+  --tw-bg-opacity: 1;
+}
+
 /* Suppress desktop page chrome inside native shell */
 html[data-native-platform="ios"] .native-main .page-header,
 html[data-native-platform="ios"] .native-main [data-page-intro] {

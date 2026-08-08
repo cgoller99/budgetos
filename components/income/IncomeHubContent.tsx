@@ -1,15 +1,18 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { IncomeForecastPanel } from "@/components/income/IncomeForecastPanel";
 import { IncomeContent } from "@/components/income/IncomeContent";
 import { IncomeLedgerPanel } from "@/components/income/IncomeLedgerPanel";
 import { IncomePlanContent } from "@/components/incomePlan/IncomePlanContent";
 import { NextPaycheckCard } from "@/components/incomePlan/NextPaycheckCard";
+import { IosIncomeScreen } from "@/components/native/ios/IosIncomeScreen";
 import { MobileCollapsibleSection } from "@/components/ui/MobileCollapsibleSection";
+import { SkeletonGrid } from "@/components/ui";
 import { cn } from "@/components/ui/cn";
 import { pageContainerWideClassName } from "@/components/ui/tokens";
+import { useNativeIos } from "@/lib/native/useNativeIos";
 
 const DESKTOP_TABS = [
   { id: "sources", label: "Sources" },
@@ -30,6 +33,7 @@ function isIncomeTab(value: string | null): value is IncomeTab {
 }
 
 export function IncomeHubContent() {
+  const nativeIos = useNativeIos();
   const searchParams = useSearchParams();
   const router = useRouter();
   const tabParam = searchParams.get("tab");
@@ -49,12 +53,20 @@ export function IncomeHubContent() {
   }, []);
 
   useEffect(() => {
-    if (!isMobile || tabParam) {
+    if (nativeIos || !isMobile || tabParam) {
       return;
     }
 
     router.replace("/income?tab=plan");
-  }, [isMobile, router, tabParam]);
+  }, [isMobile, nativeIos, router, tabParam]);
+
+  if (nativeIos) {
+    return (
+      <Suspense fallback={<SkeletonGrid count={4} />}>
+        <IosIncomeScreen />
+      </Suspense>
+    );
+  }
 
   function setTab(tab: IncomeTab) {
     const params = new URLSearchParams(searchParams.toString());

@@ -28,7 +28,11 @@ export function TopBar({
       ? "Home"
       : path === "/transactions"
         ? "Transactions"
-        : title;
+        : path === "/savings"
+          ? "Goals"
+          : path === "/whats-new"
+            ? "What's New"
+            : title;
 
   return (
     <header
