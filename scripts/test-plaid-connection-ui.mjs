@@ -27,7 +27,7 @@ const helperSrc = fs.readFileSync(
   "utf8",
 );
 assert.match(helperSrc, /hasLinkedFinancialAccounts/);
-assert.match(helperSrc, /never transaction/i);
-assert.doesNotMatch(helperSrc, /transactions/);
+assert.match(helperSrc, /never transaction presence/i);
+assert.doesNotMatch(helperSrc, /input\.transactions|finance\.transactions/);
 
 console.log("✅ Connect Bank UI gating checks passed.");

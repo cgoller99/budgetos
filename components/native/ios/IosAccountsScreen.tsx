@@ -149,7 +149,7 @@ export function IosAccountsScreen() {
             Link an institution to import balances and activity automatically.
           </p>
           <div className="mt-4">
-            <BankSyncConnect buttonLabel="Connect Bank" />
+            <BankSyncConnect buttonLabel="Connect Bank" inline />
           </div>
         </section>
       ) : null}
@@ -167,6 +167,7 @@ export function IosAccountsScreen() {
                   connectionId={item.id}
                   mode="update"
                   compact
+                  inline
                   buttonLabel="Reconnect"
                 />
               }
@@ -221,9 +222,7 @@ export function IosAccountsScreen() {
           </IosList>
           {plaidEnabled ? (
             <div className="mt-2 flex justify-end px-1">
-              <div className="scale-90 origin-right">
-                <BankSyncConnect compact buttonLabel="Add Account" />
-              </div>
+              <BankSyncConnect compact inline buttonLabel="Add Account" />
             </div>
           ) : null}
         </IosSection>

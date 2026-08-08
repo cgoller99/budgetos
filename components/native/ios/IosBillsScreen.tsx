@@ -20,8 +20,54 @@ import {
   getUpcomingBills,
 } from "@/lib/finance/bills";
 import { formatCurrency } from "@/lib/finance/format";
-import type { Bill } from "@/lib/finance/types";
+import type { Bill, BillProgress } from "@/lib/finance/types";
 import { triggerHaptic } from "@/lib/native/haptics";
+
+function BillRows({
+  items,
+  empty,
+  onEdit,
+  onMarkPaid,
+}: {
+  items: BillProgress[];
+  empty?: string;
+  onEdit: (billId: string) => void;
+  onMarkPaid: (billId: string, splitId: string) => void;
+}) {
+  if (items.length === 0) {
+    return empty ? (
+      <p className="px-1 text-[13px] text-[var(--text-muted)]">{empty}</p>
+    ) : null;
+  }
+
+  return (
+    <IosList>
+      {items.map((bill) => (
+        <IosListRow
+          key={`${bill.billId}-${bill.splitId}`}
+          title={bill.name}
+          subtitle={`${bill.statusLabel} · ${bill.formattedDueDate}`}
+          trailing={
+            <div className="flex flex-col items-end gap-1">
+              <span>{formatCurrency(bill.remainingAmount || bill.amount)}</span>
+              {bill.status !== "paid" ? (
+                <button
+                  type="button"
+                  className="text-[12px] font-semibold text-[var(--accent-light)]"
+                  onClick={() => onMarkPaid(bill.billId, bill.splitId)}
+                >
+                  Mark paid
+                </button>
+              ) : null}
+            </div>
+          }
+          onClick={() => onEdit(bill.billId)}
+          danger={bill.status === "overdue"}
+        />
+      ))}
+    </IosList>
+  );
+}
 
 export function IosBillsScreen() {
   const finance = useFinance();
@@ -91,48 +137,6 @@ export function IosBillsScreen() {
     }
   }
 
-  function BillRows({
-    items,
-    empty,
-  }: {
-    items: ReturnType<typeof getUpcomingBills>;
-    empty?: string;
-  }) {
-    if (items.length === 0) {
-      return empty ? (
-        <p className="px-1 text-[13px] text-[var(--text-muted)]">{empty}</p>
-      ) : null;
-    }
-
-    return (
-      <IosList>
-        {items.map((bill) => (
-          <IosListRow
-            key={`${bill.billId}-${bill.splitId}`}
-            title={bill.name}
-            subtitle={`${bill.statusLabel} · ${bill.formattedDueDate}`}
-            trailing={
-              <div className="flex flex-col items-end gap-1">
-                <span>{formatCurrency(bill.remainingAmount || bill.amount)}</span>
-                {bill.status !== "paid" ? (
-                  <button
-                    type="button"
-                    className="text-[12px] font-semibold text-[var(--accent-light)]"
-                    onClick={() => void handleMarkPaid(bill.billId, bill.splitId)}
-                  >
-                    Mark paid
-                  </button>
-                ) : null}
-              </div>
-            }
-            onClick={() => setEditBillId(bill.billId)}
-            danger={bill.status === "overdue"}
-          />
-        ))}
-      </IosList>
-    );
-  }
-
   return (
     <IosScreen>
       <div className="flex items-end justify-between gap-3 px-1">
@@ -192,17 +196,30 @@ export function IosBillsScreen() {
         <>
           {overdue.length > 0 ? (
             <IosSection title="Overdue">
-              <BillRows items={overdue} />
+              <BillRows
+                items={overdue}
+                onEdit={setEditBillId}
+                onMarkPaid={(billId, splitId) => void handleMarkPaid(billId, splitId)}
+              />
             </IosSection>
           ) : null}
 
           <IosSection title="Due soon">
-            <BillRows items={dueSoon} empty="Nothing due in the next few days." />
+            <BillRows
+              items={dueSoon}
+              empty="Nothing due in the next few days."
+              onEdit={setEditBillId}
+              onMarkPaid={(billId, splitId) => void handleMarkPaid(billId, splitId)}
+            />
           </IosSection>
 
           {later.length > 0 ? (
             <IosSection title="Upcoming">
-              <BillRows items={later.slice(0, 5)} />
+              <BillRows
+                items={later.slice(0, 5)}
+                onEdit={setEditBillId}
+                onMarkPaid={(billId, splitId) => void handleMarkPaid(billId, splitId)}
+              />
             </IosSection>
           ) : null}
 
