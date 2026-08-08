@@ -52,6 +52,14 @@ const cases = [
     "https://buxme.co/oauth/plaid?oauth_state_id=1",
     "/oauth/plaid?oauth_state_id=1",
   ],
+  [
+    "https://buxme.co/household/invite/tok_abc123",
+    "/household/invite/tok_abc123",
+  ],
+  [
+    "https://www.buxme.co/household/invite/tok_abc123",
+    "/household/invite/tok_abc123",
+  ],
   ["https://evil.example/oauth/plaid", null],
 ];
 
