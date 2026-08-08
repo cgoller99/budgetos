@@ -3,7 +3,7 @@
     "apps": [],
     "details": [
       {
-        "appID": "TEAMID.co.buxme.app",
+        "appID": "Y7UJK54GL9.co.buxme.app",
         "paths": [
           "*",
           "/auth/*",
@@ -21,6 +21,6 @@
     ]
   },
   "webcredentials": {
-    "apps": ["TEAMID.co.buxme.app"]
+    "apps": ["Y7UJK54GL9.co.buxme.app"]
   }
 }

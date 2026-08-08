@@ -63,13 +63,9 @@ APPLE_IAP_KEY_ID=
 APPLE_IAP_PRIVATE_KEY=
 ```
 
-Replace `TEAMID` in:
-
-- `lib/native/appleAppSiteAssociation.ts`
-- `public/.well-known/apple-app-site-association`
-
-with your Apple Team ID, then redeploy web so
-`https://buxme.co/.well-known/apple-app-site-association` is live.
+AASA appID is set to `Y7UJK54GL9.co.buxme.app` (Team ID `Y7UJK54GL9`).
+Confirm production serves it at
+`https://buxme.co/.well-known/apple-app-site-association`.
 
 ---
 
@@ -129,7 +125,7 @@ Verify flows inside the native shell:
 ### Apple Developer
 
 1. App ID `co.buxme.app` with Associated Domains + In-App Purchase.
-2. Note Team ID and replace `TEAMID` in AASA files.
+2. Team ID `Y7UJK54GL9` is configured in AASA as `Y7UJK54GL9.co.buxme.app`.
 3. Validate AASA: [Apple CDN validator](https://search.developer.apple.com/appsearch-validation-tool/).
 
 ### Supabase Auth
@@ -159,7 +155,7 @@ a Stripe subscription is active.
 ## Remaining App Store blockers
 
 1. **Xcode Archive must succeed** on a Mac (signing, capabilities, SPM packages).
-2. **Replace `TEAMID`** in AASA and redeploy production.
+2. Confirm production AASA serves `Y7UJK54GL9.co.buxme.app`.
 3. **Create StoreKit products** in App Store Connect matching product IDs above.
 4. **App Store Server API verification** — wire `APPLE_IAP_*` env vars and harden
    `/api/iap/apple/verify` before review (currently soft-validates until credentials exist).
