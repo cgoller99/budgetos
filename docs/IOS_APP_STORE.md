@@ -23,11 +23,20 @@ Supabase service role, or Apple IAP private keys. Those remain Vercel / server e
 
 ---
 
-## Status of this PR
+## Native UX shell (iOS)
+
+When `Capacitor.isNativePlatform()` is true on iOS, the app uses an app-first shell:
+
+- Bottom tabs: **Home · Accounts · Activity · Bills · More**
+- More sheet: Income, Goals, Debt, Investments, Reports, Calendar, Household, Settings, …
+- Compact top bar, safe-area chrome, bottom sheets, haptics, pull-to-refresh, scroll restore
+- Web / desktop navigation is unchanged
+
+## Status
 
 - Capacitor 8.5 + iOS platform project are committed.
 - Native detection, deep-link routing, safe-area CSS, IAP UI path, account deletion, AASA,
-  privacy manifest, and dual-billing guards are in code.
+  privacy manifest, dual-billing guards, and iOS UX polish are in code.
 - **This environment cannot run Xcode.** Do **not** treat the app as App Store–ready until
   `Product → Archive` succeeds on a Mac.
 
