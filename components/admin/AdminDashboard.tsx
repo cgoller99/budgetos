@@ -41,10 +41,10 @@ function getActionConfirmCopy(action: AdminUserAction, label: string): {
 } {
   if (action === "reset_finance") {
     return {
-      title: "Factory reset finance data",
+      title: "Reset account data",
       description:
-        "This permanently deletes all finance data for this user: Plaid bank connections, accounts, transactions, bills, goals, income plans, investments, and notifications. The login, profile, and subscription are kept. Onboarding resets to a fresh start. This cannot be undone.",
-      confirmLabel: "Reset finance data",
+        "This permanently deletes all finance data for this user: Plaid bank connections, accounts, transactions, bills, goals, income plans, investments, household membership, and notifications. Email and password are kept. Name and subscription stay. Onboarding resets to a fresh start. This cannot be undone.",
+      confirmLabel: "Reset account",
     };
   }
 
@@ -460,7 +460,7 @@ export function AdminDashboard() {
                         ["grant_pro_plus", "Pro+"],
                         ["remove_subscription", "Remove"],
                         user.isDisabled ? ["enable_user", "Enable"] : ["disable_user", "Disable"],
-                        ["reset_finance", "Reset"],
+                        ["reset_finance", "Reset account"],
                         ["delete_user", "Delete"],
                       ].map(([action, label]) => (
                         <Button

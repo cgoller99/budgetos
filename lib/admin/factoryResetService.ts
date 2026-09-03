@@ -6,6 +6,10 @@ import {
 } from "@/lib/plaid/plaidService";
 import type { BuxmeSupabaseClient } from "@/lib/supabase/client";
 
+/**
+ * User-owned finance / product tables wiped on factory reset.
+ * Auth credentials (email + password) and profile identity are preserved.
+ */
 const USER_FINANCE_TABLES = [
   "income_plan_allocation_events",
   "income_plan_paycheck_events",
@@ -22,6 +26,7 @@ const USER_FINANCE_TABLES = [
   "plaid_recurring_dismissals",
   "notifications",
   "recurring_items",
+  "user_release_views",
 ] as const;
 
 async function deleteUserRows(
@@ -85,11 +90,46 @@ async function disconnectPlaidConnections(
   return connections?.length ?? 0;
 }
 
+async function leaveHousehold(
+  adminSupabase: BuxmeSupabaseClient,
+  userId: string,
+): Promise<void> {
+  const { error: membersError } = await adminSupabase
+    .from("household_members")
+    .delete()
+    .eq("user_id", userId);
+
+  if (
+    membersError &&
+    !membersError.message.includes("Could not find the table") &&
+    !membersError.message.includes("does not exist")
+  ) {
+    throw membersError;
+  }
+
+  const { error: invitesError } = await adminSupabase
+    .from("household_invites")
+    .delete()
+    .eq("invited_by", userId);
+
+  if (
+    invitesError &&
+    !invitesError.message.includes("Could not find the table") &&
+    !invitesError.message.includes("does not exist")
+  ) {
+    throw invitesError;
+  }
+}
+
 export type FactoryResetSummary = {
   plaidConnectionsRemoved: number;
   tablesCleared: string[];
 };
 
+/**
+ * Wipe all finance / product data for a user while keeping auth login
+ * (email + password) and profile identity (name, email, subscription).
+ */
 export async function factoryResetUserFinance(input: {
   adminSupabase: BuxmeSupabaseClient;
   userId: string;
@@ -116,6 +156,8 @@ export async function factoryResetUserFinance(input: {
     userId,
   );
 
+  await leaveHousehold(adminSupabase, userId);
+
   const tablesCleared: string[] = [];
 
   for (const table of USER_FINANCE_TABLES) {
@@ -129,6 +171,9 @@ export async function factoryResetUserFinance(input: {
       onboarding_complete: false,
       onboarding_mode: "fresh",
       demo_profile_id: null,
+      household_id: null,
+      onboarding_step: 0,
+      onboarding_progress: {},
       updated_at: now,
     })
     .eq("id", userId);
