@@ -98,12 +98,101 @@ function hasActiveSubscription(subscription, nowMs = Date.now()) {
   return true;
 }
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function resolveAppAccountTokenOwnership(input) {
+  if (!input.authenticatedUserId || !UUID_RE.test(input.authenticatedUserId)) {
+    return { allowed: false, reason: "invalid_user_id" };
+  }
+  const token = input.appAccountToken?.trim();
+  if (!token) {
+    return { allowed: true, mode: "legacy_absent" };
+  }
+  if (token.toLowerCase() !== input.authenticatedUserId.toLowerCase()) {
+    return { allowed: false, reason: "app_account_token_mismatch" };
+  }
+  return { allowed: true, mode: "bound" };
+}
+
+function productionIsConfigured(env) {
+  const hasCreds = Boolean(env.issuerId && env.keyId && env.privateKey);
+  const preferred = (env.environment || "Production").toLowerCase();
+  if (preferred === "sandbox") {
+    return hasCreds;
+  }
+  return hasCreds && Boolean(env.appAppleId);
+}
+
 // ── Policy unit assertions ──────────────────────────────────────────────────
 
 assert.equal(isAllowedAppleProductId("co.buxme.app.pro.monthly"), true);
 assert.equal(isAllowedAppleProductId("co.buxme.app.proplus.monthly"), true);
 assert.equal(isAllowedAppleProductId("com.other.product"), false);
 assert.equal(isAllowedAppleProductId(""), false);
+
+const userA = "11111111-1111-4111-8111-111111111111";
+const userB = "22222222-2222-4222-8222-222222222222";
+
+assert.deepEqual(
+  resolveAppAccountTokenOwnership({
+    authenticatedUserId: userA,
+    appAccountToken: userA,
+  }),
+  { allowed: true, mode: "bound" },
+);
+assert.equal(
+  resolveAppAccountTokenOwnership({
+    authenticatedUserId: userA,
+    appAccountToken: userB,
+  }).reason,
+  "app_account_token_mismatch",
+);
+assert.deepEqual(
+  resolveAppAccountTokenOwnership({
+    authenticatedUserId: userA,
+    appAccountToken: null,
+  }),
+  { allowed: true, mode: "legacy_absent" },
+);
+assert.deepEqual(
+  resolveAppAccountTokenOwnership({
+    authenticatedUserId: userA,
+    appAccountToken: "",
+  }),
+  { allowed: true, mode: "legacy_absent" },
+);
+
+assert.equal(
+  productionIsConfigured({
+    issuerId: "iss",
+    keyId: "key",
+    privateKey: "pem",
+    appAppleId: null,
+    environment: "Production",
+  }),
+  false,
+);
+assert.equal(
+  productionIsConfigured({
+    issuerId: "iss",
+    keyId: "key",
+    privateKey: "pem",
+    appAppleId: "123",
+    environment: "Production",
+  }),
+  true,
+);
+assert.equal(
+  productionIsConfigured({
+    issuerId: "iss",
+    keyId: "key",
+    privateKey: "pem",
+    appAppleId: null,
+    environment: "Sandbox",
+  }),
+  true,
+);
 
 assert.deepEqual(
   isVerifiedAppleTransactionCurrentlyValid({
@@ -280,6 +369,19 @@ const verifyService = read("lib/iap/appleVerifyPurchase.ts");
 assert.match(verifyService, /verifyAndDecodeSignedTransaction|fetchVerifiedTransactionById/);
 assert.match(verifyService, /Never trusts client/);
 assert.match(verifyService, /ApplePurchaseVerificationError/);
+assert.match(verifyService, /resolveAppAccountTokenOwnership/);
+assert.match(verifyService, /app_account_token_mismatch/);
+assert.doesNotMatch(verifyService, /receipt\?:/);
+
+const ownershipPolicy = read("lib/iap/appleEntitlementPolicy.ts");
+assert.match(ownershipPolicy, /resolveAppAccountTokenOwnership/);
+assert.match(ownershipPolicy, /legacy_absent/);
+assert.match(ownershipPolicy, /LEGACY \/ RESTORE/);
+
+const config = read("lib/iap/config.ts");
+assert.match(config, /productionRequiresAppAppleId|APPLE_IAP_APP_APPLE_ID/);
+assert.match(config, /Environment\.PRODUCTION/);
+assert.match(config, /Environment\.SANDBOX/);
 
 const serverClient = read("lib/iap/appleServerClient.ts");
 assert.match(serverClient, /SignedDataVerifier/);
@@ -291,6 +393,7 @@ const subscriptionService = read("lib/iap/appleSubscriptionService.ts");
 assert.match(subscriptionService, /canApplyAppleEntitlementToProfile/);
 assert.match(subscriptionService, /clearAppleSubscriptionOnProfile/);
 assert.match(subscriptionService, /applyAppleSubscriptionByOriginalTransaction/);
+assert.match(subscriptionService, /already linked to another Buxme account/);
 assert.match(subscriptionService, /active_stripe_entitlement_preserved|active web subscription/);
 assert.match(
   subscriptionService,
@@ -308,12 +411,20 @@ assert.match(notificationHandler, /Idempotent/);
 
 const clientApi = read("lib/iap/clientApi.ts");
 assert.match(clientApi, /signedTransactionInfo/);
+assert.match(clientApi, /purchaseAndVerifyNativePlan\([\s\S]*authenticatedUserId/);
 assert.match(clientApi, /verifyApplePurchase\(preferred\)/);
 assert.match(clientApi, /same trusted verification path/);
+assert.doesNotMatch(clientApi, /receipt:/);
 
 const nativePurchases = read("lib/iap/nativePurchases.ts");
 assert.match(nativePurchases, /jwsRepresentation/);
 assert.match(nativePurchases, /signedTransactionInfo/);
+assert.match(nativePurchases, /appAccountToken: authenticatedUserId/);
+assert.match(nativePurchases, /isBuxmeUserUuid/);
+
+const billing = read("components/settings/BillingSection.tsx");
+assert.match(billing, /purchaseAndVerifyNativePlan\(plan, user\.id\)/);
+assert.match(billing, /useAuth/);
 
 const entitlementsRoute = read("app/api/entitlements/route.ts");
 assert.match(entitlementsRoute, /clearAppleSubscriptionOnProfile/);
@@ -338,10 +449,13 @@ assert.match(envExample, /api\/iap\/apple\/notifications/);
 const envCatalog = read("scripts/lib/env-utils.mjs");
 assert.match(envCatalog, /group: "Apple IAP"/);
 assert.match(envCatalog, /APPLE_IAP_PRIVATE_KEY/);
+assert.match(envCatalog, /REQUIRED when APPLE_IAP_ENVIRONMENT=Production/);
 
 const docs = read("docs/IOS_APP_STORE.md");
 assert.match(docs, /App Store Server Notifications/);
 assert.match(docs, /APPLE_IAP_APP_APPLE_ID/);
+assert.match(docs, /appAccountToken/);
+assert.match(docs, /legacy/i);
 
 for (const cert of [
   "AppleRootCA-G3.cer",
@@ -354,9 +468,22 @@ for (const cert of [
   );
 }
 
+assert.ok(
+  fs.existsSync(
+    path.join(
+      root,
+      "scripts/fixtures/apple-app-store-server-library/certs/testCA.der",
+    ),
+  ),
+);
+
 const pkg = JSON.parse(read("package.json"));
 assert.ok(pkg.dependencies["@apple/app-store-server-library"]);
 assert.equal(pkg.scripts["test:apple-iap"], "node scripts/test-apple-iap.mjs");
+assert.equal(
+  pkg.scripts["test:apple-iap-crypto"],
+  "node scripts/test-apple-iap-crypto.mjs",
+);
 
 // Confirm library is importable
 const appleLib = require("@apple/app-store-server-library");

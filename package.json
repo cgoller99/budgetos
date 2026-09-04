@@ -34,6 +34,7 @@
     "test:ios-polish-data-intel": "node scripts/test-ios-polish-data-intel.mjs",
     "test:public-support-page": "node scripts/test-public-support-page.mjs",
     "test:apple-iap": "node scripts/test-apple-iap.mjs",
+    "test:apple-iap-crypto": "node scripts/test-apple-iap-crypto.mjs",
     "cap:sync": "npx cap sync ios",
     "cap:open:ios": "npx cap open ios",
     "cap:copy": "npx cap copy ios",

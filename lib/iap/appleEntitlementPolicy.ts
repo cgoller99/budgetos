@@ -27,6 +27,45 @@ export type AppleProfileBillingSnapshot = {
   appleOriginalTransactionId: string | null | undefined;
 };
 
+/** StoreKit / Capgo require a UUID-shaped appAccountToken on iOS. */
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export function isBuxmeUserUuid(value: string | null | undefined): boolean {
+  return Boolean(value && UUID_RE.test(value));
+}
+
+/**
+ * Ownership binding for verified Apple transactions.
+ *
+ * - NEW purchases: client passes authenticated Buxme user UUID as StoreKit appAccountToken.
+ *   When Apple returns appAccountToken, it MUST match the authenticated user.
+ * - LEGACY / RESTORE: transactions created before binding may omit appAccountToken.
+ *   Those may first-link to the verifying user only after full Apple crypto verification
+ *   and only if originalTransactionId is not already owned by another Buxme account.
+ */
+export function resolveAppAccountTokenOwnership(input: {
+  authenticatedUserId: string;
+  appAccountToken: string | null | undefined;
+}):
+  | { allowed: true; mode: "bound" | "legacy_absent" }
+  | { allowed: false; reason: "invalid_user_id" | "app_account_token_mismatch" } {
+  if (!isBuxmeUserUuid(input.authenticatedUserId)) {
+    return { allowed: false, reason: "invalid_user_id" };
+  }
+
+  const token = input.appAccountToken?.trim();
+  if (!token) {
+    return { allowed: true, mode: "legacy_absent" };
+  }
+
+  if (token.toLowerCase() !== input.authenticatedUserId.toLowerCase()) {
+    return { allowed: false, reason: "app_account_token_mismatch" };
+  }
+
+  return { allowed: true, mode: "bound" };
+}
+
 export function isAllowedAppleProductId(productId: string | null | undefined): boolean {
   return Boolean(productId && planFromIapProductId(productId));
 }

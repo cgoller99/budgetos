@@ -21,7 +21,6 @@ export async function verifyApplePurchase(
       transactionId: purchase.transactionId,
       originalTransactionId: purchase.originalTransactionId,
       signedTransactionInfo: purchase.signedTransactionInfo,
-      receipt: purchase.receipt,
     }),
   });
 
@@ -34,9 +33,12 @@ export async function verifyApplePurchase(
   return body;
 }
 
-export async function purchaseAndVerifyNativePlan(plan: IapPlan) {
+export async function purchaseAndVerifyNativePlan(
+  plan: IapPlan,
+  authenticatedUserId: string,
+) {
   const { purchaseNativePlan } = await import("@/lib/iap/nativePurchases");
-  const purchase = await purchaseNativePlan(plan);
+  const purchase = await purchaseNativePlan(plan, authenticatedUserId);
   return verifyApplePurchase(purchase);
 }
 
@@ -53,6 +55,7 @@ export async function restoreAndVerifyNativePurchases() {
     purchases.find((item) => item.plan === "pro_plus") ?? purchases[0];
 
   // Restore must use the same trusted verification path as purchase.
+  // Legacy transactions may omit appAccountToken; server allows that path.
   await verifyApplePurchase(preferred);
   return { restored: purchases.length, plan: preferred.plan };
 }

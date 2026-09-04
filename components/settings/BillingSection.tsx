@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Badge, Button, Card, CardContent, CardHeader } from "@/components/ui";
 import { cn } from "@/components/ui/cn";
+import { useAuth } from "@/context/AuthContext";
 import { useSubscription } from "@/context/SubscriptionContext";
 import { useToast } from "@/context/ToastContext";
 import { ANALYTICS_EVENTS, trackEvent } from "@/lib/analytics/client";
@@ -84,6 +85,7 @@ async function openAppleManageSubscriptions() {
 
 export function BillingSection() {
   const { showToast } = useToast();
+  const { user } = useAuth();
   const searchParams = useSearchParams();
   const stripeEnabled = isStripeClientEnabled();
   const nativeStoreBilling = shouldUseNativeStoreBilling();
@@ -170,6 +172,10 @@ export function BillingSection() {
 
   async function handleNativePurchase(plan: IapPlan) {
     await runAction(`iap-${plan}`, async () => {
+      if (!user?.id) {
+        throw new Error("Sign in to purchase a Buxme subscription.");
+      }
+
       if (
         subscription.provider === "stripe" &&
         hasActiveSubscription(subscription)
@@ -179,7 +185,7 @@ export function BillingSection() {
         );
       }
 
-      await purchaseAndVerifyNativePlan(plan);
+      await purchaseAndVerifyNativePlan(plan, user.id);
       await refreshSubscription({ refresh: true });
       trackEvent(ANALYTICS_EVENTS.SUBSCRIPTION_PURCHASED, {
         plan,

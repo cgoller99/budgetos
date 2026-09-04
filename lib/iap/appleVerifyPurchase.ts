@@ -8,6 +8,7 @@ import {
 import {
   isVerifiedAppleTransactionCurrentlyValid,
   planFromVerifiedAppleProduct,
+  resolveAppAccountTokenOwnership,
 } from "@/lib/iap/appleEntitlementPolicy";
 import {
   fetchVerifiedTransactionById,
@@ -36,7 +37,6 @@ export type ClientApplePurchasePayload = {
   transactionId?: string | null;
   originalTransactionId?: string | null;
   signedTransactionInfo?: string | null;
-  receipt?: string | null;
   environment?: string | null;
 };
 
@@ -49,6 +49,7 @@ export type VerifiedApplePurchase = {
   environment: string;
   bundleId: string;
   revocationDate: string | null;
+  appAccountToken: string | null;
 };
 
 function toIsoFromMs(value: number | null | undefined): string | null {
@@ -104,6 +105,7 @@ export function mapDecodedTransactionToVerifiedPurchase(
     environment: String(environment),
     bundleId: transaction.bundleId!,
     revocationDate: toIsoFromMs(transaction.revocationDate),
+    appAccountToken: transaction.appAccountToken?.trim() || null,
   };
 }
 
@@ -163,6 +165,21 @@ export async function verifyAndSyncApplePurchaseForUser(input: {
   payload: ClientApplePurchasePayload;
 }): Promise<{ plan: IapPlan; status: string; verified: VerifiedApplePurchase }> {
   const verified = await verifyClientApplePurchase(input.payload);
+
+  const ownership = resolveAppAccountTokenOwnership({
+    authenticatedUserId: input.userId,
+    appAccountToken: verified.appAccountToken,
+  });
+
+  if (!ownership.allowed) {
+    throw new ApplePurchaseVerificationError(
+      ownership.reason === "app_account_token_mismatch"
+        ? "This Apple purchase is bound to a different Buxme account."
+        : "Authenticated user id is invalid for Apple purchase linking.",
+      ownership.reason,
+      403,
+    );
+  }
 
   // If Apple says revoked/expired, clear rather than grant (defense in depth).
   if (verified.revocationDate) {

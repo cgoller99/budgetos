@@ -208,7 +208,7 @@ export const ENV_CATALOG = [
         name: "APPLE_IAP_APP_APPLE_ID",
         required: false,
         source:
-          "App Store Connect → App → App Information → Apple ID (numeric). Required for Production JWS / ASN verification",
+          "App Store Connect → App → App Information → Apple ID (numeric). REQUIRED when APPLE_IAP_ENVIRONMENT=Production (default). Sandbox-only may omit.",
         example: "1234567890",
       },
       {

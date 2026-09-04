@@ -74,6 +74,8 @@ APPLE_IAP_APP_APPLE_ID=
 # optional:
 # APPLE_IAP_BUNDLE_ID=co.buxme.app
 # APPLE_IAP_ENVIRONMENT=Production
+# For Sandbox-only local testing you may set APPLE_IAP_ENVIRONMENT=Sandbox
+# and omit APPLE_IAP_APP_APPLE_ID. Production (default) fails closed without it.
 ```
 
 ASN V2 production URL:
@@ -100,6 +102,15 @@ product/transaction/expiry fields alone.
 | `POST /api/iap/apple/notifications` | App Store Server Notifications V2. Verifies `signedPayload`, applies renew/expire/refund/revoke/grace states. Idempotent. Never overwrites an active Stripe entitlement. |
 | `GET /api/entitlements` | Shared Premium gate. Apple rows without a future `subscription_current_period_end` fail closed. Expired Apple access is cleared as a hygiene fallback. |
 | Restore purchases | Native restore still calls `/api/iap/apple/verify` (same trusted path). |
+| Ownership binding | New purchases pass the authenticated Buxme user UUID as StoreKit `appAccountToken` via `@capgo/native-purchases` `purchaseProduct({ appAccountToken })`. If Apple’s verified transaction includes `appAccountToken`, it must match the authenticated user. |
+
+### Legacy / restore without `appAccountToken`
+
+Purchases created before ownership binding may omit `appAccountToken`. For a **cryptographically verified** Apple transaction where `appAccountToken` is absent:
+
+- first-link to the verifying Buxme user is allowed (restore / legacy compatibility)
+- `originalTransactionId` uniqueness still prevents moving a subscription already linked to another Buxme account
+- client fields still never grant Premium
 
 Allowed product IDs:
 
@@ -179,11 +190,14 @@ Verify flows inside the native shell:
 APPLE_IAP_ISSUER_ID=<issuer uuid>
 APPLE_IAP_KEY_ID=<key id>
 APPLE_IAP_PRIVATE_KEY=<PEM with \n newlines>
-APPLE_IAP_APP_APPLE_ID=<numeric app Apple ID>
+APPLE_IAP_APP_APPLE_ID=<numeric app Apple ID>   # required for Production
 # optional
 APPLE_IAP_BUNDLE_ID=co.buxme.app
 APPLE_IAP_ENVIRONMENT=Production
 ```
+
+Production verification/ASN **fail closed** if `APPLE_IAP_APP_APPLE_ID` is missing.
+Set `APPLE_IAP_ENVIRONMENT=Sandbox` only for Sandbox-focused testing (App Apple ID may be omitted there).
 
 ### Apple Developer
 

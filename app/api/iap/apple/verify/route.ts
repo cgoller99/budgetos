@@ -11,8 +11,6 @@ type VerifyBody = {
   transactionId?: string;
   originalTransactionId?: string;
   signedTransactionInfo?: string | null;
-  /** @deprecated Prefer signedTransactionInfo or transactionId + App Store Server API. */
-  receipt?: string | null;
   environment?: string | null;
 };
 
@@ -48,7 +46,6 @@ export async function POST(request: Request) {
         transactionId: body.transactionId,
         originalTransactionId: body.originalTransactionId,
         signedTransactionInfo: body.signedTransactionInfo,
-        receipt: body.receipt,
         environment: body.environment,
       },
     });
