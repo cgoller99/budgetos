@@ -48,7 +48,7 @@ type SettingsPanel =
   | "notifications"
   | "theme"
   | "security"
-  | "danger"
+  | "delete-account"
   | null;
 
 const NOTIFICATION_LABELS: Record<NotificationCategory, string> = {
@@ -64,6 +64,7 @@ function panelFromHash(): SettingsPanel {
   if (hash === "billing") return "billing";
   if (hash === "connections") return "connections";
   if (hash === "household") return "household";
+  if (hash === "delete-account" || hash === "account") return "delete-account";
   return null;
 }
 
@@ -213,6 +214,13 @@ export function IosSettingsScreen() {
             }
             trailing={<span className="text-[var(--text-subtle)]">›</span>}
             onClick={() => openPanel("household", "household")}
+          />
+          <IosListRow
+            title="Delete Account"
+            subtitle="Permanent"
+            danger
+            trailing={<span className="text-[var(--text-subtle)]">›</span>}
+            onClick={() => openPanel("delete-account", "delete-account")}
           />
         </IosList>
       </IosSection>
@@ -451,20 +459,11 @@ export function IosSettingsScreen() {
         </IosCard>
       ) : null}
 
-      <IosSection title="Danger zone">
-        <IosList>
-          <IosListRow
-            title="Delete account"
-            subtitle="Permanent"
-            danger
-            trailing={<span className="text-[var(--text-subtle)]">›</span>}
-            onClick={() => openPanel("danger")}
-          />
-        </IosList>
-      </IosSection>
-
-      {panel === "danger" && isConfigured ? (
-        <div className="ios-embedded-panel ios-settings-embed">
+      {panel === "delete-account" ? (
+        <div
+          id="delete-account"
+          className="ios-embedded-panel ios-settings-embed"
+        >
           <AccountDeletionSection />
         </div>
       ) : null}
