@@ -3,6 +3,7 @@ import { assertPlaidConfigured, getPlaidConfig } from "@/lib/plaid/config";
 import { requirePlaidApiUser, plaidErrorResponse } from "@/lib/plaid/apiAuth";
 import { createPlaidLinkToken } from "@/lib/plaid/plaidService";
 import { getPlaidOAuthRedirectUri } from "@/lib/plaid/oauth";
+import { assertCanStartPlaidLink } from "@/lib/plaid/requirePlaidProAccess";
 import { BankConnectionsRepository } from "@/lib/supabase/repositories/bankConnectionsRepository";
 import { decryptConnectionAccessToken } from "@/lib/plaid/plaidService";
 
@@ -41,6 +42,16 @@ export async function POST(request: Request) {
       connectionId: body.connectionId ?? null,
       redirectUri: getPlaidOAuthRedirectUri(),
     });
+
+    const entitlementBlock = await assertCanStartPlaidLink({
+      supabase: auth.supabase,
+      userId: auth.user.id,
+      email: auth.user.email,
+      mode,
+    });
+    if (entitlementBlock) {
+      return entitlementBlock;
+    }
 
     const repository = new BankConnectionsRepository(auth.supabase);
     let accessToken: string | null = null;

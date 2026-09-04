@@ -28,7 +28,7 @@ Supabase service role, or Apple IAP private keys. Those remain Vercel / server e
 When `Capacitor.isNativePlatform()` is true on iOS, the app uses an app-first shell:
 
 - Bottom tabs: **Home · Accounts · Activity · Bills · More**
-- More sheet: Income, Goals, Debt, Investments, Reports, Calendar, Household, Settings, …
+- More sheet: Income, Goals, Investments, Transactions, Reports, Calendar, Settings, Household, …
 - Compact top bar, safe-area chrome, bottom sheets, haptics, pull-to-refresh, scroll restore
 - Web / desktop navigation is unchanged
 

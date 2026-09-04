@@ -42,13 +42,14 @@ export const IOS_MORE_NAV = [
   },
   { href: "/reports", label: "Reports", icon: "reports" as const, group: "insights" as const },
   { href: "/calendar", label: "Calendar", icon: "calendar" as const, group: "insights" as const },
+  // Household lives under App — not Insights — so Insights taps never imply Settings.
+  { href: "/settings", label: "Settings", icon: "settings" as const, group: "app" as const },
   {
     href: "/settings#household",
     label: "Household",
     icon: "settings" as const,
-    group: "insights" as const,
+    group: "app" as const,
   },
-  { href: "/settings", label: "Settings", icon: "settings" as const, group: "app" as const },
   { href: "/whats-new", label: "What's New", icon: "reports" as const, group: "app" as const },
   { href: "/roadmap", label: "Roadmap", icon: "roadmap" as const, group: "app" as const },
   {

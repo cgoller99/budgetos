@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import type { PlaidLinkOnSuccessMetadata } from "react-plaid-link";
 import { Badge, Button, Card, CardContent, CardHeader } from "@/components/ui";
 import { ManualAccountsPlaidMergeModal } from "@/components/plaid/ManualAccountsPlaidMergeModal";
 import { clearPlaidConnectBannerDismissal } from "@/components/guidance/PlaidConnectBanner";
 import { useFinance } from "@/context/FinanceContext";
+import { useSubscription } from "@/context/SubscriptionContext";
 import { useToast } from "@/context/ToastContext";
 import { usePlaidLinkSession } from "@/hooks/usePlaidLinkSession";
 import { bankSyncComingSoonMessage } from "@/lib/integrations/bankSync";
@@ -16,6 +18,7 @@ import {
   isPlaidReconnectRequired,
 } from "@/lib/plaid/clientApi";
 import { isPlaidClientEnabled } from "@/lib/plaid/clientConfig";
+import { PLAID_PRO_REQUIRED_MESSAGE } from "@/lib/plaid/plaidEntitlementGate";
 import {
   storePlaidLinkToken,
   clearStoredPlaidLinkToken,
@@ -94,6 +97,7 @@ export function BankSyncConnect({
 }: BankSyncConnectProps) {
   const { connectBank, reconnectBank, isSyncing, refreshFinance, deleteAccount, accounts } =
     useFinance();
+  const { hasProAccess, isFounder } = useSubscription();
   const { showToast } = useToast();
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [isLoadingToken, setIsLoadingToken] = useState(false);
@@ -106,6 +110,8 @@ export function BankSyncConnect({
   const [plaidAccountCount, setPlaidAccountCount] = useState(0);
   const [isRemovingManual, setIsRemovingManual] = useState(false);
   const plaidEnabled = isPlaidClientEnabled();
+  const canCreatePlaid = hasProAccess || isFounder;
+  const requiresUpgrade = mode === "create" && !canCreatePlaid;
   const label =
     buttonLabel ??
     (mode === "update" ? "Reconnect bank" : "Connect bank");
@@ -313,6 +319,39 @@ export function BankSyncConnect({
             Add Plaid credentials to `.env.local` and set
             `NEXT_PUBLIC_PLAID_ENABLED=true`.
           </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (requiresUpgrade) {
+    if (inline) {
+      return (
+        <div className="space-y-3">
+          <p className="text-sm text-white/55">{PLAID_PRO_REQUIRED_MESSAGE}</p>
+          <Link href="/settings?upgrade=pro#billing">
+            <Button size="sm" className="touch-manipulation">
+              Upgrade to Pro
+            </Button>
+          </Link>
+        </div>
+      );
+    }
+
+    return (
+      <Card padding="lg">
+        <CardHeader
+          title="Connect bank"
+          action={<Badge variant="accent">Pro</Badge>}
+        />
+        <CardContent className="space-y-4">
+          <p className="text-sm leading-relaxed text-white/55">
+            {PLAID_PRO_REQUIRED_MESSAGE} Existing linked banks keep syncing if you
+            already connected them.
+          </p>
+          <Link href="/settings?upgrade=pro#billing">
+            <Button size="md">Upgrade to Pro</Button>
+          </Link>
         </CardContent>
       </Card>
     );

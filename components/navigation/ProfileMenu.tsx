@@ -2,17 +2,19 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { OverlayPortal } from "@/components/ui";
 import { cn } from "@/components/ui/cn";
 import { useAuth } from "@/context/AuthContext";
 import { useFloatingPanelPosition } from "@/lib/ui/useFloatingPanelPosition";
+import { navigateSettingsDeepLink } from "@/lib/native/navigateSettingsHash";
 import { useNativeIos } from "@/lib/native/useNativeIos";
 import { triggerHaptic } from "@/lib/native/haptics";
 
 export function ProfileMenu() {
   const { user, signOut } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const nativeIos = useNativeIos();
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -129,9 +131,12 @@ export function ProfileMenu() {
                   key={item.href}
                   href={item.href}
                   role="menuitem"
-                  onClick={() => {
+                  onClick={(event) => {
                     void triggerHaptic("selection");
                     setOpen(false);
+                    if (navigateSettingsDeepLink(item.href, pathname)) {
+                      event.preventDefault();
+                    }
                   }}
                   className={cn(
                     "focus-ring block min-h-10 rounded-[var(--radius-button)] px-3 py-2 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)]",
