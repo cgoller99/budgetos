@@ -1,7 +1,11 @@
-export type IapProductId = "co.buxme.app.pro.monthly" | "co.buxme.app.proplus.monthly";
+export type IapProductId = "com.buxme.pro.monthly" | "com.buxme.proplus.monthly";
 
 export type IapPlan = "pro" | "pro_plus";
 
+/**
+ * App Store Connect product IDs (auto-renewable subscriptions).
+ * Must match ASC exactly — do not use the iOS bundle id as a product-id prefix.
+ */
 export const IAP_PRODUCTS: Record<
   IapPlan,
   {
@@ -10,14 +14,19 @@ export const IAP_PRODUCTS: Record<
   }
 > = {
   pro: {
-    productId: "co.buxme.app.pro.monthly",
+    productId: "com.buxme.pro.monthly",
     label: "Pro",
   },
   pro_plus: {
-    productId: "co.buxme.app.proplus.monthly",
+    productId: "com.buxme.proplus.monthly",
     label: "Pro+",
   },
 };
+
+export const IAP_PRODUCT_IDS: IapProductId[] = [
+  IAP_PRODUCTS.pro.productId,
+  IAP_PRODUCTS.pro_plus.productId,
+];
 
 export function planFromIapProductId(productId: string): IapPlan | null {
   if (productId === IAP_PRODUCTS.pro.productId) {

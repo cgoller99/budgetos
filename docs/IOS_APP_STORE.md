@@ -112,10 +112,12 @@ Purchases created before ownership binding may omit `appAccountToken`. For a **c
 - `originalTransactionId` uniqueness still prevents moving a subscription already linked to another Buxme account
 - client fields still never grant Premium
 
-Allowed product IDs:
+Allowed product IDs (must match App Store Connect exactly):
 
-- `co.buxme.app.pro.monthly` → Pro
-- `co.buxme.app.proplus.monthly` → Pro+
+- `com.buxme.pro.monthly` → Pro ($7.99/month in US storefront; UI shows StoreKit `priceString`)
+- `com.buxme.proplus.monthly` → Pro+ ($14.99/month in US storefront; UI shows StoreKit `priceString`)
+
+> Note: These IDs intentionally do **not** use the `co.buxme.app` bundle-id prefix. ASC products were created as `com.buxme.*`.
 
 ---
 
@@ -165,14 +167,15 @@ Verify flows inside the native shell:
 1. Create app with bundle id `co.buxme.app`, name **Buxme**.
 2. Create a subscription group (e.g. **Buxme Premium**).
 3. Create auto-renewable subscriptions in that group:
-   - `co.buxme.app.pro.monthly` → Pro (monthly)
-   - `co.buxme.app.proplus.monthly` → Pro+ (monthly)
+   - `com.buxme.pro.monthly` → **Buxme Pro** (1 month, e.g. $7.99 US)
+   - `com.buxme.proplus.monthly` → **Buxme Pro+** (1 month, e.g. $14.99 US)
 4. Set pricing, localization, and review screenshot/notes for each product.
-5. Do **not** invent yearly Apple products for this release unless intentionally added later.
-6. Add Sandbox testers (Users and Access → Sandbox).
-7. Complete Privacy Nutrition Labels to match `PrivacyInfo.xcprivacy`.
-8. Provide App Privacy Policy URL (`https://buxme.co/privacy`).
-9. Account deletion: Settings → Account → Delete Account (separate PR).
+5. Confirm products are in the same subscription group so upgrades/downgrades work.
+6. Do **not** invent yearly Apple products for this release unless intentionally added later.
+7. Add Sandbox testers (Users and Access → Sandbox).
+8. Complete Privacy Nutrition Labels to match `PrivacyInfo.xcprivacy`.
+9. Provide App Privacy Policy URL (`https://buxme.co/privacy`).
+10. Account deletion: Settings → Account → Delete Account.
 
 ### App Store Connect — IAP API key + ASN V2
 

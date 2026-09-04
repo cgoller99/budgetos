@@ -15,7 +15,7 @@ const PRIVILEGED_UPDATE_ATTEMPTS: Array<Record<string, unknown>> = [
   { subscription_provider: "apple" },
   { stripe_customer_id: "cus_privilege_probe" },
   { stripe_subscription_id: "sub_privilege_probe" },
-  { apple_product_id: "co.buxme.app.pro.monthly" },
+  { apple_product_id: "com.buxme.pro.monthly" },
   { apple_original_transaction_id: "1000000000000000" },
   { admin_founder_granted: true },
   { beta_status: "approved" },
