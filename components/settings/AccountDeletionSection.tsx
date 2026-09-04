@@ -3,23 +3,55 @@
 import { useState } from "react";
 import { Button, Card, CardContent, CardHeader, Input } from "@/components/ui";
 import { useAuth } from "@/context/AuthContext";
+import { useSubscription } from "@/context/SubscriptionContext";
 import { useToast } from "@/context/ToastContext";
+import { APPLE_MANAGE_SUBSCRIPTIONS_URL } from "@/lib/iap/products";
 
 export function AccountDeletionSection() {
   const { signOut, isConfigured } = useAuth();
+  const { subscription } = useSubscription();
   const { showToast } = useToast();
   const [confirmText, setConfirmText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const isStripeBilled =
+    subscription.provider === "stripe" &&
+    (subscription.status === "active" ||
+      subscription.status === "trialing" ||
+      subscription.status === "past_due");
+
+  const isAppleBilled =
+    subscription.provider === "apple" ||
+    Boolean(subscription.appleOriginalTransactionId);
+
   if (!isConfigured) {
-    return null;
+    return (
+      <Card padding="lg">
+        <CardHeader
+          title="Delete Account"
+          description="Account deletion is temporarily unavailable."
+        />
+        <CardContent>
+          <p className="text-sm text-[var(--text-muted)]">
+            Buxme cannot reach account services right now. Try again later or email{" "}
+            <a
+              className="font-medium text-[var(--accent-light)] hover:underline"
+              href="mailto:support@buxme.co"
+            >
+              support@buxme.co
+            </a>
+            .
+          </p>
+        </CardContent>
+      </Card>
+    );
   }
 
   async function handleDelete() {
     if (confirmText !== "DELETE") {
       showToast({
         title: "Confirmation required",
-        subtitle: 'Type DELETE to permanently remove your account.',
+        subtitle: "Type DELETE to permanently remove your account.",
       });
       return;
     }
@@ -60,19 +92,50 @@ export function AccountDeletionSection() {
   return (
     <Card padding="lg">
       <CardHeader
-        title="Delete account"
-        description="Permanently delete your Buxme account, finance data, and bank connections. This cannot be undone."
+        title="Delete Account"
+        description="Permanently delete your Buxme account and associated user data. This cannot be undone."
       />
       <CardContent className="space-y-4">
-        <p className="text-sm text-white/45">
-          Apple App Store guidelines require in-app account deletion. Type{" "}
-          <span className="font-semibold text-white">DELETE</span> to confirm.
-        </p>
+        <div className="space-y-2 text-sm leading-relaxed text-[var(--text-muted)]">
+          <p>
+            Deleting your account permanently removes your Buxme login, finance
+            data, bank connections, and profile according to our deletion policy.
+          </p>
+          {isStripeBilled ? (
+            <p>
+              Your active web/Stripe Buxme subscription will be canceled
+              immediately when deletion completes. Stripe invoices are retained
+              for records; your Stripe customer profile is not deleted.
+            </p>
+          ) : null}
+          {isAppleBilled ? (
+            <p>
+              Deleting your Buxme account does{" "}
+              <span className="font-semibold text-[var(--foreground)]">not</span>{" "}
+              cancel an App Store subscription. Manage or cancel it in{" "}
+              <a
+                href={APPLE_MANAGE_SUBSCRIPTIONS_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-[var(--accent-light)] hover:underline"
+              >
+                Apple ID → Subscriptions
+              </a>
+              .
+            </p>
+          ) : null}
+          <p>
+            If you own a household with other members, transfer ownership first.
+            Type <span className="font-semibold text-[var(--foreground)]">DELETE</span>{" "}
+            to confirm.
+          </p>
+        </div>
         <Input
           value={confirmText}
           onChange={(event) => setConfirmText(event.target.value)}
           placeholder="Type DELETE"
           autoComplete="off"
+          aria-label="Type DELETE to confirm account deletion"
         />
         <Button
           variant="secondary"
@@ -80,7 +143,7 @@ export function AccountDeletionSection() {
           disabled={isDeleting || confirmText !== "DELETE"}
           onClick={() => void handleDelete()}
         >
-          {isDeleting ? "Deleting..." : "Delete my account"}
+          {isDeleting ? "Deleting..." : "Delete Account"}
         </Button>
       </CardContent>
     </Card>
