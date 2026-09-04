@@ -48,12 +48,34 @@ export function isPaidPlan(plan: SubscriptionPlan): plan is PaidSubscriptionPlan
   return plan === "pro" || plan === "pro_plus";
 }
 
-export function hasActiveSubscription(subscription: UserSubscription): boolean {
-  return (
+/**
+ * Server/UI Premium gate. Status alone is not enough for Apple:
+ * expired period ends and missing Apple expiry fail closed.
+ */
+export function hasActiveSubscription(
+  subscription: UserSubscription,
+  nowMs: number = Date.now(),
+): boolean {
+  const statusActive =
     subscription.status === "active" ||
     subscription.status === "trialing" ||
-    subscription.status === "past_due"
-  );
+    subscription.status === "past_due";
+
+  if (!statusActive) {
+    return false;
+  }
+
+  if (subscription.currentPeriodEnd) {
+    const end = Date.parse(subscription.currentPeriodEnd);
+    if (!Number.isNaN(end) && end <= nowMs) {
+      return false;
+    }
+  } else if (subscription.provider === "apple") {
+    // Fail closed: Apple Premium requires a verified expiration timestamp.
+    return false;
+  }
+
+  return true;
 }
 
 export function hasMinimumPlan(

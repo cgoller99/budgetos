@@ -1,21 +1,24 @@
 import { NextResponse } from "next/server";
-import { syncAppleSubscriptionToProfile } from "@/lib/iap/appleSubscriptionService";
-import { planFromIapProductId } from "@/lib/iap/products";
+import { getAppleIapConfig } from "@/lib/iap/config";
+import {
+  ApplePurchaseVerificationError,
+  verifyAndSyncApplePurchaseForUser,
+} from "@/lib/iap/appleVerifyPurchase";
 import { requireStripeApiUser, stripeErrorResponse } from "@/lib/stripe/apiAuth";
 
 type VerifyBody = {
   productId?: string;
   transactionId?: string;
   originalTransactionId?: string;
+  signedTransactionInfo?: string | null;
+  /** @deprecated Prefer signedTransactionInfo or transactionId + App Store Server API. */
   receipt?: string | null;
-  expiresAt?: string | null;
   environment?: string | null;
 };
 
 /**
- * Syncs a StoreKit purchase to the user profile.
- * Full App Store Server API verification should be added before App Review
- * using APPLE_IAP_ISSUER_ID / APPLE_IAP_KEY_ID / APPLE_IAP_PRIVATE_KEY.
+ * Verifies an Apple IAP purchase with App Store Server APIs / signed transactions,
+ * then grants Premium only from trusted server-side data.
  */
 export async function POST(request: Request) {
   try {
@@ -24,53 +27,56 @@ export async function POST(request: Request) {
       return auth.response!;
     }
 
+    const appleConfig = getAppleIapConfig();
+    if (!appleConfig.isConfigured) {
+      return NextResponse.json(
+        {
+          error:
+            "Apple In-App Purchase verification is temporarily unavailable. Contact support@buxme.co.",
+          code: "APPLE_IAP_NOT_CONFIGURED",
+        },
+        { status: 503 },
+      );
+    }
+
     const body = (await request.json().catch(() => ({}))) as VerifyBody;
-    const productId = body.productId?.trim();
-    const originalTransactionId =
-      body.originalTransactionId?.trim() || body.transactionId?.trim();
 
-    if (!productId || !originalTransactionId) {
-      return NextResponse.json(
-        { error: "productId and originalTransactionId are required." },
-        { status: 400 },
-      );
-    }
-
-    if (!planFromIapProductId(productId)) {
-      return NextResponse.json({ error: "Unknown product." }, { status: 400 });
-    }
-
-    // Soft validation gate: production App Review requires App Store Server API
-    // verification with Apple. When Apple credentials are configured, enforce them.
-    const appleConfigured = Boolean(
-      process.env.APPLE_IAP_ISSUER_ID?.trim() &&
-        process.env.APPLE_IAP_KEY_ID?.trim() &&
-        process.env.APPLE_IAP_PRIVATE_KEY?.trim(),
-    );
-
-    if (appleConfigured && !body.receipt && !body.transactionId) {
-      return NextResponse.json(
-        { error: "Apple receipt or transaction id required for verification." },
-        { status: 400 },
-      );
-    }
-
-    const synced = await syncAppleSubscriptionToProfile({
+    const result = await verifyAndSyncApplePurchaseForUser({
       userId: auth.user.id,
-      productId,
-      originalTransactionId,
-      transactionId: body.transactionId ?? null,
-      expiresAt: body.expiresAt ?? null,
-      environment: body.environment ?? null,
+      payload: {
+        productId: body.productId,
+        transactionId: body.transactionId,
+        originalTransactionId: body.originalTransactionId,
+        signedTransactionInfo: body.signedTransactionInfo,
+        receipt: body.receipt,
+        environment: body.environment,
+      },
     });
 
     return NextResponse.json({
       ok: true,
-      subscription: synced,
-      appleServerVerification: appleConfigured ? "required" : "pending_credentials",
+      subscription: {
+        plan: result.plan,
+        status: result.status,
+      },
+      appleServerVerification: "verified",
+      verified: {
+        productId: result.verified.productId,
+        originalTransactionId: result.verified.originalTransactionId,
+        expiresAt: result.verified.expiresAt,
+        environment: result.verified.environment,
+      },
     });
   } catch (error) {
     console.error("[iap/apple/verify] failed", error);
+
+    if (error instanceof ApplePurchaseVerificationError) {
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: error.status },
+      );
+    }
+
     return stripeErrorResponse(error, "Unable to verify Apple purchase.");
   }
 }

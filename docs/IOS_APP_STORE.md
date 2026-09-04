@@ -70,11 +70,41 @@ Optional Vercel env (server-only, never `NEXT_PUBLIC_`):
 APPLE_IAP_ISSUER_ID=
 APPLE_IAP_KEY_ID=
 APPLE_IAP_PRIVATE_KEY=
+APPLE_IAP_APP_APPLE_ID=
+# optional:
+# APPLE_IAP_BUNDLE_ID=co.buxme.app
+# APPLE_IAP_ENVIRONMENT=Production
+```
+
+ASN V2 production URL:
+
+```text
+https://buxme.co/api/iap/apple/notifications
 ```
 
 AASA appID is set to `Y7UJK54GL9.co.buxme.app` (Team ID `Y7UJK54GL9`).
 Confirm production serves it at
 `https://buxme.co/.well-known/apple-app-site-association`.
+
+---
+
+## Apple IAP backend architecture (Guideline 3.1.1)
+
+Premium is granted only when **active Stripe** OR **active verified Apple**
+subscription is present. Apple Premium is **never** granted from client-supplied
+product/transaction/expiry fields alone.
+
+| Path | Behavior |
+| --- | --- |
+| `POST /api/iap/apple/verify` | Requires Apple credentials. Verifies StoreKit `signedTransactionInfo` (JWS) and/or looks up `transactionId` via App Store Server API, cryptographically verifies with Apple Root CAs, checks bundle id + allowed product IDs + expiry/revocation, then writes profile. |
+| `POST /api/iap/apple/notifications` | App Store Server Notifications V2. Verifies `signedPayload`, applies renew/expire/refund/revoke/grace states. Idempotent. Never overwrites an active Stripe entitlement. |
+| `GET /api/entitlements` | Shared Premium gate. Apple rows without a future `subscription_current_period_end` fail closed. Expired Apple access is cleared as a hygiene fallback. |
+| Restore purchases | Native restore still calls `/api/iap/apple/verify` (same trusted path). |
+
+Allowed product IDs:
+
+- `co.buxme.app.pro.monthly` → Pro
+- `co.buxme.app.proplus.monthly` → Pro+
 
 ---
 
@@ -119,22 +149,47 @@ Verify flows inside the native shell:
 
 ## Apple dashboard tasks
 
-### App Store Connect
+### App Store Connect — subscriptions
 
 1. Create app with bundle id `co.buxme.app`, name **Buxme**.
-2. Create auto-renewable subscriptions:
-   - `co.buxme.app.pro.monthly` → Pro
-   - `co.buxme.app.proplus.monthly` → Pro+
-3. Attach subscriptions to an App Store subscription group.
-4. Complete Privacy Nutrition Labels to match `PrivacyInfo.xcprivacy`.
-5. Provide App Privacy Policy URL (`https://buxme.co/...` when published).
-6. Account deletion: already available in Settings inside the app.
-7. Add Sandbox testers for IAP.
+2. Create a subscription group (e.g. **Buxme Premium**).
+3. Create auto-renewable subscriptions in that group:
+   - `co.buxme.app.pro.monthly` → Pro (monthly)
+   - `co.buxme.app.proplus.monthly` → Pro+ (monthly)
+4. Set pricing, localization, and review screenshot/notes for each product.
+5. Do **not** invent yearly Apple products for this release unless intentionally added later.
+6. Add Sandbox testers (Users and Access → Sandbox).
+7. Complete Privacy Nutrition Labels to match `PrivacyInfo.xcprivacy`.
+8. Provide App Privacy Policy URL (`https://buxme.co/privacy`).
+9. Account deletion: Settings → Account → Delete Account (separate PR).
+
+### App Store Connect — IAP API key + ASN V2
+
+1. Users and Access → Integrations → **In-App Purchase** → create key.
+2. Download the `.p8` once. Store only in Vercel / password manager — never commit.
+3. Note **Issuer ID** and **Key ID**.
+4. App Information → copy numeric **Apple ID** → `APPLE_IAP_APP_APPLE_ID`.
+5. App → App Store Server Notifications → Production / Sandbox URL:
+   - `https://buxme.co/api/iap/apple/notifications`
+6. Prefer Version 2 notifications.
+
+### Vercel Production env (manual; do not auto-deploy from this PR)
+
+```text
+APPLE_IAP_ISSUER_ID=<issuer uuid>
+APPLE_IAP_KEY_ID=<key id>
+APPLE_IAP_PRIVATE_KEY=<PEM with \n newlines>
+APPLE_IAP_APP_APPLE_ID=<numeric app Apple ID>
+# optional
+APPLE_IAP_BUNDLE_ID=co.buxme.app
+APPLE_IAP_ENVIRONMENT=Production
+```
 
 ### Apple Developer
 
 1. App ID `co.buxme.app` with Associated Domains + In-App Purchase.
-2. Team ID `Y7UJK54GL9` is configured in AASA as `Y7UJK54GL9.co.buxme.app`.
+2. Team ID `Y7UJK54GL9` is already configured in AASA as `Y7UJK54GL9.co.buxme.app`
+   (unrelated to IAP crypto; leave as-is unless Universal Links fail).
 3. Validate AASA: [Apple CDN validator](https://search.developer.apple.com/appsearch-validation-tool/).
 
 ### Supabase Auth
@@ -157,7 +212,7 @@ Keep production redirect URI:
 
 Web checkout remains on **web only**. The iOS UI hides Stripe Checkout and uses StoreKit.
 Server blocks Stripe checkout when an Apple subscription is active, and blocks Apple sync when
-a Stripe subscription is active.
+a Stripe subscription is active. ASN never clobbers an active Stripe entitlement.
 
 ---
 
@@ -166,12 +221,9 @@ a Stripe subscription is active.
 1. **Xcode Archive must succeed** on a Mac (signing, capabilities, SPM packages).
 2. Confirm production AASA serves `Y7UJK54GL9.co.buxme.app`.
 3. **Create StoreKit products** in App Store Connect matching product IDs above.
-4. **App Store Server API verification** — wire `APPLE_IAP_*` env vars and harden
-   `/api/iap/apple/verify` before review (currently soft-validates until credentials exist).
+4. **Add `APPLE_IAP_*` secrets to Vercel** and configure ASN V2 URL (code is ready; credentials are manual).
 5. **App icons / screenshots / review notes / privacy policy** for Connect metadata.
-6. **Guideline 3.1.1** — confirm reader-app / multiplatform exception if you later expose
-   external Stripe manage links for existing web subscribers (current iOS path uses IAP only
-   for new purchases; web Stripe subscribers are recognized and directed to manage on web).
-7. **Manual device QA** of auth, Plaid OAuth, and IAP sandbox purchases.
+6. **Manual device QA** of auth, Plaid OAuth, sandbox IAP purchase, restore, and Stripe web subscriber access on iOS.
+7. Confirm **In-App Purchase** capability in Xcode.
 
-Until items 1–4 are done, the app is **not** ready for App Store submission.
+Until items 1–4 and sandbox purchase verification are done, the app is **not** ready for App Store submission.

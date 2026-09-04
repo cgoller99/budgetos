@@ -181,6 +181,51 @@ export const ENV_CATALOG = [
     ],
   },
   {
+    group: "Apple IAP",
+    vars: [
+      {
+        name: "APPLE_IAP_ISSUER_ID",
+        required: false,
+        secret: true,
+        source:
+          "App Store Connect → Users and Access → Integrations → In-App Purchase → Issuer ID (required before iOS App Review)",
+      },
+      {
+        name: "APPLE_IAP_KEY_ID",
+        required: false,
+        secret: true,
+        source:
+          "App Store Connect → Users and Access → Integrations → In-App Purchase → Key ID",
+      },
+      {
+        name: "APPLE_IAP_PRIVATE_KEY",
+        required: false,
+        secret: true,
+        source:
+          "Contents of the .p8 In-App Purchase key from App Store Connect (store as PEM text in Vercel; never commit the file)",
+      },
+      {
+        name: "APPLE_IAP_APP_APPLE_ID",
+        required: false,
+        source:
+          "App Store Connect → App → App Information → Apple ID (numeric). Required for Production JWS / ASN verification",
+        example: "1234567890",
+      },
+      {
+        name: "APPLE_IAP_BUNDLE_ID",
+        required: false,
+        source: "Defaults to co.buxme.app if unset",
+        example: "co.buxme.app",
+      },
+      {
+        name: "APPLE_IAP_ENVIRONMENT",
+        required: false,
+        source: "Preferred App Store Server API environment (Production or Sandbox). Verification still tries both.",
+        example: "Production",
+      },
+    ],
+  },
+  {
     group: "App Configuration",
     vars: [
       {

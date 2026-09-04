@@ -12,8 +12,10 @@ export type NativePurchaseResult = {
   productId: string;
   plan: IapPlan;
   transactionId: string | null;
-  receipt: string | null;
   originalTransactionId: string | null;
+  signedTransactionInfo: string | null;
+  receipt: string | null;
+  expiresAt: string | null;
 };
 
 function mapTransaction(item: {
@@ -21,6 +23,8 @@ function mapTransaction(item: {
   transactionId?: string;
   receipt?: string;
   originalId?: string;
+  jwsRepresentation?: string;
+  expirationDate?: string;
 }): NativePurchaseResult | null {
   const productId = item.productIdentifier;
   if (!productId) {
@@ -38,6 +42,8 @@ function mapTransaction(item: {
     transactionId: item.transactionId ?? null,
     receipt: item.receipt ?? null,
     originalTransactionId: item.originalId ?? item.transactionId ?? null,
+    signedTransactionInfo: item.jwsRepresentation ?? null,
+    expiresAt: item.expirationDate ?? null,
   };
 }
 

@@ -7,6 +7,7 @@ type VerifyResponse = {
   ok?: boolean;
   error?: string;
   subscription?: { plan: string; status: string };
+  appleServerVerification?: string;
 };
 
 export async function verifyApplePurchase(
@@ -19,6 +20,7 @@ export async function verifyApplePurchase(
       productId: purchase.productId,
       transactionId: purchase.transactionId,
       originalTransactionId: purchase.originalTransactionId,
+      signedTransactionInfo: purchase.signedTransactionInfo,
       receipt: purchase.receipt,
     }),
   });
@@ -50,6 +52,7 @@ export async function restoreAndVerifyNativePurchases() {
   const preferred =
     purchases.find((item) => item.plan === "pro_plus") ?? purchases[0];
 
+  // Restore must use the same trusted verification path as purchase.
   await verifyApplePurchase(preferred);
   return { restored: purchases.length, plan: preferred.plan };
 }

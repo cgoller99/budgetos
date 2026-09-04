@@ -33,6 +33,7 @@
     "test:ios-native-nav": "node scripts/test-ios-native-nav.mjs",
     "test:ios-polish-data-intel": "node scripts/test-ios-polish-data-intel.mjs",
     "test:public-support-page": "node scripts/test-public-support-page.mjs",
+    "test:apple-iap": "node scripts/test-apple-iap.mjs",
     "cap:sync": "npx cap sync ios",
     "cap:open:ios": "npx cap open ios",
     "cap:copy": "npx cap copy ios",
@@ -63,6 +64,7 @@
     "import:finance-spreadsheet": "node --env-file=.env.local scripts/import-finance-spreadsheet.mjs"
   },
   "dependencies": {
+    "@apple/app-store-server-library": "^3.1.0",
     "@capacitor/app": "^8.1.1",
     "@capacitor/browser": "^8.0.4",
     "@capacitor/core": "^8.5.0",
