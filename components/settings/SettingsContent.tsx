@@ -323,8 +323,11 @@ export function SettingsContent() {
   return (
     <div className={cn(pageContainerClassName)}>
       {isConfigured && (
-        <Card padding="lg">
-          <CardHeader title="Profile" />
+        <Card padding="lg" id="account">
+          <CardHeader
+            title="Account"
+            description="Profile details for your Buxme login."
+          />
           <CardContent className="space-y-5">
             <div className="flex items-center gap-4">
               <div
@@ -360,6 +363,10 @@ export function SettingsContent() {
         </Card>
       )}
 
+      <div id="delete-account">
+        <AccountDeletionSection />
+      </div>
+
       <Card padding="lg">
         <CardHeader
           title="What's New"
@@ -376,8 +383,6 @@ export function SettingsContent() {
       </Card>
 
       {isConfigured && <BillingSection />}
-
-      {isConfigured && <AccountDeletionSection />}
 
       <Card padding="lg">
         <CardHeader
