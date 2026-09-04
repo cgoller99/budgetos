@@ -50,5 +50,10 @@ assert.match(iosMore, /Roadmap/);
 assert.match(iosMore, /Support/);
 // Debt is a primary tab — must not appear again in More
 assert.doesNotMatch(iosMore, /label: "Debt"/);
+// Household must not live under Insights (Build 7 Insights → Settings bug)
+assert.doesNotMatch(
+  iosMore.match(/href: "\/settings#household"[\s\S]*?group: "\w+"/)?.[0] ?? "",
+  /insights/,
+);
 
 console.log("✅ iOS native navigation IA checks passed.");

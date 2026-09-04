@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui";
 import { useFinance } from "@/context/FinanceContext";
+import { useSubscription } from "@/context/SubscriptionContext";
 import { cn } from "@/components/ui/cn";
 import type { OnboardingProgress } from "@/lib/onboarding/progress";
 import { shouldShowPlaidConnectBanner } from "@/lib/onboarding/progress";
@@ -20,6 +22,7 @@ export function PlaidConnectBanner({
   className,
 }: PlaidConnectBannerProps) {
   const { bankConnections, accounts, debts, isLoading } = useFinance();
+  const { hasProAccess, isFounder } = useSubscription();
   const [dismissed, setDismissed] = useState(true);
 
   useEffect(() => {
@@ -35,6 +38,7 @@ export function PlaidConnectBanner({
 
   const visible =
     !isLoading &&
+    (hasProAccess || isFounder) &&
     shouldShowPlaidConnectBanner({
       dismissed,
       hasPlaidConnection,

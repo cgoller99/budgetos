@@ -72,8 +72,12 @@ const more = read("components/navigation/MobileMoreSheet.tsx");
 assert.match(more, /pointer-events-none opacity-0/);
 assert.match(more, /pointer-events-auto opacity-100/);
 assert.match(more, /pointer-events-none translate-y-full/);
-assert.match(more, /HashChangeEvent\("hashchange"\)/);
-assert.match(more, /hrefPath === pathname/);
+assert.match(more, /navigateSettingsDeepLink/);
+assert.match(more, /hrefHash/);
+
+const hashHelper = read("lib/native/navigateSettingsHash.ts");
+assert.match(hashHelper, /HashChangeEvent\("hashchange"\)/);
+assert.match(hashHelper, /navigateSettingsDeepLink/);
 
 const billing = read("components/settings/BillingSection.tsx");
 assert.match(billing, /touch-manipulation/);

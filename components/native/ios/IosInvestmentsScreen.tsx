@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   IosAvatar,
   IosCard,
@@ -15,10 +16,12 @@ import {
 import { useFinance } from "@/context/FinanceContext";
 import { formatCurrency, formatMonthlyChange } from "@/lib/finance/format";
 import { getPortfolioPresentation } from "@/lib/investments/portfolioPresentation";
+import { navigateSettingsDeepLink } from "@/lib/native/navigateSettingsHash";
 import { cn } from "@/components/ui/cn";
 
 export function IosInvestmentsScreen() {
   const finance = useFinance();
+  const pathname = usePathname();
   const { isLoading, snapshot } = finance;
 
   if (isLoading) {
@@ -98,6 +101,11 @@ export function IosInvestmentsScreen() {
             <Link
               href="/settings#connections"
               className="min-h-11 text-[13px] font-semibold text-[var(--accent-light)]"
+              onClick={(event) => {
+                if (navigateSettingsDeepLink("/settings#connections", pathname)) {
+                  event.preventDefault();
+                }
+              }}
             >
               Manage connections
             </Link>
@@ -113,7 +121,14 @@ export function IosInvestmentsScreen() {
               Link a brokerage account to track portfolio value and holdings here.
             </p>
             <div className="mt-4">
-              <Link href="/settings#connections">
+              <Link
+                href="/settings#connections"
+                onClick={(event) => {
+                  if (navigateSettingsDeepLink("/settings#connections", pathname)) {
+                    event.preventDefault();
+                  }
+                }}
+              >
                 <IosPrimaryButton>Connect investments</IosPrimaryButton>
               </Link>
             </div>

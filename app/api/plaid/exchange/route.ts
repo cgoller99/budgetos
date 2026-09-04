@@ -5,6 +5,7 @@ import {
   exchangePlaidPublicToken,
   getPlaidErrorMessage,
 } from "@/lib/plaid/plaidService";
+import { assertCanExchangeNewPlaidItem } from "@/lib/plaid/requirePlaidProAccess";
 import { syncPlaidConnection } from "@/lib/plaid/syncService";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { BankConnectionsRepository } from "@/lib/supabase/repositories/bankConnectionsRepository";
@@ -58,6 +59,16 @@ export async function POST(request: Request) {
       auth.user.id,
       exchangeResult.itemId,
     );
+
+    const entitlementBlock = await assertCanExchangeNewPlaidItem({
+      supabase: auth.supabase,
+      userId: auth.user.id,
+      email: auth.user.email,
+      hasExistingItem: Boolean(existing),
+    });
+    if (entitlementBlock) {
+      return entitlementBlock;
+    }
 
     let connection = existing;
 

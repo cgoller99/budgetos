@@ -14,6 +14,7 @@ import {
   IOS_MORE_NAV,
   MOBILE_MORE_NAV,
 } from "@/lib/mobile/navigation";
+import { navigateSettingsDeepLink } from "@/lib/native/navigateSettingsHash";
 import { triggerHaptic } from "@/lib/native/haptics";
 import { useNativeIos } from "@/lib/native/useNativeIos";
 import { IosTintIcon } from "@/components/native/ios/IosPrimitives";
@@ -85,12 +86,24 @@ export function MobileMoreSheet({
   }
 
   function isActive(href: string) {
-    const hrefPath = href.split("#")[0]!;
-    return (
+    const [hrefPath, hrefHash = ""] = href.split("#");
+    const pathMatches =
       activeHref === href ||
       pathname === hrefPath ||
-      pathname.startsWith(`${hrefPath}/`)
-    );
+      pathname.startsWith(`${hrefPath}/`);
+
+    if (!pathMatches) {
+      return false;
+    }
+
+    // Distinguish /settings vs /settings#household so both rows aren't highlighted.
+    if (hrefPath === "/settings") {
+      const currentHash =
+        typeof window !== "undefined" ? window.location.hash.replace(/^#/, "") : "";
+      return (hrefHash || "") === currentHash;
+    }
+
+    return true;
   }
 
   return (
@@ -184,16 +197,8 @@ export function MobileMoreSheet({
                             void triggerHaptic("selection");
                             onClose();
 
-                            // Same-path Settings deep links often keep a stale hash in
-                            // Capacitor/WebKit (e.g. #household → Settings). Force hash sync.
-                            const [hrefPath, hrefHash = ""] = route.href.split("#");
-                            if (hrefPath === pathname) {
+                            if (navigateSettingsDeepLink(route.href, pathname)) {
                               event.preventDefault();
-                              const nextUrl = hrefHash
-                                ? `${hrefPath}#${hrefHash}`
-                                : hrefPath;
-                              window.history.replaceState(null, "", nextUrl);
-                              window.dispatchEvent(new HashChangeEvent("hashchange"));
                             }
                           }}
                           className={cn(
