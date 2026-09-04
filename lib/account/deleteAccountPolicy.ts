@@ -66,3 +66,46 @@ export function isAppleManagedSubscription(input: {
     Boolean(input.appleOriginalTransactionId)
   );
 }
+
+/**
+ * Whether the deletion UI should warn that App Store billing may continue.
+ * Prefers an active Apple entitlement (provider + valid period), and also
+ * treats a linked originalTransactionId with an active-like status as Apple-billed.
+ */
+export function shouldWarnAboutAppleBillingOnDeletion(input: {
+  subscriptionProvider: string | null | undefined;
+  subscriptionStatus: string | null | undefined;
+  currentPeriodEnd: string | null | undefined;
+  appleOriginalTransactionId: string | null | undefined;
+  nowMs?: number;
+}): boolean {
+  if (
+    !isAppleManagedSubscription({
+      subscriptionProvider: input.subscriptionProvider,
+      appleOriginalTransactionId: input.appleOriginalTransactionId,
+    })
+  ) {
+    return false;
+  }
+
+  const status = input.subscriptionStatus ?? "none";
+  const statusActive =
+    status === "active" || status === "trialing" || status === "past_due";
+
+  if (!statusActive) {
+    return false;
+  }
+
+  const now = input.nowMs ?? Date.now();
+  if (input.currentPeriodEnd) {
+    const end = Date.parse(input.currentPeriodEnd);
+    if (!Number.isNaN(end) && end <= now) {
+      return false;
+    }
+  } else if (input.subscriptionProvider === "apple") {
+    // Match Premium fail-closed: Apple without expiry is not treated as active billing.
+    return false;
+  }
+
+  return true;
+}

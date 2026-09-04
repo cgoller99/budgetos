@@ -1,28 +1,86 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Browser } from "@capacitor/browser";
 import { Button, Card, CardContent, CardHeader, Input } from "@/components/ui";
 import { useAuth } from "@/context/AuthContext";
 import { useSubscription } from "@/context/SubscriptionContext";
 import { useToast } from "@/context/ToastContext";
+import { shouldWarnAboutAppleBillingOnDeletion } from "@/lib/account/deleteAccountPolicy";
 import { APPLE_MANAGE_SUBSCRIPTIONS_URL } from "@/lib/iap/products";
+import { isNativePlatform } from "@/lib/native/platform";
+import { fetchEntitlements } from "@/lib/subscription/clientApi";
+import {
+  hasActiveSubscription,
+  type UserSubscription,
+} from "@/lib/subscription/types";
+
+function isStripeBilledSubscription(subscription: UserSubscription): boolean {
+  return (
+    subscription.provider === "stripe" && hasActiveSubscription(subscription)
+  );
+}
+
+function isAppleBillingWarningNeeded(subscription: UserSubscription): boolean {
+  return shouldWarnAboutAppleBillingOnDeletion({
+    subscriptionProvider: subscription.provider,
+    subscriptionStatus: subscription.status,
+    currentPeriodEnd: subscription.currentPeriodEnd,
+    appleOriginalTransactionId: subscription.appleOriginalTransactionId,
+  });
+}
+
+async function openAppleManageSubscriptions() {
+  if (isNativePlatform()) {
+    await Browser.open({ url: APPLE_MANAGE_SUBSCRIPTIONS_URL });
+    return;
+  }
+
+  window.open(APPLE_MANAGE_SUBSCRIPTIONS_URL, "_blank", "noopener,noreferrer");
+}
 
 export function AccountDeletionSection() {
   const { signOut, isConfigured } = useAuth();
-  const { subscription } = useSubscription();
+  const { subscription, refreshSubscription } = useSubscription();
   const { showToast } = useToast();
   const [confirmText, setConfirmText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
+  const [serverSubscription, setServerSubscription] =
+    useState<UserSubscription | null>(null);
 
-  const isStripeBilled =
-    subscription.provider === "stripe" &&
-    (subscription.status === "active" ||
-      subscription.status === "trialing" ||
-      subscription.status === "past_due");
+  useEffect(() => {
+    if (!isConfigured) {
+      setServerSubscription(null);
+      return;
+    }
 
-  const isAppleBilled =
-    subscription.provider === "apple" ||
-    Boolean(subscription.appleOriginalTransactionId);
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        // Refresh shared context and read a fresh server entitlements snapshot so
+        // the Apple billing warning is not based only on stale client state.
+        await refreshSubscription({ refresh: true });
+        const entitlements = await fetchEntitlements({ refresh: true });
+        if (!cancelled) {
+          setServerSubscription(entitlements.subscription);
+        }
+      } catch {
+        if (!cancelled) {
+          // Fall back to context subscription below.
+          setServerSubscription(null);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isConfigured, refreshSubscription]);
+
+  const billingSubscription = serverSubscription ?? subscription;
+  const isStripeBilled = isStripeBilledSubscription(billingSubscription);
+  const isAppleBilled = isAppleBillingWarningNeeded(billingSubscription);
 
   if (!isConfigured) {
     return (
@@ -109,20 +167,32 @@ export function AccountDeletionSection() {
             </p>
           ) : null}
           {isAppleBilled ? (
-            <p>
-              Deleting your Buxme account does{" "}
-              <span className="font-semibold text-[var(--foreground)]">not</span>{" "}
-              cancel an App Store subscription. Manage or cancel it in{" "}
-              <a
-                href={APPLE_MANAGE_SUBSCRIPTIONS_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-medium text-[var(--accent-light)] hover:underline"
+            <div className="space-y-3 rounded-2xl border border-[var(--warning)]/30 bg-[var(--warning-muted)] px-4 py-4 text-[var(--foreground)]">
+              <p className="text-sm font-semibold">
+                App Store subscription is still active
+              </p>
+              <p className="text-sm leading-relaxed text-[var(--text-muted)]">
+                Deleting your Buxme account does{" "}
+                <span className="font-semibold text-[var(--foreground)]">
+                  not
+                </span>{" "}
+                cancel your App Store subscription. Apple billing may continue
+                until you cancel it in Apple ID → Subscriptions.
+              </p>
+              <p className="text-sm leading-relaxed text-[var(--text-muted)]">
+                Please cancel or manage your Apple subscription before deleting
+                this account if you do not want to keep being charged.
+              </p>
+              <Button
+                variant="secondary"
+                size="md"
+                className="w-full sm:w-auto"
+                disabled={isDeleting}
+                onClick={() => void openAppleManageSubscriptions()}
               >
-                Apple ID → Subscriptions
-              </a>
-              .
-            </p>
+                Manage Apple Subscription
+              </Button>
+            </div>
           ) : null}
           <p>
             If you own a household with other members, transfer ownership first.
@@ -143,7 +213,11 @@ export function AccountDeletionSection() {
           disabled={isDeleting || confirmText !== "DELETE"}
           onClick={() => void handleDelete()}
         >
-          {isDeleting ? "Deleting..." : "Delete Account"}
+          {isDeleting
+            ? "Deleting..."
+            : isAppleBilled
+              ? "Delete Account Now"
+              : "Delete Account"}
         </Button>
       </CardContent>
     </Card>
