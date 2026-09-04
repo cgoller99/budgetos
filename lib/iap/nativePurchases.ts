@@ -4,6 +4,7 @@ import { NativePurchases, PURCHASE_TYPE } from "@capgo/native-purchases";
 import { isNativeIos } from "@/lib/native/platform";
 import { isBuxmeUserUuid } from "@/lib/iap/appleEntitlementPolicy";
 import {
+  IAP_PRODUCT_IDS,
   IAP_PRODUCTS,
   type IapPlan,
   planFromIapProductId,
@@ -17,6 +18,16 @@ export type NativePurchaseResult = {
   signedTransactionInfo: string | null;
   expiresAt: string | null;
   appAccountToken: string | null;
+};
+
+export type NativeStoreProduct = {
+  productId: string;
+  plan: IapPlan;
+  title: string;
+  description: string;
+  priceString: string;
+  price: number;
+  currencyCode: string;
 };
 
 function mapTransaction(item: {
@@ -46,6 +57,40 @@ function mapTransaction(item: {
     expiresAt: item.expirationDate ?? null,
     appAccountToken: item.appAccountToken?.trim() || null,
   };
+}
+
+/**
+ * Loads StoreKit localized product metadata (title + priceString) for the iOS purchase UI.
+ * Apple requires displaying App Store-provided prices rather than hardcoding.
+ */
+export async function getNativeStoreProducts(): Promise<NativeStoreProduct[]> {
+  if (!isNativeIos()) {
+    return [];
+  }
+
+  const { products } = await NativePurchases.getProducts({
+    productIdentifiers: [...IAP_PRODUCT_IDS],
+    productType: PURCHASE_TYPE.SUBS,
+  });
+
+  return products
+    .map((product) => {
+      const plan = planFromIapProductId(product.identifier);
+      if (!plan) {
+        return null;
+      }
+
+      return {
+        productId: product.identifier,
+        plan,
+        title: product.title,
+        description: product.description,
+        priceString: product.priceString,
+        price: product.price,
+        currencyCode: product.currencyCode,
+      } satisfies NativeStoreProduct;
+    })
+    .filter((item): item is NativeStoreProduct => Boolean(item));
 }
 
 /**

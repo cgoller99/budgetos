@@ -20,8 +20,8 @@ function read(relativePath) {
 // ── Policy helpers (mirrors lib/iap/appleEntitlementPolicy.ts) ───────────────
 
 function planFromIapProductId(productId) {
-  if (productId === "co.buxme.app.pro.monthly") return "pro";
-  if (productId === "co.buxme.app.proplus.monthly") return "pro_plus";
+  if (productId === "com.buxme.pro.monthly") return "pro";
+  if (productId === "com.buxme.proplus.monthly") return "pro_plus";
   return null;
 }
 
@@ -44,6 +44,21 @@ function canApplyAppleEntitlementToProfile(profile) {
   return !isStripeSubscriptionActiveOnProfile(profile);
 }
 
+function shouldPreserveHigherApplePlan(input) {
+  if (input.currentProvider !== "apple") return false;
+  const status = input.currentStatus ?? "none";
+  if (status !== "active" && status !== "past_due" && status !== "trialing") return false;
+  const rank = { free: 0, pro: 1, pro_plus: 2 };
+  const currentRank = rank[input.currentPlan] ?? 0;
+  const incomingRank = rank[input.incomingPlan] ?? 0;
+  if (incomingRank >= currentRank) return false;
+  const currentOtid = (input.currentOriginalTransactionId || "").trim();
+  const incomingOtid = (input.incomingOriginalTransactionId || "").trim();
+  if (currentOtid && incomingOtid && currentOtid === incomingOtid) return false;
+  return true;
+}
+
+
 function isVerifiedAppleTransactionCurrentlyValid(input) {
   const now = input.nowMs ?? Date.now();
   if (input.bundleId !== input.expectedBundleId) {
@@ -59,13 +74,18 @@ function isVerifiedAppleTransactionCurrentlyValid(input) {
 
 function mapAppleNotificationToAction(input) {
   const type = input.notificationType ?? "";
+  const subtype = input.subtype ?? "";
   switch (type) {
     case "SUBSCRIBED":
     case "DID_RENEW":
     case "OFFER_REDEEMED":
     case "RENEWAL_EXTENDED":
     case "REFUND_REVERSED":
+      return { kind: "upsert", status: "active" };
     case "DID_CHANGE_RENEWAL_PREF":
+      if (subtype === "DOWNGRADE") {
+        return { kind: "ignore", reason: "renewal_pref_downgrade_deferred" };
+      }
       return { kind: "upsert", status: "active" };
     case "DID_FAIL_TO_RENEW":
       return { kind: "upsert", status: "past_due" };
@@ -126,8 +146,8 @@ function productionIsConfigured(env) {
 
 // ── Policy unit assertions ──────────────────────────────────────────────────
 
-assert.equal(isAllowedAppleProductId("co.buxme.app.pro.monthly"), true);
-assert.equal(isAllowedAppleProductId("co.buxme.app.proplus.monthly"), true);
+assert.equal(isAllowedAppleProductId("com.buxme.pro.monthly"), true);
+assert.equal(isAllowedAppleProductId("com.buxme.proplus.monthly"), true);
 assert.equal(isAllowedAppleProductId("com.other.product"), false);
 assert.equal(isAllowedAppleProductId(""), false);
 
@@ -196,7 +216,7 @@ assert.equal(
 
 assert.deepEqual(
   isVerifiedAppleTransactionCurrentlyValid({
-    productId: "co.buxme.app.pro.monthly",
+    productId: "com.buxme.pro.monthly",
     bundleId: "co.buxme.app",
     expectedBundleId: "co.buxme.app",
     expiresDateMs: Date.now() + 60_000,
@@ -207,7 +227,7 @@ assert.deepEqual(
 
 assert.equal(
   isVerifiedAppleTransactionCurrentlyValid({
-    productId: "co.buxme.app.pro.monthly",
+    productId: "com.buxme.pro.monthly",
     bundleId: "co.other.app",
     expectedBundleId: "co.buxme.app",
     expiresDateMs: Date.now() + 60_000,
@@ -229,7 +249,7 @@ assert.equal(
 
 assert.equal(
   isVerifiedAppleTransactionCurrentlyValid({
-    productId: "co.buxme.app.pro.monthly",
+    productId: "com.buxme.pro.monthly",
     bundleId: "co.buxme.app",
     expectedBundleId: "co.buxme.app",
     expiresDateMs: Date.now() - 1,
@@ -240,7 +260,7 @@ assert.equal(
 
 assert.equal(
   isVerifiedAppleTransactionCurrentlyValid({
-    productId: "co.buxme.app.pro.monthly",
+    productId: "com.buxme.pro.monthly",
     bundleId: "co.buxme.app",
     expectedBundleId: "co.buxme.app",
     expiresDateMs: Date.now() + 60_000,
@@ -314,6 +334,55 @@ assert.equal(
   }),
   true,
 );
+assert.equal(
+  shouldPreserveHigherApplePlan({
+    currentProvider: "apple",
+    currentStatus: "active",
+    currentPlan: "pro_plus",
+    currentOriginalTransactionId: "ot-high",
+    incomingPlan: "pro",
+    incomingOriginalTransactionId: "ot-low",
+  }),
+  true,
+);
+assert.equal(
+  shouldPreserveHigherApplePlan({
+    currentProvider: "apple",
+    currentStatus: "active",
+    currentPlan: "pro_plus",
+    currentOriginalTransactionId: "ot-same",
+    incomingPlan: "pro",
+    incomingOriginalTransactionId: "ot-same",
+  }),
+  false,
+);
+assert.equal(
+  shouldPreserveHigherApplePlan({
+    currentProvider: "apple",
+    currentStatus: "active",
+    currentPlan: "pro",
+    currentOriginalTransactionId: "ot-1",
+    incomingPlan: "pro_plus",
+    incomingOriginalTransactionId: "ot-2",
+  }),
+  false,
+);
+assert.equal(
+  mapAppleNotificationToAction({
+    notificationType: "DID_CHANGE_RENEWAL_PREF",
+    subtype: "DOWNGRADE",
+  }).kind,
+  "ignore",
+);
+assert.equal(
+  mapAppleNotificationToAction({
+    notificationType: "DID_CHANGE_RENEWAL_PREF",
+    subtype: "UPGRADE",
+  }).kind,
+  "upsert",
+);
+
+
 
 // Entitlement fail-open fixes
 assert.equal(
@@ -377,6 +446,8 @@ const ownershipPolicy = read("lib/iap/appleEntitlementPolicy.ts");
 assert.match(ownershipPolicy, /resolveAppAccountTokenOwnership/);
 assert.match(ownershipPolicy, /legacy_absent/);
 assert.match(ownershipPolicy, /LEGACY \/ RESTORE/);
+assert.match(ownershipPolicy, /shouldPreserveHigherApplePlan/);
+assert.match(ownershipPolicy, /renewal_pref_downgrade_deferred/);
 
 const config = read("lib/iap/config.ts");
 assert.match(config, /productionRequiresAppAppleId|APPLE_IAP_APP_APPLE_ID/);
@@ -395,6 +466,7 @@ assert.match(subscriptionService, /clearAppleSubscriptionOnProfile/);
 assert.match(subscriptionService, /applyAppleSubscriptionByOriginalTransaction/);
 assert.match(subscriptionService, /already linked to another Buxme account/);
 assert.match(subscriptionService, /active_stripe_entitlement_preserved|active web subscription/);
+assert.match(subscriptionService, /shouldPreserveHigherApplePlan/);
 assert.match(
   subscriptionService,
   /Unverified Apple subscription sync is disabled/,
@@ -422,9 +494,15 @@ assert.match(nativePurchases, /signedTransactionInfo/);
 assert.match(nativePurchases, /appAccountToken: authenticatedUserId/);
 assert.match(nativePurchases, /isBuxmeUserUuid/);
 
+assert.match(nativePurchases, /getNativeStoreProducts/);
+assert.match(nativePurchases, /priceString/);
+assert.match(nativePurchases, /getProducts/);
+
 const billing = read("components/settings/BillingSection.tsx");
 assert.match(billing, /purchaseAndVerifyNativePlan\(plan, user\.id\)/);
 assert.match(billing, /useAuth/);
+assert.match(billing, /getNativeStoreProducts/);
+assert.match(billing, /priceString/);
 
 const entitlementsRoute = read("app/api/entitlements/route.ts");
 assert.match(entitlementsRoute, /clearAppleSubscriptionOnProfile/);
@@ -436,8 +514,9 @@ assert.match(types, /currentPeriodEnd/);
 assert.match(types, /Fail closed/);
 
 const products = read("lib/iap/products.ts");
-assert.match(products, /co\.buxme\.app\.pro\.monthly/);
-assert.match(products, /co\.buxme\.app\.proplus\.monthly/);
+assert.match(products, /com\.buxme\.pro\.monthly/);
+assert.match(products, /com\.buxme\.proplus\.monthly/);
+assert.doesNotMatch(products, /co\.buxme\.app\.pro/);
 
 const envExample = read(".env.local.example");
 assert.match(envExample, /APPLE_IAP_ISSUER_ID/);

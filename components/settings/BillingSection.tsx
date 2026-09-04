@@ -19,6 +19,7 @@ import {
   IAP_PRODUCTS,
   type IapPlan,
 } from "@/lib/iap/products";
+import type { NativeStoreProduct } from "@/lib/iap/nativePurchases";
 import { isNativePlatform, shouldUseNativeStoreBilling } from "@/lib/native/platform";
 import { PLAN_DEFINITIONS } from "@/lib/subscription/plans";
 import {
@@ -100,8 +101,51 @@ export function BillingSection() {
   } = useSubscription();
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [storeProducts, setStoreProducts] = useState<
+    Partial<Record<IapPlan, NativeStoreProduct>>
+  >({});
   const checkoutTrackedRef = useRef(false);
   const upgradePlan = parsePaidPlan(searchParams.get("upgrade") ?? undefined);
+
+  useEffect(() => {
+    if (!nativeStoreBilling) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const { getNativeStoreProducts } = await import("@/lib/iap/nativePurchases");
+        const products = await getNativeStoreProducts();
+        if (cancelled) {
+          return;
+        }
+
+        const next: Partial<Record<IapPlan, NativeStoreProduct>> = {};
+        for (const product of products) {
+          next[product.plan] = product;
+        }
+        setStoreProducts(next);
+      } catch {
+        // StoreKit catalog may be unavailable offline / before ASC products are Ready to Submit.
+        // Fall back to App Store label without hardcoded dollar amounts.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [nativeStoreBilling]);
+
+  function getApplePlanPriceLabel(plan: IapPlan): string {
+    const storeProduct = storeProducts[plan];
+    if (storeProduct?.priceString) {
+      return `${storeProduct.priceString}/month`;
+    }
+
+    return `${IAP_PRODUCTS[plan].label} · App Store`;
+  }
 
   const runAction = useCallback(
     async (key: string, action: () => Promise<void>) => {
@@ -435,7 +479,7 @@ export function BillingSection() {
                     {plan.id === "free"
                       ? plan.priceLabel
                       : nativeStoreBilling
-                        ? `${IAP_PRODUCTS[plan.id as IapPlan].label} · App Store`
+                        ? getApplePlanPriceLabel(plan.id as IapPlan)
                         : getPlanPriceLabel(plan.id)}
                   </p>
                   <p className="mt-2 text-xs leading-relaxed text-white/45">
@@ -461,18 +505,29 @@ export function BillingSection() {
                           Manage on the web to avoid duplicate billing
                         </p>
                       ) : !activePaid || isAppleBilled ? (
-                        <Button
-                          size="sm"
-                          className="relative z-[1] w-full touch-manipulation"
-                          disabled={pendingAction !== null}
-                          onClick={() =>
-                            void handleNativePurchase(plan.id as IapPlan)
-                          }
-                        >
-                          {pendingAction === `iap-${plan.id}`
-                            ? "Purchasing..."
-                            : `Subscribe to ${plan.name}`}
-                        </Button>
+                        // Do not offer a lower Apple tier while a higher Apple tier is active.
+                        activePaid &&
+                        isAppleBilled &&
+                        hasMinimumPlan(plan.id) &&
+                        !isCurrent ? (
+                          <p className="text-xs text-white/35">
+                            Included in your current App Store plan. Manage changes in
+                            Subscriptions.
+                          </p>
+                        ) : (
+                          <Button
+                            size="sm"
+                            className="relative z-[1] w-full touch-manipulation"
+                            disabled={pendingAction !== null}
+                            onClick={() =>
+                              void handleNativePurchase(plan.id as IapPlan)
+                            }
+                          >
+                            {pendingAction === `iap-${plan.id}`
+                              ? "Purchasing..."
+                              : `Subscribe to ${plan.name}`}
+                          </Button>
+                        )
                       ) : null
                     ) : !activePaid ? (
                       <Button

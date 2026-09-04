@@ -39,6 +39,29 @@ function isAppleManagedSubscription(input) {
   );
 }
 
+function shouldWarnAboutAppleBillingOnDeletion(input) {
+  if (
+    !isAppleManagedSubscription({
+      subscriptionProvider: input.subscriptionProvider,
+      appleOriginalTransactionId: input.appleOriginalTransactionId,
+    })
+  ) {
+    return false;
+  }
+  const status = input.subscriptionStatus ?? "none";
+  const statusActive =
+    status === "active" || status === "trialing" || status === "past_due";
+  if (!statusActive) return false;
+  const now = input.nowMs ?? Date.now();
+  if (input.currentPeriodEnd) {
+    const end = Date.parse(input.currentPeriodEnd);
+    if (!Number.isNaN(end) && end <= now) return false;
+  } else if (input.subscriptionProvider === "apple") {
+    return false;
+  }
+  return true;
+}
+
 assert.equal(
   resolveHouseholdDeletionRole("u1", {
     householdId: null,
@@ -95,12 +118,49 @@ assert.equal(
   }),
   true,
 );
+assert.equal(
+  shouldWarnAboutAppleBillingOnDeletion({
+    subscriptionProvider: "apple",
+    subscriptionStatus: "active",
+    currentPeriodEnd: new Date(Date.now() + 86_400_000).toISOString(),
+    appleOriginalTransactionId: "txn",
+  }),
+  true,
+);
+assert.equal(
+  shouldWarnAboutAppleBillingOnDeletion({
+    subscriptionProvider: "apple",
+    subscriptionStatus: "active",
+    currentPeriodEnd: null,
+    appleOriginalTransactionId: "txn",
+  }),
+  false,
+);
+assert.equal(
+  shouldWarnAboutAppleBillingOnDeletion({
+    subscriptionProvider: "apple",
+    subscriptionStatus: "canceled",
+    currentPeriodEnd: new Date(Date.now() + 86_400_000).toISOString(),
+    appleOriginalTransactionId: "txn",
+  }),
+  false,
+);
+assert.equal(
+  shouldWarnAboutAppleBillingOnDeletion({
+    subscriptionProvider: "stripe",
+    subscriptionStatus: "active",
+    currentPeriodEnd: new Date(Date.now() + 86_400_000).toISOString(),
+    appleOriginalTransactionId: null,
+  }),
+  false,
+);
 
 const policy = read("lib/account/deleteAccountPolicy.ts");
 assert.match(policy, /owner_with_members/);
 assert.match(policy, /Transfer household ownership/);
 assert.match(policy, /isStripeSubscriptionActiveForDeletion/);
 assert.match(policy, /isAppleManagedSubscription/);
+assert.match(policy, /shouldWarnAboutAppleBillingOnDeletion/);
 
 const iosSettings = read("components/native/ios/IosSettingsScreen.tsx");
 assert.match(iosSettings, /title="Account"/);
@@ -120,9 +180,18 @@ assert.match(deletionUi, /Delete Account/);
 assert.match(deletionUi, /Type DELETE/);
 assert.match(deletionUi, /APPLE_MANAGE_SUBSCRIPTIONS_URL/);
 assert.match(deletionUi, /Stripe Buxme subscription will be canceled/);
-assert.match(deletionUi, /does[\s\S]*not[\s\S]*cancel an App Store subscription/);
+assert.match(deletionUi, /does[\s\S]*not[\s\S]*cancel/);
+assert.match(deletionUi, /Apple billing may continue/);
+assert.match(deletionUi, /Please cancel or manage your Apple subscription before deleting/);
+assert.match(deletionUi, /Manage Apple Subscription/);
+assert.match(deletionUi, /Delete Account Now/);
+assert.match(deletionUi, /Browser\.open/);
+assert.match(deletionUi, /isNativePlatform/);
+assert.match(deletionUi, /fetchEntitlements/);
+assert.match(deletionUi, /shouldWarnAboutAppleBillingOnDeletion/);
 assert.match(deletionUi, /temporarily unavailable/);
 assert.match(deletionUi, /\/api\/account\/delete/);
+assert.doesNotMatch(deletionUi, /cancelApple|refundApple/i);
 
 const route = read("app/api/account/delete/route.ts");
 assert.match(route, /deleteUserAccount/);
