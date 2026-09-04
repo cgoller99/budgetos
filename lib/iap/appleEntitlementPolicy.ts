@@ -3,7 +3,20 @@
  */
 
 import { planFromIapProductId, type IapPlan } from "@/lib/iap/products";
-import type { SubscriptionStatus } from "@/lib/subscription/types";
+import type { SubscriptionPlan, SubscriptionStatus } from "@/lib/subscription/types";
+
+const PLAN_RANK: Record<SubscriptionPlan, number> = {
+  free: 0,
+  pro: 1,
+  pro_plus: 2,
+};
+
+function planRank(plan: string | null | undefined): number {
+  if (plan === "pro" || plan === "pro_plus" || plan === "free") {
+    return PLAN_RANK[plan];
+  }
+  return 0;
+}
 
 export type AppleNotificationAction =
   | {
@@ -109,6 +122,44 @@ export function canApplyAppleEntitlementToProfile(
   return !isStripeSubscriptionActiveOnProfile(profile);
 }
 
+/**
+ * Prevent a lower Apple tier from clobbering a higher active Apple tier when the
+ * incoming transaction is a *different* originalTransactionId (e.g. stale restore).
+ *
+ * Same-subscription-group changes (identical originalTransactionId) are allowed so
+ * legitimate renewals / upgrades / post-renewal downgrades can update the plan.
+ */
+export function shouldPreserveHigherApplePlan(input: {
+  currentProvider: string | null | undefined;
+  currentStatus: string | null | undefined;
+  currentPlan: string | null | undefined;
+  currentOriginalTransactionId: string | null | undefined;
+  incomingPlan: IapPlan;
+  incomingOriginalTransactionId: string;
+}): boolean {
+  if (input.currentProvider !== "apple") {
+    return false;
+  }
+
+  const status = input.currentStatus ?? "none";
+  if (status !== "active" && status !== "past_due" && status !== "trialing") {
+    return false;
+  }
+
+  if (planRank(input.incomingPlan) >= planRank(input.currentPlan)) {
+    return false;
+  }
+
+  const currentOtid = input.currentOriginalTransactionId?.trim() || "";
+  const incomingOtid = input.incomingOriginalTransactionId.trim();
+
+  if (currentOtid && incomingOtid && currentOtid === incomingOtid) {
+    return false;
+  }
+
+  return true;
+}
+
 export function isVerifiedAppleTransactionCurrentlyValid(input: {
   productId: string | null | undefined;
   bundleId: string | null | undefined;
@@ -156,7 +207,14 @@ export function mapAppleNotificationToAction(input: {
     case "OFFER_REDEEMED":
     case "RENEWAL_EXTENDED":
     case "REFUND_REVERSED":
+      return { kind: "upsert", status: "active" };
+
     case "DID_CHANGE_RENEWAL_PREF":
+      // UPGRADE applies immediately. DOWNGRADE takes effect at next renewal —
+      // ignore so a lower product id cannot overwrite active Pro+ early.
+      if (subtype === "DOWNGRADE") {
+        return { kind: "ignore", reason: "renewal_pref_downgrade_deferred" };
+      }
       return { kind: "upsert", status: "active" };
 
     case "DID_FAIL_TO_RENEW":
