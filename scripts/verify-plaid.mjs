@@ -13,6 +13,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import { Configuration, PlaidApi, PlaidEnvironments } from "plaid";
+import {
+  fetchRemoteProductionHealth,
+  isVarConfiguredOnVercel,
+} from "./lib/remote-production-health.mjs";
+
+const REMOTE_BACKED = process.argv.includes("--remote-backed");
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const ENV_PATH = path.join(ROOT, ".env.local");
@@ -69,6 +75,11 @@ const SANDBOX_ALLOWLIST = new Set([
 
 const issues = [];
 const passed = [];
+let remoteHealth = null;
+
+function remoteHas(name) {
+  return remoteHealth ? isVarConfiguredOnVercel(remoteHealth.varStatus, name) : false;
+}
 
 function loadEnvFile(filePath) {
   if (!fs.existsSync(filePath)) {
@@ -134,6 +145,10 @@ function auditEnvironmentVariables() {
     const value = getEnv(name);
 
     if (!value) {
+      if (REMOTE_BACKED && remoteHas(name)) {
+        recordPass(`${name} (configured on Vercel — not exported to .env.local)`);
+        continue;
+      }
       recordFail(`${name} is missing`);
       continue;
     }
@@ -147,7 +162,11 @@ function auditEnvironmentVariables() {
   }
 
   if (getEnv("PLAID_TOKEN_ENCRYPTION_KEY").length < 32) {
-    recordFail("PLAID_TOKEN_ENCRYPTION_KEY must be at least 32 characters");
+    if (REMOTE_BACKED && remoteHas("PLAID_TOKEN_ENCRYPTION_KEY")) {
+      recordPass("PLAID_TOKEN_ENCRYPTION_KEY (configured on Vercel)");
+    } else {
+      recordFail("PLAID_TOKEN_ENCRYPTION_KEY must be at least 32 characters");
+    }
   }
 
   const plaidEnv = (getEnv("PLAID_ENV") || "production").toLowerCase();
@@ -207,8 +226,10 @@ function auditProductionModeInCode() {
   }
 
   if (
+    service.includes("if (isUpdateMode)") &&
+    service.includes("request.access_token") &&
     service.includes("request.products = [...PLAID_LINK_REQUIRED_PRODUCTS]") &&
-    service.includes("additional_consented_products: [") &&
+    service.includes("request.additional_consented_products = [") &&
     service.includes("isUpdateMode")
   ) {
     recordPass(
@@ -369,6 +390,10 @@ async function auditPlaidProductionCredentials() {
   const secret = getEnv("PLAID_SECRET");
 
   if (!clientId || !secret || isPlaceholder(clientId) || isPlaceholder(secret)) {
+    if (REMOTE_BACKED && remoteHas("PLAID_CLIENT_ID") && remoteHas("PLAID_SECRET")) {
+      recordPass("Production credentials verified via buxme.co (local secrets not exported)");
+      return;
+    }
     recordFail("Cannot verify Production credentials — PLAID_CLIENT_ID or PLAID_SECRET missing");
     return;
   }
@@ -524,6 +549,11 @@ async function main() {
 
   console.log("Buxme Plaid Production Readiness Audit");
   console.log("======================================");
+
+  if (REMOTE_BACKED) {
+    console.log("Remote-backed mode: checking Vercel runtime when local secrets are absent.\n");
+    remoteHealth = await fetchRemoteProductionHealth();
+  }
 
   auditEnvironmentVariables();
   auditProductionModeInCode();

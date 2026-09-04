@@ -169,8 +169,8 @@ export const ENV_CATALOG = [
     vars: [
       {
         name: "NEXT_PUBLIC_POSTHOG_KEY",
-        required: true,
-        source: "PostHog → Project Settings → Project API Key (phc_...)",
+        required: false,
+        source: "PostHog → Project Settings → Project API Key (phc_...) — optional for soft launch",
       },
       {
         name: "NEXT_PUBLIC_POSTHOG_HOST",

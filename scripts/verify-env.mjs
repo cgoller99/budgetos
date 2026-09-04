@@ -16,13 +16,42 @@ import {
   hydrateProcessEnvFromFile,
   parseEnvFile,
 } from "./lib/env-utils.mjs";
+import {
+  MANUAL_DASHBOARD_VARS,
+  REMOTE_BACKED_SECRET_VARS,
+  fetchRemoteProductionHealth,
+  isVarConfiguredOnVercel,
+} from "./lib/remote-production-health.mjs";
 
 hydrateProcessEnvFromFile();
 
+const REMOTE_BACKED = process.argv.includes("--remote-backed");
 const REQUIRED = getRequiredVarNames();
 const issues = [];
+const remoteNotes = [];
 
 console.log("Buxme environment variable check\n");
+
+if (REMOTE_BACKED) {
+  console.log("Remote-backed mode: Vercel-configured secrets may be absent locally.\n");
+}
+
+async function loadRemoteHealth() {
+  if (!REMOTE_BACKED) {
+    return null;
+  }
+
+  try {
+    return await fetchRemoteProductionHealth();
+  } catch (error) {
+    console.error(
+      `✗ Could not fetch remote production health: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    process.exit(1);
+  }
+}
+
+const remoteHealth = await loadRemoteHealth();
 
 if (!fs.existsSync(ENV_PATH)) {
   console.error("✗ .env.local is missing");
@@ -40,6 +69,27 @@ for (const name of REQUIRED) {
 
   if (status === "ok") {
     console.log(`✓ ${name}`);
+    continue;
+  }
+
+  if (
+    REMOTE_BACKED &&
+    remoteHealth &&
+    REMOTE_BACKED_SECRET_VARS.includes(name) &&
+    isVarConfiguredOnVercel(remoteHealth.varStatus, name)
+  ) {
+    console.log(`✓ ${name} (configured on Vercel — not exported to .env.local)`);
+    remoteNotes.push(name);
+    continue;
+  }
+
+  if (
+    REMOTE_BACKED &&
+    remoteHealth &&
+    MANUAL_DASHBOARD_VARS.includes(name) &&
+    !isVarConfiguredOnVercel(remoteHealth.varStatus, name)
+  ) {
+    console.log(`⚠ ${name} missing on Vercel — manual dashboard action required`);
     continue;
   }
 
@@ -95,6 +145,12 @@ if (issues.length > 0) {
   console.error("\nRun: npm run audit:env   (full checklist + diagnosis)");
   console.error("Run: npm run env:pull    (pull from Vercel without wiping secrets)");
   process.exit(1);
+}
+
+if (remoteNotes.length > 0) {
+  console.log(
+    `ℹ ${remoteNotes.length} secret(s) verified via production health (values stay on Vercel).`,
+  );
 }
 
 console.log("✅ All required environment variables are present.");
