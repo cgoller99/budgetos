@@ -1,18 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode } from "react";
+import type { HTMLAttributes, ReactNode } from "react";
 import { cn } from "@/components/ui/cn";
 
 export function IosScreen({
   children,
   className,
+  ...props
 }: {
   children: ReactNode;
   className?: string;
-}) {
+} & HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cn("ios-screen flex flex-col gap-4", className)}>{children}</div>
+    <div className={cn("ios-screen flex flex-col gap-4", className)} {...props}>
+      {children}
+    </div>
   );
 }
 
@@ -177,7 +180,7 @@ export function IosListRow({
   if (href) {
     return (
       <li>
-        <Link href={href} className={cn(className, "active:bg-white/[0.03]")}>
+        <Link href={href} className={cn(className, "w-full active:bg-white/[0.03]")}>
           {body}
         </Link>
       </li>
@@ -186,20 +189,17 @@ export function IosListRow({
 
   if (onClick) {
     return (
-      <li className={className}>
+      <li>
         <button
           type="button"
           onClick={onClick}
-          className="flex min-h-11 min-w-0 flex-1 items-center gap-3 text-left active:opacity-80"
+          className={cn(
+            className,
+            "w-full touch-manipulation text-left active:bg-white/[0.03]",
+          )}
         >
-          {leading}
-          {label}
+          {body}
         </button>
-        {trailing ? (
-          <div className="shrink-0 text-right text-[15px] font-medium tabular-nums text-[var(--text-secondary)]">
-            {trailing}
-          </div>
-        ) : null}
       </li>
     );
   }

@@ -99,7 +99,9 @@ export function MobileMoreSheet({
         type="button"
         className={cn(
           "fixed inset-0 z-40 bg-black/50 backdrop-blur-sm transition-opacity duration-200 lg:hidden",
-          animating ? "opacity-100" : "opacity-0",
+          animating
+            ? "pointer-events-auto opacity-100"
+            : "pointer-events-none opacity-0",
         )}
         aria-label="Close menu"
         onClick={onClose}
@@ -109,7 +111,9 @@ export function MobileMoreSheet({
           "fixed inset-x-0 bottom-0 z-50 max-h-[78vh] overflow-y-auto rounded-t-[22px] border border-[var(--surface-border)] bg-[var(--background)] px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 transition-transform duration-220 ease-out lg:hidden",
           nativeIos &&
             "native-sheet ios-more-sheet max-h-[92vh] rounded-t-[14px] border-white/[0.08] bg-[#0b0f14] px-3 pt-2",
-          animating ? "translate-y-0" : "translate-y-full",
+          animating
+            ? "pointer-events-auto translate-y-0"
+            : "pointer-events-none translate-y-full",
         )}
         role="dialog"
         aria-modal="true"
@@ -176,9 +180,21 @@ export function MobileMoreSheet({
                       <li key={route.href}>
                         <Link
                           href={route.href}
-                          onClick={() => {
+                          onClick={(event) => {
                             void triggerHaptic("selection");
                             onClose();
+
+                            // Same-path Settings deep links often keep a stale hash in
+                            // Capacitor/WebKit (e.g. #household → Settings). Force hash sync.
+                            const [hrefPath, hrefHash = ""] = route.href.split("#");
+                            if (hrefPath === pathname) {
+                              event.preventDefault();
+                              const nextUrl = hrefHash
+                                ? `${hrefPath}#${hrefHash}`
+                                : hrefPath;
+                              window.history.replaceState(null, "", nextUrl);
+                              window.dispatchEvent(new HashChangeEvent("hashchange"));
+                            }
                           }}
                           className={cn(
                             "flex min-h-[52px] items-center gap-3 border-b border-white/[0.06] px-3.5 py-2.5 last:border-b-0 active:bg-white/[0.05]",

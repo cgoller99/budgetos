@@ -794,7 +794,9 @@ html[data-native-platform="ios"] .ios-more-sheet {
 
 html[data-native-platform="ios"] .ios-embedded-panel {
   border-radius: 16px;
-  overflow: hidden;
+  overflow: visible;
+  position: relative;
+  z-index: 1;
 }
 
 html[data-native-platform="ios"] .ios-settings-embed h2,

@@ -463,8 +463,8 @@ export function BillingSection() {
                       ) : !activePaid || isAppleBilled ? (
                         <Button
                           size="sm"
-                          className="w-full"
-                          disabled={isLoading || pendingAction !== null}
+                          className="relative z-[1] w-full touch-manipulation"
+                          disabled={pendingAction !== null}
                           onClick={() =>
                             void handleNativePurchase(plan.id as IapPlan)
                           }
@@ -530,7 +530,8 @@ export function BillingSection() {
               <Button
                 variant="secondary"
                 size="md"
-                disabled={isLoading || pendingAction !== null}
+                className="relative z-[1] touch-manipulation"
+                disabled={pendingAction !== null}
                 onClick={() => void handleRestorePurchases()}
               >
                 {pendingAction === "restore" ? "Restoring..." : "Restore Purchases"}
@@ -538,7 +539,8 @@ export function BillingSection() {
               <Button
                 variant="secondary"
                 size="md"
-                disabled={isLoading || pendingAction !== null}
+                className="relative z-[1] touch-manipulation"
+                disabled={pendingAction !== null}
                 onClick={() => void openAppleManageSubscriptions()}
               >
                 Manage App Store subscription

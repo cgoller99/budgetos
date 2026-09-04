@@ -38,18 +38,13 @@ import {
   type ThemePreference,
 } from "@/lib/theme/preferences";
 import { triggerHaptic } from "@/lib/native/haptics";
+import {
+  IOS_SETTINGS_PANEL_TITLES,
+  panelFromSettingsHash,
+  settingsUrlForPanel,
+  type IosSettingsPanel,
+} from "@/lib/native/iosSettingsNavigation";
 import { cn } from "@/components/ui/cn";
-
-type SettingsPanel =
-  | "profile"
-  | "billing"
-  | "connections"
-  | "household"
-  | "notifications"
-  | "theme"
-  | "security"
-  | "delete-account"
-  | null;
 
 const NOTIFICATION_LABELS: Record<NotificationCategory, string> = {
   bills: "Bills & payments",
@@ -58,14 +53,28 @@ const NOTIFICATION_LABELS: Record<NotificationCategory, string> = {
   weeklySummary: "Weekly summary",
 };
 
-function panelFromHash(): SettingsPanel {
-  if (typeof window === "undefined") return null;
-  const hash = window.location.hash.replace("#", "");
-  if (hash === "billing") return "billing";
-  if (hash === "connections") return "connections";
-  if (hash === "household") return "household";
-  if (hash === "delete-account" || hash === "account") return "delete-account";
-  return null;
+function scrollNativeMainToTop() {
+  if (typeof document === "undefined") {
+    return;
+  }
+
+  const main = document.querySelector(".native-main");
+  if (main instanceof HTMLElement) {
+    main.scrollTo({ top: 0, behavior: "auto" });
+    return;
+  }
+
+  window.scrollTo({ top: 0, behavior: "auto" });
+}
+
+function replaceSettingsUrl(url: string) {
+  const current = `${window.location.pathname}${window.location.hash}`;
+  if (current === url) {
+    return;
+  }
+  // Do not dispatch hashchange here — openPanel/closePanel already set state.
+  // External navigations (More sheet) dispatch hashchange themselves.
+  window.history.replaceState(null, "", url);
 }
 
 export function IosSettingsScreen() {
@@ -73,7 +82,7 @@ export function IosSettingsScreen() {
   const { showToast } = useToast();
   const { user, isConfigured, signOut } = useAuth();
   const { isLoading, isDemoMode, exitDemoMode, isSyncing } = useFinance();
-  const [panel, setPanel] = useState<SettingsPanel>(null);
+  const [panel, setPanel] = useState<IosSettingsPanel>(null);
   const [fullName, setFullName] = useState("");
   const [profileEmail, setProfileEmail] = useState<string | null>(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
@@ -89,9 +98,9 @@ export function IosSettingsScreen() {
   }, [isConfigured]);
 
   useEffect(() => {
-    setPanel(panelFromHash());
+    setPanel(panelFromSettingsHash(window.location.hash));
     function onHash() {
-      setPanel(panelFromHash());
+      setPanel(panelFromSettingsHash(window.location.hash));
     }
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
@@ -120,18 +129,28 @@ export function IosSettingsScreen() {
       .catch(() => setNotificationPrefs(getNotificationPreferences()));
   }, [profileRepository, user]);
 
+  useEffect(() => {
+    if (panel) {
+      scrollNativeMainToTop();
+    }
+  }, [panel]);
+
   if (isLoading) {
     return <IosSkeletonScreen rows={6} />;
   }
 
-  function openPanel(next: SettingsPanel, hash?: string) {
+  function openPanel(next: Exclude<IosSettingsPanel, null>, hash?: string) {
     void triggerHaptic("selection");
-    setPanel((current) => (current === next ? null : next));
-    if (hash) {
-      window.history.replaceState(null, "", `/settings#${hash}`);
-    } else if (typeof window !== "undefined") {
-      window.history.replaceState(null, "", "/settings");
-    }
+    // Always open the requested panel (no toggle). Toggle caused hash/panel desync
+    // and made rows appear to open the wrong screen.
+    setPanel(next);
+    replaceSettingsUrl(hash ? `/settings#${hash}` : settingsUrlForPanel(next));
+  }
+
+  function closePanel() {
+    void triggerHaptic("selection");
+    setPanel(null);
+    replaceSettingsUrl("/settings");
   }
 
   async function handleSaveProfile() {
@@ -152,8 +171,182 @@ export function IosSettingsScreen() {
     }
   }
 
+  if (panel) {
+    const title = IOS_SETTINGS_PANEL_TITLES[panel];
+
+    return (
+      <IosScreen data-ios-settings-panel={panel}>
+        <div className="sticky top-0 z-20 -mx-0.5 mb-1 bg-[#060b14]/95 pb-2 pt-0.5 backdrop-blur-md">
+          <button
+            type="button"
+            onClick={closePanel}
+            className="flex min-h-11 touch-manipulation items-center gap-1 px-0.5 text-[15px] font-semibold text-[var(--accent-light)]"
+          >
+            <span aria-hidden>‹</span>
+            Settings
+          </button>
+          <h1 className="mt-1 px-0.5 text-[22px] font-semibold tracking-tight text-[var(--foreground)]">
+            {title}
+          </h1>
+        </div>
+
+        {panel === "profile" && isConfigured ? (
+          <IosCard padding="md">
+            <FormField label="Display name" className="mt-1">
+              <Input
+                value={fullName}
+                onChange={(event) => setFullName(event.target.value)}
+                placeholder="Your name"
+              />
+            </FormField>
+            <Button
+              className="mt-3 w-full touch-manipulation"
+              onClick={() => void handleSaveProfile()}
+              disabled={isSavingProfile}
+            >
+              {isSavingProfile ? "Saving…" : "Save"}
+            </Button>
+          </IosCard>
+        ) : null}
+
+        {panel === "billing" && isConfigured ? (
+          <div className="relative z-[1] ios-embedded-panel ios-settings-embed touch-manipulation">
+            <BillingSection />
+          </div>
+        ) : null}
+
+        {panel === "connections" && isConfigured ? (
+          <div className="relative z-[1] ios-embedded-panel ios-settings-embed">
+            <ConnectedInstitutionsSection />
+          </div>
+        ) : null}
+
+        {panel === "household" && isConfigured ? (
+          <div className="relative z-[1] ios-embedded-panel ios-settings-embed">
+            <HouseholdSection />
+          </div>
+        ) : null}
+
+        {panel === "notifications" ? (
+          <IosCard padding="md" className="space-y-3">
+            {(Object.keys(NOTIFICATION_LABELS) as NotificationCategory[]).map(
+              (category) => (
+                <div
+                  key={category}
+                  className="flex min-h-11 items-center justify-between gap-3"
+                >
+                  <p className="text-[14px] text-[var(--foreground)]">
+                    {NOTIFICATION_LABELS[category]}
+                  </p>
+                  <PreferenceToggle
+                    label={NOTIFICATION_LABELS[category]}
+                    checked={notificationPrefs[category]}
+                    onChange={(enabled) => {
+                      const next = { ...notificationPrefs, [category]: enabled };
+                      setNotificationPrefs(next);
+                      setNotificationPreferences(next);
+                      if (profileRepository && user) {
+                        void profileRepository
+                          .saveNotificationPreferences(user.id, next)
+                          .then((saved) => {
+                            setNotificationPrefs(saved);
+                            syncNotificationPreferencesFromServer(saved);
+                          });
+                      }
+                    }}
+                  />
+                </div>
+              ),
+            )}
+          </IosCard>
+        ) : null}
+
+        {panel === "theme" ? (
+          <IosCard padding="md">
+            <div className="grid grid-cols-3 gap-2">
+              {(["dark", "light", "system"] as ThemePreference[]).map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => {
+                    void triggerHaptic("selection");
+                    setTheme(option);
+                    setStoredThemePreference(option);
+                  }}
+                  className={cn(
+                    "min-h-11 touch-manipulation rounded-[12px] text-[13px] font-semibold capitalize",
+                    theme === option
+                      ? "bg-[var(--accent)] text-white"
+                      : "bg-white/[0.06] text-[var(--text-muted)]",
+                  )}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+          </IosCard>
+        ) : null}
+
+        {panel === "security" && isConfigured ? (
+          <IosCard padding="md" className="space-y-3">
+            <p className="text-[13px] text-[var(--text-muted)]">
+              {profileEmail ?? user?.email ?? "—"}
+            </p>
+            <Link
+              href="/forgot-password"
+              className="inline-flex min-h-11 items-center text-[14px] font-semibold text-[var(--accent-light)]"
+            >
+              Reset password
+            </Link>
+            <Button
+              variant="secondary"
+              className="w-full touch-manipulation"
+              disabled={isSigningOut}
+              onClick={() => {
+                void (async () => {
+                  setIsSigningOut(true);
+                  try {
+                    await signOut();
+                    router.push("/login");
+                  } finally {
+                    setIsSigningOut(false);
+                  }
+                })();
+              }}
+            >
+              {isSigningOut ? "Signing out…" : "Sign out"}
+            </Button>
+          </IosCard>
+        ) : null}
+
+        {panel === "delete-account" ? (
+          <div
+            id="delete-account"
+            className="relative z-[1] ios-embedded-panel ios-settings-embed"
+          >
+            <AccountDeletionSection />
+          </div>
+        ) : null}
+
+        {panel &&
+        ((panel === "profile" ||
+          panel === "billing" ||
+          panel === "connections" ||
+          panel === "household" ||
+          panel === "security") &&
+          !isConfigured) ? (
+          <IosCard padding="md">
+            <p className="text-[14px] text-[var(--text-muted)]">
+              Account services are unavailable right now. Try again shortly.
+            </p>
+          </IosCard>
+        ) : null}
+      </IosScreen>
+    );
+  }
+
   return (
-    <IosScreen>
+    <IosScreen data-ios-settings-panel="root">
       <div className="flex items-center gap-3 px-0.5">
         <IosAvatar
           fallback={(fullName || profileEmail || "ME").slice(0, 2).toUpperCase()}
@@ -300,141 +493,6 @@ export function IosSettingsScreen() {
         </IosList>
       </IosSection>
 
-      {panel === "profile" && isConfigured ? (
-        <IosCard padding="md">
-          <p className="text-[15px] font-semibold text-[var(--foreground)]">Profile</p>
-          <FormField label="Display name" className="mt-3">
-            <Input
-              value={fullName}
-              onChange={(event) => setFullName(event.target.value)}
-              placeholder="Your name"
-            />
-          </FormField>
-          <Button
-            className="mt-3 w-full"
-            onClick={() => void handleSaveProfile()}
-            disabled={isSavingProfile}
-          >
-            {isSavingProfile ? "Saving…" : "Save"}
-          </Button>
-        </IosCard>
-      ) : null}
-
-      {panel === "billing" && isConfigured ? (
-        <div className="ios-embedded-panel ios-settings-embed">
-          <BillingSection />
-        </div>
-      ) : null}
-
-      {panel === "connections" && isConfigured ? (
-        <div className="ios-embedded-panel ios-settings-embed">
-          <ConnectedInstitutionsSection />
-        </div>
-      ) : null}
-
-      {panel === "household" && isConfigured ? (
-        <div className="ios-embedded-panel ios-settings-embed">
-          <HouseholdSection />
-        </div>
-      ) : null}
-
-      {panel === "notifications" ? (
-        <IosCard padding="md" className="space-y-3">
-          <p className="text-[15px] font-semibold text-[var(--foreground)]">
-            Notifications
-          </p>
-          {(Object.keys(NOTIFICATION_LABELS) as NotificationCategory[]).map(
-            (category) => (
-              <div
-                key={category}
-                className="flex min-h-11 items-center justify-between gap-3"
-              >
-                <p className="text-[14px] text-[var(--foreground)]">
-                  {NOTIFICATION_LABELS[category]}
-                </p>
-                <PreferenceToggle
-                  label={NOTIFICATION_LABELS[category]}
-                  checked={notificationPrefs[category]}
-                  onChange={(enabled) => {
-                    const next = { ...notificationPrefs, [category]: enabled };
-                    setNotificationPrefs(next);
-                    setNotificationPreferences(next);
-                    if (profileRepository && user) {
-                      void profileRepository
-                        .saveNotificationPreferences(user.id, next)
-                        .then((saved) => {
-                          setNotificationPrefs(saved);
-                          syncNotificationPreferencesFromServer(saved);
-                        });
-                    }
-                  }}
-                />
-              </div>
-            ),
-          )}
-        </IosCard>
-      ) : null}
-
-      {panel === "theme" ? (
-        <IosCard padding="md">
-          <p className="mb-3 text-[15px] font-semibold text-[var(--foreground)]">Theme</p>
-          <div className="grid grid-cols-3 gap-2">
-            {(["dark", "light", "system"] as ThemePreference[]).map((option) => (
-              <button
-                key={option}
-                type="button"
-                onClick={() => {
-                  void triggerHaptic("selection");
-                  setTheme(option);
-                  setStoredThemePreference(option);
-                }}
-                className={cn(
-                  "min-h-11 rounded-[12px] text-[13px] font-semibold capitalize",
-                  theme === option
-                    ? "bg-[var(--accent)] text-white"
-                    : "bg-white/[0.06] text-[var(--text-muted)]",
-                )}
-              >
-                {option}
-              </button>
-            ))}
-          </div>
-        </IosCard>
-      ) : null}
-
-      {panel === "security" && isConfigured ? (
-        <IosCard padding="md" className="space-y-3">
-          <p className="text-[15px] font-semibold text-[var(--foreground)]">Security</p>
-          <p className="text-[13px] text-[var(--text-muted)]">
-            {profileEmail ?? user?.email ?? "—"}
-          </p>
-          <Link
-            href="/forgot-password"
-            className="inline-flex min-h-11 items-center text-[14px] font-semibold text-[var(--accent-light)]"
-          >
-            Reset password
-          </Link>
-          <Button
-            variant="secondary"
-            className="w-full"
-            disabled={isSigningOut}
-            onClick={() => {
-              void (async () => {
-                setIsSigningOut(true);
-                try {
-                  await signOut();
-                  router.push("/login");
-                } finally {
-                  setIsSigningOut(false);
-                }
-              })();
-            }}
-          >
-            {isSigningOut ? "Signing out…" : "Sign out"}
-          </Button>
-        </IosCard>
-      ) : null}
-
       {isDemoMode ? (
         <IosCard padding="md">
           <p className="text-[15px] font-semibold text-[var(--foreground)]">Demo mode</p>
@@ -442,7 +500,7 @@ export function IosSettingsScreen() {
             You’re exploring sample data.
           </p>
           <Button
-            className="mt-3 w-full"
+            className="mt-3 w-full touch-manipulation"
             disabled={isSyncing}
             onClick={() => {
               if (
@@ -457,15 +515,6 @@ export function IosSettingsScreen() {
             Exit demo mode
           </Button>
         </IosCard>
-      ) : null}
-
-      {panel === "delete-account" ? (
-        <div
-          id="delete-account"
-          className="ios-embedded-panel ios-settings-embed"
-        >
-          <AccountDeletionSection />
-        </div>
       ) : null}
     </IosScreen>
   );
