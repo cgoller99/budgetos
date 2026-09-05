@@ -65,8 +65,8 @@ for (const [input, expected] of cases) {
 
 const productsPath = path.join(ROOT, "lib/iap/products.ts");
 const products = fs.readFileSync(productsPath, "utf8");
-assert.match(products, /co\.buxme\.app\.pro\.monthly/);
-assert.match(products, /co\.buxme\.app\.proplus\.monthly/);
+assert.match(products, /com\.buxme\.pro\.monthly/);
+assert.match(products, /com\.buxme\.proplus\.monthly/);
 assert.match(products, /apps\.apple\.com\/account\/subscriptions/);
 
 const configPath = path.join(ROOT, "capacitor.config.ts");
