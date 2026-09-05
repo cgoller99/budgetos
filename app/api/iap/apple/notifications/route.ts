@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { getAppleIapConfig } from "@/lib/iap/config";
+import {
+  getAppleIapConfig,
+  getAppleIapConfigDiagnostics,
+} from "@/lib/iap/config";
 import { handleAppleServerNotificationV2 } from "@/lib/iap/appleNotificationHandler";
 
 type NotificationBody = {
@@ -14,9 +17,20 @@ export async function POST(request: Request) {
   try {
     const appleConfig = getAppleIapConfig();
     if (!appleConfig.isConfigured) {
-      console.error("[iap/apple/notifications] Apple IAP credentials missing");
+      const diagnostics = getAppleIapConfigDiagnostics(
+        appleConfig.preferredEnvironment,
+      );
+      // Log presence only — never log secret values.
+      console.error(
+        "[iap/apple/notifications] Apple IAP credentials missing",
+        diagnostics.map((d) => `${d.variable}=${d.presence}`).join(" "),
+      );
       return NextResponse.json(
-        { error: "Apple IAP not configured." },
+        {
+          error: "Apple IAP not configured.",
+          // Secret-safe: variable names + presence only (no values).
+          diagnostics,
+        },
         { status: 503 },
       );
     }
