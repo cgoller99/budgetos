@@ -106,6 +106,9 @@ function mapTransaction(item: {
 /**
  * Loads StoreKit localized product metadata (title + priceString) for the iOS purchase UI.
  * Apple requires displaying App Store-provided prices rather than hardcoding.
+ *
+ * Capgo iOS maps Product.products(for:) → `{ identifier, title, priceString, ... }`.
+ * An empty array means StoreKit returned no matching products (not a silent Capgo filter).
  */
 export async function getNativeStoreProducts(): Promise<NativeStoreProduct[]> {
   if (!isNativeIos()) {
@@ -155,23 +158,23 @@ export async function purchaseNativePlan(
 
   const productId = IAP_PRODUCTS[plan].productId;
 
-  // Fail fast with a clear message when StoreKit cannot see ASC products.
-  // Capgo's purchaseProduct error is easy to miss; this surfaces ASC/capability issues.
+  // Fail fast when StoreKit cannot see the product. Capgo's purchaseProduct
+  // rejects with "Cannot find product for id …" after Product.products(for:)
+  // returns []; attach the full catalog probe so TestFlight logs show evidence.
   try {
-    const billing = await NativePurchases.isBillingSupported();
-    if (!billing.isBillingSupported) {
+    const { probeNativeStoreKitCatalog, formatStoreKitCatalogProbe } =
+      await import("@/lib/iap/storeKitDiagnostics");
+    const probe = await probeNativeStoreKitCatalog();
+
+    if (probe.billingSupported === false) {
       throw new Error(
         "This device cannot make App Store purchases (billing unsupported).",
       );
     }
 
-    const { products } = await NativePurchases.getProducts({
-      productIdentifiers: [productId],
-      productType: PURCHASE_TYPE.SUBS,
-    });
-    if (!products.some((product) => product.identifier === productId)) {
+    if (!probe.returnedProductIds.includes(productId)) {
       throw new Error(
-        `App Store did not return product ${productId}. In App Store Connect, confirm this subscription is complete (pricing + localization), in the Buxme subscription group, and available for Sandbox. On the device, sign into Settings → App Store → Sandbox Account. Rebuild TestFlight after enabling the In-App Purchase capability.`,
+        `App Store did not return product ${productId}.\n${formatStoreKitCatalogProbe(probe)}`,
       );
     }
   } catch (error) {
@@ -182,28 +185,51 @@ export async function purchaseNativePlan(
     ) {
       throw error;
     }
-    // If the preflight APIs themselves fail, continue to purchaseProduct —
+    // If the probe APIs themselves fail, continue to purchaseProduct —
     // it will surface Capgo's native error.
   }
 
-  const result = await NativePurchases.purchaseProduct({
-    productIdentifier: productId,
-    productType: PURCHASE_TYPE.SUBS,
-    appAccountToken: authenticatedUserId,
-  });
+  try {
+    const result = await NativePurchases.purchaseProduct({
+      productIdentifier: productId,
+      productType: PURCHASE_TYPE.SUBS,
+      appAccountToken: authenticatedUserId,
+    });
 
-  const mapped = mapTransaction(result);
-  if (!mapped) {
-    throw new Error("Purchase completed but product mapping failed.");
+    const mapped = mapTransaction(result);
+    if (!mapped) {
+      throw new Error("Purchase completed but product mapping failed.");
+    }
+
+    if (!mapped.signedTransactionInfo && !mapped.transactionId) {
+      throw new Error(
+        "Purchase completed but StoreKit returned no transaction to verify.",
+      );
+    }
+
+    return mapped;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    // Capgo NativePurchasesPlugin.purchaseProduct rejects with this exact string
+    // when Product.products(for: [id]) returns []. Attach probe evidence.
+    if (/cannot find product for id/i.test(message)) {
+      try {
+        const { probeNativeStoreKitCatalog, formatStoreKitCatalogProbe } =
+          await import("@/lib/iap/storeKitDiagnostics");
+        const probe = await probeNativeStoreKitCatalog();
+        throw new Error(`${message}\n${formatStoreKitCatalogProbe(probe)}`);
+      } catch (enriched) {
+        if (
+          enriched instanceof Error &&
+          enriched.message.includes(message) &&
+          enriched.message !== message
+        ) {
+          throw enriched;
+        }
+      }
+    }
+    throw error;
   }
-
-  if (!mapped.signedTransactionInfo && !mapped.transactionId) {
-    throw new Error(
-      "Purchase completed but StoreKit returned no transaction to verify.",
-    );
-  }
-
-  return mapped;
 }
 
 /**

@@ -20,6 +20,7 @@ import {
   type IapPlan,
 } from "@/lib/iap/products";
 import type { NativeStoreProduct } from "@/lib/iap/nativePurchases";
+import type { StoreKitCatalogProbe } from "@/lib/iap/storeKitDiagnostics";
 import { isNativePlatform, shouldUseNativeStoreBilling } from "@/lib/native/platform";
 import { PLAN_DEFINITIONS } from "@/lib/subscription/plans";
 import {
@@ -107,6 +108,9 @@ export function BillingSection() {
   const [storeCatalogStatus, setStoreCatalogStatus] = useState<
     "idle" | "loading" | "ready" | "empty" | "error"
   >("idle");
+  const [storeKitProbe, setStoreKitProbe] = useState<StoreKitCatalogProbe | null>(
+    null,
+  );
   const checkoutTrackedRef = useRef(false);
   const upgradePlan = parsePaidPlan(searchParams.get("upgrade") ?? undefined);
 
@@ -117,11 +121,18 @@ export function BillingSection() {
 
     let cancelled = false;
     setStoreCatalogStatus("loading");
+    setStoreKitProbe(null);
 
     void (async () => {
       try {
         const { getNativeStoreProducts } = await import("@/lib/iap/nativePurchases");
-        const products = await getNativeStoreProducts();
+        const {
+          probeNativeStoreKitCatalog,
+        } = await import("@/lib/iap/storeKitDiagnostics");
+        const [products, probe] = await Promise.all([
+          getNativeStoreProducts(),
+          probeNativeStoreKitCatalog(),
+        ]);
         if (cancelled) {
           return;
         }
@@ -131,12 +142,58 @@ export function BillingSection() {
           next[product.plan] = product;
         }
         setStoreProducts(next);
+        setStoreKitProbe(probe);
         setStoreCatalogStatus(products.length > 0 ? "ready" : "empty");
-      } catch {
-        // StoreKit catalog may be unavailable offline / before ASC products are Ready to Submit.
-        // Fall back to App Store label without hardcoded dollar amounts.
+      } catch (loadError) {
+        // StoreKit catalog may be unavailable; still surface Capgo/StoreKit probe evidence.
         if (!cancelled) {
           setStoreCatalogStatus("error");
+          try {
+            const { probeNativeStoreKitCatalog } = await import(
+              "@/lib/iap/storeKitDiagnostics"
+            );
+            const probe = await probeNativeStoreKitCatalog();
+            if (!cancelled) {
+              setStoreKitProbe(probe);
+            }
+          } catch {
+            setStoreKitProbe({
+              probedAt: new Date().toISOString(),
+              platform: "ios",
+              isNativeIos: true,
+              capacitorNative: true,
+              appId: null,
+              appName: null,
+              appVersion: null,
+              appBuild: null,
+              pluginVersion: null,
+              billingSupported: null,
+              storeKitBundleId: null,
+              storeKitEnvironment: null,
+              storeKitAppVersion: null,
+              requestedProductIds: [
+                IAP_PRODUCTS.pro.productId,
+                IAP_PRODUCTS.pro_plus.productId,
+              ],
+              returnedProductIds: [],
+              returnedCount: 0,
+              missingProductIds: [
+                IAP_PRODUCTS.pro.productId,
+                IAP_PRODUCTS.pro_plus.productId,
+              ],
+              perProduct: [],
+              getProductsError:
+                loadError instanceof Error
+                  ? loadError.message
+                  : "StoreKit catalog load failed",
+              appInfoError: null,
+              appTransactionError: null,
+              verdict:
+                loadError instanceof Error
+                  ? loadError.message
+                  : "StoreKit catalog load failed",
+            });
+          }
         }
       }
     })();
@@ -589,15 +646,54 @@ export function BillingSection() {
 
         {nativeStoreBilling &&
           (storeCatalogStatus === "empty" || storeCatalogStatus === "error") && (
-            <p className="text-sm text-amber-300/90">
-              App Store products didn&apos;t load on this device. Purchases will
-              fail until{" "}
-              <span className="font-medium">com.buxme.pro.monthly</span> and{" "}
-              <span className="font-medium">com.buxme.proplus.monthly</span> are
-              available in App Store Connect (complete metadata, same
-              subscription group, Sandbox tester signed in) and the iOS app has
-              the In-App Purchase capability enabled.
-            </p>
+            <div className="space-y-2 text-sm text-amber-300/90">
+              <p>
+                App Store products didn&apos;t load on this device. Capgo called
+                StoreKit <span className="font-medium">Product.products(for:)</span>{" "}
+                for{" "}
+                <span className="font-medium">com.buxme.pro.monthly</span> and{" "}
+                <span className="font-medium">com.buxme.proplus.monthly</span>; an
+                empty result makes purchase fail with &quot;Cannot find product
+                for id …&quot;.
+              </p>
+              {storeKitProbe && (
+                <pre className="overflow-x-auto whitespace-pre-wrap rounded-md border border-amber-400/20 bg-black/30 p-3 font-mono text-[11px] leading-relaxed text-amber-100/90">
+                  {storeKitProbe.verdict}
+                  {"\n"}
+                  requested={storeKitProbe.requestedProductIds.join(",")}
+                  {"\n"}
+                  returned({storeKitProbe.returnedCount})=
+                  {storeKitProbe.returnedProductIds.join(",") || "∅"}
+                  {"\n"}
+                  missing={storeKitProbe.missingProductIds.join(",") || "∅"}
+                  {"\n"}
+                  appId={storeKitProbe.appId ?? "n/a"} build=
+                  {storeKitProbe.appBuild ?? "n/a"}
+                  {"\n"}
+                  storeKitBundle={storeKitProbe.storeKitBundleId ?? "n/a"} env=
+                  {storeKitProbe.storeKitEnvironment ?? "n/a"}
+                  {"\n"}
+                  billingSupported=
+                  {String(storeKitProbe.billingSupported ?? "n/a")} plugin=
+                  {storeKitProbe.pluginVersion ?? "n/a"}
+                  {storeKitProbe.getProductsError
+                    ? `\ngetProductsError=${storeKitProbe.getProductsError}`
+                    : ""}
+                  {storeKitProbe.appTransactionError
+                    ? `\nappTransactionError=${storeKitProbe.appTransactionError}`
+                    : ""}
+                  {storeKitProbe.perProduct
+                    .map((row) =>
+                      row.error
+                        ? `\n${row.productId}: ${row.error}`
+                        : row.found
+                          ? `\n${row.productId}: ok ${row.priceString ?? ""}`
+                          : `\n${row.productId}: not returned`,
+                    )
+                    .join("")}
+                </pre>
+              )}
+            </div>
           )}
 
         <div className="flex flex-wrap gap-2">
