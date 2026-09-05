@@ -605,6 +605,19 @@ assert.match(envCatalog, /REQUIRED when APPLE_IAP_ENVIRONMENT=Production/);
 const docs = read("docs/IOS_APP_STORE.md");
 assert.match(docs, /App Store Server Notifications/);
 assert.match(docs, /APPLE_IAP_APP_APPLE_ID/);
+
+const appleHealth = read("lib/iap/appleApiHealth.ts");
+assert.match(appleHealth, /probeAppleApiAuth/);
+assert.match(appleHealth, /inspectAppleCredentialFormats/);
+assert.match(appleHealth, /getTransactionInfo/);
+assert.doesNotMatch(appleHealth, /privateKey!/);
+
+const appleHealthRoute = read("app/api/iap/apple/health/route.ts");
+assert.match(appleHealthRoute, /getAppleIapHealthReport/);
+
+const launchHealth = read("app/api/health/launch/route.ts");
+assert.match(launchHealth, /appleIapConfigured/);
+
 assert.match(docs, /appAccountToken/);
 assert.match(docs, /legacy/i);
 
