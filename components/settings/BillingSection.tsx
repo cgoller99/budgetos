@@ -104,6 +104,9 @@ export function BillingSection() {
   const [storeProducts, setStoreProducts] = useState<
     Partial<Record<IapPlan, NativeStoreProduct>>
   >({});
+  const [storeCatalogStatus, setStoreCatalogStatus] = useState<
+    "idle" | "loading" | "ready" | "empty" | "error"
+  >("idle");
   const checkoutTrackedRef = useRef(false);
   const upgradePlan = parsePaidPlan(searchParams.get("upgrade") ?? undefined);
 
@@ -113,6 +116,7 @@ export function BillingSection() {
     }
 
     let cancelled = false;
+    setStoreCatalogStatus("loading");
 
     void (async () => {
       try {
@@ -127,9 +131,13 @@ export function BillingSection() {
           next[product.plan] = product;
         }
         setStoreProducts(next);
+        setStoreCatalogStatus(products.length > 0 ? "ready" : "empty");
       } catch {
         // StoreKit catalog may be unavailable offline / before ASC products are Ready to Submit.
         // Fall back to App Store label without hardcoded dollar amounts.
+        if (!cancelled) {
+          setStoreCatalogStatus("error");
+        }
       }
     })();
 
@@ -578,6 +586,19 @@ export function BillingSection() {
         )}
 
         {error && <p className="text-sm text-amber-300">{error}</p>}
+
+        {nativeStoreBilling &&
+          (storeCatalogStatus === "empty" || storeCatalogStatus === "error") && (
+            <p className="text-sm text-amber-300/90">
+              App Store products didn&apos;t load on this device. Purchases will
+              fail until{" "}
+              <span className="font-medium">com.buxme.pro.monthly</span> and{" "}
+              <span className="font-medium">com.buxme.proplus.monthly</span> are
+              available in App Store Connect (complete metadata, same
+              subscription group, Sandbox tester signed in) and the iOS app has
+              the In-App Purchase capability enabled.
+            </p>
+          )}
 
         <div className="flex flex-wrap gap-2">
           {nativeStoreBilling && (

@@ -553,16 +553,28 @@ assert.match(nativePurchases, /jwsRepresentation/);
 assert.match(nativePurchases, /signedTransactionInfo/);
 assert.match(nativePurchases, /appAccountToken: authenticatedUserId/);
 assert.match(nativePurchases, /isBuxmeUserUuid/);
+assert.match(nativePurchases, /peekOriginalTransactionIdFromJws/);
+assert.match(nativePurchases, /Never fall back to transactionId/);
+assert.doesNotMatch(
+  nativePurchases,
+  /originalId \?\? item\.transactionId/,
+);
 
 assert.match(nativePurchases, /getNativeStoreProducts/);
 assert.match(nativePurchases, /priceString/);
 assert.match(nativePurchases, /getProducts/);
+
+const verifyPurchase = read("lib/iap/appleVerifyPurchase.ts");
+assert.match(verifyPurchase, /verifiedViaJws/);
+assert.match(verifyPurchase, /original_transaction_mismatch/);
 
 const billing = read("components/settings/BillingSection.tsx");
 assert.match(billing, /purchaseAndVerifyNativePlan\(plan, user\.id\)/);
 assert.match(billing, /useAuth/);
 assert.match(billing, /getNativeStoreProducts/);
 assert.match(billing, /priceString/);
+assert.match(billing, /storeCatalogStatus/);
+assert.match(billing, /com\.buxme\.pro\.monthly/);
 
 const entitlementsRoute = read("app/api/entitlements/route.ts");
 assert.match(entitlementsRoute, /clearAppleSubscriptionOnProfile/);
