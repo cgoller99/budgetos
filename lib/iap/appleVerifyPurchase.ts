@@ -148,8 +148,17 @@ export async function verifyClientApplePurchase(
     );
   }
 
+  // Soft-check originalTransactionId only when the client sent an explicit
+  // value that differs. Capgo historically omitted originalId and some clients
+  // incorrectly sent transactionId; when signedTransactionInfo is present the
+  // verified JWS is already the source of truth, so skip this hint check.
   const claimedOriginal = payload.originalTransactionId?.trim();
-  if (claimedOriginal && claimedOriginal !== mapped.originalTransactionId) {
+  const verifiedViaJws = Boolean(signedTransactionInfo);
+  if (
+    !verifiedViaJws &&
+    claimedOriginal &&
+    claimedOriginal !== mapped.originalTransactionId
+  ) {
     throw new ApplePurchaseVerificationError(
       "Client original transaction id does not match the verified Apple transaction.",
       "original_transaction_mismatch",

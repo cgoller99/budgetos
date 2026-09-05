@@ -30,6 +30,42 @@ export type NativeStoreProduct = {
   currencyCode: string;
 };
 
+/**
+ * Capgo's iOS Transaction payload does not include `originalId` /
+ * `originalTransactionId`. After renewal, `transactionId` !== Apple's
+ * originalTransactionId. Falling back to transactionId causes false
+ * `original_transaction_mismatch` failures on restore/renew verify.
+ *
+ * Prefer Capgo's field when present; otherwise decode the claim from the
+ * StoreKit 2 JWS (server still cryptographically verifies the same JWS).
+ */
+function peekOriginalTransactionIdFromJws(
+  jws: string | null | undefined,
+): string | null {
+  if (!jws) {
+    return null;
+  }
+
+  try {
+    const payloadPart = jws.split(".")[1];
+    if (!payloadPart) {
+      return null;
+    }
+
+    const padded = payloadPart.replace(/-/g, "+").replace(/_/g, "/");
+    const padLength = (4 - (padded.length % 4)) % 4;
+    const json = atob(padded + "=".repeat(padLength));
+    const claims = JSON.parse(json) as {
+      originalTransactionId?: string | number;
+    };
+    return claims.originalTransactionId != null
+      ? String(claims.originalTransactionId)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 function mapTransaction(item: {
   productIdentifier?: string;
   transactionId?: string;
@@ -48,12 +84,20 @@ function mapTransaction(item: {
     return null;
   }
 
+  const signedTransactionInfo = item.jwsRepresentation ?? null;
+  // Never fall back to transactionId — Capgo omits originalId, and the current
+  // transaction id diverges from originalTransactionId after the first renewal.
+  const originalTransactionId =
+    item.originalId?.trim() ||
+    peekOriginalTransactionIdFromJws(signedTransactionInfo) ||
+    null;
+
   return {
     productId,
     plan,
     transactionId: item.transactionId ?? null,
-    originalTransactionId: item.originalId ?? item.transactionId ?? null,
-    signedTransactionInfo: item.jwsRepresentation ?? null,
+    originalTransactionId,
+    signedTransactionInfo,
     expiresAt: item.expirationDate ?? null,
     appAccountToken: item.appAccountToken?.trim() || null,
   };
