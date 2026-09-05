@@ -453,6 +453,64 @@ const config = read("lib/iap/config.ts");
 assert.match(config, /productionRequiresAppAppleId|APPLE_IAP_APP_APPLE_ID/);
 assert.match(config, /Environment\.PRODUCTION/);
 assert.match(config, /Environment\.SANDBOX/);
+assert.match(config, /normalizePrivateKey/);
+assert.match(config, /stripWrappingQuotes/);
+assert.match(config, /getAppleIapConfigDiagnostics/);
+assert.match(config, /\\\\r\\\\n/);
+
+// ── Env parsing (mirrors lib/iap/config.ts; no secrets) ─────────────────────
+
+function stripWrappingQuotes(raw) {
+  const value = raw.trim();
+  if (value.length >= 2) {
+    const first = value[0];
+    const last = value[value.length - 1];
+    if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
+      return value.slice(1, -1).trim();
+    }
+  }
+  return value;
+}
+
+function normalizePrivateKey(raw) {
+  if (raw == null) return null;
+  let value = stripWrappingQuotes(raw);
+  if (!value) return null;
+  if (value.includes("\\r\\n")) value = value.replace(/\\r\\n/g, "\n");
+  if (value.includes("\\n")) value = value.replace(/\\n/g, "\n");
+  if (value.includes("\r\n")) value = value.replace(/\r\n/g, "\n");
+  else if (value.includes("\r")) value = value.replace(/\r/g, "\n");
+  return value.trim() ? value : null;
+}
+
+function parseAppAppleId(raw) {
+  if (raw == null) return null;
+  const value = stripWrappingQuotes(raw);
+  if (!value) return null;
+  const digits = value.replace(/[^\d]/g, "");
+  if (!digits) return null;
+  const parsed = Number(digits);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+assert.equal(
+  normalizePrivateKey("-----BEGIN PRIVATE KEY-----\\nABC\\n-----END PRIVATE KEY-----\\n")?.includes(
+    "\n",
+  ),
+  true,
+);
+assert.equal(
+  normalizePrivateKey(
+    '"-----BEGIN PRIVATE KEY-----\\nABC\\n-----END PRIVATE KEY-----\\n"',
+  )?.startsWith("-----BEGIN"),
+  true,
+);
+assert.equal(normalizePrivateKey("   "), null);
+assert.equal(parseAppAppleId("6799452001"), 6799452001);
+assert.equal(parseAppAppleId('"6799452001"'), 6799452001);
+assert.equal(parseAppAppleId("'6799452001'"), 6799452001);
+assert.equal(parseAppAppleId("App Apple ID 6799452001"), 6799452001);
+assert.equal(parseAppAppleId("co.buxme.app"), null);
 
 const serverClient = read("lib/iap/appleServerClient.ts");
 assert.match(serverClient, /SignedDataVerifier/);
@@ -475,6 +533,8 @@ assert.match(
 const notificationsRoute = read("app/api/iap/apple/notifications/route.ts");
 assert.match(notificationsRoute, /handleAppleServerNotificationV2/);
 assert.match(notificationsRoute, /signedPayload/);
+assert.match(notificationsRoute, /getAppleIapConfigDiagnostics/);
+assert.match(notificationsRoute, /diagnostics/);
 
 const notificationHandler = read("lib/iap/appleNotificationHandler.ts");
 assert.match(notificationHandler, /mapAppleNotificationToAction/);
