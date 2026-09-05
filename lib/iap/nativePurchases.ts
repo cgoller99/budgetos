@@ -154,6 +154,38 @@ export async function purchaseNativePlan(
   }
 
   const productId = IAP_PRODUCTS[plan].productId;
+
+  // Fail fast with a clear message when StoreKit cannot see ASC products.
+  // Capgo's purchaseProduct error is easy to miss; this surfaces ASC/capability issues.
+  try {
+    const billing = await NativePurchases.isBillingSupported();
+    if (!billing.isBillingSupported) {
+      throw new Error(
+        "This device cannot make App Store purchases (billing unsupported).",
+      );
+    }
+
+    const { products } = await NativePurchases.getProducts({
+      productIdentifiers: [productId],
+      productType: PURCHASE_TYPE.SUBS,
+    });
+    if (!products.some((product) => product.identifier === productId)) {
+      throw new Error(
+        `App Store did not return product ${productId}. In App Store Connect, confirm this subscription is complete (pricing + localization), in the Buxme subscription group, and available for Sandbox. On the device, sign into Settings → App Store → Sandbox Account. Rebuild TestFlight after enabling the In-App Purchase capability.`,
+      );
+    }
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      (error.message.includes("App Store did not return product") ||
+        error.message.includes("billing unsupported"))
+    ) {
+      throw error;
+    }
+    // If the preflight APIs themselves fail, continue to purchaseProduct —
+    // it will surface Capgo's native error.
+  }
+
   const result = await NativePurchases.purchaseProduct({
     productIdentifier: productId,
     productType: PURCHASE_TYPE.SUBS,
@@ -163,6 +195,12 @@ export async function purchaseNativePlan(
   const mapped = mapTransaction(result);
   if (!mapped) {
     throw new Error("Purchase completed but product mapping failed.");
+  }
+
+  if (!mapped.signedTransactionInfo && !mapped.transactionId) {
+    throw new Error(
+      "Purchase completed but StoreKit returned no transaction to verify.",
+    );
   }
 
   return mapped;
