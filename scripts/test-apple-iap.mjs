@@ -606,6 +606,78 @@ const docs = read("docs/IOS_APP_STORE.md");
 assert.match(docs, /App Store Server Notifications/);
 assert.match(docs, /APPLE_IAP_APP_APPLE_ID/);
 
+const adminTypes = read("lib/admin/types.ts");
+assert.match(adminTypes, /clear_apple_iap_binding/);
+assert.match(adminTypes, /appleOriginalTransactionId/);
+
+const entitlementAdmin = read("lib/admin/entitlementAdmin.ts");
+assert.match(entitlementAdmin, /buildClearAppleIapBindingUpdate/);
+assert.match(entitlementAdmin, /profileHasAppleIapBinding/);
+assert.match(entitlementAdmin, /apple_original_transaction_id: null/);
+
+const adminUserService = read("lib/admin/userService.ts");
+assert.match(adminUserService, /clear_apple_iap_binding/);
+assert.match(adminUserService, /buildClearAppleIapBindingUpdate/);
+assert.match(adminUserService, /supportOnly: true/);
+assert.match(adminUserService, /cleared Apple IAP binding/i);
+assert.match(adminUserService, /apple_original_transaction_id\.eq/);
+assert.match(adminUserService, /no stored Apple IAP binding to clear/);
+
+const adminDashboard = read("components/admin/AdminDashboard.tsx");
+assert.match(adminDashboard, /clear_apple_iap_binding/);
+assert.match(adminDashboard, /Clear Apple IAP binding/);
+assert.match(adminDashboard, /Apple OTID/);
+assert.match(adminDashboard, /Does not delete the Auth user/);
+
+const clearBindingScript = read("scripts/clear-apple-iap-binding.mjs");
+assert.match(clearBindingScript, /clear_apple_iap_binding/);
+assert.match(clearBindingScript, /apple_original_transaction_id/);
+assert.match(clearBindingScript, /Does NOT delete Auth users/);
+assert.match(clearBindingScript, /admin_event_logs/);
+assert.match(clearBindingScript, /dry-run|dryRun/);
+
+// Pure helper mirrors (keep in sync with entitlementAdmin.ts)
+function profileHasAppleIapBinding(input) {
+  return Boolean(
+    input.appleOriginalTransactionId ||
+      input.appleTransactionId ||
+      input.appleProductId ||
+      input.appleEnvironment ||
+      input.subscriptionProvider === "apple",
+  );
+}
+
+assert.equal(
+  profileHasAppleIapBinding({
+    appleOriginalTransactionId: "2000000123456789",
+    appleTransactionId: null,
+    appleProductId: null,
+    appleEnvironment: null,
+    subscriptionProvider: "none",
+  }),
+  true,
+);
+assert.equal(
+  profileHasAppleIapBinding({
+    appleOriginalTransactionId: null,
+    appleTransactionId: null,
+    appleProductId: null,
+    appleEnvironment: null,
+    subscriptionProvider: "none",
+  }),
+  false,
+);
+assert.equal(
+  profileHasAppleIapBinding({
+    appleOriginalTransactionId: null,
+    appleTransactionId: null,
+    appleProductId: null,
+    appleEnvironment: null,
+    subscriptionProvider: "apple",
+  }),
+  true,
+);
+
 const appleHealth = read("lib/iap/appleApiHealth.ts");
 assert.match(appleHealth, /probeAppleApiAuth/);
 assert.match(appleHealth, /inspectAppleCredentialFormats/);

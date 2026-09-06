@@ -4,9 +4,11 @@ import { isFounderEmail } from "@/lib/founder/emails";
 import { logAdminEvent } from "@/lib/admin/eventLog";
 import {
   adminActionToEntitlementPlan,
+  buildClearAppleIapBindingUpdate,
   buildEntitlementProfileUpdate,
   buildEntitlementSnapshot,
   entitlementPlanLabel,
+  profileHasAppleIapBinding,
   type AdminEntitlementSnapshot,
 } from "@/lib/admin/entitlementAdmin";
 import { factoryResetUserFinance } from "@/lib/admin/factoryResetService";
@@ -42,6 +44,8 @@ type ProfileEntitlementRow = {
   stripe_subscription_id: string | null;
   apple_product_id: string | null;
   apple_original_transaction_id: string | null;
+  apple_transaction_id: string | null;
+  apple_environment: string | null;
 };
 
 function toSummary(
@@ -75,6 +79,10 @@ function toSummary(
     effectivePlan: snapshot.effectivePlan,
     entitlementSource: snapshot.entitlementSource,
     hasExternalSubscriptionRisk: snapshot.hasExternalSubscriptionRisk,
+    appleProductId: profile.apple_product_id,
+    appleOriginalTransactionId: profile.apple_original_transaction_id,
+    appleTransactionId: profile.apple_transaction_id,
+    appleEnvironment: profile.apple_environment,
     joinedAt: profile.created_at,
     lastActiveAt: profile.last_active_at,
     isDisabled: profile.is_disabled,
@@ -137,6 +145,11 @@ export async function searchAdminUsers(
 
     if (uuidPattern.test(trimmed)) {
       profileQuery = profileQuery.eq("id", trimmed);
+    } else if (/^\d{5,}$/.test(trimmed)) {
+      // Support lookup by Apple original / latest transaction id (sandbox ops).
+      profileQuery = profileQuery.or(
+        `apple_original_transaction_id.eq.${trimmed},apple_transaction_id.eq.${trimmed}`,
+      );
     } else {
       profileQuery = profileQuery.or(
         `email.ilike.%${trimmed}%,full_name.ilike.%${trimmed}%`,
@@ -258,6 +271,79 @@ export async function performAdminUserAction(input: {
         oldSource: beforeSnapshot.entitlementSource,
         newSource: afterSnapshot?.entitlementSource ?? null,
         hadExternalSubscriptionRisk: beforeSnapshot.hasExternalSubscriptionRisk,
+        timestamp: now,
+      },
+      userId,
+    });
+    return;
+  }
+
+  if (action === "clear_apple_iap_binding") {
+    const { data: profile, error: profileError } = await adminSupabase
+      .from("profiles")
+      .select(
+        "id, email, subscription_plan, subscription_status, subscription_provider, apple_product_id, apple_original_transaction_id, apple_transaction_id, apple_environment, stripe_subscription_id",
+      )
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (profileError) throw profileError;
+    if (!profile) {
+      throw new Error("User not found.");
+    }
+
+    const beforeBinding = {
+      appleProductId: profile.apple_product_id,
+      appleOriginalTransactionId: profile.apple_original_transaction_id,
+      appleTransactionId: profile.apple_transaction_id,
+      appleEnvironment: profile.apple_environment,
+      subscriptionProvider: profile.subscription_provider,
+      subscriptionPlan: profile.subscription_plan,
+      subscriptionStatus: profile.subscription_status,
+    };
+
+    if (
+      !profileHasAppleIapBinding({
+        appleOriginalTransactionId: profile.apple_original_transaction_id,
+        appleTransactionId: profile.apple_transaction_id,
+        appleProductId: profile.apple_product_id,
+        appleEnvironment: profile.apple_environment,
+        subscriptionProvider: profile.subscription_provider,
+      })
+    ) {
+      throw new Error(
+        "This user has no stored Apple IAP binding to clear (no apple_* identifiers and provider is not apple).",
+      );
+    }
+
+    const { error: updateError } = await adminSupabase
+      .from("profiles")
+      .update(buildClearAppleIapBindingUpdate(now))
+      .eq("id", userId);
+
+    if (updateError) throw updateError;
+
+    await logAdminEvent(adminSupabase, {
+      eventType: "auth",
+      message: `Admin cleared Apple IAP binding for user ${userId} (${profile.email ?? "no-email"})`,
+      metadata: {
+        action,
+        userId,
+        actorId: actor.id,
+        actorEmail: actor.email ?? null,
+        supportOnly: true,
+        before: beforeBinding,
+        after: {
+          appleProductId: null,
+          appleOriginalTransactionId: null,
+          appleTransactionId: null,
+          appleEnvironment: null,
+          subscriptionProvider: "none",
+          subscriptionPlan: "free",
+          subscriptionStatus: "none",
+        },
+        stripeSubscriptionIdPreserved: profile.stripe_subscription_id,
+        note: "Local Apple ownership columns cleared only. Auth user preserved. Remote Apple/Stripe subscriptions were not cancelled or modified.",
         timestamp: now,
       },
       userId,
