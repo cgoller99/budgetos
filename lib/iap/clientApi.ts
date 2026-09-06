@@ -18,6 +18,23 @@ type VerifyResponse = {
     purchaseDateMs?: number | null;
     originalPurchaseDateMs?: number | null;
     lineage?: "original" | "continuation" | "unknown";
+    appAccountTokenSent?: string | null;
+    rebind?: {
+      codePath?: string;
+      appAccountTokenSent?: string | null;
+      appleAppAccountToken?: string | null;
+      rebindEligible?: boolean;
+      rebindAttempted?: boolean;
+      rebindSucceeded?: boolean;
+      blockedReason?: string | null;
+      activeOwnerUserId?: string | null;
+      inactiveOwnerUserIds?: string[];
+      appleSetTokenHttpStatus?: number | null;
+      appleSetTokenApiError?: string | null;
+      appleSetTokenEnvironment?: string | null;
+      postRebindRefreshAttempted?: boolean;
+      postRebindAppleToken?: string | null;
+    };
   };
   subscription?: { plan: string; status: string };
   appleServerVerification?: string;
@@ -29,10 +46,15 @@ function formatOwnershipMismatchError(body: VerifyResponse): string {
     return body.error ?? "Unable to verify Apple purchase.";
   }
 
+  const rebind = details.rebind;
+
   return [
     body.error ?? "This Apple purchase is bound to a different Buxme account.",
     details.authenticatedUserId
       ? `signedInUser=${details.authenticatedUserId}`
+      : null,
+    details.appAccountTokenSent != null
+      ? `appAccountTokenSent=${details.appAccountTokenSent || "(absent)"}`
       : null,
     details.appAccountToken != null
       ? `appleAppAccountToken=${details.appAccountToken || "(absent)"}`
@@ -43,6 +65,28 @@ function formatOwnershipMismatchError(body: VerifyResponse): string {
     details.transactionId ? `transactionId=${details.transactionId}` : null,
     details.lineage ? `lineage=${details.lineage}` : null,
     details.environment ? `environment=${details.environment}` : null,
+    rebind?.codePath ? `rebindCodePath=${rebind.codePath}` : null,
+    rebind?.blockedReason != null
+      ? `rebindBlockedReason=${rebind.blockedReason || "(none)"}`
+      : null,
+    rebind
+      ? `rebindAttempted=${String(Boolean(rebind.rebindAttempted))}`
+      : null,
+    rebind?.activeOwnerUserId
+      ? `activeOtidOwner=${rebind.activeOwnerUserId}`
+      : null,
+    rebind?.inactiveOwnerUserIds?.length
+      ? `inactiveOtidOwners=${rebind.inactiveOwnerUserIds.join(",")}`
+      : null,
+    rebind?.appleSetTokenHttpStatus != null
+      ? `appleSetTokenHttpStatus=${rebind.appleSetTokenHttpStatus}`
+      : null,
+    rebind?.appleSetTokenApiError
+      ? `appleSetTokenApiError=${rebind.appleSetTokenApiError}`
+      : null,
+    rebind?.postRebindAppleToken
+      ? `postRebindAppleToken=${rebind.postRebindAppleToken}`
+      : null,
   ]
     .filter(Boolean)
     .join(" ");

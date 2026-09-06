@@ -18,11 +18,36 @@ import {
 } from "@/lib/iap/appleServerClient";
 import {
   clearAppleSubscriptionOnProfile,
-  findActiveAppleOwnerOfOriginalTransaction,
+  listAppleOwnersOfOriginalTransaction,
   releaseInactiveAppleOriginalTransaction,
   syncVerifiedAppleSubscriptionToProfile,
 } from "@/lib/iap/appleSubscriptionService";
 import type { IapPlan } from "@/lib/iap/products";
+import { APIException } from "@apple/app-store-server-library";
+
+export type AppleAppAccountTokenRebindDecision = {
+  /** Deployed server path marker — proves PR #66+ rebind code ran. */
+  codePath: "apple_app_account_token_rebind_v1";
+  appAccountTokenSent: string | null;
+  appleAppAccountToken: string | null;
+  rebindEligible: boolean;
+  rebindAttempted: boolean;
+  rebindSucceeded: boolean;
+  blockedReason:
+    | null
+    | "missing_app_account_token_sent"
+    | "app_account_token_sent_mismatch"
+    | "active_otid_owner"
+    | "apple_set_app_account_token_failed"
+    | "invalid_user_id";
+  activeOwnerUserId: string | null;
+  inactiveOwnerUserIds: string[];
+  appleSetTokenHttpStatus: number | null;
+  appleSetTokenApiError: string | null;
+  appleSetTokenEnvironment: string | null;
+  postRebindRefreshAttempted: boolean;
+  postRebindAppleToken: string | null;
+};
 
 export type ApplePurchaseVerificationDetails = {
   authenticatedUserId?: string;
@@ -34,6 +59,8 @@ export type ApplePurchaseVerificationDetails = {
   purchaseDateMs?: number | null;
   originalPurchaseDateMs?: number | null;
   lineage?: "original" | "continuation" | "unknown";
+  appAccountTokenSent?: string | null;
+  rebind?: AppleAppAccountTokenRebindDecision;
 };
 
 export class ApplePurchaseVerificationError extends Error {
@@ -264,6 +291,51 @@ function buildOwnershipDetails(
   };
 }
 
+function emptyRebindDecision(
+  partial: Partial<AppleAppAccountTokenRebindDecision> & {
+    appAccountTokenSent: string | null;
+    appleAppAccountToken: string | null;
+  },
+): AppleAppAccountTokenRebindDecision {
+  return {
+    codePath: "apple_app_account_token_rebind_v1",
+    appAccountTokenSent: partial.appAccountTokenSent,
+    appleAppAccountToken: partial.appleAppAccountToken,
+    rebindEligible: partial.rebindEligible ?? false,
+    rebindAttempted: partial.rebindAttempted ?? false,
+    rebindSucceeded: partial.rebindSucceeded ?? false,
+    blockedReason: partial.blockedReason ?? null,
+    activeOwnerUserId: partial.activeOwnerUserId ?? null,
+    inactiveOwnerUserIds: partial.inactiveOwnerUserIds ?? [],
+    appleSetTokenHttpStatus: partial.appleSetTokenHttpStatus ?? null,
+    appleSetTokenApiError: partial.appleSetTokenApiError ?? null,
+    appleSetTokenEnvironment: partial.appleSetTokenEnvironment ?? null,
+    postRebindRefreshAttempted: partial.postRebindRefreshAttempted ?? false,
+    postRebindAppleToken: partial.postRebindAppleToken ?? null,
+  };
+}
+
+function describeAppleApiError(error: unknown): {
+  message: string;
+  httpStatus: number | null;
+  apiError: string | null;
+} {
+  if (error instanceof APIException) {
+    return {
+      message: error.message || `Apple APIException HTTP ${error.httpStatusCode}`,
+      httpStatus: error.httpStatusCode,
+      apiError:
+        error.apiError != null
+          ? String(error.apiError)
+          : error.errorMessage ?? null,
+    };
+  }
+  if (error instanceof Error) {
+    return { message: error.message, httpStatus: null, apiError: null };
+  }
+  return { message: String(error), httpStatus: null, apiError: null };
+}
+
 /**
  * StoreKit often returns an existing subscription lineage whose signed
  * appAccountToken was bound at an earlier purchase — even when the client just
@@ -283,7 +355,17 @@ async function rebindStaleAppAccountTokenForPurchase(input: {
   const sent = input.appAccountTokenSent.trim();
   const appleToken = input.verified.appAccountToken?.trim() || null;
 
+  const owners = await listAppleOwnersOfOriginalTransaction({
+    originalTransactionId: input.verified.originalTransactionId,
+    excludeUserId: input.userId,
+  });
+  const activeOwner = owners.find((owner) => owner.isActiveAppleEntitlement);
+  const inactiveOwnerUserIds = owners
+    .filter((owner) => !owner.isActiveAppleEntitlement)
+    .map((owner) => owner.id);
+
   console.info("[iap/apple/verify] appAccountToken mismatch on purchase", {
+    codePath: "apple_app_account_token_rebind_v1",
     authenticatedUserId: input.userId,
     appAccountTokenSent: sent,
     appleAppAccountToken: appleToken,
@@ -293,31 +375,48 @@ async function rebindStaleAppAccountTokenForPurchase(input: {
     environment: input.verified.environment,
     purchaseDateMs: input.verified.purchaseDateMs,
     originalPurchaseDateMs: input.verified.originalPurchaseDateMs,
+    otidOwners: owners,
   });
 
   if (sent.toLowerCase() !== input.userId.toLowerCase()) {
+    const rebind = emptyRebindDecision({
+      appAccountTokenSent: sent,
+      appleAppAccountToken: appleToken,
+      blockedReason: "app_account_token_sent_mismatch",
+      activeOwnerUserId: activeOwner?.id ?? null,
+      inactiveOwnerUserIds,
+    });
+    console.info("[iap/apple/verify] rebind blocked", rebind);
     throw new ApplePurchaseVerificationError(
       "This Apple purchase is bound to a different Buxme account.",
       "app_account_token_mismatch",
       403,
       buildOwnershipDetails(input.userId, input.verified, {
         appAccountToken: appleToken,
+        appAccountTokenSent: sent,
+        rebind,
       }),
     );
   }
 
-  const activeOwner = await findActiveAppleOwnerOfOriginalTransaction({
-    originalTransactionId: input.verified.originalTransactionId,
-    excludeUserId: input.userId,
-  });
-
   if (activeOwner) {
+    const rebind = emptyRebindDecision({
+      appAccountTokenSent: sent,
+      appleAppAccountToken: appleToken,
+      rebindEligible: false,
+      blockedReason: "active_otid_owner",
+      activeOwnerUserId: activeOwner.id,
+      inactiveOwnerUserIds,
+    });
+    console.info("[iap/apple/verify] rebind blocked", rebind);
     throw new ApplePurchaseVerificationError(
       "This Apple purchase is bound to a different Buxme account.",
       "app_account_token_mismatch",
       403,
       buildOwnershipDetails(input.userId, input.verified, {
         appAccountToken: appleToken,
+        appAccountTokenSent: sent,
+        rebind,
       }),
     );
   }
@@ -329,24 +428,46 @@ async function rebindStaleAppAccountTokenForPurchase(input: {
     excludeUserId: input.userId,
   });
 
+  let setTokenEnvironment: string | null = null;
   try {
-    await setAppleAppAccountToken({
+    const setResult = await setAppleAppAccountToken({
       originalTransactionId: input.verified.originalTransactionId,
       appAccountToken: input.userId,
       preferredEnvironment: input.verified.environment,
     });
-  } catch (error) {
-    console.error("[iap/apple/verify] setAppAccountToken failed", {
+    setTokenEnvironment = String(setResult.environment);
+    console.info("[iap/apple/verify] setAppAccountToken succeeded", {
       authenticatedUserId: input.userId,
-      appleAppAccountToken: appleToken,
       originalTransactionId: input.verified.originalTransactionId,
-      error: error instanceof Error ? error.message : String(error),
+      environment: setTokenEnvironment,
+      appleAppAccountTokenBefore: appleToken,
+    });
+  } catch (error) {
+    const appleError = describeAppleApiError(error);
+    const rebind = emptyRebindDecision({
+      appAccountTokenSent: sent,
+      appleAppAccountToken: appleToken,
+      rebindEligible: true,
+      rebindAttempted: true,
+      blockedReason: "apple_set_app_account_token_failed",
+      activeOwnerUserId: null,
+      inactiveOwnerUserIds,
+      appleSetTokenHttpStatus: appleError.httpStatus,
+      appleSetTokenApiError: appleError.apiError ?? appleError.message,
+    });
+    console.error("[iap/apple/verify] setAppAccountToken failed", {
+      ...rebind,
+      error: appleError.message,
     });
     throw new ApplePurchaseVerificationError(
       "This Apple purchase is bound to a different Buxme account.",
       "app_account_token_mismatch",
       403,
-      buildOwnershipDetails(input.userId, input.verified),
+      buildOwnershipDetails(input.userId, input.verified, {
+        appAccountToken: appleToken,
+        appAccountTokenSent: sent,
+        rebind,
+      }),
     );
   }
 
@@ -358,13 +479,17 @@ async function rebindStaleAppAccountTokenForPurchase(input: {
     ...input.verified,
     appAccountToken: input.userId,
   };
+  let postRebindRefreshAttempted = false;
+  let postRebindAppleToken: string | null = null;
 
   try {
+    postRebindRefreshAttempted = true;
     const fresh = await fetchVerifiedTransactionById(input.verified.transactionId);
     const remapped = mapDecodedTransactionToVerifiedPurchase(
       fresh.transaction,
       fresh.environment,
     );
+    postRebindAppleToken = remapped.appAccountToken;
     rebound = {
       ...remapped,
       appAccountToken:
@@ -379,10 +504,22 @@ async function rebindStaleAppAccountTokenForPurchase(input: {
     );
   }
 
-  console.info("[iap/apple/verify] appAccountToken rebound to authenticated user", {
-    authenticatedUserId: input.userId,
+  const rebind = emptyRebindDecision({
     appAccountTokenSent: sent,
-    appleAppAccountTokenBefore: appleToken,
+    appleAppAccountToken: appleToken,
+    rebindEligible: true,
+    rebindAttempted: true,
+    rebindSucceeded: true,
+    blockedReason: null,
+    inactiveOwnerUserIds,
+    appleSetTokenEnvironment: setTokenEnvironment,
+    postRebindRefreshAttempted,
+    postRebindAppleToken,
+  });
+
+  console.info("[iap/apple/verify] appAccountToken rebound to authenticated user", {
+    ...rebind,
+    authenticatedUserId: input.userId,
     appleAppAccountTokenAfter: rebound.appAccountToken,
     productId: rebound.productId,
     transactionId: rebound.transactionId,
@@ -400,6 +537,7 @@ export async function verifyAndSyncApplePurchaseForUser(input: {
   let verified = await verifyClientApplePurchase(input.payload);
 
   console.info("[iap/apple/verify] verified Apple transaction", {
+    codePath: "apple_app_account_token_rebind_v1",
     authenticatedUserId: input.userId,
     appAccountTokenSent: input.payload.appAccountTokenSent ?? null,
     appleAppAccountToken: verified.appAccountToken,
@@ -415,27 +553,68 @@ export async function verifyAndSyncApplePurchaseForUser(input: {
   });
 
   if (!ownership.allowed) {
-    const tokenSent = input.payload.appAccountTokenSent?.trim() || "";
+    const tokenSentRaw = input.payload.appAccountTokenSent?.trim() || "";
+    const tokenSent = tokenSentRaw || null;
     const canAttemptRebind =
       ownership.reason === "app_account_token_mismatch" &&
-      isBuxmeUserUuid(tokenSent) &&
-      tokenSent.toLowerCase() === input.userId.toLowerCase();
+      isBuxmeUserUuid(tokenSentRaw) &&
+      tokenSentRaw.toLowerCase() === input.userId.toLowerCase();
 
     if (!canAttemptRebind) {
+      const blockedReason =
+        ownership.reason === "invalid_user_id"
+          ? "invalid_user_id"
+          : !tokenSentRaw
+            ? "missing_app_account_token_sent"
+            : tokenSentRaw.toLowerCase() !== input.userId.toLowerCase()
+              ? "app_account_token_sent_mismatch"
+              : "missing_app_account_token_sent";
+
+      let inactiveOwnerUserIds: string[] = [];
+      let activeOwnerUserId: string | null = null;
+      try {
+        const owners = await listAppleOwnersOfOriginalTransaction({
+          originalTransactionId: verified.originalTransactionId,
+          excludeUserId: input.userId,
+        });
+        activeOwnerUserId =
+          owners.find((owner) => owner.isActiveAppleEntitlement)?.id ?? null;
+        inactiveOwnerUserIds = owners
+          .filter((owner) => !owner.isActiveAppleEntitlement)
+          .map((owner) => owner.id);
+      } catch (error) {
+        console.warn(
+          "[iap/apple/verify] OTID owner lookup failed during mismatch diagnostics",
+          error instanceof Error ? error.message : String(error),
+        );
+      }
+
+      const rebind = emptyRebindDecision({
+        appAccountTokenSent: tokenSent,
+        appleAppAccountToken: verified.appAccountToken,
+        blockedReason,
+        activeOwnerUserId,
+        inactiveOwnerUserIds,
+      });
+      console.info("[iap/apple/verify] rebind not eligible", rebind);
+
       throw new ApplePurchaseVerificationError(
         ownership.reason === "app_account_token_mismatch"
           ? "This Apple purchase is bound to a different Buxme account."
           : "Authenticated user id is invalid for Apple purchase linking.",
         ownership.reason,
         403,
-        buildOwnershipDetails(input.userId, verified),
+        buildOwnershipDetails(input.userId, verified, {
+          appAccountTokenSent: tokenSent,
+          rebind,
+        }),
       );
     }
 
     verified = await rebindStaleAppAccountTokenForPurchase({
       userId: input.userId,
       verified,
-      appAccountTokenSent: tokenSent,
+      appAccountTokenSent: tokenSentRaw,
     });
   }
 
