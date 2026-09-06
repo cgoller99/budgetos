@@ -17,6 +17,12 @@ export type VerifiedAppleSubscriptionSyncInput = {
   expiresAt: string;
   environment?: string | null;
   status?: Extract<SubscriptionStatus, "active" | "past_due">;
+  /**
+   * Purchase verify must apply the resolved Apple product even when the profile
+   * still has a leftover higher-tier Apple row (different OTID / stale Pro+).
+   * Restore + ASN keep higher-tier preservation for true stale-restore safety.
+   */
+  preserveHigherPlan?: boolean;
 };
 
 /**
@@ -38,7 +44,7 @@ export async function syncVerifiedAppleSubscriptionToProfile(
   const { data: profile, error } = await admin
     .from("profiles")
     .select(
-      "id, subscription_plan, subscription_status, subscription_provider, stripe_subscription_id, apple_original_transaction_id",
+      "id, subscription_plan, subscription_status, subscription_provider, stripe_subscription_id, apple_original_transaction_id, subscription_current_period_end",
     )
     .eq("id", input.userId)
     .maybeSingle();
@@ -65,12 +71,16 @@ export async function syncVerifiedAppleSubscriptionToProfile(
     );
   }
 
+  const preserveHigherPlan = input.preserveHigherPlan !== false;
+
   if (
+    preserveHigherPlan &&
     shouldPreserveHigherApplePlan({
       currentProvider: profile.subscription_provider,
       currentStatus: profile.subscription_status,
       currentPlan: profile.subscription_plan,
       currentOriginalTransactionId: profile.apple_original_transaction_id,
+      currentPeriodEnd: profile.subscription_current_period_end,
       incomingPlan: plan,
       incomingOriginalTransactionId: input.originalTransactionId,
     })
@@ -314,7 +324,7 @@ export async function applyAppleSubscriptionByOriginalTransaction(input: {
   const { data: profile, error } = await admin
     .from("profiles")
     .select(
-      "id, subscription_plan, subscription_provider, subscription_status, stripe_subscription_id, apple_original_transaction_id",
+      "id, subscription_plan, subscription_provider, subscription_status, stripe_subscription_id, apple_original_transaction_id, subscription_current_period_end",
     )
     .eq("apple_original_transaction_id", input.originalTransactionId)
     .maybeSingle();
@@ -360,6 +370,7 @@ export async function applyAppleSubscriptionByOriginalTransaction(input: {
       currentStatus: profile.subscription_status,
       currentPlan: profile.subscription_plan,
       currentOriginalTransactionId: profile.apple_original_transaction_id,
+      currentPeriodEnd: profile.subscription_current_period_end,
       incomingPlan,
       incomingOriginalTransactionId: input.originalTransactionId,
     })

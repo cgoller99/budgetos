@@ -133,13 +133,28 @@ export function canApplyAppleEntitlementToProfile(
  * Same-subscription-group changes (identical originalTransactionId) are allowed so
  * legitimate renewals / upgrades / post-renewal downgrades can update the plan.
  */
+/**
+ * Prevent a lower Apple tier from clobbering a higher *still-valid* Apple tier when
+ * the incoming transaction is a different originalTransactionId (e.g. stale restore).
+ *
+ * Same-subscription-group changes (identical originalTransactionId) are allowed so
+ * legitimate renewals / upgrades / post-renewal downgrades can update the plan.
+ *
+ * Expired / missing period ends must NOT preserve — otherwise a stale Pro+ row can
+ * outrank a newly verified Pro purchase after the UI already showed Free.
+ *
+ * Purchase verify must pass `preserveHigherPlan: false` so the verified (or
+ * purchase-intent) product always wins over leftover profile state.
+ */
 export function shouldPreserveHigherApplePlan(input: {
   currentProvider: string | null | undefined;
   currentStatus: string | null | undefined;
   currentPlan: string | null | undefined;
   currentOriginalTransactionId: string | null | undefined;
+  currentPeriodEnd?: string | null | undefined;
   incomingPlan: IapPlan;
   incomingOriginalTransactionId: string;
+  nowMs?: number;
 }): boolean {
   if (input.currentProvider !== "apple") {
     return false;
@@ -147,6 +162,17 @@ export function shouldPreserveHigherApplePlan(input: {
 
   const status = input.currentStatus ?? "none";
   if (status !== "active" && status !== "past_due" && status !== "trialing") {
+    return false;
+  }
+
+  // Fail closed: Apple rows without a future period end are not preservable.
+  const periodEnd = input.currentPeriodEnd?.trim() || "";
+  if (!periodEnd) {
+    return false;
+  }
+  const endMs = Date.parse(periodEnd);
+  const now = input.nowMs ?? Date.now();
+  if (Number.isNaN(endMs) || endMs <= now) {
     return false;
   }
 
@@ -162,6 +188,59 @@ export function shouldPreserveHigherApplePlan(input: {
   }
 
   return true;
+}
+
+/**
+ * Resolve which Apple product id should drive the Buxme plan after crypto verify.
+ *
+ * - Default: verified JWS / App Store Server API productId.
+ * - Purchase path: if the client reports the product they actually bought and that
+ *   product is an allowed tier at or below the verified product, prefer it.
+ *   StoreKit often returns an existing higher-tier lineage transaction when the
+ *   user buys Pro after a prior Pro+ on the same sandbox Apple ID; we must not
+ *   infer Pro+ from that lineage when they purchased Pro.
+ */
+export function resolveAppleProductIdForEntitlement(input: {
+  verifiedProductId: string;
+  purchasedProductId?: string | null;
+}): { productId: string; plan: IapPlan; usedPurchaseIntent: boolean } {
+  const verifiedPlan = planFromVerifiedAppleProduct(input.verifiedProductId);
+  if (!verifiedPlan) {
+    throw new Error(`Unsupported verified Apple product: ${input.verifiedProductId}`);
+  }
+
+  const purchasedId = input.purchasedProductId?.trim() || "";
+  if (!purchasedId || purchasedId === input.verifiedProductId) {
+    return {
+      productId: input.verifiedProductId,
+      plan: verifiedPlan,
+      usedPurchaseIntent: false,
+    };
+  }
+
+  const purchasedPlan = planFromVerifiedAppleProduct(purchasedId);
+  if (!purchasedPlan) {
+    return {
+      productId: input.verifiedProductId,
+      plan: verifiedPlan,
+      usedPurchaseIntent: false,
+    };
+  }
+
+  // Never allow purchase intent to escalate above the verified Apple product.
+  if (planRank(purchasedPlan) > planRank(verifiedPlan)) {
+    return {
+      productId: input.verifiedProductId,
+      plan: verifiedPlan,
+      usedPurchaseIntent: false,
+    };
+  }
+
+  return {
+    productId: purchasedId,
+    plan: purchasedPlan,
+    usedPurchaseIntent: true,
+  };
 }
 
 export function isVerifiedAppleTransactionCurrentlyValid(input: {

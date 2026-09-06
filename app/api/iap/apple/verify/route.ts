@@ -14,6 +14,8 @@ type VerifyBody = {
   environment?: string | null;
   /** UUID the client passed into StoreKit purchaseProduct (purchase path only). */
   appAccountTokenSent?: string | null;
+  /** Product id passed into StoreKit purchaseProduct (purchase path only). */
+  purchasedProductId?: string | null;
 };
 
 /**
@@ -50,6 +52,7 @@ export async function POST(request: Request) {
         signedTransactionInfo: body.signedTransactionInfo,
         environment: body.environment,
         appAccountTokenSent: body.appAccountTokenSent,
+        purchasedProductId: body.purchasedProductId,
       },
     });
 

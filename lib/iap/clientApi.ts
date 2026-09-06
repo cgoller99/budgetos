@@ -1,6 +1,6 @@
 "use client";
 
-import type { IapPlan } from "@/lib/iap/products";
+import { IAP_PRODUCTS, type IapPlan } from "@/lib/iap/products";
 import type { NativePurchaseResult } from "@/lib/iap/nativePurchases";
 import { getSupabaseClient } from "@/lib/supabase/client";
 
@@ -94,7 +94,10 @@ function formatOwnershipMismatchError(body: VerifyResponse): string {
 
 export async function verifyApplePurchase(
   purchase: NativePurchaseResult,
-  options?: { appAccountTokenSent?: string | null },
+  options?: {
+    appAccountTokenSent?: string | null;
+    purchasedProductId?: string | null;
+  },
 ): Promise<VerifyResponse> {
   const response = await fetch("/api/iap/apple/verify", {
     method: "POST",
@@ -106,6 +109,7 @@ export async function verifyApplePurchase(
       signedTransactionInfo: purchase.signedTransactionInfo,
       environment: purchase.environment,
       appAccountTokenSent: options?.appAccountTokenSent ?? null,
+      purchasedProductId: options?.purchasedProductId ?? null,
     }),
   });
 
@@ -160,7 +164,10 @@ export async function purchaseAndVerifyNativePlan(
   const purchase = await purchaseNativePlan(plan, freshUserId);
   // Pass the UUID we sent into StoreKit so the server can rebind a stale Apple
   // lineage token via Set App Account Token when appropriate.
-  return verifyApplePurchase(purchase, { appAccountTokenSent: freshUserId });
+  return verifyApplePurchase(purchase, {
+    appAccountTokenSent: freshUserId,
+    purchasedProductId: IAP_PRODUCTS[plan].productId,
+  });
 }
 
 export async function restoreAndVerifyNativePurchases() {
@@ -171,9 +178,13 @@ export async function restoreAndVerifyNativePurchases() {
     return { restored: 0 as const };
   }
 
-  // Prefer the highest plan if multiple entitlements exist.
-  const preferred =
-    purchases.find((item) => item.plan === "pro_plus") ?? purchases[0];
+  // Prefer the current entitlement (latest expiry), not the historically highest
+  // tier. A prior Pro+ on the same Apple ID must not outrank an active Pro.
+  const preferred = [...purchases].sort((a, b) => {
+    const aEnd = a.expiresAt ? Date.parse(a.expiresAt) : 0;
+    const bEnd = b.expiresAt ? Date.parse(b.expiresAt) : 0;
+    return (Number.isNaN(bEnd) ? 0 : bEnd) - (Number.isNaN(aEnd) ? 0 : aEnd);
+  })[0];
 
   // Restore must use the same trusted verification path as purchase.
   // Legacy transactions may omit appAccountToken; server allows that path.

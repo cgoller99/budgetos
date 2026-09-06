@@ -35,6 +35,7 @@ export type NativeStoreProduct = {
 };
 
 type PeekedAppleTransactionClaims = {
+  productId: string | null;
   originalTransactionId: string | null;
   appAccountToken: string | null;
   purchaseDateMs: number | null;
@@ -55,6 +56,7 @@ function peekAppleTransactionClaimsFromJws(
   jws: string | null | undefined,
 ): PeekedAppleTransactionClaims {
   const empty: PeekedAppleTransactionClaims = {
+    productId: null,
     originalTransactionId: null,
     appAccountToken: null,
     purchaseDateMs: null,
@@ -76,6 +78,7 @@ function peekAppleTransactionClaimsFromJws(
     const padLength = (4 - (padded.length % 4)) % 4;
     const json = atob(padded + "=".repeat(padLength));
     const claims = JSON.parse(json) as {
+      productId?: string;
       originalTransactionId?: string | number;
       appAccountToken?: string;
       purchaseDate?: number;
@@ -84,6 +87,7 @@ function peekAppleTransactionClaimsFromJws(
     };
 
     return {
+      productId: claims.productId?.trim() || null,
       originalTransactionId:
         claims.originalTransactionId != null
           ? String(claims.originalTransactionId)
@@ -150,7 +154,12 @@ function mapTransaction(item: {
   originalPurchaseDate?: string;
   environment?: string;
 }): NativePurchaseResult | null {
-  const productId = item.productIdentifier;
+  const signedTransactionInfo = item.jwsRepresentation ?? null;
+  const peeked = peekAppleTransactionClaimsFromJws(signedTransactionInfo);
+  // Prefer the cryptographically signed productId over Capgo's productIdentifier
+  // when they differ (lineage / catalog quirks).
+  const productId =
+    peeked.productId || item.productIdentifier?.trim() || null;
   if (!productId) {
     return null;
   }
@@ -159,9 +168,6 @@ function mapTransaction(item: {
   if (!plan) {
     return null;
   }
-
-  const signedTransactionInfo = item.jwsRepresentation ?? null;
-  const peeked = peekAppleTransactionClaimsFromJws(signedTransactionInfo);
   // Never fall back to transactionId — Capgo omits originalId, and the current
   // transaction id diverges from originalTransactionId after the first renewal.
   const originalTransactionId =
