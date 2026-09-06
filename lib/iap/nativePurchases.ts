@@ -297,32 +297,27 @@ export async function purchaseNativePlan(
       );
     }
 
-    // Apple may return an existing sandbox subscription lineage whose signed
+    // StoreKit may return an existing subscription lineage whose signed
     // appAccountToken was bound at an earlier purchase — even when we just
-    // passed the current user UUID into purchaseProduct. Detect that before
-    // hitting /verify so the toast can show both UUIDs.
+    // passed the current user UUID into purchaseProduct. Do NOT fail here:
+    // /api/iap/apple/verify rebinds via Apple's Set App Account Token when the
+    // client reports appAccountTokenSent and no other Buxme account owns the
+    // OTID. Log both UUIDs for sandbox QA.
     if (
       mapped.appAccountToken &&
       mapped.appAccountToken.toLowerCase() !== authenticatedUserId.toLowerCase()
     ) {
-      const lineageNote =
-        mapped.lineage === "continuation"
-          ? "Apple returned a continuation/restoration of an older sandbox subscription lineage."
-          : mapped.lineage === "original"
-            ? "Apple returned an original-looking transaction, but its appAccountToken belongs to a different Buxme user."
-            : "Apple returned a transaction whose appAccountToken belongs to a different Buxme user.";
-      throw new Error(
-        [
-          "This Apple purchase is bound to a different Buxme account.",
-          `signedInUser=${authenticatedUserId}`,
-          `appleAppAccountToken=${mapped.appAccountToken}`,
-          `originalTransactionId=${mapped.originalTransactionId ?? "unknown"}`,
-          `transactionId=${mapped.transactionId ?? "unknown"}`,
-          `lineage=${mapped.lineage}`,
-          `environment=${mapped.environment ?? "unknown"}`,
-          lineageNote,
-          "Clearing Buxme profiles.apple_* fields cannot change Apple’s signed appAccountToken. Clear ASC sandbox purchase history (or use a fresh sandbox Apple ID), then buy again while signed into the intended Buxme account.",
-        ].join(" "),
+      console.warn(
+        "[iap] StoreKit returned appAccountToken that differs from purchaseProduct input; deferring to server rebind",
+        {
+          appAccountTokenSent: authenticatedUserId,
+          appleAppAccountToken: mapped.appAccountToken,
+          originalTransactionId: mapped.originalTransactionId,
+          transactionId: mapped.transactionId,
+          lineage: mapped.lineage,
+          environment: mapped.environment,
+          productId: mapped.productId,
+        },
       );
     }
 

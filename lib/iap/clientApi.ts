@@ -50,6 +50,7 @@ function formatOwnershipMismatchError(body: VerifyResponse): string {
 
 export async function verifyApplePurchase(
   purchase: NativePurchaseResult,
+  options?: { appAccountTokenSent?: string | null },
 ): Promise<VerifyResponse> {
   const response = await fetch("/api/iap/apple/verify", {
     method: "POST",
@@ -59,6 +60,8 @@ export async function verifyApplePurchase(
       transactionId: purchase.transactionId,
       originalTransactionId: purchase.originalTransactionId,
       signedTransactionInfo: purchase.signedTransactionInfo,
+      environment: purchase.environment,
+      appAccountTokenSent: options?.appAccountTokenSent ?? null,
     }),
   });
 
@@ -111,7 +114,9 @@ export async function purchaseAndVerifyNativePlan(
   const freshUserId = await resolveFreshAuthenticatedUserId(authenticatedUserId);
   const { purchaseNativePlan } = await import("@/lib/iap/nativePurchases");
   const purchase = await purchaseNativePlan(plan, freshUserId);
-  return verifyApplePurchase(purchase);
+  // Pass the UUID we sent into StoreKit so the server can rebind a stale Apple
+  // lineage token via Set App Account Token when appropriate.
+  return verifyApplePurchase(purchase, { appAccountTokenSent: freshUserId });
 }
 
 export async function restoreAndVerifyNativePurchases() {

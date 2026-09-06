@@ -6,16 +6,20 @@ import {
   assertAppleIapConfigured,
 } from "@/lib/iap/config";
 import {
+  isBuxmeUserUuid,
   isVerifiedAppleTransactionCurrentlyValid,
   planFromVerifiedAppleProduct,
   resolveAppAccountTokenOwnership,
 } from "@/lib/iap/appleEntitlementPolicy";
 import {
   fetchVerifiedTransactionById,
+  setAppleAppAccountToken,
   verifyAndDecodeSignedTransaction,
 } from "@/lib/iap/appleServerClient";
 import {
   clearAppleSubscriptionOnProfile,
+  findActiveAppleOwnerOfOriginalTransaction,
+  releaseInactiveAppleOriginalTransaction,
   syncVerifiedAppleSubscriptionToProfile,
 } from "@/lib/iap/appleSubscriptionService";
 import type { IapPlan } from "@/lib/iap/products";
@@ -90,6 +94,13 @@ export type ClientApplePurchasePayload = {
   originalTransactionId?: string | null;
   signedTransactionInfo?: string | null;
   environment?: string | null;
+  /**
+   * UUID the client passed into StoreKit `purchaseProduct({ appAccountToken })`.
+   * Present only on new-purchase verify (not restore). When Apple returns a
+   * stale lineage token, this proves the current user attempted to bind
+   * themselves and authorizes App Store Server API rebind.
+   */
+  appAccountTokenSent?: string | null;
 };
 
 export type VerifiedApplePurchase = {
@@ -229,11 +240,174 @@ export async function verifyClientApplePurchase(
   return mapped;
 }
 
+function buildOwnershipDetails(
+  userId: string,
+  verified: VerifiedApplePurchase,
+  extras?: Partial<ApplePurchaseVerificationDetails>,
+): ApplePurchaseVerificationDetails {
+  return {
+    authenticatedUserId: userId,
+    appAccountToken: verified.appAccountToken,
+    originalTransactionId: verified.originalTransactionId,
+    transactionId: verified.transactionId,
+    productId: verified.productId,
+    environment: verified.environment,
+    purchaseDateMs: verified.purchaseDateMs,
+    originalPurchaseDateMs: verified.originalPurchaseDateMs,
+    lineage: describeTransactionLineage({
+      transactionId: verified.transactionId,
+      originalTransactionId: verified.originalTransactionId,
+      purchaseDateMs: verified.purchaseDateMs,
+      originalPurchaseDateMs: verified.originalPurchaseDateMs,
+    }),
+    ...extras,
+  };
+}
+
+/**
+ * StoreKit often returns an existing subscription lineage whose signed
+ * appAccountToken was bound at an earlier purchase — even when the client just
+ * passed the current Buxme UUID into purchaseProduct. Apple does not rewrite
+ * that token on repurchase; App Store Server API `Set App Account Token` does.
+ *
+ * Only allowed when:
+ * - crypto verification already succeeded
+ * - client proves it sent the authenticated user's UUID into StoreKit
+ * - no *other* Buxme profile currently holds an active Apple entitlement on this OTID
+ */
+async function rebindStaleAppAccountTokenForPurchase(input: {
+  userId: string;
+  verified: VerifiedApplePurchase;
+  appAccountTokenSent: string;
+}): Promise<VerifiedApplePurchase> {
+  const sent = input.appAccountTokenSent.trim();
+  const appleToken = input.verified.appAccountToken?.trim() || null;
+
+  console.info("[iap/apple/verify] appAccountToken mismatch on purchase", {
+    authenticatedUserId: input.userId,
+    appAccountTokenSent: sent,
+    appleAppAccountToken: appleToken,
+    productId: input.verified.productId,
+    transactionId: input.verified.transactionId,
+    originalTransactionId: input.verified.originalTransactionId,
+    environment: input.verified.environment,
+    purchaseDateMs: input.verified.purchaseDateMs,
+    originalPurchaseDateMs: input.verified.originalPurchaseDateMs,
+  });
+
+  if (sent.toLowerCase() !== input.userId.toLowerCase()) {
+    throw new ApplePurchaseVerificationError(
+      "This Apple purchase is bound to a different Buxme account.",
+      "app_account_token_mismatch",
+      403,
+      buildOwnershipDetails(input.userId, input.verified, {
+        appAccountToken: appleToken,
+      }),
+    );
+  }
+
+  const activeOwner = await findActiveAppleOwnerOfOriginalTransaction({
+    originalTransactionId: input.verified.originalTransactionId,
+    excludeUserId: input.userId,
+  });
+
+  if (activeOwner) {
+    throw new ApplePurchaseVerificationError(
+      "This Apple purchase is bound to a different Buxme account.",
+      "app_account_token_mismatch",
+      403,
+      buildOwnershipDetails(input.userId, input.verified, {
+        appAccountToken: appleToken,
+      }),
+    );
+  }
+
+  // Release stale local OTID mirrors on inactive Free profiles so sync can
+  // first-link this lineage to the purchaser after Apple rebind.
+  await releaseInactiveAppleOriginalTransaction({
+    originalTransactionId: input.verified.originalTransactionId,
+    excludeUserId: input.userId,
+  });
+
+  try {
+    await setAppleAppAccountToken({
+      originalTransactionId: input.verified.originalTransactionId,
+      appAccountToken: input.userId,
+      preferredEnvironment: input.verified.environment,
+    });
+  } catch (error) {
+    console.error("[iap/apple/verify] setAppAccountToken failed", {
+      authenticatedUserId: input.userId,
+      appleAppAccountToken: appleToken,
+      originalTransactionId: input.verified.originalTransactionId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw new ApplePurchaseVerificationError(
+      "This Apple purchase is bound to a different Buxme account.",
+      "app_account_token_mismatch",
+      403,
+      buildOwnershipDetails(input.userId, input.verified),
+    );
+  }
+
+  // Historical JWS snapshots keep the pre-rebind token. Prefer a fresh App
+  // Store Server API read; if Apple still returns the old snapshot, treat a
+  // successful Set App Account Token as the ownership source of truth for
+  // *this* authenticated purchaser (OTID uniqueness already enforced).
+  let rebound: VerifiedApplePurchase = {
+    ...input.verified,
+    appAccountToken: input.userId,
+  };
+
+  try {
+    const fresh = await fetchVerifiedTransactionById(input.verified.transactionId);
+    const remapped = mapDecodedTransactionToVerifiedPurchase(
+      fresh.transaction,
+      fresh.environment,
+    );
+    rebound = {
+      ...remapped,
+      appAccountToken:
+        remapped.appAccountToken?.toLowerCase() === input.userId.toLowerCase()
+          ? remapped.appAccountToken
+          : input.userId,
+    };
+  } catch (error) {
+    console.warn(
+      "[iap/apple/verify] post-rebind transaction refresh failed; continuing with Set App Account Token success",
+      error instanceof Error ? error.message : String(error),
+    );
+  }
+
+  console.info("[iap/apple/verify] appAccountToken rebound to authenticated user", {
+    authenticatedUserId: input.userId,
+    appAccountTokenSent: sent,
+    appleAppAccountTokenBefore: appleToken,
+    appleAppAccountTokenAfter: rebound.appAccountToken,
+    productId: rebound.productId,
+    transactionId: rebound.transactionId,
+    originalTransactionId: rebound.originalTransactionId,
+    environment: rebound.environment,
+  });
+
+  return rebound;
+}
+
 export async function verifyAndSyncApplePurchaseForUser(input: {
   userId: string;
   payload: ClientApplePurchasePayload;
 }): Promise<{ plan: IapPlan; status: string; verified: VerifiedApplePurchase }> {
-  const verified = await verifyClientApplePurchase(input.payload);
+  let verified = await verifyClientApplePurchase(input.payload);
+
+  console.info("[iap/apple/verify] verified Apple transaction", {
+    authenticatedUserId: input.userId,
+    appAccountTokenSent: input.payload.appAccountTokenSent ?? null,
+    appleAppAccountToken: verified.appAccountToken,
+    productId: verified.productId,
+    transactionId: verified.transactionId,
+    originalTransactionId: verified.originalTransactionId,
+    environment: verified.environment,
+  });
 
   const ownership = resolveAppAccountTokenOwnership({
     authenticatedUserId: input.userId,
@@ -241,31 +415,28 @@ export async function verifyAndSyncApplePurchaseForUser(input: {
   });
 
   if (!ownership.allowed) {
-    const details: ApplePurchaseVerificationDetails = {
-      authenticatedUserId: input.userId,
-      appAccountToken: verified.appAccountToken,
-      originalTransactionId: verified.originalTransactionId,
-      transactionId: verified.transactionId,
-      productId: verified.productId,
-      environment: verified.environment,
-      purchaseDateMs: verified.purchaseDateMs,
-      originalPurchaseDateMs: verified.originalPurchaseDateMs,
-      lineage: describeTransactionLineage({
-        transactionId: verified.transactionId,
-        originalTransactionId: verified.originalTransactionId,
-        purchaseDateMs: verified.purchaseDateMs,
-        originalPurchaseDateMs: verified.originalPurchaseDateMs,
-      }),
-    };
+    const tokenSent = input.payload.appAccountTokenSent?.trim() || "";
+    const canAttemptRebind =
+      ownership.reason === "app_account_token_mismatch" &&
+      isBuxmeUserUuid(tokenSent) &&
+      tokenSent.toLowerCase() === input.userId.toLowerCase();
 
-    throw new ApplePurchaseVerificationError(
-      ownership.reason === "app_account_token_mismatch"
-        ? "This Apple purchase is bound to a different Buxme account."
-        : "Authenticated user id is invalid for Apple purchase linking.",
-      ownership.reason,
-      403,
-      details,
-    );
+    if (!canAttemptRebind) {
+      throw new ApplePurchaseVerificationError(
+        ownership.reason === "app_account_token_mismatch"
+          ? "This Apple purchase is bound to a different Buxme account."
+          : "Authenticated user id is invalid for Apple purchase linking.",
+        ownership.reason,
+        403,
+        buildOwnershipDetails(input.userId, verified),
+      );
+    }
+
+    verified = await rebindStaleAppAccountTokenForPurchase({
+      userId: input.userId,
+      verified,
+      appAccountTokenSent: tokenSent,
+    });
   }
 
   // If Apple says revoked/expired, clear rather than grant (defense in depth).
