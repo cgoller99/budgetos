@@ -110,6 +110,19 @@ Purchases created before ownership binding may omit `appAccountToken`. For a **c
 
 - first-link to the verifying Buxme user is allowed (restore / legacy compatibility)
 - `originalTransactionId` uniqueness still prevents moving a subscription already linked to another Buxme account
+
+### Admin / support: Clear Apple IAP Binding
+
+Sandbox and App Review resets sometimes leave `profiles.apple_original_transaction_id` (and related `apple_*` columns) bound to a Buxme user after the tester expects a Free re-purchase.
+
+Use the admin **Clear Apple IAP** action (or `scripts/clear-apple-iap-binding.mjs`) to remove **only** Buxme’s stored Apple ownership for the selected user:
+
+- Clears `apple_product_id`, `apple_original_transaction_id`, `apple_transaction_id`, `apple_environment`
+- Sets local plan to Free / provider `none` for consistency
+- Requires confirmation and writes an `admin_event_logs` audit row
+- Does **not** delete the Auth user, cancel at Apple, change product IDs, or weaken OTID / `appAccountToken` duplicate-purchase checks
+
+If verify still returns `This Apple purchase is bound to a different Buxme account.`, the Apple-signed `appAccountToken` UUID does not match the signed-in user — clear ASC sandbox purchase history and buy again while signed into the intended Buxme account.
 - client fields still never grant Premium
 
 Allowed product IDs (must match App Store Connect exactly):

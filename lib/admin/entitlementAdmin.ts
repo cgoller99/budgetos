@@ -207,6 +207,45 @@ export function buildEntitlementProfileUpdate(
   }
 }
 
+/**
+ * Test/support-only: clear Buxme's stored Apple IAP ownership columns so a
+ * sandbox transaction can be associated again.
+ *
+ * Does not delete Auth users, cancel Apple/Stripe remotely, or touch Stripe ids.
+ * When the profile is Apple-billed (or still carries Apple identifiers), local
+ * Apple entitlement fields are also reset to Free/none for consistency.
+ */
+export function buildClearAppleIapBindingUpdate(nowIso: string): ProfileUpdate {
+  return {
+    apple_product_id: null,
+    apple_original_transaction_id: null,
+    apple_transaction_id: null,
+    apple_environment: null,
+    // Keep local entitlement coherent once ownership identifiers are removed.
+    subscription_plan: "free",
+    subscription_status: "none",
+    subscription_provider: "none",
+    subscription_current_period_end: null,
+    updated_at: nowIso,
+  };
+}
+
+export function profileHasAppleIapBinding(input: {
+  appleOriginalTransactionId: string | null | undefined;
+  appleTransactionId: string | null | undefined;
+  appleProductId: string | null | undefined;
+  appleEnvironment: string | null | undefined;
+  subscriptionProvider: string | null | undefined;
+}): boolean {
+  return Boolean(
+    input.appleOriginalTransactionId ||
+      input.appleTransactionId ||
+      input.appleProductId ||
+      input.appleEnvironment ||
+      input.subscriptionProvider === "apple",
+  );
+}
+
 export function adminActionToEntitlementPlan(
   action: string,
 ): AdminEntitlementPlan | null {

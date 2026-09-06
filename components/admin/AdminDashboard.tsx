@@ -98,6 +98,17 @@ function getActionConfirmCopy(
     };
   }
 
+  if (action === "clear_apple_iap_binding") {
+    const otid = user?.appleOriginalTransactionId ?? "none";
+    const product = user?.appleProductId ?? "none";
+    const environment = user?.appleEnvironment ?? "unknown";
+    return {
+      title: "Clear Apple IAP binding",
+      description: `Test/support only. Remove Buxme’s stored Apple ownership for ${user?.email ?? "this user"} so a sandbox purchase can be associated again. Clears apple_original_transaction_id (${otid}), apple_transaction_id, apple_product_id (${product}), and apple_environment (${environment}). Sets local plan to Free/none when Apple identifiers are present. Does not delete the Auth user, cancel anything at Apple, change StoreKit product IDs, or weaken duplicate-purchase protection. This action is audited.`,
+      confirmLabel: "Clear Apple IAP binding",
+    };
+  }
+
   if (ENTITLEMENT_ACTIONS.has(action)) {
     const target =
       action === "grant_founder"
@@ -481,7 +492,7 @@ export function AdminDashboard() {
           <Input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search by email, name, or user ID"
+            placeholder="Search by email, name, user ID, or Apple transaction id"
             className="flex-1"
           />
           <Button size="md" onClick={() => void searchUsers()}>
@@ -527,6 +538,13 @@ export function AdminDashboard() {
                         External Apple/Stripe link present
                       </p>
                     ) : null}
+                    {user.appleOriginalTransactionId ? (
+                      <p className="mt-1 break-all font-mono text-[10px] normal-case text-[var(--text-muted)]">
+                        Apple OTID {user.appleOriginalTransactionId}
+                        {user.appleProductId ? ` · ${user.appleProductId}` : ""}
+                        {user.appleEnvironment ? ` · ${user.appleEnvironment}` : ""}
+                      </p>
+                    ) : null}
                   </td>
                   <td className="px-4 py-4 align-top text-[var(--text-muted)]">{formatDate(user.joinedAt)}</td>
                   <td className="px-4 py-4 align-top text-[var(--text-muted)]">{formatDate(user.lastSignInAt)}</td>
@@ -570,6 +588,10 @@ export function AdminDashboard() {
                       <div className="flex flex-wrap gap-2 pt-1">
                         {(
                           [
+                            [
+                              "clear_apple_iap_binding",
+                              "Clear Apple IAP",
+                            ] as const,
                             user.isDisabled
                               ? (["enable_user", "Enable"] as const)
                               : (["disable_user", "Disable"] as const),
@@ -582,6 +604,13 @@ export function AdminDashboard() {
                             size="sm"
                             variant="secondary"
                             className="touch-manipulation"
+                            disabled={
+                              action === "clear_apple_iap_binding" &&
+                              !user.appleOriginalTransactionId &&
+                              !user.appleTransactionId &&
+                              !user.appleProductId &&
+                              user.subscriptionProvider !== "apple"
+                            }
                             onClick={() =>
                               setPendingAction({
                                 userId: user.id,

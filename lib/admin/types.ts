@@ -3,6 +3,7 @@ export type AdminUserAction =
   | "grant_pro"
   | "grant_pro_plus"
   | "remove_subscription"
+  | "clear_apple_iap_binding"
   | "disable_user"
   | "enable_user"
   | "reset_finance"
@@ -26,6 +27,10 @@ export type AdminUserSummary = {
   effectivePlan: AdminEffectivePlan;
   entitlementSource: AdminEntitlementSource;
   hasExternalSubscriptionRisk: boolean;
+  appleProductId: string | null;
+  appleOriginalTransactionId: string | null;
+  appleTransactionId: string | null;
+  appleEnvironment: string | null;
   joinedAt: string;
   lastActiveAt: string | null;
   isDisabled: boolean;
