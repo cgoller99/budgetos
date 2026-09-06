@@ -32,9 +32,50 @@ type PendingAction = {
   userId: string;
   action: AdminUserAction;
   label: string;
+  user?: AdminUserSummary;
 };
 
-function getActionConfirmCopy(action: AdminUserAction, label: string): {
+const ENTITLEMENT_ACTIONS = new Set<AdminUserAction>([
+  "grant_founder",
+  "grant_pro",
+  "grant_pro_plus",
+  "remove_subscription",
+]);
+
+function effectivePlanLabel(plan: AdminUserSummary["effectivePlan"]): string {
+  switch (plan) {
+    case "founder":
+      return "Founder";
+    case "pro_plus":
+      return "Pro+";
+    case "pro":
+      return "Pro";
+    default:
+      return "Free";
+  }
+}
+
+function entitlementSourceLabel(
+  source: AdminUserSummary["entitlementSource"],
+): string {
+  switch (source) {
+    case "apple":
+      return "Apple IAP";
+    case "stripe":
+      return "Stripe";
+    case "founder":
+    case "manual":
+      return "Founder/manual";
+    default:
+      return "none";
+  }
+}
+
+function getActionConfirmCopy(
+  action: AdminUserAction,
+  label: string,
+  user?: AdminUserSummary,
+): {
   title: string;
   description: string;
   confirmLabel: string;
@@ -54,6 +95,29 @@ function getActionConfirmCopy(action: AdminUserAction, label: string): {
       description:
         "This permanently deletes the user profile and auth account. All associated data is removed. This cannot be undone.",
       confirmLabel: "Delete user",
+    };
+  }
+
+  if (ENTITLEMENT_ACTIONS.has(action)) {
+    const target =
+      action === "grant_founder"
+        ? "Founder"
+        : action === "grant_pro"
+          ? "Pro"
+          : action === "grant_pro_plus"
+            ? "Pro+"
+            : "Free";
+    const current = user
+      ? `${effectivePlanLabel(user.effectivePlan)} (${entitlementSourceLabel(user.entitlementSource)})`
+      : "the current entitlement";
+    const externalWarning = user?.hasExternalSubscriptionRisk
+      ? " Warning: this account has Apple IAP and/or Stripe subscription identifiers. This action only updates Buxme app entitlement fields — it does not cancel the remote Apple or Stripe subscription. An active external subscription or restore/sync may put the paid plan back."
+      : " This only updates Buxme app entitlement fields. It does not cancel a remote Apple or Stripe subscription.";
+
+    return {
+      title: `Set entitlement to ${target}`,
+      description: `Change ${user?.email ?? "this user"} from ${current} to ${target}.${externalWarning}`,
+      confirmLabel: `Set ${target}`,
     };
   }
 
@@ -310,7 +374,11 @@ export function AdminDashboard() {
   }
 
   const confirmCopy = pendingAction
-    ? getActionConfirmCopy(pendingAction.action, pendingAction.label)
+    ? getActionConfirmCopy(
+        pendingAction.action,
+        pendingAction.label,
+        pendingAction.user,
+      )
     : null;
 
   if (loading) {
@@ -444,8 +512,21 @@ export function AdminDashboard() {
                       <Badge variant="accent">Founder</Badge>
                     ) : null}
                   </td>
-                  <td className="px-4 py-4 align-top capitalize text-[var(--text-secondary)]">
-                    {user.subscriptionPlan} · {user.subscriptionStatus}
+                  <td className="px-4 py-4 align-top text-[var(--text-secondary)]">
+                    <p className="font-medium text-[var(--foreground)]">
+                      {effectivePlanLabel(user.effectivePlan)}
+                    </p>
+                    <p className="text-xs normal-case text-[var(--text-muted)]">
+                      Source: {entitlementSourceLabel(user.entitlementSource)}
+                    </p>
+                    <p className="text-xs capitalize text-[var(--text-muted)]">
+                      {user.subscriptionPlan} · {user.subscriptionStatus}
+                    </p>
+                    {user.hasExternalSubscriptionRisk ? (
+                      <p className="mt-1 text-xs normal-case text-amber-300/90">
+                        External Apple/Stripe link present
+                      </p>
+                    ) : null}
                   </td>
                   <td className="px-4 py-4 align-top text-[var(--text-muted)]">{formatDate(user.joinedAt)}</td>
                   <td className="px-4 py-4 align-top text-[var(--text-muted)]">{formatDate(user.lastSignInAt)}</td>
@@ -458,7 +539,7 @@ export function AdminDashboard() {
                         ["grant_founder", "Founder"],
                         ["grant_pro", "Pro"],
                         ["grant_pro_plus", "Pro+"],
-                        ["remove_subscription", "Remove"],
+                        ["remove_subscription", "Free"],
                         user.isDisabled ? ["enable_user", "Enable"] : ["disable_user", "Disable"],
                         ["reset_finance", "Reset"],
                         ["delete_user", "Delete"],
@@ -476,6 +557,7 @@ export function AdminDashboard() {
                               userId: user.id,
                               action: action as AdminUserAction,
                               label,
+                              user,
                             })
                           }
                         >
