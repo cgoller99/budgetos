@@ -440,6 +440,8 @@ assert.match(verifyService, /Never trusts client/);
 assert.match(verifyService, /ApplePurchaseVerificationError/);
 assert.match(verifyService, /resolveAppAccountTokenOwnership/);
 assert.match(verifyService, /app_account_token_mismatch/);
+assert.match(verifyService, /ownership audit log failed|Apple IAP ownership rejected/);
+assert.match(verifyService, /logAdminEvent/);
 assert.doesNotMatch(verifyService, /receipt\?:/);
 
 const ownershipPolicy = read("lib/iap/appleEntitlementPolicy.ts");
@@ -523,6 +525,7 @@ assert.match(subscriptionService, /canApplyAppleEntitlementToProfile/);
 assert.match(subscriptionService, /clearAppleSubscriptionOnProfile/);
 assert.match(subscriptionService, /applyAppleSubscriptionByOriginalTransaction/);
 assert.match(subscriptionService, /already linked to another Buxme account/);
+assert.match(subscriptionService, /apple_original_transaction_conflict|OTID conflict/);
 assert.match(subscriptionService, /active_stripe_entitlement_preserved|active web subscription/);
 assert.match(subscriptionService, /shouldPreserveHigherApplePlan/);
 assert.match(

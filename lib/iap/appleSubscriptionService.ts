@@ -94,6 +94,24 @@ export async function syncVerifiedAppleSubscriptionToProfile(
   }
 
   if (conflictingOwner) {
+    try {
+      const { logAdminEvent } = await import("@/lib/admin/eventLog");
+      await logAdminEvent(admin, {
+        eventType: "api_failure",
+        message: `Apple IAP OTID conflict: ${input.originalTransactionId} already on ${conflictingOwner.id}`,
+        metadata: {
+          code: "apple_original_transaction_conflict",
+          authenticatedUserId: input.userId,
+          conflictingOwnerId: conflictingOwner.id,
+          originalTransactionId: input.originalTransactionId,
+          productId: input.productId,
+        },
+        userId: input.userId,
+      });
+    } catch (auditError) {
+      console.error("[iap/apple] OTID conflict audit log failed", auditError);
+    }
+
     throw new Error(
       "This Apple subscription is already linked to another Buxme account.",
     );

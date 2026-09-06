@@ -181,6 +181,55 @@ export async function verifyAndSyncApplePurchaseForUser(input: {
   });
 
   if (!ownership.allowed) {
+    // Support audit: record which Apple token/OTID conflicted without exposing
+    // service-role material to the client.
+    try {
+      const { createSupabaseAdminClient } = await import("@/lib/supabase/admin");
+      const { logAdminEvent } = await import("@/lib/admin/eventLog");
+      const admin = createSupabaseAdminClient();
+      const tokenOwnerId = verified.appAccountToken?.trim() || null;
+      let tokenOwnerEmail: string | null = null;
+      let otidOwnerId: string | null = null;
+      let otidOwnerEmail: string | null = null;
+
+      if (tokenOwnerId) {
+        const { data: tokenOwner } = await admin
+          .from("profiles")
+          .select("id, email, apple_original_transaction_id, subscription_plan, subscription_provider")
+          .eq("id", tokenOwnerId)
+          .maybeSingle();
+        tokenOwnerEmail = tokenOwner?.email ?? null;
+      }
+
+      const { data: otidOwner } = await admin
+        .from("profiles")
+        .select("id, email")
+        .eq("apple_original_transaction_id", verified.originalTransactionId)
+        .maybeSingle();
+      otidOwnerId = otidOwner?.id ?? null;
+      otidOwnerEmail = otidOwner?.email ?? null;
+
+      await logAdminEvent(admin, {
+        eventType: "api_failure",
+        message: `Apple IAP ownership rejected for user ${input.userId}: ${ownership.reason}`,
+        metadata: {
+          code: ownership.reason,
+          authenticatedUserId: input.userId,
+          appAccountToken: tokenOwnerId,
+          tokenOwnerEmail,
+          originalTransactionId: verified.originalTransactionId,
+          transactionId: verified.transactionId,
+          productId: verified.productId,
+          environment: verified.environment,
+          otidOwnerId,
+          otidOwnerEmail,
+        },
+        userId: input.userId,
+      });
+    } catch (auditError) {
+      console.error("[iap/apple/verify] ownership audit log failed", auditError);
+    }
+
     throw new ApplePurchaseVerificationError(
       ownership.reason === "app_account_token_mismatch"
         ? "This Apple purchase is bound to a different Buxme account."
