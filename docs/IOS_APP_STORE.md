@@ -102,7 +102,25 @@ product/transaction/expiry fields alone.
 | `POST /api/iap/apple/notifications` | App Store Server Notifications V2. Verifies `signedPayload`, applies renew/expire/refund/revoke/grace states. Idempotent. Never overwrites an active Stripe entitlement. |
 | `GET /api/entitlements` | Shared Premium gate. Apple rows without a future `subscription_current_period_end` fail closed. Expired Apple access is cleared as a hygiene fallback. |
 | Restore purchases | Native restore still calls `/api/iap/apple/verify` (same trusted path). |
-| Ownership binding | New purchases pass the authenticated Buxme user UUID as StoreKit `appAccountToken` via `@capgo/native-purchases` `purchaseProduct({ appAccountToken })`. If Apple’s verified transaction includes `appAccountToken`, it must match the authenticated user. |
+| Ownership binding | New purchases pass the authenticated Buxme user UUID as StoreKit `appAccountToken` via `@capgo/native-purchases` `purchaseProduct({ appAccountToken })`. The client re-reads `supabase.auth.getUser()` immediately before purchase so a stale React auth snapshot cannot send the wrong UUID. If Apple’s verified transaction includes `appAccountToken`, it must match the authenticated user. |
+
+### `app_account_token_mismatch` (sandbox)
+
+Toast: **This Apple purchase is bound to a different Buxme account.**
+
+This means Apple’s **signed** transaction already carries an `appAccountToken` UUID that is not the signed-in Buxme user. Common causes:
+
+1. The sandbox Apple ID still has an older subscription lineage from a previous Buxme Auth user (deleted/recreated account → new UUID, same email).
+2. StoreKit returned that existing lineage even though the app passed the current UUID into `purchaseProduct` (Apple does not rewrite `appAccountToken` on renewals / re-purchases of the same subscription group).
+
+**Clearing `profiles.apple_*` alone does not fix this.** Those columns are Buxme’s local ownership mirror; they are not what Apple signed. Admin **Clear Apple IAP Binding** only helps when the failure is an OTID uniqueness conflict on `profiles`, not when verify returns `app_account_token_mismatch`.
+
+Clean sandbox reset:
+
+1. App Store Connect → Users and Access → Sandbox → clear purchase history for the tester Apple ID (or use a fresh sandbox Apple ID).
+2. On device: sign out of the App Store sandbox account / reinstall if unfinished transactions linger.
+3. Sign into the intended Buxme account and purchase again.
+4. On mismatch, `/api/iap/apple/verify` now returns `details` with `authenticatedUserId`, `appAccountToken`, OTID, and `lineage` (`original` vs `continuation`) so you can confirm both UUIDs without service-role access.
 
 ### Legacy / restore without `appAccountToken`
 

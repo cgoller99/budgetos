@@ -69,7 +69,12 @@ export async function POST(request: Request) {
 
     if (error instanceof ApplePurchaseVerificationError) {
       return NextResponse.json(
-        { error: error.message, code: error.code },
+        {
+          error: error.message,
+          code: error.code,
+          // Safe ownership diagnostics (UUIDs / Apple transaction ids — not secrets).
+          ...(error.details ? { details: error.details } : {}),
+        },
         { status: error.status },
       );
     }

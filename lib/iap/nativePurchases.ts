@@ -18,6 +18,10 @@ export type NativePurchaseResult = {
   signedTransactionInfo: string | null;
   expiresAt: string | null;
   appAccountToken: string | null;
+  purchaseDate: string | null;
+  originalPurchaseDate: string | null;
+  environment: string | null;
+  lineage: "original" | "continuation" | "unknown";
 };
 
 export type NativeStoreProduct = {
@@ -30,6 +34,14 @@ export type NativeStoreProduct = {
   currencyCode: string;
 };
 
+type PeekedAppleTransactionClaims = {
+  originalTransactionId: string | null;
+  appAccountToken: string | null;
+  purchaseDateMs: number | null;
+  originalPurchaseDateMs: number | null;
+  environment: string | null;
+};
+
 /**
  * Capgo's iOS Transaction payload does not include `originalId` /
  * `originalTransactionId`. After renewal, `transactionId` !== Apple's
@@ -39,17 +51,25 @@ export type NativeStoreProduct = {
  * Prefer Capgo's field when present; otherwise decode the claim from the
  * StoreKit 2 JWS (server still cryptographically verifies the same JWS).
  */
-function peekOriginalTransactionIdFromJws(
+function peekAppleTransactionClaimsFromJws(
   jws: string | null | undefined,
-): string | null {
+): PeekedAppleTransactionClaims {
+  const empty: PeekedAppleTransactionClaims = {
+    originalTransactionId: null,
+    appAccountToken: null,
+    purchaseDateMs: null,
+    originalPurchaseDateMs: null,
+    environment: null,
+  };
+
   if (!jws) {
-    return null;
+    return empty;
   }
 
   try {
     const payloadPart = jws.split(".")[1];
     if (!payloadPart) {
-      return null;
+      return empty;
     }
 
     const padded = payloadPart.replace(/-/g, "+").replace(/_/g, "/");
@@ -57,13 +77,66 @@ function peekOriginalTransactionIdFromJws(
     const json = atob(padded + "=".repeat(padLength));
     const claims = JSON.parse(json) as {
       originalTransactionId?: string | number;
+      appAccountToken?: string;
+      purchaseDate?: number;
+      originalPurchaseDate?: number;
+      environment?: string;
     };
-    return claims.originalTransactionId != null
-      ? String(claims.originalTransactionId)
-      : null;
+
+    return {
+      originalTransactionId:
+        claims.originalTransactionId != null
+          ? String(claims.originalTransactionId)
+          : null,
+      appAccountToken: claims.appAccountToken?.trim() || null,
+      purchaseDateMs:
+        typeof claims.purchaseDate === "number" ? claims.purchaseDate : null,
+      originalPurchaseDateMs:
+        typeof claims.originalPurchaseDate === "number"
+          ? claims.originalPurchaseDate
+          : null,
+      environment: claims.environment?.trim() || null,
+    };
   } catch {
+    return empty;
+  }
+}
+
+function toIsoFromMs(value: number | null | undefined): string | null {
+  if (value == null || !Number.isFinite(value)) {
     return null;
   }
+  return new Date(value).toISOString();
+}
+
+function describeNativeLineage(input: {
+  transactionId: string | null;
+  originalTransactionId: string | null;
+  purchaseDateMs: number | null;
+  originalPurchaseDateMs: number | null;
+}): "original" | "continuation" | "unknown" {
+  if (
+    input.transactionId &&
+    input.originalTransactionId &&
+    input.transactionId !== input.originalTransactionId
+  ) {
+    return "continuation";
+  }
+  if (
+    input.purchaseDateMs != null &&
+    input.originalPurchaseDateMs != null &&
+    input.purchaseDateMs !== input.originalPurchaseDateMs
+  ) {
+    return "continuation";
+  }
+  if (
+    input.transactionId &&
+    input.originalTransactionId &&
+    input.transactionId === input.originalTransactionId
+  ) {
+    return "original";
+  }
+  return "unknown";
 }
 
 function mapTransaction(item: {
@@ -73,6 +146,9 @@ function mapTransaction(item: {
   jwsRepresentation?: string;
   expirationDate?: string;
   appAccountToken?: string | null;
+  purchaseDate?: string;
+  originalPurchaseDate?: string;
+  environment?: string;
 }): NativePurchaseResult | null {
   const productId = item.productIdentifier;
   if (!productId) {
@@ -85,21 +161,35 @@ function mapTransaction(item: {
   }
 
   const signedTransactionInfo = item.jwsRepresentation ?? null;
+  const peeked = peekAppleTransactionClaimsFromJws(signedTransactionInfo);
   // Never fall back to transactionId — Capgo omits originalId, and the current
   // transaction id diverges from originalTransactionId after the first renewal.
   const originalTransactionId =
-    item.originalId?.trim() ||
-    peekOriginalTransactionIdFromJws(signedTransactionInfo) ||
-    null;
+    item.originalId?.trim() || peeked.originalTransactionId || null;
+  const transactionId = item.transactionId ?? null;
+  const appAccountToken =
+    item.appAccountToken?.trim() || peeked.appAccountToken || null;
+  const purchaseDateMs = peeked.purchaseDateMs;
+  const originalPurchaseDateMs = peeked.originalPurchaseDateMs;
 
   return {
     productId,
     plan,
-    transactionId: item.transactionId ?? null,
+    transactionId,
     originalTransactionId,
     signedTransactionInfo,
     expiresAt: item.expirationDate ?? null,
-    appAccountToken: item.appAccountToken?.trim() || null,
+    appAccountToken,
+    purchaseDate: item.purchaseDate ?? toIsoFromMs(purchaseDateMs),
+    originalPurchaseDate:
+      item.originalPurchaseDate ?? toIsoFromMs(originalPurchaseDateMs),
+    environment: item.environment?.trim() || peeked.environment,
+    lineage: describeNativeLineage({
+      transactionId,
+      originalTransactionId,
+      purchaseDateMs,
+      originalPurchaseDateMs,
+    }),
   };
 }
 
@@ -204,6 +294,35 @@ export async function purchaseNativePlan(
     if (!mapped.signedTransactionInfo && !mapped.transactionId) {
       throw new Error(
         "Purchase completed but StoreKit returned no transaction to verify.",
+      );
+    }
+
+    // Apple may return an existing sandbox subscription lineage whose signed
+    // appAccountToken was bound at an earlier purchase — even when we just
+    // passed the current user UUID into purchaseProduct. Detect that before
+    // hitting /verify so the toast can show both UUIDs.
+    if (
+      mapped.appAccountToken &&
+      mapped.appAccountToken.toLowerCase() !== authenticatedUserId.toLowerCase()
+    ) {
+      const lineageNote =
+        mapped.lineage === "continuation"
+          ? "Apple returned a continuation/restoration of an older sandbox subscription lineage."
+          : mapped.lineage === "original"
+            ? "Apple returned an original-looking transaction, but its appAccountToken belongs to a different Buxme user."
+            : "Apple returned a transaction whose appAccountToken belongs to a different Buxme user.";
+      throw new Error(
+        [
+          "This Apple purchase is bound to a different Buxme account.",
+          `signedInUser=${authenticatedUserId}`,
+          `appleAppAccountToken=${mapped.appAccountToken}`,
+          `originalTransactionId=${mapped.originalTransactionId ?? "unknown"}`,
+          `transactionId=${mapped.transactionId ?? "unknown"}`,
+          `lineage=${mapped.lineage}`,
+          `environment=${mapped.environment ?? "unknown"}`,
+          lineageNote,
+          "Clearing Buxme profiles.apple_* fields cannot change Apple’s signed appAccountToken. Clear ASC sandbox purchase history (or use a fresh sandbox Apple ID), then buy again while signed into the intended Buxme account.",
+        ].join(" "),
       );
     }
 

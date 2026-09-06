@@ -431,6 +431,7 @@ const verifyRoute = read("app/api/iap/apple/verify/route.ts");
 assert.match(verifyRoute, /verifyAndSyncApplePurchaseForUser/);
 assert.match(verifyRoute, /APPLE_IAP_NOT_CONFIGURED|isConfigured/);
 assert.match(verifyRoute, /status: 503/);
+assert.match(verifyRoute, /error\.details/);
 assert.doesNotMatch(verifyRoute, /pending_credentials/);
 assert.doesNotMatch(verifyRoute, /syncAppleSubscriptionToProfile\(/);
 
@@ -440,7 +441,15 @@ assert.match(verifyService, /Never trusts client/);
 assert.match(verifyService, /ApplePurchaseVerificationError/);
 assert.match(verifyService, /resolveAppAccountTokenOwnership/);
 assert.match(verifyService, /app_account_token_mismatch/);
+assert.match(verifyService, /ApplePurchaseVerificationDetails/);
+assert.match(verifyService, /describeTransactionLineage/);
+assert.match(verifyService, /purchaseDateMs/);
 assert.doesNotMatch(verifyService, /receipt\?:/);
+
+assert.match(
+  read("lib/iap/nativePurchases.ts"),
+  /peekAppleTransactionClaimsFromJws/,
+);
 
 const ownershipPolicy = read("lib/iap/appleEntitlementPolicy.ts");
 assert.match(ownershipPolicy, /resolveAppAccountTokenOwnership/);
@@ -546,6 +555,10 @@ assert.match(clientApi, /signedTransactionInfo/);
 assert.match(clientApi, /purchaseAndVerifyNativePlan\([\s\S]*authenticatedUserId/);
 assert.match(clientApi, /verifyApplePurchase\(preferred\)/);
 assert.match(clientApi, /same trusted verification path/);
+assert.match(clientApi, /resolveFreshAuthenticatedUserId/);
+assert.match(clientApi, /supabase\.auth\.getUser/);
+assert.match(clientApi, /formatOwnershipMismatchError/);
+assert.match(clientApi, /appleAppAccountToken=/);
 assert.doesNotMatch(clientApi, /receipt:/);
 
 const nativePurchases = read("lib/iap/nativePurchases.ts");
@@ -553,7 +566,10 @@ assert.match(nativePurchases, /jwsRepresentation/);
 assert.match(nativePurchases, /signedTransactionInfo/);
 assert.match(nativePurchases, /appAccountToken: authenticatedUserId/);
 assert.match(nativePurchases, /isBuxmeUserUuid/);
-assert.match(nativePurchases, /peekOriginalTransactionIdFromJws/);
+assert.match(nativePurchases, /peekAppleTransactionClaimsFromJws/);
+assert.match(nativePurchases, /signedInUser=/);
+assert.match(nativePurchases, /appleAppAccountToken=/);
+assert.match(nativePurchases, /Clearing Buxme profiles\.apple_\*/);
 assert.match(nativePurchases, /Never fall back to transactionId/);
 assert.doesNotMatch(
   nativePurchases,

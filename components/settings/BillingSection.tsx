@@ -294,6 +294,8 @@ export function BillingSection() {
         );
       }
 
+      // purchaseAndVerifyNativePlan re-resolves supabase.auth.getUser() so a
+      // stale AuthContext snapshot cannot send the wrong appAccountToken.
       await purchaseAndVerifyNativePlan(plan, user.id);
       await refreshSubscription({ refresh: true });
       trackEvent(ANALYTICS_EVENTS.SUBSCRIPTION_PURCHASED, {
