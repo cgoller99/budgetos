@@ -140,12 +140,35 @@ Allowed product IDs (must match App Store Connect exactly):
 
 ---
 
+## App icon (TestFlight / StoreKit purchase sheet)
+
+The Apple purchase sheet uses the **native AppIcon** from the uploaded binary — not the web favicon and not Capgo/web updates.
+
+| Setting | Required value |
+| --- | --- |
+| Asset catalog | `ios/App/App/Assets.xcassets/AppIcon.appiconset` |
+| App Icons Source / Primary App Icon Set Name | `AppIcon` (`ASSETCATALOG_COMPILER_APPICON_NAME`) |
+| `CFBundleIconName` / `INFOPLIST_KEY_CFBundleIconName` | `AppIcon` |
+| Icon art | Navy background + bright blue folded-ribbon **B** (never the Capacitor white grid / blue mark) |
+
+Verify before archiving:
+
+```bash
+npm run test:ios-appicon
+```
+
+In Xcode → target **App** → **General** → **App Icons and Launch Screen**: App Icons Source must be **AppIcon**.  
+Then **Product → Clean Build Folder**, delete DerivedData for this project if an old placeholder still appears, Archive, and upload a **new** TestFlight build. Install that build before judging the purchase-sheet icon.
+
+---
+
 ## Commands on Mac (required for native build)
 
 ```bash
 cd path/to/buxme
 git pull
 npm install
+npm run test:ios-appicon
 npx cap sync ios
 npx cap open ios
 ```
@@ -159,8 +182,8 @@ In Xcode:
    - `webcredentials:buxme.co`
 3. Confirm URL scheme `buxme` is present (Info → URL Types).
 4. Confirm **In-App Purchase** capability is enabled.
-5. Build & run on a simulator/device.
-6. Product → Archive → Distribute to TestFlight / App Store Connect.
+5. Confirm **App Icons Source = AppIcon** and the navy Buxme icon (not Capacitor white).
+6. Product → Clean Build Folder, then Archive → Distribute to TestFlight / App Store Connect (new build number).
 
 Verify flows inside the native shell:
 
