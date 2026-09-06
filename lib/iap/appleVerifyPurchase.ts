@@ -9,6 +9,7 @@ import {
   isBuxmeUserUuid,
   isVerifiedAppleTransactionCurrentlyValid,
   planFromVerifiedAppleProduct,
+  resolveAppleProductIdForEntitlement,
   resolveAppAccountTokenOwnership,
 } from "@/lib/iap/appleEntitlementPolicy";
 import {
@@ -128,6 +129,12 @@ export type ClientApplePurchasePayload = {
    * themselves and authorizes App Store Server API rebind.
    */
   appAccountTokenSent?: string | null;
+  /**
+   * Product id the client intentionally purchased (StoreKit purchaseProduct input).
+   * Used when Apple returns a higher-tier lineage transaction for the same Apple ID
+   * so we map com.buxme.pro.monthly -> pro instead of inferring Pro+ from lineage.
+   */
+  purchasedProductId?: string | null;
 };
 
 export type VerifiedApplePurchase = {
@@ -237,8 +244,16 @@ export async function verifyClientApplePurchase(
   );
 
   // Optional soft consistency checks against client hints (never used as source of truth).
+  // On purchase, Capgo may echo the requested product id while Apple's JWS still
+  // carries a higher-tier lineage productId. Skip the strict match when the client
+  // also sent purchasedProductId (purchase intent); entitlement resolution handles it.
   const claimedProduct = payload.productId?.trim();
-  if (claimedProduct && claimedProduct !== mapped.productId) {
+  const purchasedProductId = payload.purchasedProductId?.trim() || "";
+  if (
+    claimedProduct &&
+    claimedProduct !== mapped.productId &&
+    !purchasedProductId
+  ) {
     throw new ApplePurchaseVerificationError(
       "Client product id does not match the verified Apple transaction.",
       "product_mismatch",
@@ -628,14 +643,33 @@ export async function verifyAndSyncApplePurchaseForUser(input: {
     );
   }
 
+  const isPurchasePath = Boolean(input.payload.appAccountTokenSent?.trim());
+  const entitlementProduct = resolveAppleProductIdForEntitlement({
+    verifiedProductId: verified.productId,
+    purchasedProductId: isPurchasePath
+      ? input.payload.purchasedProductId
+      : null,
+  });
+
+  if (entitlementProduct.usedPurchaseIntent) {
+    console.info("[iap/apple/verify] applying purchase-intent product over lineage", {
+      verifiedProductId: verified.productId,
+      purchasedProductId: entitlementProduct.productId,
+      plan: entitlementProduct.plan,
+      originalTransactionId: verified.originalTransactionId,
+    });
+  }
+
   const synced = await syncVerifiedAppleSubscriptionToProfile({
     userId: input.userId,
-    productId: verified.productId,
+    productId: entitlementProduct.productId,
     originalTransactionId: verified.originalTransactionId,
     transactionId: verified.transactionId,
     expiresAt: verified.expiresAt,
     environment: verified.environment,
     status: "active",
+    // Fresh purchase must not be outranked by stale higher-tier profile rows.
+    preserveHigherPlan: isPurchasePath ? false : true,
   });
 
   return {

@@ -48,6 +48,11 @@ function shouldPreserveHigherApplePlan(input) {
   if (input.currentProvider !== "apple") return false;
   const status = input.currentStatus ?? "none";
   if (status !== "active" && status !== "past_due" && status !== "trialing") return false;
+  const periodEnd = (input.currentPeriodEnd || "").trim();
+  if (!periodEnd) return false;
+  const endMs = Date.parse(periodEnd);
+  const now = input.nowMs ?? Date.now();
+  if (Number.isNaN(endMs) || endMs <= now) return false;
   const rank = { free: 0, pro: 1, pro_plus: 2 };
   const currentRank = rank[input.currentPlan] ?? 0;
   const incomingRank = rank[input.incomingPlan] ?? 0;
@@ -56,6 +61,24 @@ function shouldPreserveHigherApplePlan(input) {
   const incomingOtid = (input.incomingOriginalTransactionId || "").trim();
   if (currentOtid && incomingOtid && currentOtid === incomingOtid) return false;
   return true;
+}
+
+function resolveAppleProductIdForEntitlement(input) {
+  const verifiedPlan = planFromIapProductId(input.verifiedProductId);
+  if (!verifiedPlan) throw new Error("unsupported");
+  const purchasedId = (input.purchasedProductId || "").trim();
+  if (!purchasedId || purchasedId === input.verifiedProductId) {
+    return { productId: input.verifiedProductId, plan: verifiedPlan, usedPurchaseIntent: false };
+  }
+  const purchasedPlan = planFromIapProductId(purchasedId);
+  if (!purchasedPlan) {
+    return { productId: input.verifiedProductId, plan: verifiedPlan, usedPurchaseIntent: false };
+  }
+  const rank = { free: 0, pro: 1, pro_plus: 2 };
+  if ((rank[purchasedPlan] ?? 0) > (rank[verifiedPlan] ?? 0)) {
+    return { productId: input.verifiedProductId, plan: verifiedPlan, usedPurchaseIntent: false };
+  }
+  return { productId: purchasedId, plan: purchasedPlan, usedPurchaseIntent: true };
 }
 
 
@@ -340,6 +363,7 @@ assert.equal(
     currentStatus: "active",
     currentPlan: "pro_plus",
     currentOriginalTransactionId: "ot-high",
+    currentPeriodEnd: new Date(Date.now() + 86400000).toISOString(),
     incomingPlan: "pro",
     incomingOriginalTransactionId: "ot-low",
   }),
@@ -351,6 +375,7 @@ assert.equal(
     currentStatus: "active",
     currentPlan: "pro_plus",
     currentOriginalTransactionId: "ot-same",
+    currentPeriodEnd: new Date(Date.now() + 86400000).toISOString(),
     incomingPlan: "pro",
     incomingOriginalTransactionId: "ot-same",
   }),
@@ -362,11 +387,67 @@ assert.equal(
     currentStatus: "active",
     currentPlan: "pro",
     currentOriginalTransactionId: "ot-1",
+    currentPeriodEnd: new Date(Date.now() + 86400000).toISOString(),
     incomingPlan: "pro_plus",
     incomingOriginalTransactionId: "ot-2",
   }),
   false,
 );
+// Expired Pro+ must not outrank a verified Pro purchase.
+assert.equal(
+  shouldPreserveHigherApplePlan({
+    currentProvider: "apple",
+    currentStatus: "active",
+    currentPlan: "pro_plus",
+    currentOriginalTransactionId: "ot-high",
+    currentPeriodEnd: new Date(Date.now() - 86400000).toISOString(),
+    incomingPlan: "pro",
+    incomingOriginalTransactionId: "ot-low",
+  }),
+  false,
+);
+assert.equal(
+  shouldPreserveHigherApplePlan({
+    currentProvider: "apple",
+    currentStatus: "active",
+    currentPlan: "pro_plus",
+    currentOriginalTransactionId: "ot-high",
+    currentPeriodEnd: null,
+    incomingPlan: "pro",
+    incomingOriginalTransactionId: "ot-low",
+  }),
+  false,
+);
+assert.equal(
+  resolveAppleProductIdForEntitlement({
+    verifiedProductId: "com.buxme.pro.monthly",
+    purchasedProductId: "com.buxme.pro.monthly",
+  }).plan,
+  "pro",
+);
+assert.equal(
+  resolveAppleProductIdForEntitlement({
+    verifiedProductId: "com.buxme.proplus.monthly",
+    purchasedProductId: "com.buxme.pro.monthly",
+  }).plan,
+  "pro",
+);
+assert.equal(
+  resolveAppleProductIdForEntitlement({
+    verifiedProductId: "com.buxme.proplus.monthly",
+    purchasedProductId: "com.buxme.pro.monthly",
+  }).usedPurchaseIntent,
+  true,
+);
+assert.equal(
+  resolveAppleProductIdForEntitlement({
+    verifiedProductId: "com.buxme.pro.monthly",
+    purchasedProductId: "com.buxme.proplus.monthly",
+  }).plan,
+  "pro",
+);
+assert.equal(planFromIapProductId("com.buxme.pro.monthly"), "pro");
+assert.equal(planFromIapProductId("com.buxme.proplus.monthly"), "pro_plus");
 assert.equal(
   mapAppleNotificationToAction({
     notificationType: "DID_CHANGE_RENEWAL_PREF",
@@ -488,6 +569,8 @@ assert.match(ownershipPolicy, /resolveAppAccountTokenOwnership/);
 assert.match(ownershipPolicy, /legacy_absent/);
 assert.match(ownershipPolicy, /LEGACY \/ RESTORE/);
 assert.match(ownershipPolicy, /shouldPreserveHigherApplePlan/);
+assert.match(ownershipPolicy, /resolveAppleProductIdForEntitlement/);
+assert.match(ownershipPolicy, /currentPeriodEnd/);
 assert.match(ownershipPolicy, /renewal_pref_downgrade_deferred/);
 
 const config = read("lib/iap/config.ts");
@@ -566,6 +649,11 @@ assert.match(subscriptionService, /applyAppleSubscriptionByOriginalTransaction/)
 assert.match(subscriptionService, /already linked to another Buxme account/);
 assert.match(subscriptionService, /active_stripe_entitlement_preserved|active web subscription/);
 assert.match(subscriptionService, /shouldPreserveHigherApplePlan/);
+assert.match(subscriptionService, /preserveHigherPlan/);
+assert.match(read("lib/iap/appleVerifyPurchase.ts"), /purchasedProductId/);
+assert.match(read("lib/iap/appleVerifyPurchase.ts"), /preserveHigherPlan: isPurchasePath \? false/);
+assert.match(read("lib/iap/appleVerifyPurchase.ts"), /resolveAppleProductIdForEntitlement/);
+assert.match(subscriptionService, /subscription_current_period_end/);
 assert.match(
   subscriptionService,
   /Unverified Apple subscription sync is disabled/,
@@ -585,6 +673,9 @@ assert.match(notificationHandler, /Idempotent/);
 const clientApi = read("lib/iap/clientApi.ts");
 assert.match(clientApi, /signedTransactionInfo/);
 assert.match(clientApi, /purchaseAndVerifyNativePlan\([\s\S]*authenticatedUserId/);
+assert.match(clientApi, /purchasedProductId/);
+assert.match(clientApi, /latest expiry|current entitlement/);
+assert.doesNotMatch(clientApi, /Prefer the highest plan/);
 assert.match(clientApi, /verifyApplePurchase\(preferred\)/);
 assert.match(clientApi, /same trusted verification path/);
 assert.match(clientApi, /resolveFreshAuthenticatedUserId/);
