@@ -447,7 +447,15 @@ assert.match(verifyService, /purchaseDateMs/);
 assert.match(verifyService, /setAppleAppAccountToken/);
 assert.match(verifyService, /appAccountTokenSent/);
 assert.match(verifyService, /rebindStaleAppAccountTokenForPurchase/);
+assert.match(verifyService, /apple_app_account_token_rebind_v1/);
+assert.match(verifyService, /blockedReason/);
+assert.match(verifyService, /appleSetTokenHttpStatus/);
+assert.match(verifyService, /listAppleOwnersOfOriginalTransaction/);
 assert.doesNotMatch(verifyService, /receipt\?:/);
+
+assert.match(read("lib/iap/clientApi.ts"), /rebindCodePath=/);
+assert.match(read("lib/iap/clientApi.ts"), /rebindBlockedReason=/);
+assert.match(read("lib/iap/clientApi.ts"), /appleSetTokenHttpStatus=/);
 
 assert.match(
   read("lib/iap/nativePurchases.ts"),

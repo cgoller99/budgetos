@@ -126,13 +126,21 @@ export async function syncVerifiedAppleSubscriptionToProfile(
 }
 
 /**
- * Returns another Buxme profile that currently holds an *active* Apple
- * entitlement for this originalTransactionId (if any).
+ * Lists other Buxme profiles that still mirror this originalTransactionId
+ * (active or not). Used for rebind diagnostics.
  */
-export async function findActiveAppleOwnerOfOriginalTransaction(input: {
+export async function listAppleOwnersOfOriginalTransaction(input: {
   originalTransactionId: string;
   excludeUserId: string;
-}): Promise<{ id: string } | null> {
+}): Promise<
+  Array<{
+    id: string;
+    subscriptionProvider: string | null;
+    subscriptionStatus: string | null;
+    subscriptionCurrentPeriodEnd: string | null;
+    isActiveAppleEntitlement: boolean;
+  }>
+> {
   const admin = createSupabaseAdminClient();
   const { data, error } = await admin
     .from("profiles")
@@ -140,39 +148,46 @@ export async function findActiveAppleOwnerOfOriginalTransaction(input: {
       "id, subscription_provider, subscription_status, subscription_current_period_end",
     )
     .eq("apple_original_transaction_id", input.originalTransactionId)
-    .neq("id", input.excludeUserId)
-    .maybeSingle();
+    .neq("id", input.excludeUserId);
 
   if (error) {
     throw error;
   }
 
-  if (!data) {
-    return null;
-  }
+  return (data ?? []).map((row) => {
+    const status = row.subscription_status ?? "none";
+    const statusActive =
+      status === "active" || status === "past_due" || status === "trialing";
+    const end = row.subscription_current_period_end
+      ? Date.parse(row.subscription_current_period_end)
+      : NaN;
+    const isActiveAppleEntitlement =
+      row.subscription_provider === "apple" &&
+      statusActive &&
+      !Number.isNaN(end) &&
+      end > Date.now();
 
-  if (data.subscription_provider !== "apple") {
-    return null;
-  }
+    return {
+      id: row.id,
+      subscriptionProvider: row.subscription_provider,
+      subscriptionStatus: row.subscription_status,
+      subscriptionCurrentPeriodEnd: row.subscription_current_period_end,
+      isActiveAppleEntitlement,
+    };
+  });
+}
 
-  const status = data.subscription_status ?? "none";
-  const statusActive =
-    status === "active" || status === "past_due" || status === "trialing";
-  if (!statusActive) {
-    return null;
-  }
-
-  if (data.subscription_current_period_end) {
-    const end = Date.parse(data.subscription_current_period_end);
-    if (!Number.isNaN(end) && end <= Date.now()) {
-      return null;
-    }
-  } else {
-    // Apple entitlements without a future expiry fail closed.
-    return null;
-  }
-
-  return { id: data.id };
+/**
+ * Returns another Buxme profile that currently holds an *active* Apple
+ * entitlement for this originalTransactionId (if any).
+ */
+export async function findActiveAppleOwnerOfOriginalTransaction(input: {
+  originalTransactionId: string;
+  excludeUserId: string;
+}): Promise<{ id: string } | null> {
+  const owners = await listAppleOwnersOfOriginalTransaction(input);
+  const active = owners.find((owner) => owner.isActiveAppleEntitlement);
+  return active ? { id: active.id } : null;
 }
 
 /**
