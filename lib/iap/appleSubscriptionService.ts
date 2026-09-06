@@ -126,6 +126,112 @@ export async function syncVerifiedAppleSubscriptionToProfile(
 }
 
 /**
+ * Returns another Buxme profile that currently holds an *active* Apple
+ * entitlement for this originalTransactionId (if any).
+ */
+export async function findActiveAppleOwnerOfOriginalTransaction(input: {
+  originalTransactionId: string;
+  excludeUserId: string;
+}): Promise<{ id: string } | null> {
+  const admin = createSupabaseAdminClient();
+  const { data, error } = await admin
+    .from("profiles")
+    .select(
+      "id, subscription_provider, subscription_status, subscription_current_period_end",
+    )
+    .eq("apple_original_transaction_id", input.originalTransactionId)
+    .neq("id", input.excludeUserId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  if (data.subscription_provider !== "apple") {
+    return null;
+  }
+
+  const status = data.subscription_status ?? "none";
+  const statusActive =
+    status === "active" || status === "past_due" || status === "trialing";
+  if (!statusActive) {
+    return null;
+  }
+
+  if (data.subscription_current_period_end) {
+    const end = Date.parse(data.subscription_current_period_end);
+    if (!Number.isNaN(end) && end <= Date.now()) {
+      return null;
+    }
+  } else {
+    // Apple entitlements without a future expiry fail closed.
+    return null;
+  }
+
+  return { id: data.id };
+}
+
+/**
+ * Clears apple_* identifiers on inactive profiles that still mirror this OTID
+ * so a rebound purchase can first-link to the authenticated purchaser.
+ * Does not touch profiles with an active Apple entitlement.
+ */
+export async function releaseInactiveAppleOriginalTransaction(input: {
+  originalTransactionId: string;
+  excludeUserId: string;
+}): Promise<void> {
+  const admin = createSupabaseAdminClient();
+  const { data: rows, error } = await admin
+    .from("profiles")
+    .select(
+      "id, subscription_provider, subscription_status, subscription_current_period_end",
+    )
+    .eq("apple_original_transaction_id", input.originalTransactionId)
+    .neq("id", input.excludeUserId);
+
+  if (error) {
+    throw error;
+  }
+
+  for (const row of rows ?? []) {
+    const status = row.subscription_status ?? "none";
+    const statusActive =
+      status === "active" || status === "past_due" || status === "trialing";
+    const end = row.subscription_current_period_end
+      ? Date.parse(row.subscription_current_period_end)
+      : NaN;
+    const stillValid =
+      row.subscription_provider === "apple" &&
+      statusActive &&
+      !Number.isNaN(end) &&
+      end > Date.now();
+
+    if (stillValid) {
+      continue;
+    }
+
+    const { error: clearError } = await admin
+      .from("profiles")
+      .update({
+        apple_product_id: null,
+        apple_original_transaction_id: null,
+        apple_transaction_id: null,
+        apple_environment: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", row.id);
+
+    if (clearError) {
+      throw clearError;
+    }
+  }
+}
+
+/**
  * Removes Apple Premium access for a user while preserving audit identifiers.
  */
 export async function clearAppleSubscriptionOnProfile(

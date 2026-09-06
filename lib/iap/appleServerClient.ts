@@ -116,6 +116,48 @@ export async function fetchVerifiedTransactionById(transactionId: string): Promi
     : new Error("Unable to load Apple transaction from App Store Server API.");
 }
 
+/**
+ * Updates Apple's durable appAccountToken for a subscription lineage.
+ * Used when StoreKit returns an existing sandbox/production lineage whose
+ * signed token still belongs to a previous Buxme UUID after the current user
+ * completed purchaseProduct with their own UUID.
+ *
+ * @see https://developer.apple.com/documentation/appstoreserverapi/set-app-account-token
+ */
+export async function setAppleAppAccountToken(input: {
+  originalTransactionId: string;
+  appAccountToken: string;
+  preferredEnvironment?: Environment | string;
+}): Promise<{ environment: Environment }> {
+  const config = assertAppleIapConfigured();
+  const preferred =
+    input.preferredEnvironment != null
+      ? (String(input.preferredEnvironment).toUpperCase() === "SANDBOX"
+          ? Environment.SANDBOX
+          : String(input.preferredEnvironment).toUpperCase() === "XCODE"
+            ? Environment.SANDBOX
+            : Environment.PRODUCTION)
+      : config.preferredEnvironment;
+
+  let lastError: unknown;
+
+  for (const environment of environmentsToTry(preferred)) {
+    try {
+      const client = createApiClient(config, environment);
+      await client.setAppAccountToken(input.originalTransactionId, {
+        appAccountToken: input.appAccountToken,
+      });
+      return { environment };
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("Unable to set Apple appAccountToken via App Store Server API.");
+}
+
 export async function verifyAndDecodeNotificationPayload(
   signedPayload: string,
 ): Promise<{

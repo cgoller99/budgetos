@@ -51,11 +51,15 @@ export function isBuxmeUserUuid(value: string | null | undefined): boolean {
 /**
  * Ownership binding for verified Apple transactions.
  *
- * - NEW purchases: client passes authenticated Buxme user UUID as StoreKit appAccountToken.
- *   When Apple returns appAccountToken, it MUST match the authenticated user.
+ * - NEW purchases: client passes authenticated Buxme user UUID as StoreKit appAccountToken
+ *   and reports the same value as appAccountTokenSent on /verify.
+ *   When Apple returns a matching appAccountToken → allowed.
+ *   When Apple returns a *different* token (stale lineage) → verify path may rebind via
+ *   App Store Server API Set App Account Token if no other active Buxme owner holds the OTID.
  * - LEGACY / RESTORE: transactions created before binding may omit appAccountToken.
  *   Those may first-link to the verifying user only after full Apple crypto verification
  *   and only if originalTransactionId is not already owned by another Buxme account.
+ *   Restore does not send appAccountTokenSent, so it cannot rebind a foreign token.
  */
 export function resolveAppAccountTokenOwnership(input: {
   authenticatedUserId: string;

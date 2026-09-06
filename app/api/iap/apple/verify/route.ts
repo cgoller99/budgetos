@@ -12,6 +12,8 @@ type VerifyBody = {
   originalTransactionId?: string;
   signedTransactionInfo?: string | null;
   environment?: string | null;
+  /** UUID the client passed into StoreKit purchaseProduct (purchase path only). */
+  appAccountTokenSent?: string | null;
 };
 
 /**
@@ -47,6 +49,7 @@ export async function POST(request: Request) {
         originalTransactionId: body.originalTransactionId,
         signedTransactionInfo: body.signedTransactionInfo,
         environment: body.environment,
+        appAccountTokenSent: body.appAccountTokenSent,
       },
     });
 
@@ -62,6 +65,7 @@ export async function POST(request: Request) {
         originalTransactionId: result.verified.originalTransactionId,
         expiresAt: result.verified.expiresAt,
         environment: result.verified.environment,
+        appAccountToken: result.verified.appAccountToken,
       },
     });
   } catch (error) {

@@ -444,12 +444,36 @@ assert.match(verifyService, /app_account_token_mismatch/);
 assert.match(verifyService, /ApplePurchaseVerificationDetails/);
 assert.match(verifyService, /describeTransactionLineage/);
 assert.match(verifyService, /purchaseDateMs/);
+assert.match(verifyService, /setAppleAppAccountToken/);
+assert.match(verifyService, /appAccountTokenSent/);
+assert.match(verifyService, /rebindStaleAppAccountTokenForPurchase/);
 assert.doesNotMatch(verifyService, /receipt\?:/);
 
 assert.match(
   read("lib/iap/nativePurchases.ts"),
   /peekAppleTransactionClaimsFromJws/,
 );
+assert.match(
+  read("lib/iap/nativePurchases.ts"),
+  /deferring to server rebind/,
+);
+assert.doesNotMatch(
+  read("lib/iap/nativePurchases.ts"),
+  /Clear ASC sandbox purchase history/,
+);
+
+assert.match(read("lib/iap/clientApi.ts"), /appAccountTokenSent/);
+assert.match(read("lib/iap/appleServerClient.ts"), /setAppAccountToken/);
+assert.match(
+  read("lib/iap/appleSubscriptionService.ts"),
+  /findActiveAppleOwnerOfOriginalTransaction/,
+);
+assert.match(
+  read("lib/iap/appleSubscriptionService.ts"),
+  /releaseInactiveAppleOriginalTransaction/,
+);
+
+assert.match(verifyRoute, /appAccountTokenSent/);
 
 const ownershipPolicy = read("lib/iap/appleEntitlementPolicy.ts");
 assert.match(ownershipPolicy, /resolveAppAccountTokenOwnership/);
@@ -567,10 +591,11 @@ assert.match(nativePurchases, /signedTransactionInfo/);
 assert.match(nativePurchases, /appAccountToken: authenticatedUserId/);
 assert.match(nativePurchases, /isBuxmeUserUuid/);
 assert.match(nativePurchases, /peekAppleTransactionClaimsFromJws/);
-assert.match(nativePurchases, /signedInUser=/);
-assert.match(nativePurchases, /appleAppAccountToken=/);
-assert.match(nativePurchases, /Clearing Buxme profiles\.apple_\*/);
+assert.match(nativePurchases, /deferring to server rebind/);
+assert.match(nativePurchases, /appAccountTokenSent: authenticatedUserId/);
 assert.match(nativePurchases, /Never fall back to transactionId/);
+assert.doesNotMatch(nativePurchases, /signedInUser=/);
+assert.doesNotMatch(nativePurchases, /Clearing Buxme profiles\.apple_\*/);
 assert.doesNotMatch(
   nativePurchases,
   /originalId \?\? item\.transactionId/,

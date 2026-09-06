@@ -228,6 +228,7 @@ export function BillingSection() {
         showToast({
           title: "Billing action failed",
           subtitle: message,
+          type: "error",
         });
       } finally {
         setPendingAction(null);
