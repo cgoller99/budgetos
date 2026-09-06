@@ -20,16 +20,68 @@ import {
 } from "@/lib/iap/appleSubscriptionService";
 import type { IapPlan } from "@/lib/iap/products";
 
+export type ApplePurchaseVerificationDetails = {
+  authenticatedUserId?: string;
+  appAccountToken?: string | null;
+  originalTransactionId?: string;
+  transactionId?: string;
+  productId?: string;
+  environment?: string;
+  purchaseDateMs?: number | null;
+  originalPurchaseDateMs?: number | null;
+  lineage?: "original" | "continuation" | "unknown";
+};
+
 export class ApplePurchaseVerificationError extends Error {
   readonly code: string;
   readonly status: number;
+  readonly details: ApplePurchaseVerificationDetails | undefined;
 
-  constructor(message: string, code: string, status = 400) {
+  constructor(
+    message: string,
+    code: string,
+    status = 400,
+    details?: ApplePurchaseVerificationDetails,
+  ) {
     super(message);
     this.name = "ApplePurchaseVerificationError";
     this.code = code;
     this.status = status;
+    this.details = details;
   }
+}
+
+function describeTransactionLineage(input: {
+  transactionId: string;
+  originalTransactionId: string;
+  purchaseDateMs?: number | null;
+  originalPurchaseDateMs?: number | null;
+}): "original" | "continuation" | "unknown" {
+  if (
+    input.transactionId &&
+    input.originalTransactionId &&
+    input.transactionId !== input.originalTransactionId
+  ) {
+    return "continuation";
+  }
+
+  if (
+    input.purchaseDateMs != null &&
+    input.originalPurchaseDateMs != null &&
+    input.purchaseDateMs !== input.originalPurchaseDateMs
+  ) {
+    return "continuation";
+  }
+
+  if (
+    input.transactionId &&
+    input.originalTransactionId &&
+    input.transactionId === input.originalTransactionId
+  ) {
+    return "original";
+  }
+
+  return "unknown";
 }
 
 export type ClientApplePurchasePayload = {
@@ -50,6 +102,8 @@ export type VerifiedApplePurchase = {
   bundleId: string;
   revocationDate: string | null;
   appAccountToken: string | null;
+  purchaseDateMs: number | null;
+  originalPurchaseDateMs: number | null;
 };
 
 function toIsoFromMs(value: number | null | undefined): string | null {
@@ -106,6 +160,12 @@ export function mapDecodedTransactionToVerifiedPurchase(
     bundleId: transaction.bundleId!,
     revocationDate: toIsoFromMs(transaction.revocationDate),
     appAccountToken: transaction.appAccountToken?.trim() || null,
+    purchaseDateMs:
+      typeof transaction.purchaseDate === "number" ? transaction.purchaseDate : null,
+    originalPurchaseDateMs:
+      typeof transaction.originalPurchaseDate === "number"
+        ? transaction.originalPurchaseDate
+        : null,
   };
 }
 
@@ -181,12 +241,30 @@ export async function verifyAndSyncApplePurchaseForUser(input: {
   });
 
   if (!ownership.allowed) {
+    const details: ApplePurchaseVerificationDetails = {
+      authenticatedUserId: input.userId,
+      appAccountToken: verified.appAccountToken,
+      originalTransactionId: verified.originalTransactionId,
+      transactionId: verified.transactionId,
+      productId: verified.productId,
+      environment: verified.environment,
+      purchaseDateMs: verified.purchaseDateMs,
+      originalPurchaseDateMs: verified.originalPurchaseDateMs,
+      lineage: describeTransactionLineage({
+        transactionId: verified.transactionId,
+        originalTransactionId: verified.originalTransactionId,
+        purchaseDateMs: verified.purchaseDateMs,
+        originalPurchaseDateMs: verified.originalPurchaseDateMs,
+      }),
+    };
+
     throw new ApplePurchaseVerificationError(
       ownership.reason === "app_account_token_mismatch"
         ? "This Apple purchase is bound to a different Buxme account."
         : "Authenticated user id is invalid for Apple purchase linking.",
       ownership.reason,
       403,
+      details,
     );
   }
 
