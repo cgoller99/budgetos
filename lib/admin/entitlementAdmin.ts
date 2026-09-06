@@ -1,5 +1,7 @@
 import "server-only";
 
+import type { ProfileUpdate } from "@/lib/supabase/database.types";
+
 /**
  * Admin-only entitlement helpers for support/testing.
  * Updates local profile entitlement fields via the service-role client.
@@ -152,7 +154,7 @@ export function entitlementSourceLabel(source: AdminEntitlementSource): string {
 export function buildEntitlementProfileUpdate(
   plan: AdminEntitlementPlan,
   nowIso: string,
-): Record<string, unknown> {
+): ProfileUpdate {
   switch (plan) {
     case "founder":
       return {

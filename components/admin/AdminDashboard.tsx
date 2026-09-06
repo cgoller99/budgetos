@@ -534,36 +534,67 @@ export function AdminDashboard() {
                     Goals {user.goalCount} · Accounts {user.connectedAccountCount} · Feedback {user.feedbackCount}
                   </td>
                   <td className="px-4 py-4 align-top">
-                    <div className="flex flex-wrap gap-2">
-                      {[
-                        ["grant_founder", "Founder"],
-                        ["grant_pro", "Pro"],
-                        ["grant_pro_plus", "Pro+"],
-                        ["remove_subscription", "Free"],
-                        user.isDisabled ? ["enable_user", "Enable"] : ["disable_user", "Disable"],
-                        ["reset_finance", "Reset"],
-                        ["delete_user", "Delete"],
-                      ].map(([action, label]) => (
-                        <Button
-                          key={action}
-                          size="sm"
-                          variant={
-                            action === "delete_user" || action === "reset_finance"
-                              ? "secondary"
-                              : "ghost"
-                          }
-                          onClick={() =>
-                            setPendingAction({
-                              userId: user.id,
-                              action: action as AdminUserAction,
-                              label,
-                              user,
-                            })
-                          }
-                        >
-                          {label}
-                        </Button>
-                      ))}
+                    <div className="flex min-w-[11rem] flex-col gap-2">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
+                        Set entitlement
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {(
+                          [
+                            ["grant_founder", "Founder"],
+                            ["grant_pro", "Pro"],
+                            ["grant_pro_plus", "Pro+"],
+                            ["remove_subscription", "Set Free"],
+                          ] as const
+                        ).map(([action, label]) => (
+                          <Button
+                            key={action}
+                            size="sm"
+                            variant={
+                              action === "remove_subscription" ? "secondary" : "primary"
+                            }
+                            className="w-full touch-manipulation"
+                            onClick={() =>
+                              setPendingAction({
+                                userId: user.id,
+                                action,
+                                label,
+                                user,
+                              })
+                            }
+                          >
+                            {label}
+                          </Button>
+                        ))}
+                      </div>
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {(
+                          [
+                            user.isDisabled
+                              ? (["enable_user", "Enable"] as const)
+                              : (["disable_user", "Disable"] as const),
+                            ["reset_finance", "Reset"] as const,
+                            ["delete_user", "Delete"] as const,
+                          ] as const
+                        ).map(([action, label]) => (
+                          <Button
+                            key={action}
+                            size="sm"
+                            variant="secondary"
+                            className="touch-manipulation"
+                            onClick={() =>
+                              setPendingAction({
+                                userId: user.id,
+                                action,
+                                label,
+                                user,
+                              })
+                            }
+                          >
+                            {label}
+                          </Button>
+                        ))}
+                      </div>
                     </div>
                   </td>
                 </tr>
