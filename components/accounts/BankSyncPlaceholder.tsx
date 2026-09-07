@@ -1,16 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import type { PlaidLinkOnSuccessMetadata } from "react-plaid-link";
 import { Badge, Button, Card, CardContent, CardHeader } from "@/components/ui";
 import { ManualAccountsPlaidMergeModal } from "@/components/plaid/ManualAccountsPlaidMergeModal";
 import { clearPlaidConnectBannerDismissal } from "@/components/guidance/PlaidConnectBanner";
+import { useAuth } from "@/context/AuthContext";
 import { useFinance } from "@/context/FinanceContext";
 import { useSubscription } from "@/context/SubscriptionContext";
 import { useToast } from "@/context/ToastContext";
 import { usePlaidLinkSession } from "@/hooks/usePlaidLinkSession";
+import { ANALYTICS_EVENTS, trackEvent } from "@/lib/analytics/client";
+import { purchaseAndVerifyNativePlan } from "@/lib/iap/clientApi";
 import { bankSyncComingSoonMessage } from "@/lib/integrations/bankSync";
+import { navigateSettingsDeepLink } from "@/lib/native/navigateSettingsHash";
+import { shouldUseNativeStoreBilling } from "@/lib/native/platform";
 import { getManualAccounts } from "@/lib/onboarding/progress";
 import {
   exchangePlaidPublicToken,
@@ -24,7 +29,10 @@ import {
   clearStoredPlaidLinkToken,
   isPlaidOAuthHandoffExit,
 } from "@/lib/plaid/oauth";
-import { ANALYTICS_EVENTS, trackEvent } from "@/lib/analytics/client";
+import { hasActiveSubscription } from "@/lib/subscription/types";
+
+/** Same Settings billing deep-link BillingSection / ProfileMenu use. */
+const BILLING_DEEP_LINK = "/settings?upgrade=pro#billing";
 
 type BankSyncConnectProps = {
   connectionId?: string;
@@ -95,9 +103,13 @@ export function BankSyncConnect({
   compact = false,
   inline = false,
 }: BankSyncConnectProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const { user } = useAuth();
   const { connectBank, reconnectBank, isSyncing, refreshFinance, deleteAccount, accounts } =
     useFinance();
-  const { hasProAccess, isFounder } = useSubscription();
+  const { subscription, hasProAccess, isFounder, refreshSubscription } =
+    useSubscription();
   const { showToast } = useToast();
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [isLoadingToken, setIsLoadingToken] = useState(false);
@@ -109,12 +121,102 @@ export function BankSyncConnect({
   >([]);
   const [plaidAccountCount, setPlaidAccountCount] = useState(0);
   const [isRemovingManual, setIsRemovingManual] = useState(false);
+  const [isSubscribePending, setIsSubscribePending] = useState(false);
   const plaidEnabled = isPlaidClientEnabled();
   const canCreatePlaid = hasProAccess || isFounder;
   const requiresUpgrade = mode === "create" && !canCreatePlaid;
+  const nativeStoreBilling = shouldUseNativeStoreBilling();
   const label =
     buttonLabel ??
     (mode === "update" ? "Reconnect bank" : "Connect bank");
+
+  const openBillingScreen = useCallback(() => {
+    if (navigateSettingsDeepLink(BILLING_DEEP_LINK, pathname)) {
+      return;
+    }
+    router.push(BILLING_DEEP_LINK);
+  }, [pathname, router]);
+
+  /**
+   * Bank Connect paywall CTA. Reuses BillingSection purchase/navigation paths:
+   * - Free + iOS → purchaseAndVerifyNativePlan("pro") (same StoreKit sheet)
+   * - Active Apple → Settings Billing (Manage Subscription lives there)
+   * - Active Stripe → Settings Billing only (double-billing protection)
+   * - Web Free → Settings Billing / Stripe checkout UI
+   */
+  const handleSubscribeToPro = useCallback(async () => {
+    if (isSubscribePending) {
+      return;
+    }
+
+    const activePaid = hasActiveSubscription(subscription);
+
+    if (activePaid && subscription.provider === "stripe") {
+      openBillingScreen();
+      return;
+    }
+
+    if (activePaid && subscription.provider === "apple") {
+      openBillingScreen();
+      return;
+    }
+
+    if (nativeStoreBilling) {
+      if (!user?.id) {
+        showToast({
+          title: "Sign in required",
+          subtitle: "Sign in to purchase a Buxme subscription.",
+        });
+        return;
+      }
+
+      setIsSubscribePending(true);
+      try {
+        // Same Stripe guard as BillingSection.handleNativePurchase.
+        if (
+          subscription.provider === "stripe" &&
+          hasActiveSubscription(subscription)
+        ) {
+          openBillingScreen();
+          return;
+        }
+
+        await purchaseAndVerifyNativePlan("pro", user.id);
+        await refreshSubscription({ refresh: true });
+        trackEvent(ANALYTICS_EVENTS.SUBSCRIPTION_PURCHASED, {
+          plan: "pro",
+          provider: "apple",
+          source: "bank_connect",
+        });
+        showToast({
+          title: "Subscription updated",
+          subtitle: "Buxme Pro is now active via the App Store.",
+        });
+      } catch (purchaseError) {
+        const message =
+          purchaseError instanceof Error
+            ? purchaseError.message
+            : "Unable to start App Store purchase.";
+        showToast({
+          title: "Purchase failed",
+          subtitle: message,
+        });
+      } finally {
+        setIsSubscribePending(false);
+      }
+      return;
+    }
+
+    openBillingScreen();
+  }, [
+    isSubscribePending,
+    nativeStoreBilling,
+    openBillingScreen,
+    refreshSubscription,
+    showToast,
+    subscription,
+    user,
+  ]);
 
   const loadLinkToken = useCallback(async () => {
     setIsLoadingToken(true);
@@ -325,15 +427,22 @@ export function BankSyncConnect({
   }
 
   if (requiresUpgrade) {
+    const subscribeButton = (
+      <Button
+        size={inline ? "sm" : "md"}
+        className="touch-manipulation"
+        disabled={isSubscribePending}
+        onClick={() => void handleSubscribeToPro()}
+      >
+        {isSubscribePending ? "Starting…" : "Subscribe to Pro"}
+      </Button>
+    );
+
     if (inline) {
       return (
         <div className="space-y-3">
           <p className="text-sm text-white/55">{PLAID_PRO_REQUIRED_MESSAGE}</p>
-          <Link href="/settings?upgrade=pro#billing">
-            <Button size="sm" className="touch-manipulation">
-              Upgrade to Pro
-            </Button>
-          </Link>
+          {subscribeButton}
         </div>
       );
     }
@@ -349,9 +458,7 @@ export function BankSyncConnect({
             {PLAID_PRO_REQUIRED_MESSAGE} Existing linked banks keep syncing if you
             already connected them.
           </p>
-          <Link href="/settings?upgrade=pro#billing">
-            <Button size="md">Upgrade to Pro</Button>
-          </Link>
+          {subscribeButton}
         </CardContent>
       </Card>
     );

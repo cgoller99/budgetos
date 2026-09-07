@@ -59,7 +59,7 @@ assert.match(exchange, /hasExistingItem: Boolean\(existing\)/);
 
 const bankUi = read("components/accounts/BankSyncPlaceholder.tsx");
 assert.match(bankUi, /requiresUpgrade/);
-assert.match(bankUi, /Upgrade to Pro/);
+assert.match(bankUi, /Subscribe to Pro/);
 assert.match(bankUi, /hasProAccess/);
 
 const plans = read("lib/subscription/plans.ts");
