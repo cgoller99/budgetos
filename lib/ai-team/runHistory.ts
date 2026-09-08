@@ -9,6 +9,7 @@ import type { BuxmeSupabaseClient } from "@/lib/supabase/client";
 import type {
   AiTeamPlan,
   AiTeamRun,
+  AiTeamRuntimeMetadata,
   AiTeamSnapshot,
   AiTeamTask,
 } from "@/lib/ai-team/types";
@@ -31,6 +32,48 @@ function objectArray<T>(value: Json | undefined): T[] {
         (item) => item && !Array.isArray(item) && typeof item === "object",
       ) as T[])
     : [];
+}
+
+function runtimeMetadataFromJson(value: Json | null): AiTeamRuntimeMetadata | null {
+  if (!value || Array.isArray(value) || typeof value !== "object") return null;
+  const record = value as Record<string, Json | undefined>;
+  const selectedSpecialists = stringArray(record.selectedSpecialists ?? []).filter(
+    (id): id is AiTeamRuntimeMetadata["selectedSpecialists"][number] =>
+      [
+        "chief_of_staff",
+        "engineering",
+        "qa",
+        "analytics",
+        "product",
+        "growth",
+        "customer",
+        "critic",
+      ].includes(id),
+  );
+  if (
+    typeof record.durationMs !== "number"
+  ) {
+    return null;
+  }
+
+  return {
+    selectedSpecialists,
+    modelCallCount:
+      typeof record.modelCallCount === "number"
+        ? record.modelCallCount
+        : undefined,
+    durationMs: record.durationMs,
+    inputTokens:
+      typeof record.inputTokens === "number" ? record.inputTokens : undefined,
+    outputTokens:
+      typeof record.outputTokens === "number" ? record.outputTokens : undefined,
+    totalTokens:
+      typeof record.totalTokens === "number" ? record.totalTokens : undefined,
+    criticSummary:
+      typeof record.criticSummary === "string"
+        ? record.criticSummary
+        : undefined,
+  };
 }
 
 function snapshotFromJson(value: Json): AiTeamSnapshot {
@@ -77,6 +120,7 @@ function runFromRow(row: AiTeamRunRow, tasks: AiTeamTask[]): AiTeamRun {
     model: row.model,
     summary: row.summary,
     snapshot: snapshotFromJson(row.snapshot),
+    runtimeMetadata: runtimeMetadataFromJson(row.runtime_metadata),
     createdAt: row.created_at,
     tasks,
   };
@@ -112,6 +156,9 @@ export async function saveAiTeamRun(
       p_snapshot: snapshot as unknown as Json,
       p_created_at: plan.createdAt,
       p_tasks: taskPayload,
+      p_runtime_metadata: plan.runtimeMetadata
+        ? (plan.runtimeMetadata as unknown as Json)
+        : null,
     },
   );
 
@@ -193,7 +240,6 @@ export async function listAiTeamApprovalRuns(
     .from("ai_team_tasks")
     .select("*")
     .eq("requires_approval", true)
-    .eq("status", "needs_approval")
     .order("created_at", { ascending: false })
     .limit(100);
 

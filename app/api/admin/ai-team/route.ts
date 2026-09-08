@@ -7,7 +7,9 @@ import {
   createAiTeamPlan,
   getAiTeamRuntimeInfo,
   getAiTeamSnapshot,
+  listAiTeamApprovalDecisions,
   listAiTeamApprovalRuns,
+  listAiTeamPlaybooks,
   listRecentAiTeamRuns,
   saveAiTeamRun,
 } from "@/lib/ai-team";
@@ -38,6 +40,14 @@ async function hasDailyPlanCapacity(
   userId: string,
   now: number,
 ): Promise<boolean> {
+  return (await dailyPlanUsage(adminSupabase, userId, now)) < PLAN_DAILY_LIMIT;
+}
+
+async function dailyPlanUsage(
+  adminSupabase: BuxmeSupabaseClient,
+  userId: string,
+  now: number,
+): Promise<number> {
   const dayStart = new Date(now);
   dayStart.setUTCHours(0, 0, 0, 0);
 
@@ -50,7 +60,7 @@ async function hasDailyPlanCapacity(
     .gte("created_at", dayStart.toISOString());
 
   if (error) throw error;
-  return (count ?? 0) < PLAN_DAILY_LIMIT;
+  return count ?? 0;
 }
 
 async function claimPlanLock(
@@ -118,17 +128,35 @@ export async function GET() {
   if ("response" in auth) return auth.response;
 
   try {
-    const [snapshot, recentRuns, approvalRuns] = await Promise.all([
+    const [snapshot, recentRuns, approvalRuns, playbooks, planningUsed] =
+      await Promise.all([
       getAiTeamSnapshot(auth.adminSupabase),
       listRecentAiTeamRuns(auth.adminSupabase),
       listAiTeamApprovalRuns(auth.adminSupabase),
+      listAiTeamPlaybooks(auth.adminSupabase, auth.user.id),
+      dailyPlanUsage(auth.adminSupabase, auth.user.id, Date.now()),
     ]);
+    const approvalDecisions = await listAiTeamApprovalDecisions(
+      auth.adminSupabase,
+      [
+        ...new Set(
+          [...approvalRuns, ...recentRuns].flatMap((run) =>
+            run.tasks
+              .filter((task) => task.requiresApproval)
+              .map((task) => task.id),
+          ),
+        ),
+      ],
+    );
     return NextResponse.json({
       agents: AI_TEAM_AGENTS,
       runtime: getAiTeamRuntimeInfo(),
       snapshot,
       recentRuns,
       approvalRuns,
+      approvalDecisions,
+      playbooks,
+      planningUsage: { used: planningUsed, limit: PLAN_DAILY_LIMIT },
     });
   } catch (error) {
     console.error("[admin/ai-team] Load failed", error);

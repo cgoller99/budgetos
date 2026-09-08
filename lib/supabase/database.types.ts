@@ -686,6 +686,7 @@ export type AiTeamRunRow = {
   model: string | null;
   summary: string;
   snapshot: Json;
+  runtime_metadata: Json | null;
   created_at: string;
 };
 
@@ -697,6 +698,7 @@ export type AiTeamRunInsert = {
   model?: string | null;
   summary: string;
   snapshot: Json;
+  runtime_metadata?: Json | null;
   created_at?: string;
 };
 
@@ -716,6 +718,8 @@ export type AiTeamTaskStatusRow =
   | "queued"
   | "running"
   | "needs_approval"
+  | "approved"
+  | "rejected"
   | "completed"
   | "failed";
 
@@ -746,6 +750,52 @@ export type AiTeamTaskInsert = {
 };
 
 export type AiTeamTaskUpdate = Partial<AiTeamTaskInsert>;
+
+export type AiTeamApprovalDecisionRow = {
+  id: string;
+  task_id: string;
+  run_id: string;
+  actor_id: string;
+  actor_email: string | null;
+  decision: "approved" | "rejected";
+  note: string | null;
+  created_at: string;
+};
+
+export type AiTeamApprovalDecisionInsert = {
+  id?: string;
+  task_id: string;
+  run_id: string;
+  actor_id: string;
+  actor_email?: string | null;
+  decision: "approved" | "rejected";
+  note?: string | null;
+  created_at?: string;
+};
+
+export type AiTeamPlaybookRow = {
+  id: string;
+  created_by: string;
+  title: string;
+  description: string;
+  category: string;
+  goal_template: string;
+  favorite: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AiTeamPlaybookInsert = {
+  id?: string;
+  created_by: string;
+  title: string;
+  description?: string;
+  category: string;
+  goal_template: string;
+  favorite?: boolean;
+  created_at?: string;
+  updated_at?: string;
+};
 
 export type BetaSettingsRow = {
   id: number;
@@ -942,6 +992,33 @@ export type Database = {
         Update: AiTeamRunUpdate;
         Relationships: [];
       };
+      ai_team_approval_decisions: {
+        Row: AiTeamApprovalDecisionRow;
+        Insert: AiTeamApprovalDecisionInsert;
+        Update: never;
+        Relationships: [
+          {
+            foreignKeyName: "ai_team_approval_decisions_task_id_fkey";
+            columns: ["task_id"];
+            isOneToOne: true;
+            referencedRelation: "ai_team_tasks";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "ai_team_approval_decisions_run_id_fkey";
+            columns: ["run_id"];
+            isOneToOne: false;
+            referencedRelation: "ai_team_runs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      ai_team_playbooks: {
+        Row: AiTeamPlaybookRow;
+        Insert: AiTeamPlaybookInsert;
+        Update: Partial<AiTeamPlaybookInsert>;
+        Relationships: [];
+      };
       ai_team_tasks: {
         Row: AiTeamTaskRow;
         Insert: AiTeamTaskInsert;
@@ -989,6 +1066,16 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      record_ai_team_approval_decision: {
+        Args: {
+          p_task_id: string;
+          p_actor_id: string;
+          p_actor_email: string;
+          p_decision: "approved" | "rejected";
+          p_note: string;
+        };
+        Returns: AiTeamApprovalDecisionRow[];
+      };
       save_ai_team_run_atomic: {
         Args: {
           p_created_by: string;
@@ -999,6 +1086,7 @@ export type Database = {
           p_snapshot: Json;
           p_created_at: string;
           p_tasks: Json;
+          p_runtime_metadata?: Json | null;
         };
         Returns: string;
       };

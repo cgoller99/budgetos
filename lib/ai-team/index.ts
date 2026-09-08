@@ -16,11 +16,21 @@ export {
   saveAiTeamRun,
 } from "@/lib/ai-team/runHistory";
 export { getAiTeamSnapshot } from "@/lib/ai-team/snapshot";
+export {
+  approvalDecisionFromRow,
+  listAiTeamApprovalDecisions,
+  listAiTeamPlaybooks,
+  playbookFromRow,
+} from "@/lib/ai-team/operations";
 export type {
   AiTeamAgent,
   AiTeamAgentId,
+  AiTeamApprovalDecision,
   AiTeamPlan,
+  AiTeamPlanningUsage,
+  AiTeamPlaybook,
   AiTeamRun,
+  AiTeamRuntimeMetadata,
   AiTeamRuntimeInfo,
   AiTeamSnapshot,
   AiTeamTask,
