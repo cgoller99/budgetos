@@ -10,7 +10,11 @@ export type AiTeamAgentId =
   | "chief_of_staff"
   | "engineering"
   | "qa"
-  | "analytics";
+  | "analytics"
+  | "product"
+  | "growth"
+  | "customer"
+  | "critic";
 
 export type AiTeamTaskStatus =
   | "queued"

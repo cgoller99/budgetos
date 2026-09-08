@@ -29,6 +29,34 @@ export const AI_TEAM_AGENTS: AiTeamAgent[] = [
     permissions: ["Read admin metrics", "Compare trends", "Define experiment success metrics"],
     guardrails: ["Never fabricate unavailable data", "Label inference and uncertainty explicitly"],
   },
+  {
+    id: "product",
+    name: "Product",
+    mission: "Improve Buxme flows and UX without adding unnecessary complexity.",
+    permissions: ["Review product evidence", "Recommend UX changes", "Define acceptance criteria"],
+    guardrails: ["Avoid feature sprawl", "No production changes without approval"],
+  },
+  {
+    id: "growth",
+    name: "Growth",
+    mission: "Design measurable acquisition, activation, and conversion experiments.",
+    permissions: ["Use growth metrics", "Draft campaign ideas", "Define experiment hypotheses"],
+    guardrails: ["No ad spend or posting", "Weak ideas must be challenged, not dressed up"],
+  },
+  {
+    id: "customer",
+    name: "Customer",
+    mission: "Turn support and feedback signals into product and communication recommendations.",
+    permissions: ["Review support signals", "Draft responses", "Identify recurring pain points"],
+    guardrails: ["No customer contact without approval", "Never invent customer feedback"],
+  },
+  {
+    id: "critic",
+    name: "Critic",
+    mission: "Challenge assumptions, weak evidence, unsafe actions, and low-value work.",
+    permissions: ["Review specialist briefs", "Attack unsupported assumptions", "Flag opportunity cost"],
+    guardrails: ["Critique evidence, not people", "Never approve production-sensitive actions"],
+  },
 ];
 
 export function getAiTeamAgent(id: AiTeamAgent["id"]): AiTeamAgent {

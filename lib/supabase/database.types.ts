@@ -706,7 +706,11 @@ export type AiTeamTaskOwner =
   | "chief_of_staff"
   | "engineering"
   | "qa"
-  | "analytics";
+  | "analytics"
+  | "product"
+  | "growth"
+  | "customer"
+  | "critic";
 
 export type AiTeamTaskStatusRow =
   | "queued"
@@ -985,6 +989,19 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      save_ai_team_run_atomic: {
+        Args: {
+          p_created_by: string;
+          p_goal: string;
+          p_source: string;
+          p_model: string | null;
+          p_summary: string;
+          p_snapshot: Json;
+          p_created_at: string;
+          p_tasks: Json;
+        };
+        Returns: string;
+      };
       accept_household_invite: {
         Args: { p_invite_id: string };
         Returns: string;

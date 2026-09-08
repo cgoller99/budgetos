@@ -31,6 +31,10 @@ const AGENT_LABELS: Record<AiTeamAgentId, string> = {
   engineering: "Engineering",
   qa: "QA",
   analytics: "Analytics",
+  product: "Product",
+  growth: "Growth",
+  customer: "Customer",
+  critic: "Critic",
 };
 function statusVariant(status: AiTeamTaskStatus) {
   if (status === "completed") return "success" as const;

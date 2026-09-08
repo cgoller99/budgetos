@@ -4,8 +4,12 @@ import { Output, ToolLoopAgent } from "ai";
 import { z } from "zod";
 import {
   buildAiTeamPlan,
-  requiresApprovalForTaskText,
+  requiresApprovalForTaskContext,
 } from "@/lib/ai-team/planner";
+import {
+  selectAiTeamSpecialists,
+  type RoutedSpecialistId,
+} from "@/lib/ai-team/routing";
 import type {
   AiTeamAgentId,
   AiTeamPlan,
@@ -39,7 +43,16 @@ const chiefOutput = Output.object({
     tasks: z
       .array(
         recommendationSchema.extend({
-          owner: z.enum(["chief_of_staff", "engineering", "qa", "analytics"]),
+          owner: z.enum([
+            "chief_of_staff",
+            "engineering",
+            "qa",
+            "analytics",
+            "product",
+            "growth",
+            "customer",
+            "critic",
+          ]),
         }),
       )
       .min(2)
@@ -64,6 +77,7 @@ function makeSpecialistAgent(role: string, mission: string) {
     model: SPECIALIST_MODEL,
     instructions: specialistInstructions(role, mission),
     output: specialistOutput,
+    maxOutputTokens: 900,
   });
 }
 const analyticsAgent = makeSpecialistAgent(
@@ -81,16 +95,37 @@ const qaAgent = makeSpecialistAgent(
   "Define acceptance coverage, regression risks, and reproducible checks for critical flows.",
 );
 
+const productAgent = makeSpecialistAgent(
+  "Product",
+  "Improve flows and UX with the smallest useful change while resisting feature sprawl.",
+);
+
+const growthAgent = makeSpecialistAgent(
+  "Growth",
+  "Design measurable acquisition, activation, and conversion experiments without spending or posting.",
+);
+
+const customerAgent = makeSpecialistAgent(
+  "Customer",
+  "Turn available support signals into product or response recommendations without inventing feedback.",
+);
+
+const criticAgent = makeSpecialistAgent(
+  "Critic",
+  "Challenge weak evidence, unsafe actions, unnecessary scope, and unsupported assumptions.",
+);
+
 const chiefOfStaffAgent = new ToolLoopAgent({
   model: ORCHESTRATOR_MODEL,
   instructions: [
     "You are the Buxme Chief of Staff.",
-    "Turn the founder's goal and specialist briefs into a prioritized execution plan.",
+    "Turn the founder's goal, selected specialist briefs, and Critic review into a prioritized execution plan.",
     "Use only supplied evidence for factual claims. Never invent metrics or completed work.",
     "Prefer launch-critical, measurable work over feature sprawl.",
     "Production-sensitive actions must be approval-gated.",
   ].join(" "),
   output: chiefOutput,
+  maxOutputTokens: 1200,
 });
 function modelRuntimeAvailable(): boolean {
   if (process.env.AI_TEAM_DISABLE_MODEL === "1") return false;
@@ -122,6 +157,18 @@ function snapshotForPrompt(snapshot: AiTeamSnapshot): string {
   );
 }
 
+const routedSpecialistAgents: Record<
+  RoutedSpecialistId,
+  ReturnType<typeof makeSpecialistAgent>
+> = {
+  analytics: analyticsAgent,
+  engineering: engineeringAgent,
+  qa: qaAgent,
+  product: productAgent,
+  growth: growthAgent,
+  customer: customerAgent,
+};
+
 async function specialistBrief(
   agent: ReturnType<typeof makeSpecialistAgent>,
   goal: string,
@@ -138,6 +185,26 @@ async function specialistBrief(
 
   return result.output;
 }
+
+async function criticBrief(
+  goal: string,
+  snapshot: AiTeamSnapshot,
+  specialistContext: Record<string, unknown>,
+) {
+  const result = await criticAgent.generate({
+    prompt:
+      "Founder goal:\n" +
+      goal +
+      "\n\nEvidence snapshot:\n" +
+      snapshotForPrompt(snapshot) +
+      "\n\nSpecialist briefs to challenge:\n" +
+      JSON.stringify(specialistContext, null, 2),
+    abortSignal: AbortSignal.timeout(MODEL_TIMEOUT_MS),
+  });
+
+  return result.output;
+}
+
 function taskFromModel(
   input: {
     owner: AiTeamAgentId;
@@ -147,9 +214,12 @@ function taskFromModel(
     approvalReason: string | null;
   },
   index: number,
+  goal: string,
   snapshot: AiTeamSnapshot,
 ): AiTeamTask {
-  const sensitive = requiresApprovalForTaskText(
+  const sensitive = requiresApprovalForTaskContext(
+    goal,
+    input.owner,
     input.title + " " + input.objective + " " + (input.approvalReason ?? ""),
   );
   const requiresApproval = input.requiresApproval || sensitive;
@@ -163,7 +233,8 @@ function taskFromModel(
     evidence: snapshot.observations.slice(0, 3),
     requiresApproval,
     approvalReason: requiresApproval
-      ? input.approvalReason ?? "Production-sensitive action requires approval."
+      ? input.approvalReason?.trim() ||
+        "Production-sensitive action requires approval."
       : undefined,
   };
 }
@@ -183,17 +254,25 @@ export async function createAiTeamPlan(
   }
 
   try {
-    const [analytics, engineering, qa] = await Promise.all([
-      specialistBrief(analyticsAgent, goal, snapshot),
-      specialistBrief(engineeringAgent, goal, snapshot),
-      specialistBrief(qaAgent, goal, snapshot),
-    ]);
+    const selectedSpecialists = selectAiTeamSpecialists(goal);
+    const briefEntries = await Promise.all(
+      selectedSpecialists.map(async (id) => [
+        id,
+        await specialistBrief(routedSpecialistAgents[id], goal, snapshot),
+      ] as const),
+    );
 
+    const specialistBriefs = Object.fromEntries(briefEntries) as Record<
+      string,
+      unknown
+    >;
+    const critic = await criticBrief(goal, snapshot, specialistBriefs);
     const specialistContext = JSON.stringify(
-      { analytics, engineering, qa },
+      { ...specialistBriefs, critic },
       null,
       2,
     );
+
     const result = await chiefOfStaffAgent.generate({
       prompt:
         "Founder goal:\n" +
@@ -206,7 +285,7 @@ export async function createAiTeamPlan(
     });
 
     const tasks = result.output.tasks.map((item, index) =>
-      taskFromModel(item, index, snapshot),
+      taskFromModel(item, index, goal, snapshot),
     );
 
     return {

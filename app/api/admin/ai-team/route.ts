@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { requireAdminApiUser } from "@/lib/admin/apiAuth";
 import type { BuxmeSupabaseClient } from "@/lib/supabase/client";
@@ -12,13 +12,14 @@ import {
 } from "@/lib/ai-team";
 
 const PLAN_COOLDOWN_MS = 15_000;
+const PLAN_DAILY_LIMIT = 40;
+const PLAN_LOCK_STALE_MS = 180_000;
 const activePlanningUsers = new Set<string>();
 const lastPlanStartedAt = new Map<string, number>();
 
-function planBucketId(userId: string, now: number): string {
-  const bucket = Math.floor(now / PLAN_COOLDOWN_MS);
+function planLockId(userId: string): string {
   const hex = createHash("sha256")
-    .update("ai-team-plan:" + userId + ":" + bucket)
+    .update("ai-team-lock:" + userId)
     .digest("hex")
     .slice(0, 32);
 
@@ -31,23 +32,84 @@ function planBucketId(userId: string, now: number): string {
   ].join("-");
 }
 
-async function claimPlanBucket(
+async function hasDailyPlanCapacity(
+  adminSupabase: BuxmeSupabaseClient,
+  userId: string,
+  now: number,
+): Promise<boolean> {
+  const dayStart = new Date(now);
+  dayStart.setUTCHours(0, 0, 0, 0);
+
+  const { count, error } = await adminSupabase
+    .from("admin_event_logs")
+    .select("id", { count: "exact", head: true })
+    .eq("event_type", "ai_team")
+    .eq("message", "AI Team plan started")
+    .eq("user_id", userId)
+    .gte("created_at", dayStart.toISOString());
+
+  if (error) throw error;
+  return (count ?? 0) < PLAN_DAILY_LIMIT;
+}
+
+async function claimPlanLock(
   adminSupabase: BuxmeSupabaseClient,
   userId: string,
   goal: string,
   now: number,
-): Promise<boolean> {
+): Promise<string | null> {
+  const id = planLockId(userId);
+  const lockToken = randomUUID();
+  const staleBefore = new Date(now - PLAN_LOCK_STALE_MS).toISOString();
+
+  const { error: staleCleanupError } = await adminSupabase
+    .from("admin_event_logs")
+    .delete()
+    .eq("id", id)
+    .lt("created_at", staleBefore);
+
+  if (staleCleanupError) throw staleCleanupError;
+
   const { error } = await adminSupabase.from("admin_event_logs").insert({
-    id: planBucketId(userId, now),
+    id,
+    event_type: "ai_team",
+    message: "AI Team active lock",
+    metadata: { goalLength: goal.length, lockToken },
+    user_id: userId,
+  });
+
+  if (!error) return lockToken;
+  if (error.code === "23505") return null;
+  throw error;
+}
+
+async function recordPlanStart(
+  adminSupabase: BuxmeSupabaseClient,
+  userId: string,
+  goal: string,
+): Promise<void> {
+  const { error } = await adminSupabase.from("admin_event_logs").insert({
     event_type: "ai_team",
     message: "AI Team plan started",
     metadata: { goalLength: goal.length },
     user_id: userId,
   });
 
-  if (!error) return true;
-  if (error.code === "23505") return false;
-  throw error;
+  if (error) throw error;
+}
+
+async function releasePlanLock(
+  adminSupabase: BuxmeSupabaseClient,
+  userId: string,
+  lockToken: string,
+): Promise<void> {
+  const { error } = await adminSupabase
+    .from("admin_event_logs")
+    .delete()
+    .eq("id", planLockId(userId))
+    .contains("metadata", { lockToken });
+
+  if (error) throw error;
 }
 
 export async function GET() {
@@ -107,15 +169,41 @@ export async function POST(request: Request) {
     );
   }
 
+  let distributedLockToken: string | null = null;
+
   try {
-    const claimed = await claimPlanBucket(auth.adminSupabase, userId, goal, now);
-    if (!claimed) {
+    if (!(await hasDailyPlanCapacity(auth.adminSupabase, userId, now))) {
       return NextResponse.json(
-        { error: "Please wait a few seconds before starting another plan." },
+        { error: "Daily AI Team planning limit reached. Try again tomorrow." },
         { status: 429 },
       );
     }
+
+    distributedLockToken = await claimPlanLock(
+      auth.adminSupabase,
+      userId,
+      goal,
+      now,
+    );
+    if (!distributedLockToken) {
+      return NextResponse.json(
+        { error: "An AI Team plan is already running." },
+        { status: 429 },
+      );
+    }
+
+    await recordPlanStart(auth.adminSupabase, userId, goal);
   } catch (rateLimitError) {
+    if (distributedLockToken) {
+      await releasePlanLock(
+        auth.adminSupabase,
+        userId,
+        distributedLockToken,
+      ).catch((releaseError) =>
+        console.error("[admin/ai-team] Lock cleanup failed", releaseError),
+      );
+    }
+
     console.error("[admin/ai-team] Durable rate-limit guard failed", rateLimitError);
     return NextResponse.json(
       { error: "AI Team guard is temporarily unavailable." },
@@ -160,5 +248,15 @@ export async function POST(request: Request) {
     );
   } finally {
     activePlanningUsers.delete(userId);
+
+    if (distributedLockToken) {
+      await releasePlanLock(
+        auth.adminSupabase,
+        userId,
+        distributedLockToken,
+      ).catch((releaseError) =>
+        console.error("[admin/ai-team] Lock release failed", releaseError),
+      );
+    }
   }
 }
