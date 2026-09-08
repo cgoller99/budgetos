@@ -2,7 +2,13 @@ import "server-only";
 
 import type { BuxmeSupabaseClient } from "@/lib/supabase/client";
 
-export type AdminEventType = "error" | "stripe" | "plaid" | "auth" | "api_failure";
+export type AdminEventType =
+  | "error"
+  | "stripe"
+  | "plaid"
+  | "auth"
+  | "api_failure"
+  | "ai_team";
 
 export async function logAdminEvent(
   adminSupabase: BuxmeSupabaseClient,

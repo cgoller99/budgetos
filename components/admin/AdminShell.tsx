@@ -8,6 +8,7 @@ import { scheduleAdminHashScroll } from "@/components/admin/adminHashScroll";
 
 const NAV_ITEMS = [
   { href: "/admin", label: "Overview" },
+  { href: "/admin#ai-team", label: "AI Team" },
   { href: "/admin#revenue", label: "Revenue" },
   { href: "/admin#users", label: "Users" },
   { href: "/admin#feedback", label: "Feedback" },
