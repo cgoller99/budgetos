@@ -12,9 +12,15 @@ import { cn } from "@/components/ui/cn";
 import type {
   AiTeamAgent,
   AiTeamApprovalDecision,
+  AiTeamCustomerVoice,
+  AiTeamExecutionCandidate,
+  AiTeamExecutionPacket,
+  AiTeamFounderBrief,
   AiTeamPlan,
   AiTeamPlanningUsage,
   AiTeamPlaybook,
+  AiTeamProductAnalytics,
+  AiTeamRevenueIntelligence,
   AiTeamRun,
   AiTeamRuntimeInfo,
   AiTeamSnapshot,
@@ -25,6 +31,11 @@ import { CommandCenter } from "./ai-team/CommandCenter";
 import { Playbooks } from "./ai-team/Playbooks";
 import { RunExplorer } from "./ai-team/RunExplorer";
 import { WorkQueue } from "./ai-team/WorkQueue";
+import { CustomerVoiceCenter } from "./ai-team/CustomerVoiceCenter";
+import { ExecutionCenter } from "./ai-team/ExecutionCenter";
+import { FounderBriefCenter } from "./ai-team/FounderBriefCenter";
+import { ProductAnalyticsCenter } from "./ai-team/ProductAnalyticsCenter";
+import { RevenueCenter } from "./ai-team/RevenueCenter";
 
 type GetPayload = {
   agents: AiTeamAgent[];
@@ -47,15 +58,58 @@ type PostPayload = {
 type TabId =
   | "command"
   | "work"
+  | "execution"
+  | "analytics"
+  | "revenue"
+  | "customer-voice"
+  | "brief"
   | "runs"
   | "approvals"
   | "playbooks"
   | "evidence"
   | "agents";
 
+type V3TabId =
+  | "execution"
+  | "analytics"
+  | "revenue"
+  | "customer-voice"
+  | "brief";
+
+type V3LoadState = {
+  loaded: boolean;
+  loading: boolean;
+  error: string | null;
+};
+
+const V3_TAB_IDS: V3TabId[] = [
+  "execution",
+  "analytics",
+  "revenue",
+  "customer-voice",
+  "brief",
+];
+
+const INITIAL_V3_LOAD_STATE: Record<V3TabId, V3LoadState> = {
+  execution: { loaded: false, loading: false, error: null },
+  analytics: { loaded: false, loading: false, error: null },
+  revenue: { loaded: false, loading: false, error: null },
+  "customer-voice": { loaded: false, loading: false, error: null },
+  brief: { loaded: false, loading: false, error: null },
+};
+
+function isV3Tab(tab: TabId): tab is V3TabId {
+  return V3_TAB_IDS.includes(tab as V3TabId);
+}
+
 const TABS: Array<{ id: TabId; label: string }> = [
   { id: "command", label: "Command" },
-  { id: "work", label: "Work Queue" },
+  { id: "work", label: "Work" },
+  { id: "execution", label: "Execution" },
+  { id: "analytics", label: "Analytics" },
+  { id: "revenue", label: "Revenue" },
+  { id: "customer-voice", label: "Customer Voice" },
+  { id: "brief", label: "Brief" },
   { id: "runs", label: "Runs" },
   { id: "approvals", label: "Approvals" },
   { id: "playbooks", label: "Playbooks" },
@@ -72,6 +126,15 @@ export function AdminAiTeamSection() {
   const [approvalRuns, setApprovalRuns] = useState<AiTeamRun[]>([]);
   const [decisions, setDecisions] = useState<AiTeamApprovalDecision[]>([]);
   const [playbooks, setPlaybooks] = useState<AiTeamPlaybook[]>([]);
+  const [executionCandidates, setExecutionCandidates] = useState<AiTeamExecutionCandidate[]>([]);
+  const [executionPackets, setExecutionPackets] = useState<AiTeamExecutionPacket[]>([]);
+  const [productAnalytics, setProductAnalytics] = useState<AiTeamProductAnalytics | null>(null);
+  const [revenueIntelligence, setRevenueIntelligence] = useState<AiTeamRevenueIntelligence | null>(null);
+  const [customerVoice, setCustomerVoice] = useState<AiTeamCustomerVoice | null>(null);
+  const [founderBrief, setFounderBrief] = useState<AiTeamFounderBrief | null>(null);
+  const [briefGenerating, setBriefGenerating] = useState(false);
+  const [v3LoadState, setV3LoadState] =
+    useState<Record<V3TabId, V3LoadState>>(INITIAL_V3_LOAD_STATE);
   const [planningUsage, setPlanningUsage] = useState<AiTeamPlanningUsage>({
     used: 0,
     limit: 40,
@@ -83,6 +146,27 @@ export function AdminAiTeamSection() {
   const requestVersion = useRef(0);
   const planningRef = useRef(false);
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const v3LoadedRef = useRef<Record<V3TabId, boolean>>({
+    execution: false,
+    analytics: false,
+    revenue: false,
+    "customer-voice": false,
+    brief: false,
+  });
+  const v3LoadingRef = useRef<Record<V3TabId, boolean>>({
+    execution: false,
+    analytics: false,
+    revenue: false,
+    "customer-voice": false,
+    brief: false,
+  });
+  const v3RequestVersion = useRef<Record<V3TabId, number>>({
+    execution: 0,
+    analytics: 0,
+    revenue: 0,
+    "customer-voice": 0,
+    brief: 0,
+  });
 
   const load = useCallback(async () => {
     const version = ++requestVersion.current;
@@ -115,6 +199,77 @@ export function AdminAiTeamSection() {
     }
   }, []);
 
+  const loadV3Tab = useCallback(async (tab: V3TabId, refresh = false) => {
+    if (
+      (!refresh && v3LoadedRef.current[tab]) ||
+      v3LoadingRef.current[tab]
+    ) {
+      return;
+    }
+
+    const version = ++v3RequestVersion.current[tab];
+    v3LoadingRef.current[tab] = true;
+    setV3LoadState((current) => ({
+      ...current,
+      [tab]: { ...current[tab], loading: true, error: null },
+    }));
+
+    try {
+      const response = await fetch(`/api/admin/ai-team/${tab}`, {
+        cache: "no-store",
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        error?: string;
+      };
+      if (!response.ok) {
+        throw new Error(payload.error ?? `Unable to load ${tab.replace("-", " ")}.`);
+      }
+      if (version !== v3RequestVersion.current[tab]) return;
+
+      if (tab === "execution") {
+        const executionPayload = payload as {
+          packets?: AiTeamExecutionPacket[];
+          candidates?: AiTeamExecutionCandidate[];
+        };
+        setExecutionPackets(executionPayload.packets ?? []);
+        setExecutionCandidates(executionPayload.candidates ?? []);
+      } else if (tab === "analytics") {
+        setProductAnalytics(payload as AiTeamProductAnalytics);
+      } else if (tab === "revenue") {
+        setRevenueIntelligence(payload as AiTeamRevenueIntelligence);
+      } else if (tab === "customer-voice") {
+        setCustomerVoice(payload as AiTeamCustomerVoice);
+      } else {
+        setFounderBrief(
+          (payload as { brief?: AiTeamFounderBrief | null }).brief ?? null,
+        );
+      }
+
+      v3LoadedRef.current[tab] = true;
+      setV3LoadState((current) => ({
+        ...current,
+        [tab]: { loaded: true, loading: false, error: null },
+      }));
+    } catch (loadError) {
+      if (version !== v3RequestVersion.current[tab]) return;
+      setV3LoadState((current) => ({
+        ...current,
+        [tab]: {
+          ...current[tab],
+          loading: false,
+          error:
+            loadError instanceof Error
+              ? loadError.message
+              : `Unable to load ${tab.replace("-", " ")}.`,
+        },
+      }));
+    } finally {
+      if (version === v3RequestVersion.current[tab]) {
+        v3LoadingRef.current[tab] = false;
+      }
+    }
+  }, []);
+
   useEffect(() => {
     void load();
     const interval = window.setInterval(() => {
@@ -122,6 +277,10 @@ export function AdminAiTeamSection() {
     }, 60_000);
     return () => window.clearInterval(interval);
   }, [load]);
+
+  useEffect(() => {
+    if (isV3Tab(activeTab)) void loadV3Tab(activeTab);
+  }, [activeTab, loadV3Tab]);
 
   async function createPlan() {
     const trimmed = goal.trim();
@@ -225,6 +384,52 @@ export function AdminAiTeamSection() {
     );
   }
 
+  async function refreshFounderBrief() {
+    if (v3LoadingRef.current.brief) return;
+    const version = ++v3RequestVersion.current.brief;
+    v3LoadingRef.current.brief = true;
+    setBriefGenerating(true);
+    setV3LoadState((current) => ({
+      ...current,
+      brief: { ...current.brief, loading: true, error: null },
+    }));
+    try {
+      const response = await fetch("/api/admin/ai-team/brief", { method: "POST" });
+      const payload = (await response.json().catch(() => ({}))) as {
+        brief?: AiTeamFounderBrief;
+        error?: string;
+      };
+      if (!response.ok || !payload.brief) {
+        throw new Error(payload.error ?? "Unable to generate founder brief.");
+      }
+      if (version !== v3RequestVersion.current.brief) return;
+      setFounderBrief(payload.brief);
+      v3LoadedRef.current.brief = true;
+      setV3LoadState((current) => ({
+        ...current,
+        brief: { loaded: true, loading: false, error: null },
+      }));
+    } catch (briefError) {
+      if (version !== v3RequestVersion.current.brief) return;
+      setV3LoadState((current) => ({
+        ...current,
+        brief: {
+          ...current.brief,
+          loading: false,
+          error:
+            briefError instanceof Error
+              ? briefError.message
+              : "Unable to generate founder brief.",
+        },
+      }));
+    } finally {
+      if (version === v3RequestVersion.current.brief) {
+        v3LoadingRef.current.brief = false;
+        setBriefGenerating(false);
+      }
+    }
+  }
+
   async function deletePlaybook(id: string) {
     setError(null);
     const response = await fetch("/api/admin/ai-team/playbooks", {
@@ -262,7 +467,7 @@ export function AdminAiTeamSection() {
     return (
       <section id="ai-team" className="scroll-mt-28 space-y-5" aria-label="AI Mission Control">
         <div className="rounded-3xl border border-[var(--surface-border)] bg-[var(--surface-soft)] p-8">
-          <Badge variant="accent">AI Team V2</Badge>
+          <Badge variant="accent">AI Team V3</Badge>
           <h2 className="mt-4 text-2xl font-semibold text-[var(--foreground)]">
             Initializing Mission Control
           </h2>
@@ -302,7 +507,7 @@ export function AdminAiTeamSection() {
   };
 
   return (
-    <section id="ai-team" className="scroll-mt-28 space-y-5" aria-label="AI Mission Control V2">
+    <section id="ai-team" className="scroll-mt-28 space-y-5" aria-label="AI Mission Control V3">
       {error ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200" role="alert">
           <span>{error}</span>
@@ -365,6 +570,56 @@ export function AdminAiTeamSection() {
           />
         ) : null}
         {activeTab === "work" ? <WorkQueue runs={runs} decisions={decisions} /> : null}
+        {activeTab === "execution" ? (
+          <ExecutionCenter
+            candidates={executionCandidates}
+            packets={executionPackets}
+            onStaged={(packet) => {
+              setExecutionPackets((current) => [
+                packet,
+                ...current.filter((item) => item.id !== packet.id),
+              ]);
+              setExecutionCandidates((current) =>
+                current.filter((candidate) => candidate.task.id !== packet.taskId),
+              );
+            }}
+            onRefresh={() => void loadV3Tab("execution", true)}
+            loading={v3LoadState.execution.loading}
+            error={v3LoadState.execution.error}
+          />
+        ) : null}
+        {activeTab === "analytics" ? (
+          <ProductAnalyticsCenter
+            data={productAnalytics}
+            onRefresh={() => void loadV3Tab("analytics", true)}
+            loading={v3LoadState.analytics.loading}
+            error={v3LoadState.analytics.error}
+          />
+        ) : null}
+        {activeTab === "revenue" ? (
+          <RevenueCenter
+            data={revenueIntelligence}
+            onRefresh={() => void loadV3Tab("revenue", true)}
+            loading={v3LoadState.revenue.loading}
+            error={v3LoadState.revenue.error}
+          />
+        ) : null}
+        {activeTab === "customer-voice" ? (
+          <CustomerVoiceCenter
+            data={customerVoice}
+            onRefresh={() => void loadV3Tab("customer-voice", true)}
+            loading={v3LoadState["customer-voice"].loading}
+            error={v3LoadState["customer-voice"].error}
+          />
+        ) : null}
+        {activeTab === "brief" ? (
+          <FounderBriefCenter
+            brief={founderBrief}
+            onRefresh={refreshFounderBrief}
+            refreshing={briefGenerating || v3LoadState.brief.loading}
+            error={v3LoadState.brief.error}
+          />
+        ) : null}
         {activeTab === "runs" ? <RunExplorer runs={runs} /> : null}
         {activeTab === "approvals" ? (
           <ApprovalCenter runs={approvalRuns} decisions={decisions} onDecision={recordDecision} />

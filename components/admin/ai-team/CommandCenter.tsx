@@ -159,7 +159,7 @@ export function CommandCenter({
         <div className="relative flex flex-col justify-between gap-6 xl:flex-row">
           <div className="max-w-2xl">
             <div className="flex flex-wrap gap-2">
-              <Badge variant="accent">AI Team V2</Badge>
+              <Badge variant="accent">AI Team V3</Badge>
               <Badge variant={runtime.mode === "ai" ? "success" : "warning"}>
                 {runtime.mode === "ai" ? "Runtime online" : "Safe fallback"}
               </Badge>
@@ -168,8 +168,9 @@ export function CommandCenter({
               Executive Command Center
             </h2>
             <p className="mt-2 max-w-xl text-sm leading-relaxed text-[var(--text-secondary)]">
-              Evidence-first planning for Buxme. Decisions can be recorded, but no
-              underlying action executes from Mission Control.
+              Evidence-first planning plus dedicated execution, product analytics,
+              revenue, customer voice, and founder brief centers. Decisions can be
+              recorded, but no underlying action executes from Mission Control.
             </p>
           </div>
           <div className="grid gap-2 sm:grid-cols-2 xl:w-[440px]">

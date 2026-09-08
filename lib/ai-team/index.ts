@@ -22,13 +22,42 @@ export {
   listAiTeamPlaybooks,
   playbookFromRow,
 } from "@/lib/ai-team/operations";
+export {
+  executionPacketFromRow,
+  listAiTeamExecutionCandidates,
+  listAiTeamExecutionPackets,
+  stageAiTeamExecutionPacket,
+} from "@/lib/ai-team/executionPackets";
+export {
+  buildFounderBriefSections,
+  founderBriefFromRow,
+  getLatestAiTeamFounderBrief,
+  saveAiTeamFounderBrief,
+} from "@/lib/ai-team/founderBrief";
+export { getAiTeamProductAnalytics } from "@/lib/ai-team/productAnalytics";
+export { getAiTeamRevenueIntelligence } from "@/lib/ai-team/revenueIntelligence";
+export { getAiTeamCustomerVoice } from "@/lib/ai-team/customerVoice";
+export {
+  deriveRevenueIntelligence,
+  summarizeCustomerVoice,
+} from "@/lib/ai-team/v3Math";
 export type {
   AiTeamAgent,
   AiTeamAgentId,
   AiTeamApprovalDecision,
+  AiTeamCustomerVoice,
+  AiTeamEvidenceState,
+  AiTeamExecutionCandidate,
+  AiTeamExecutionPacket,
+  AiTeamFounderBrief,
+  AiTeamFounderBriefSections,
   AiTeamPlan,
   AiTeamPlanningUsage,
   AiTeamPlaybook,
+  AiTeamProductAnalytics,
+  AiTeamProductSignal,
+  AiTeamRevenueIntelligence,
+  AiTeamRevenueProjection,
   AiTeamRun,
   AiTeamRuntimeMetadata,
   AiTeamRuntimeInfo,

@@ -122,6 +122,140 @@ export type AiTeamPlanningUsage = {
   limit: number;
 };
 
+export type AiTeamEvidenceState = "observed" | "derived" | "missing";
+
+export type AiTeamProductSignal = {
+  id: string;
+  label: string;
+  state: AiTeamEvidenceState;
+  value: number | string | null;
+  detail: string;
+  source: string;
+  numerator?: number;
+  denominator?: number;
+  rate?: number;
+};
+
+export type AiTeamProductAnalytics = {
+  generatedAt: string;
+  posthog: {
+    status: "connected" | "missing_config" | "error";
+    detail: string;
+  };
+  signals: AiTeamProductSignal[];
+  funnels: Array<{
+    id: string;
+    label: string;
+    stages: Array<{ label: string; count: number | null; source: string }>;
+    conversionRate: number | null;
+  }>;
+  missingEvidence: string[];
+};
+
+export type AiTeamRevenueProjection = {
+  targetMrr: number;
+  blendedCustomersNeeded: number | null;
+  proCustomersNeeded: number;
+  proPlusCustomersNeeded: number;
+};
+
+export type AiTeamRevenueIntelligence = AdminRevenueMetrics & {
+  generatedAt: string;
+  paidUsers: number;
+  arpu: number | null;
+  freeToPaidRatio: number | null;
+  proMonthlyPrice: number;
+  proPlusMonthlyPrice: number;
+  projections: AiTeamRevenueProjection[];
+  notes: string[];
+};
+
+export type AiTeamCustomerVoice = {
+  generatedAt: string;
+  total: number;
+  counts: {
+    byType: Record<string, number>;
+    byCategory: Record<string, number>;
+    byStatus: Record<string, number>;
+    byPriority: Record<string, number>;
+  };
+  themes: Array<{
+    id: string;
+    label: string;
+    count: number;
+    reportIds: string[];
+  }>;
+  recentSignals: Array<{
+    id: string;
+    type: string;
+    priority: string;
+    snippet: string;
+    pagePath: string | null;
+    createdAt: string;
+  }>;
+  frictionSurfaces: {
+    paths: Array<{ value: string; count: number }>;
+    devices: Array<{ value: string; count: number }>;
+    appVersions: Array<{ value: string; count: number }>;
+  };
+  investigationPrompts: string[];
+};
+
+export type AiTeamExecutionCandidate = {
+  task: AiTeamTask;
+  run: {
+    id: string;
+    goal: string;
+    summary: string;
+    createdAt: string;
+  };
+  decision: AiTeamApprovalDecision;
+};
+
+export type AiTeamExecutionPacket = {
+  id: string;
+  taskId: string;
+  runId: string;
+  approvalDecisionId: string;
+  createdBy: string;
+  status: "staged" | "claimed" | "completed" | "failed";
+  task: Record<string, unknown>;
+  run: Record<string, unknown>;
+  approval: Record<string, unknown>;
+  evidence: string[];
+  proposedBranchName: string;
+  implementationBrief: string;
+  validationChecklist: string[];
+  rollbackNotes: string;
+  requiresExternalOperator: true;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AiTeamFounderBriefSections = {
+  whatChanged: string[];
+  revenue: string[];
+  product: string[];
+  customers: string[];
+  reliability: string[];
+  decisionsWaiting: string[];
+  executionReadyWork: string[];
+  topPriorities: string[];
+  risks: string[];
+  missingEvidence: string[];
+};
+
+export type AiTeamFounderBrief = {
+  id: string;
+  briefDate: string;
+  generatedBy: string;
+  source: "deterministic" | "ai";
+  snapshot: Record<string, unknown>;
+  sections: AiTeamFounderBriefSections;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type AiTeamRuntimeInfo = {
   mode: "ai" | "fallback";
   specialistModel: string;

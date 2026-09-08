@@ -78,7 +78,7 @@ const healthRoute = await readFile(
   "utf8",
 );
 for (const field of [
-  'version: "2.0.0"',
+  'version: "3.0.0"',
   "persistenceConfigured",
   "runtimeConfigured",
   "ready",
