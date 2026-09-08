@@ -230,7 +230,18 @@ function taskFromModel(
     title: input.title,
     objective: input.objective,
     status: requiresApproval ? "needs_approval" : "queued",
-    evidence: snapshot.observations.slice(0, 3),
+    evidence: [
+      ...snapshot.observations.slice(0, 3),
+      ...(snapshot.unavailableSources.length > 0
+        ? [`Unavailable sources: ${snapshot.unavailableSources.join(", ")}`]
+        : []),
+      ...(snapshot.revenue && !snapshot.revenue.available
+        ? ["Stripe live revenue data is unavailable or partial."]
+        : []),
+      ...(snapshot.plaid && !snapshot.plaid.available
+        ? ["Plaid live connection data is unavailable."]
+        : []),
+    ].slice(0, 5),
     requiresApproval,
     approvalReason: requiresApproval
       ? input.approvalReason?.trim() ||

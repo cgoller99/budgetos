@@ -7,13 +7,14 @@ import {
   createAiTeamPlan,
   getAiTeamRuntimeInfo,
   getAiTeamSnapshot,
+  listAiTeamApprovalRuns,
   listRecentAiTeamRuns,
   saveAiTeamRun,
 } from "@/lib/ai-team";
 
 const PLAN_COOLDOWN_MS = 15_000;
 const PLAN_DAILY_LIMIT = 40;
-const PLAN_LOCK_STALE_MS = 180_000;
+const PLAN_LOCK_STALE_MS = 10 * 60_000;
 const activePlanningUsers = new Set<string>();
 const lastPlanStartedAt = new Map<string, number>();
 
@@ -117,15 +118,17 @@ export async function GET() {
   if ("response" in auth) return auth.response;
 
   try {
-    const [snapshot, recentRuns] = await Promise.all([
+    const [snapshot, recentRuns, approvalRuns] = await Promise.all([
       getAiTeamSnapshot(auth.adminSupabase),
       listRecentAiTeamRuns(auth.adminSupabase),
+      listAiTeamApprovalRuns(auth.adminSupabase),
     ]);
     return NextResponse.json({
       agents: AI_TEAM_AGENTS,
       runtime: getAiTeamRuntimeInfo(),
       snapshot,
       recentRuns,
+      approvalRuns,
     });
   } catch (error) {
     console.error("[admin/ai-team] Load failed", error);

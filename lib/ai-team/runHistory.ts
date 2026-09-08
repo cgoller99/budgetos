@@ -185,3 +185,47 @@ export async function listRecentAiTeamRuns(
 
   return runs.map((run) => runFromRow(run, tasksByRun.get(run.id) ?? []));
 }
+
+export async function listAiTeamApprovalRuns(
+  adminSupabase: BuxmeSupabaseClient,
+): Promise<AiTeamRun[]> {
+  const { data: tasks, error: tasksError } = await adminSupabase
+    .from("ai_team_tasks")
+    .select("*")
+    .eq("requires_approval", true)
+    .eq("status", "needs_approval")
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (tasksError) {
+    throw new Error("Unable to load AI Team approval tasks.", {
+      cause: tasksError,
+    });
+  }
+
+  if (tasks.length === 0) return [];
+
+  const runIds = [...new Set(tasks.map((task) => task.run_id))].slice(0, 20);
+  const selectedTasks = tasks.filter((task) => runIds.includes(task.run_id));
+
+  const { data: runs, error: runsError } = await adminSupabase
+    .from("ai_team_runs")
+    .select("*")
+    .in("id", runIds)
+    .order("created_at", { ascending: false });
+
+  if (runsError) {
+    throw new Error("Unable to load AI Team approval runs.", {
+      cause: runsError,
+    });
+  }
+
+  const tasksByRun = new Map<string, AiTeamTask[]>();
+  for (const task of selectedTasks) {
+    const runTasks = tasksByRun.get(task.run_id) ?? [];
+    runTasks.push(taskFromRow(task));
+    tasksByRun.set(task.run_id, runTasks);
+  }
+
+  return runs.map((run) => runFromRow(run, tasksByRun.get(run.id) ?? []));
+}

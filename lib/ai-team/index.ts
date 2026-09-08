@@ -11,6 +11,7 @@ export {
 } from "@/lib/ai-team/modelRuntime";
 export { selectAiTeamSpecialists } from "@/lib/ai-team/routing";
 export {
+  listAiTeamApprovalRuns,
   listRecentAiTeamRuns,
   saveAiTeamRun,
 } from "@/lib/ai-team/runHistory";
