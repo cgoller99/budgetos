@@ -29,6 +29,9 @@ async function persistenceIsConfigured(): Promise<boolean> {
       adminSupabase
         .from("ai_team_founder_briefs")
         .select("id", { head: true, count: "exact" }),
+      adminSupabase
+        .from("ai_team_activity_events")
+        .select("id", { head: true, count: "exact" }),
     ]);
     return checks.every((result) => !result.error);
   } catch {
@@ -44,7 +47,7 @@ export async function GET() {
   return NextResponse.json(
     {
       ok: ready,
-      version: "3.0.0",
+      version: "4.0.0",
       ready,
       persistenceConfigured,
       runtimeConfigured,
@@ -54,6 +57,7 @@ export async function GET() {
         revenueIntelligence: true,
         customerVoice: true,
         founderBrief: persistenceConfigured,
+        liveActivityTrace: persistenceConfigured,
       },
     },
     { status: ready ? 200 : 503 },

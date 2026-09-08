@@ -37,6 +37,35 @@ export type AiTeamAgent = {
   costAwareness: "core" | "default" | "conditional";
 };
 
+export type AiTeamActivityStatus =
+  | "pending"
+  | "running"
+  | "completed"
+  | "warning"
+  | "failed";
+
+export type AiTeamActivityEvent = {
+  id: string;
+  operationId: string;
+  createdBy: string;
+  runId: string | null;
+  agentId: AiTeamAgentId | null;
+  phase: string;
+  status: AiTeamActivityStatus;
+  label: string;
+  detail: string | null;
+  ordinal: number;
+  createdAt: string;
+};
+
+export type AiTeamProgressEvent = {
+  agentId?: AiTeamAgentId;
+  phase: string;
+  status: AiTeamActivityStatus;
+  label: string;
+  detail?: string;
+};
+
 export type AiTeamRuntimeMetadata = {
   selectedSpecialists: AiTeamAgentId[];
   modelCallCount?: number;

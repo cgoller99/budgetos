@@ -4,6 +4,8 @@ import { requireAdminApiUser } from "@/lib/admin/apiAuth";
 import type { BuxmeSupabaseClient } from "@/lib/supabase/client";
 import {
   AI_TEAM_AGENTS,
+  appendAiTeamActivity,
+  attachAiTeamActivityRun,
   createAiTeamPlan,
   getAiTeamRuntimeInfo,
   getAiTeamSnapshot,
@@ -17,12 +19,14 @@ import {
 const PLAN_COOLDOWN_MS = 15_000;
 const PLAN_DAILY_LIMIT = 40;
 const PLAN_LOCK_STALE_MS = 10 * 60_000;
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const activePlanningUsers = new Set<string>();
 const lastPlanStartedAt = new Map<string, number>();
 
-function planLockId(userId: string): string {
+function deterministicUuid(namespace: string, value: string): string {
   const hex = createHash("sha256")
-    .update("ai-team-lock:" + userId)
+    .update(namespace + ":" + value)
     .digest("hex")
     .slice(0, 32);
 
@@ -33,6 +37,14 @@ function planLockId(userId: string): string {
     "a" + hex.slice(17, 20),
     hex.slice(20, 32),
   ].join("-");
+}
+
+function planLockId(userId: string): string {
+  return deterministicUuid("ai-team-lock", userId);
+}
+
+function operationReservationId(userId: string, operationId: string): string {
+  return deterministicUuid("ai-team-operation", userId + ":" + operationId);
 }
 
 async function hasDailyPlanCapacity(
@@ -109,6 +121,24 @@ async function recordPlanStart(
   if (error) throw error;
 }
 
+async function reserveOperationId(
+  adminSupabase: BuxmeSupabaseClient,
+  userId: string,
+  operationId: string,
+): Promise<boolean> {
+  const { error } = await adminSupabase.from("admin_event_logs").insert({
+    id: operationReservationId(userId, operationId),
+    event_type: "ai_team",
+    message: "AI Team operation reserved",
+    metadata: { operationId },
+    user_id: userId,
+  });
+
+  if (!error) return true;
+  if (error.code === "23505") return false;
+  throw error;
+}
+
 async function releasePlanLock(
   adminSupabase: BuxmeSupabaseClient,
   userId: string,
@@ -171,9 +201,11 @@ export async function POST(request: Request) {
   if ("response" in auth) return auth.response;
 
   const body = (await request.json().catch(() => null)) as
-    | { goal?: unknown }
+    | { goal?: unknown; operationId?: unknown }
     | null;
   const goal = typeof body?.goal === "string" ? body.goal.trim() : "";
+  const suppliedOperationId =
+    typeof body?.operationId === "string" ? body.operationId.trim() : null;
 
   if (goal.length < 3 || goal.length > 1000) {
     return NextResponse.json(
@@ -182,7 +214,42 @@ export async function POST(request: Request) {
     );
   }
 
+  if (
+    body?.operationId !== undefined &&
+    (!suppliedOperationId || !UUID_PATTERN.test(suppliedOperationId))
+  ) {
+    return NextResponse.json(
+      { error: "operationId must be a valid UUID." },
+      { status: 400 },
+    );
+  }
+
+  const operationId = suppliedOperationId ?? randomUUID();
   const userId = auth.user.id;
+
+  try {
+    const reserved = await reserveOperationId(
+      auth.adminSupabase,
+      userId,
+      operationId,
+    );
+    if (!reserved) {
+      return NextResponse.json(
+        { error: "operationId has already been used.", operationId },
+        { status: 409 },
+      );
+    }
+  } catch (operationReservationError) {
+    console.error(
+      "[admin/ai-team] Operation reservation failed",
+      operationReservationError,
+    );
+    return NextResponse.json(
+      { error: "AI Team operation guard is temporarily unavailable." },
+      { status: 503 },
+    );
+  }
+
   const now = Date.now();
   const lastStartedAt = lastPlanStartedAt.get(userId) ?? 0;
 
@@ -245,11 +312,65 @@ export async function POST(request: Request) {
   activePlanningUsers.add(userId);
   lastPlanStartedAt.set(userId, now);
 
+  let ordinal = 0;
+  let persistedRunId: string | undefined;
+  const recordActivity = async (event: {
+    agentId?: (typeof AI_TEAM_AGENTS)[number]["id"];
+    phase: string;
+    status: "pending" | "running" | "completed" | "warning" | "failed";
+    label: string;
+    detail?: string;
+  }): Promise<void> => {
+    const eventOrdinal = ordinal++;
+    try {
+      await appendAiTeamActivity(auth.adminSupabase, {
+        operationId,
+        createdBy: userId,
+        runId: persistedRunId,
+        ordinal: eventOrdinal,
+        ...event,
+      });
+    } catch (activityError) {
+      console.error("[admin/ai-team] Activity write failed", {
+        operationId,
+        ordinal: eventOrdinal,
+        phase: event.phase,
+        error: activityError,
+      });
+    }
+  };
+
   try {
+    await recordActivity({
+      phase: "initializing",
+      status: "running",
+      label: "Command accepted",
+      detail: "Mission Control is initializing a safe operational plan.",
+    });
+    await recordActivity({
+      phase: "evidence",
+      status: "running",
+      label: "Collecting evidence",
+      detail: "Loading current operating, revenue, product, Plaid, and health signals.",
+    });
     const snapshot = await getAiTeamSnapshot(auth.adminSupabase);
-    const plan = await createAiTeamPlan(goal, snapshot);
+    await recordActivity({
+      phase: "evidence",
+      status: "completed",
+      label: "Evidence collection completed",
+      detail: `${snapshot.unavailableSources.length} evidence source${
+        snapshot.unavailableSources.length === 1 ? "" : "s"
+      } unavailable.`,
+    });
+    const plan = await createAiTeamPlan(goal, snapshot, recordActivity);
     let run;
 
+    await recordActivity({
+      phase: "persistence",
+      status: "running",
+      label: "Saving command result",
+      detail: "Persisting the plan and its approval-aware tasks.",
+    });
     try {
       run = await saveAiTeamRun(
         auth.adminSupabase,
@@ -259,13 +380,58 @@ export async function POST(request: Request) {
       );
     } catch (persistenceError) {
       console.error("[admin/ai-team] Plan persistence failed", persistenceError);
+      await recordActivity({
+        phase: "persistence",
+        status: "failed",
+        label: "Plan persistence failed",
+        detail: "The generated plan could not be safely saved.",
+      }).catch((activityError) =>
+        console.error("[admin/ai-team] Failure activity write failed", activityError),
+      );
+      await recordActivity({
+        phase: "operation",
+        status: "failed",
+        label: "Command failed",
+        detail: "Mission Control stopped because the plan could not be persisted.",
+      }).catch((activityError) =>
+        console.error("[admin/ai-team] Failure activity write failed", activityError),
+      );
       return NextResponse.json(
-        { error: "The plan was generated but could not be saved. Please try again." },
+        {
+          error: "The plan was generated but could not be saved. Please try again.",
+          operationId,
+        },
         { status: 500 },
       );
     }
 
+    persistedRunId = run.id;
+    await attachAiTeamActivityRun(
+      auth.adminSupabase,
+      userId,
+      operationId,
+      run.id,
+    ).catch((activityAttachError) =>
+      console.error(
+        "[admin/ai-team] Activity run attachment failed",
+        activityAttachError,
+      ),
+    );
+    await recordActivity({
+      phase: "persistence",
+      status: "completed",
+      label: "Command result saved",
+      detail: "The plan, tasks, and operational trace are linked to the run.",
+    });
+    await recordActivity({
+      phase: "operation",
+      status: "completed",
+      label: "Command completed",
+      detail: "The final plan is ready for founder review.",
+    });
+
     return NextResponse.json({
+      operationId,
       plan,
       run,
       runtime: getAiTeamRuntimeInfo(),
@@ -273,8 +439,16 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("[admin/ai-team] Planning failed", error);
+    await recordActivity({
+      phase: "operation",
+      status: "failed",
+      label: "Command failed",
+      detail: "Mission Control stopped after an operational error.",
+    }).catch((activityError) =>
+      console.error("[admin/ai-team] Failure activity write failed", activityError),
+    );
     return NextResponse.json(
-      { error: "Unable to create AI Team plan." },
+      { error: "Unable to create AI Team plan.", operationId },
       { status: 500 },
     );
   } finally {

@@ -14,6 +14,7 @@ import {
 import type {
   AiTeamAgentId,
   AiTeamPlan,
+  AiTeamProgressEvent,
   AiTeamRuntimeMetadata,
   AiTeamSnapshot,
   AiTeamTask,
@@ -24,6 +25,28 @@ const SPECIALIST_MODEL =
 const ORCHESTRATOR_MODEL =
   process.env.AI_TEAM_ORCHESTRATOR_MODEL?.trim() || "openai/gpt-5.6-sol-fast";
 const MODEL_TIMEOUT_MS = 35_000;
+
+export type AiTeamProgressCallback = (
+  event: AiTeamProgressEvent,
+) => void | Promise<void>;
+
+const AGENT_ACTIVITY_LABELS: Record<AiTeamAgentId, string> = {
+  chief_of_staff: "Chief of Staff",
+  engineering: "Engineering",
+  qa: "QA",
+  analytics: "Analytics",
+  product: "Product",
+  growth: "Growth",
+  customer: "Customer",
+  critic: "Critic",
+};
+
+async function emitProgress(
+  onProgress: AiTeamProgressCallback | undefined,
+  event: AiTeamProgressEvent,
+): Promise<void> {
+  await onProgress?.(event);
+}
 
 const recommendationSchema = z.object({
   title: z.string().min(3).max(140),
@@ -227,7 +250,6 @@ function runtimeMetadata(
   selectedSpecialists: RoutedSpecialistId[],
   generations: GenerationTelemetry[],
   startedAt: number,
-  criticSummary?: string,
 ): AiTeamRuntimeMetadata {
   const sumAvailable = (
     field: "inputTokens" | "outputTokens" | "totalTokens",
@@ -250,7 +272,6 @@ function runtimeMetadata(
     inputTokens: sumAvailable("inputTokens"),
     outputTokens: sumAvailable("outputTokens"),
     totalTokens: sumAvailable("totalTokens"),
-    criticSummary: criticSummary?.trim() || undefined,
   };
 }
 
@@ -308,10 +329,27 @@ function fallbackPlan(goal: string, snapshot: AiTeamSnapshot): AiTeamPlan {
 export async function createAiTeamPlan(
   goal: string,
   snapshot: AiTeamSnapshot,
+  onProgress?: AiTeamProgressCallback,
 ): Promise<AiTeamPlan> {
   const startedAt = Date.now();
   const selectedSpecialists = selectAiTeamSpecialists(goal);
+  await emitProgress(onProgress, {
+    phase: "routing",
+    status: "completed",
+    label: "Agents routed",
+    detail: `Selected ${selectedSpecialists
+      .map((id) => `${AGENT_ACTIVITY_LABELS[id]} (${id})`)
+      .join(", ")}, Critic (critic), and Chief of Staff (chief_of_staff).`,
+  });
+
   if (!isAiTeamModelRuntimeAvailable()) {
+    await emitProgress(onProgress, {
+      phase: "fallback",
+      status: "warning",
+      label: "Safe planning fallback active",
+      detail:
+        "The model runtime is unavailable; the deterministic evidence-first planner is being used.",
+    });
     return {
       ...fallbackPlan(goal, snapshot),
       runtimeMetadata: {
@@ -333,6 +371,13 @@ export async function createAiTeamPlan(
       MODEL_TIMEOUT_MS,
     );
     const specialistPromises = selectedSpecialists.map(async (id) => {
+      await emitProgress(onProgress, {
+        phase: "specialist",
+        agentId: id,
+        status: "running",
+        label: `${AGENT_ACTIVITY_LABELS[id]} active`,
+        detail: "Reviewing the available evidence for this command.",
+      });
       try {
         const generation = await specialistBrief(
           routedSpecialistAgents[id],
@@ -341,8 +386,22 @@ export async function createAiTeamPlan(
           specialistAbortController.signal,
         );
         completedGenerations.push(generation);
+        await emitProgress(onProgress, {
+          phase: "specialist",
+          agentId: id,
+          status: "completed",
+          label: `${AGENT_ACTIVITY_LABELS[id]} completed`,
+          detail: "Specialist recommendations are ready for review.",
+        });
         return [id, generation] as const;
       } catch (error) {
+        await emitProgress(onProgress, {
+          phase: "specialist",
+          agentId: id,
+          status: "failed",
+          label: `${AGENT_ACTIVITY_LABELS[id]} did not complete`,
+          detail: "The specialist runtime stopped before producing a usable result.",
+        });
         specialistAbortController.abort(error);
         throw error;
       }
@@ -363,8 +422,34 @@ export async function createAiTeamPlan(
       string,
       unknown
     >;
-    const criticResult = await criticBrief(goal, snapshot, specialistBriefs);
+    await emitProgress(onProgress, {
+      phase: "critic",
+      agentId: "critic",
+      status: "running",
+      label: "Critic reviewing",
+      detail: "Challenging scope, evidence quality, and operational risk.",
+    });
+    let criticResult: Awaited<ReturnType<typeof criticBrief>>;
+    try {
+      criticResult = await criticBrief(goal, snapshot, specialistBriefs);
+    } catch (error) {
+      await emitProgress(onProgress, {
+        phase: "critic",
+        agentId: "critic",
+        status: "failed",
+        label: "Critic review did not complete",
+        detail: "The reviewer runtime stopped before producing a usable result.",
+      });
+      throw error;
+    }
     completedGenerations.push(criticResult);
+    await emitProgress(onProgress, {
+      phase: "critic",
+      agentId: "critic",
+      status: "completed",
+      label: "Critic review completed",
+      detail: "The specialist direction has completed safety and evidence review.",
+    });
     const critic = criticResult.output;
     const specialistContext = JSON.stringify(
       { ...specialistBriefs, critic },
@@ -372,17 +457,43 @@ export async function createAiTeamPlan(
       2,
     );
 
-    const result = await chiefOfStaffAgent.generate({
-      prompt:
-        "Founder goal:\n" +
-        goal +
-        "\n\nEvidence snapshot:\n" +
-        snapshotForPrompt(snapshot) +
-        "\n\nSpecialist briefs:\n" +
-        specialistContext,
-      abortSignal: AbortSignal.timeout(MODEL_TIMEOUT_MS),
+    await emitProgress(onProgress, {
+      phase: "chief",
+      agentId: "chief_of_staff",
+      status: "running",
+      label: "Chief synthesizing",
+      detail: "Prioritizing reviewed findings into the final plan.",
     });
+    let result: Awaited<ReturnType<typeof chiefOfStaffAgent.generate>>;
+    try {
+      result = await chiefOfStaffAgent.generate({
+        prompt:
+          "Founder goal:\n" +
+          goal +
+          "\n\nEvidence snapshot:\n" +
+          snapshotForPrompt(snapshot) +
+          "\n\nSpecialist briefs:\n" +
+          specialistContext,
+        abortSignal: AbortSignal.timeout(MODEL_TIMEOUT_MS),
+      });
+    } catch (error) {
+      await emitProgress(onProgress, {
+        phase: "chief",
+        agentId: "chief_of_staff",
+        status: "failed",
+        label: "Chief synthesis did not complete",
+        detail: "The orchestrator runtime stopped before producing a usable plan.",
+      });
+      throw error;
+    }
     completedGenerations.push(result);
+    await emitProgress(onProgress, {
+      phase: "chief",
+      agentId: "chief_of_staff",
+      status: "completed",
+      label: "Chief synthesis completed",
+      detail: "A prioritized, approval-aware plan is ready to save.",
+    });
 
     const tasks = result.output.tasks.map((item, index) =>
       taskFromModel(item, index, goal, snapshot),
@@ -406,11 +517,17 @@ export async function createAiTeamPlan(
         selectedSpecialists,
         completedGenerations,
         startedAt,
-        critic.summary,
       ),
     };
   } catch (error) {
     console.error("[ai-team/model] Falling back to deterministic planning", error);
+    await emitProgress(onProgress, {
+      phase: "fallback",
+      status: "warning",
+      label: "Model runtime fallback engaged",
+      detail:
+        "A model step did not complete; the deterministic evidence-first planner produced the plan.",
+    });
     return {
       ...fallbackPlan(goal, snapshot),
       runtimeMetadata: runtimeMetadata(

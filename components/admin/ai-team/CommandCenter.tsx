@@ -1,5 +1,7 @@
 "use client";
 
+export { CommandCenter } from "./CommandCenterV4";
+
 import { Badge, Button, Card, CardContent, CardHeader } from "@/components/ui";
 import {
   launchReadinessScore,
@@ -90,7 +92,7 @@ function ScoreCard({
   );
 }
 
-export function CommandCenter({
+export function LegacyCommandCenter({
   goal,
   setGoal,
   createPlan,

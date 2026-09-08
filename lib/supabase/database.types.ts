@@ -751,6 +751,46 @@ export type AiTeamTaskInsert = {
 
 export type AiTeamTaskUpdate = Partial<AiTeamTaskInsert>;
 
+export type AiTeamActivityStatus =
+  | "pending"
+  | "running"
+  | "completed"
+  | "warning"
+  | "failed";
+
+export type AiTeamActivityEventRow = {
+  id: string;
+  operation_id: string;
+  created_by: string;
+  run_id: string | null;
+  agent_id: AiTeamTaskOwner | null;
+  phase: string;
+  status: AiTeamActivityStatus;
+  label: string;
+  detail: string | null;
+  ordinal: number;
+  created_at: string;
+};
+
+export type AiTeamActivityEventInsert = {
+  id?: string;
+  operation_id: string;
+  created_by: string;
+  run_id?: string | null;
+  agent_id?: AiTeamTaskOwner | null;
+  phase: string;
+  status: AiTeamActivityStatus;
+  label: string;
+  detail?: string | null;
+  ordinal: number;
+  created_at?: string;
+};
+
+export type AiTeamActivityEventUpdate = Pick<
+  Partial<AiTeamActivityEventInsert>,
+  "run_id"
+>;
+
 export type AiTeamApprovalDecisionRow = {
   id: string;
   task_id: string;
@@ -1059,6 +1099,20 @@ export type Database = {
         Insert: AiTeamRunInsert;
         Update: AiTeamRunUpdate;
         Relationships: [];
+      };
+      ai_team_activity_events: {
+        Row: AiTeamActivityEventRow;
+        Insert: AiTeamActivityEventInsert;
+        Update: AiTeamActivityEventUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "ai_team_activity_events_run_id_fkey";
+            columns: ["run_id"];
+            isOneToOne: false;
+            referencedRelation: "ai_team_runs";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       ai_team_approval_decisions: {
         Row: AiTeamApprovalDecisionRow;
