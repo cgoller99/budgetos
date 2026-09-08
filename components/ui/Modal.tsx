@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { lockBodyScroll, unlockBodyScroll } from "@/lib/ui/bodyScrollLock";
 import { useNativeIos } from "@/lib/native/useNativeIos";
@@ -18,6 +18,7 @@ type ModalProps = {
 export function Modal({ isOpen, onClose, title, children }: ModalProps) {
   const [isMounted, setIsMounted] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const nativeIos = useNativeIos();
 
   useEffect(() => {
@@ -46,17 +47,54 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
   }, [isOpen, nativeIos]);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || !isMounted) return;
+    const previouslyFocused =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    const focusableSelector =
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    const getFocusable = () =>
+      Array.from(
+        dialogRef.current?.querySelectorAll<HTMLElement>(focusableSelector) ?? [],
+      ).filter((element) => element.getClientRects().length > 0);
+    const frame = window.requestAnimationFrame(() => {
+      const firstFocusable = getFocusable()[0];
+      (firstFocusable ?? dialogRef.current)?.focus();
+    });
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         onClose();
+        return;
+      }
+      if (event.key !== "Tab" || !dialogRef.current) return;
+
+      const focusable = getFocusable();
+      if (focusable.length === 0) {
+        event.preventDefault();
+        dialogRef.current.focus();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable.at(-1)!;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
       }
     }
 
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("keydown", handleKeyDown);
+      previouslyFocused?.focus();
+    };
+  }, [isMounted, isOpen, onClose]);
 
   if (!isMounted || typeof document === "undefined") return null;
 
@@ -77,6 +115,8 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
         )}
       />
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"

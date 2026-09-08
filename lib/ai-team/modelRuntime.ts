@@ -1,6 +1,7 @@
 import "server-only";
 
 import { Output, ToolLoopAgent } from "ai";
+import { getVercelOidcTokenSync } from "@vercel/oidc";
 import { z } from "zod";
 import {
   buildAiTeamPlan,
@@ -13,6 +14,7 @@ import {
 import type {
   AiTeamAgentId,
   AiTeamPlan,
+  AiTeamRuntimeMetadata,
   AiTeamSnapshot,
   AiTeamTask,
 } from "@/lib/ai-team/types";
@@ -127,14 +129,20 @@ const chiefOfStaffAgent = new ToolLoopAgent({
   output: chiefOutput,
   maxOutputTokens: 1200,
 });
-function modelRuntimeAvailable(): boolean {
+export function isAiTeamModelRuntimeAvailable(): boolean {
   if (process.env.AI_TEAM_DISABLE_MODEL === "1") return false;
-  return Boolean(process.env.AI_GATEWAY_API_KEY?.trim() || process.env.VERCEL);
+  if (process.env.AI_GATEWAY_API_KEY?.trim()) return true;
+
+  try {
+    return Boolean(getVercelOidcTokenSync()?.trim());
+  } catch {
+    return false;
+  }
 }
 
 export function getAiTeamRuntimeInfo() {
   return {
-    mode: modelRuntimeAvailable() ? "ai" : "fallback",
+    mode: isAiTeamModelRuntimeAvailable() ? "ai" : "fallback",
     specialistModel: SPECIALIST_MODEL,
     orchestratorModel: ORCHESTRATOR_MODEL,
   } as const;
@@ -173,6 +181,7 @@ async function specialistBrief(
   agent: ReturnType<typeof makeSpecialistAgent>,
   goal: string,
   snapshot: AiTeamSnapshot,
+  abortSignal: AbortSignal,
 ) {
   const result = await agent.generate({
     prompt:
@@ -180,10 +189,10 @@ async function specialistBrief(
       goal +
       "\n\nEvidence snapshot:\n" +
       snapshotForPrompt(snapshot),
-    abortSignal: AbortSignal.timeout(MODEL_TIMEOUT_MS),
+    abortSignal,
   });
 
-  return result.output;
+  return result;
 }
 
 async function criticBrief(
@@ -202,7 +211,47 @@ async function criticBrief(
     abortSignal: AbortSignal.timeout(MODEL_TIMEOUT_MS),
   });
 
-  return result.output;
+  return result;
+}
+
+type GenerationTelemetry = {
+  usage: {
+    inputTokens: number | undefined;
+    outputTokens: number | undefined;
+    totalTokens: number | undefined;
+  };
+  steps: unknown[];
+};
+
+function runtimeMetadata(
+  selectedSpecialists: RoutedSpecialistId[],
+  generations: GenerationTelemetry[],
+  startedAt: number,
+  criticSummary?: string,
+): AiTeamRuntimeMetadata {
+  const sumAvailable = (
+    field: "inputTokens" | "outputTokens" | "totalTokens",
+  ): number | undefined => {
+    const values = generations
+      .map((generation) => generation.usage[field])
+      .filter((value): value is number => typeof value === "number");
+    return values.length > 0
+      ? values.reduce((total, value) => total + value, 0)
+      : undefined;
+  };
+
+  return {
+    selectedSpecialists,
+    modelCallCount: generations.reduce(
+      (total, generation) => total + generation.steps.length,
+      0,
+    ),
+    durationMs: Math.max(0, Date.now() - startedAt),
+    inputTokens: sumAvailable("inputTokens"),
+    outputTokens: sumAvailable("outputTokens"),
+    totalTokens: sumAvailable("totalTokens"),
+    criticSummary: criticSummary?.trim() || undefined,
+  };
 }
 
 function taskFromModel(
@@ -260,24 +309,63 @@ export async function createAiTeamPlan(
   goal: string,
   snapshot: AiTeamSnapshot,
 ): Promise<AiTeamPlan> {
-  if (!modelRuntimeAvailable()) {
-    return fallbackPlan(goal, snapshot);
+  const startedAt = Date.now();
+  const selectedSpecialists = selectAiTeamSpecialists(goal);
+  if (!isAiTeamModelRuntimeAvailable()) {
+    return {
+      ...fallbackPlan(goal, snapshot),
+      runtimeMetadata: {
+        selectedSpecialists,
+        modelCallCount: 0,
+        durationMs: Math.max(0, Date.now() - startedAt),
+      },
+    };
   }
 
+  const completedGenerations: GenerationTelemetry[] = [];
   try {
-    const selectedSpecialists = selectAiTeamSpecialists(goal);
-    const briefEntries = await Promise.all(
-      selectedSpecialists.map(async (id) => [
-        id,
-        await specialistBrief(routedSpecialistAgents[id], goal, snapshot),
-      ] as const),
+    const specialistAbortController = new AbortController();
+    const specialistTimeout = setTimeout(
+      () =>
+        specialistAbortController.abort(
+          new Error("AI Team specialist generation timed out."),
+        ),
+      MODEL_TIMEOUT_MS,
     );
+    const specialistPromises = selectedSpecialists.map(async (id) => {
+      try {
+        const generation = await specialistBrief(
+          routedSpecialistAgents[id],
+          goal,
+          snapshot,
+          specialistAbortController.signal,
+        );
+        completedGenerations.push(generation);
+        return [id, generation] as const;
+      } catch (error) {
+        specialistAbortController.abort(error);
+        throw error;
+      }
+    });
+    let briefEntries: Awaited<(typeof specialistPromises)[number]>[];
+    try {
+      briefEntries = await Promise.all(specialistPromises);
+    } catch (error) {
+      await Promise.allSettled(specialistPromises);
+      throw error;
+    } finally {
+      clearTimeout(specialistTimeout);
+    }
 
-    const specialistBriefs = Object.fromEntries(briefEntries) as Record<
+    const specialistBriefs = Object.fromEntries(
+      briefEntries.map(([id, result]) => [id, result.output]),
+    ) as Record<
       string,
       unknown
     >;
-    const critic = await criticBrief(goal, snapshot, specialistBriefs);
+    const criticResult = await criticBrief(goal, snapshot, specialistBriefs);
+    completedGenerations.push(criticResult);
+    const critic = criticResult.output;
     const specialistContext = JSON.stringify(
       { ...specialistBriefs, critic },
       null,
@@ -294,6 +382,7 @@ export async function createAiTeamPlan(
         specialistContext,
       abortSignal: AbortSignal.timeout(MODEL_TIMEOUT_MS),
     });
+    completedGenerations.push(result);
 
     const tasks = result.output.tasks.map((item, index) =>
       taskFromModel(item, index, goal, snapshot),
@@ -313,9 +402,22 @@ export async function createAiTeamPlan(
       ],
       source: "ai",
       model: ORCHESTRATOR_MODEL,
+      runtimeMetadata: runtimeMetadata(
+        selectedSpecialists,
+        completedGenerations,
+        startedAt,
+        critic.summary,
+      ),
     };
   } catch (error) {
     console.error("[ai-team/model] Falling back to deterministic planning", error);
-    return fallbackPlan(goal, snapshot);
+    return {
+      ...fallbackPlan(goal, snapshot),
+      runtimeMetadata: runtimeMetadata(
+        selectedSpecialists,
+        completedGenerations,
+        startedAt,
+      ),
+    };
   }
 }
