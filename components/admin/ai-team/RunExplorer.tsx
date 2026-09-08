@@ -191,14 +191,6 @@ export function RunExplorer({ runs }: { runs: AiTeamRun[] }) {
                       Runtime usage metadata was not recorded for this run.
                     </p>
                   )}
-                  {run.runtimeMetadata?.criticSummary ? (
-                    <div className="rounded-xl border border-[var(--surface-border)] bg-[var(--surface-subtle)] p-4">
-                      <p className="text-xs font-semibold text-[var(--foreground)]">Critic summary</p>
-                      <p className="mt-1 text-xs leading-relaxed text-[var(--text-secondary)]">
-                        {run.runtimeMetadata.criticSummary}
-                      </p>
-                    </div>
-                  ) : null}
                   <div className="grid gap-3 lg:grid-cols-2">
                     {run.tasks.map((task) => (
                       <article key={task.id} className="rounded-xl border border-[var(--surface-border)] bg-[var(--surface-subtle)] p-4">

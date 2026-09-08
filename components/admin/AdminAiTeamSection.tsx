@@ -10,6 +10,7 @@ import {
 import { Badge, Button, LoadingSkeleton } from "@/components/ui";
 import { cn } from "@/components/ui/cn";
 import type {
+  AiTeamActivityEvent,
   AiTeamAgent,
   AiTeamApprovalDecision,
   AiTeamCustomerVoice,
@@ -49,10 +50,16 @@ type GetPayload = {
 };
 
 type PostPayload = {
+  operationId: string;
   plan: AiTeamPlan;
   run: AiTeamRun;
   runtime: AiTeamRuntimeInfo;
   snapshot: AiTeamSnapshot;
+};
+
+type ActivityPayload = {
+  operationId: string;
+  events: AiTeamActivityEvent[];
 };
 
 type TabId =
@@ -140,10 +147,14 @@ export function AdminAiTeamSection() {
     limit: 40,
   });
   const [goal, setGoal] = useState("");
+  const [activity, setActivity] = useState<AiTeamActivityEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [planning, setPlanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const requestVersion = useRef(0);
+  const operationVersion = useRef(0);
+  const activeOperationId = useRef<string | null>(null);
+  const activityInterval = useRef<number | null>(null);
   const planningRef = useRef(false);
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const v3LoadedRef = useRef<Record<V3TabId, boolean>>({
@@ -282,18 +293,78 @@ export function AdminAiTeamSection() {
     if (isV3Tab(activeTab)) void loadV3Tab(activeTab);
   }, [activeTab, loadV3Tab]);
 
+  useEffect(
+    () => () => {
+      if (activityInterval.current !== null) {
+        window.clearInterval(activityInterval.current);
+      }
+    },
+    [],
+  );
+
   async function createPlan() {
     const trimmed = goal.trim();
     if (trimmed.length < 3 || planningRef.current) return;
+    const operationId = crypto.randomUUID();
+    const version = ++operationVersion.current;
+    activeOperationId.current = operationId;
     requestVersion.current += 1;
     planningRef.current = true;
     setPlanning(true);
+    setActivity([]);
     setError(null);
+
+    const pollActivity = async () => {
+      if (
+        operationVersion.current !== version ||
+        activeOperationId.current !== operationId
+      ) {
+        return;
+      }
+      try {
+        const response = await fetch(
+          `/api/admin/ai-team/activity?operationId=${encodeURIComponent(operationId)}`,
+          { cache: "no-store" },
+        );
+        const payload = (await response.json().catch(() => ({}))) as
+          | ActivityPayload
+          | { error?: string };
+        if (!response.ok || !("events" in payload)) return;
+        if (
+          operationVersion.current !== version ||
+          activeOperationId.current !== operationId
+        ) {
+          return;
+        }
+        setActivity((current) =>
+          payload.events.length >= current.length ? payload.events : current,
+        );
+        if (
+          payload.events.some(
+            (event) =>
+              event.phase === "operation" &&
+              (event.status === "completed" || event.status === "failed"),
+          ) &&
+          activityInterval.current !== null
+        ) {
+          window.clearInterval(activityInterval.current);
+          activityInterval.current = null;
+        }
+      } catch {
+        // The POST remains authoritative; the next poll can recover the trace.
+      }
+    };
+
+    void pollActivity();
+    activityInterval.current = window.setInterval(() => {
+      void pollActivity();
+    }, 800);
+
     try {
       const response = await fetch("/api/admin/ai-team", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ goal: trimmed }),
+        body: JSON.stringify({ goal: trimmed, operationId }),
       });
       const payload = (await response.json().catch(() => ({}))) as
         | PostPayload
@@ -318,6 +389,11 @@ export function AdminAiTeamSection() {
     } catch (planError) {
       setError(planError instanceof Error ? planError.message : "Unable to create plan.");
     } finally {
+      if (activityInterval.current !== null) {
+        window.clearInterval(activityInterval.current);
+        activityInterval.current = null;
+      }
+      await pollActivity();
       planningRef.current = false;
       setPlanning(false);
     }
@@ -558,6 +634,7 @@ export function AdminAiTeamSection() {
             setGoal={setGoal}
             createPlan={() => void createPlan()}
             planning={planning}
+            activity={activity}
             runtime={runtime}
             snapshot={snapshot}
             runs={runs}

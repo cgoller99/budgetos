@@ -11,6 +11,12 @@ export {
 } from "@/lib/ai-team/modelRuntime";
 export { selectAiTeamSpecialists } from "@/lib/ai-team/routing";
 export {
+  aiTeamActivityFromRow,
+  appendAiTeamActivity,
+  attachAiTeamActivityRun,
+  listAiTeamActivity,
+} from "@/lib/ai-team/activity";
+export {
   listAiTeamApprovalRuns,
   listRecentAiTeamRuns,
   saveAiTeamRun,
@@ -42,6 +48,8 @@ export {
   summarizeCustomerVoice,
 } from "@/lib/ai-team/v3Math";
 export type {
+  AiTeamActivityEvent,
+  AiTeamActivityStatus,
   AiTeamAgent,
   AiTeamAgentId,
   AiTeamApprovalDecision,
@@ -56,6 +64,7 @@ export type {
   AiTeamPlaybook,
   AiTeamProductAnalytics,
   AiTeamProductSignal,
+  AiTeamProgressEvent,
   AiTeamRevenueIntelligence,
   AiTeamRevenueProjection,
   AiTeamRun,
