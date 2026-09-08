@@ -23,6 +23,12 @@ async function persistenceIsConfigured(): Promise<boolean> {
       adminSupabase
         .from("ai_team_playbooks")
         .select("id", { head: true, count: "exact" }),
+      adminSupabase
+        .from("ai_team_execution_packets")
+        .select("id", { head: true, count: "exact" }),
+      adminSupabase
+        .from("ai_team_founder_briefs")
+        .select("id", { head: true, count: "exact" }),
     ]);
     return checks.every((result) => !result.error);
   } catch {
@@ -38,10 +44,17 @@ export async function GET() {
   return NextResponse.json(
     {
       ok: ready,
-      version: "2.0.0",
+      version: "3.0.0",
       ready,
       persistenceConfigured,
       runtimeConfigured,
+      features: {
+        approvedExecution: persistenceConfigured,
+        productAnalytics: true,
+        revenueIntelligence: true,
+        customerVoice: true,
+        founderBrief: persistenceConfigured,
+      },
     },
     { status: ready ? 200 : 503 },
   );

@@ -797,6 +797,74 @@ export type AiTeamPlaybookInsert = {
   updated_at?: string;
 };
 
+export type AiTeamExecutionPacketStatus =
+  | "staged"
+  | "claimed"
+  | "completed"
+  | "failed";
+
+export type AiTeamExecutionPacketRow = {
+  id: string;
+  task_id: string;
+  run_id: string;
+  approval_decision_id: string;
+  created_by: string;
+  status: AiTeamExecutionPacketStatus;
+  task_snapshot: Json;
+  run_snapshot: Json;
+  approval_snapshot: Json;
+  evidence: Json;
+  proposed_branch_name: string;
+  implementation_brief: string;
+  validation_checklist: Json;
+  rollback_notes: string;
+  requires_external_operator: true;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AiTeamExecutionPacketInsert = {
+  id?: string;
+  task_id: string;
+  run_id: string;
+  approval_decision_id: string;
+  created_by: string;
+  status?: AiTeamExecutionPacketStatus;
+  task_snapshot: Json;
+  run_snapshot: Json;
+  approval_snapshot: Json;
+  evidence?: Json;
+  proposed_branch_name: string;
+  implementation_brief: string;
+  validation_checklist: Json;
+  rollback_notes: string;
+  requires_external_operator?: true;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type AiTeamFounderBriefRow = {
+  id: string;
+  brief_date: string;
+  generated_by: string;
+  source: "deterministic" | "ai";
+  snapshot: Json;
+  sections: Json;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AiTeamFounderBriefInsert = {
+  id?: string;
+  brief_date: string;
+  generated_by: string;
+  source?: "deterministic" | "ai";
+  snapshot: Json;
+  sections: Json;
+  created_at?: string;
+  updated_at?: string;
+};
+
 export type BetaSettingsRow = {
   id: number;
   invite_only: boolean;
@@ -1019,6 +1087,40 @@ export type Database = {
         Update: Partial<AiTeamPlaybookInsert>;
         Relationships: [];
       };
+      ai_team_execution_packets: {
+        Row: AiTeamExecutionPacketRow;
+        Insert: AiTeamExecutionPacketInsert;
+        Update: never;
+        Relationships: [
+          {
+            foreignKeyName: "ai_team_execution_packets_task_id_fkey";
+            columns: ["task_id"];
+            isOneToOne: true;
+            referencedRelation: "ai_team_tasks";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "ai_team_execution_packets_run_id_fkey";
+            columns: ["run_id"];
+            isOneToOne: false;
+            referencedRelation: "ai_team_runs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "ai_team_execution_packets_approval_decision_id_fkey";
+            columns: ["approval_decision_id"];
+            isOneToOne: true;
+            referencedRelation: "ai_team_approval_decisions";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      ai_team_founder_briefs: {
+        Row: AiTeamFounderBriefRow;
+        Insert: AiTeamFounderBriefInsert;
+        Update: Partial<AiTeamFounderBriefInsert>;
+        Relationships: [];
+      };
       ai_team_tasks: {
         Row: AiTeamTaskRow;
         Insert: AiTeamTaskInsert;
@@ -1075,6 +1177,17 @@ export type Database = {
           p_note: string;
         };
         Returns: AiTeamApprovalDecisionRow[];
+      };
+      stage_ai_team_execution_packet: {
+        Args: {
+          p_task_id: string;
+          p_created_by: string;
+          p_proposed_branch_name: string;
+          p_implementation_brief: string;
+          p_validation_checklist: Json;
+          p_rollback_notes: string;
+        };
+        Returns: AiTeamExecutionPacketRow[];
       };
       save_ai_team_run_atomic: {
         Args: {
