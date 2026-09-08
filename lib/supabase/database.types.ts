@@ -1,3 +1,11 @@
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[];
+
 export type AccountRecordKind = "account" | "debt" | "investment";
 
 export type RecurringEntityType = "income" | "bill" | "goal" | "investment";
@@ -668,6 +676,73 @@ export type AdminEventLogRow = {
   created_at: string;
 };
 
+export type AiTeamRunSource = "ai" | "fallback";
+
+export type AiTeamRunRow = {
+  id: string;
+  created_by: string | null;
+  goal: string;
+  source: AiTeamRunSource;
+  model: string | null;
+  summary: string;
+  snapshot: Json;
+  created_at: string;
+};
+
+export type AiTeamRunInsert = {
+  id?: string;
+  created_by?: string | null;
+  goal: string;
+  source: AiTeamRunSource;
+  model?: string | null;
+  summary: string;
+  snapshot: Json;
+  created_at?: string;
+};
+
+export type AiTeamRunUpdate = Partial<AiTeamRunInsert>;
+
+export type AiTeamTaskOwner =
+  | "chief_of_staff"
+  | "engineering"
+  | "qa"
+  | "analytics";
+
+export type AiTeamTaskStatusRow =
+  | "queued"
+  | "running"
+  | "needs_approval"
+  | "completed"
+  | "failed";
+
+export type AiTeamTaskRow = {
+  id: string;
+  run_id: string;
+  owner: AiTeamTaskOwner;
+  status: AiTeamTaskStatusRow;
+  title: string;
+  objective: string;
+  evidence: Json;
+  requires_approval: boolean;
+  approval_reason: string | null;
+  created_at: string;
+};
+
+export type AiTeamTaskInsert = {
+  id?: string;
+  run_id: string;
+  owner: AiTeamTaskOwner;
+  status: AiTeamTaskStatusRow;
+  title: string;
+  objective: string;
+  evidence?: Json;
+  requires_approval?: boolean;
+  approval_reason?: string | null;
+  created_at?: string;
+};
+
+export type AiTeamTaskUpdate = Partial<AiTeamTaskInsert>;
+
 export type BetaSettingsRow = {
   id: number;
   invite_only: boolean;
@@ -856,6 +931,26 @@ export type Database = {
         Insert: Record<string, unknown>;
         Update: Record<string, unknown>;
         Relationships: [];
+      };
+      ai_team_runs: {
+        Row: AiTeamRunRow;
+        Insert: AiTeamRunInsert;
+        Update: AiTeamRunUpdate;
+        Relationships: [];
+      };
+      ai_team_tasks: {
+        Row: AiTeamTaskRow;
+        Insert: AiTeamTaskInsert;
+        Update: AiTeamTaskUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "ai_team_tasks_run_id_fkey";
+            columns: ["run_id"];
+            isOneToOne: false;
+            referencedRelation: "ai_team_runs";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       beta_settings: {
         Row: BetaSettingsRow;

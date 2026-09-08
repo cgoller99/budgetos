@@ -7,6 +7,8 @@ import {
   createAiTeamPlan,
   getAiTeamRuntimeInfo,
   getAiTeamSnapshot,
+  listRecentAiTeamRuns,
+  saveAiTeamRun,
 } from "@/lib/ai-team";
 
 const PLAN_COOLDOWN_MS = 15_000;
@@ -53,14 +55,18 @@ export async function GET() {
   if ("response" in auth) return auth.response;
 
   try {
-    const snapshot = await getAiTeamSnapshot(auth.adminSupabase);
+    const [snapshot, recentRuns] = await Promise.all([
+      getAiTeamSnapshot(auth.adminSupabase),
+      listRecentAiTeamRuns(auth.adminSupabase),
+    ]);
     return NextResponse.json({
       agents: AI_TEAM_AGENTS,
       runtime: getAiTeamRuntimeInfo(),
       snapshot,
+      recentRuns,
     });
   } catch (error) {
-    console.error("[admin/ai-team] Snapshot failed", error);
+    console.error("[admin/ai-team] Load failed", error);
     return NextResponse.json(
       { error: "Unable to load AI Team." },
       { status: 500 },
@@ -123,8 +129,26 @@ export async function POST(request: Request) {
   try {
     const snapshot = await getAiTeamSnapshot(auth.adminSupabase);
     const plan = await createAiTeamPlan(goal, snapshot);
+    let run;
+
+    try {
+      run = await saveAiTeamRun(
+        auth.adminSupabase,
+        auth.user.id,
+        plan,
+        snapshot,
+      );
+    } catch (persistenceError) {
+      console.error("[admin/ai-team] Plan persistence failed", persistenceError);
+      return NextResponse.json(
+        { error: "The plan was generated but could not be saved. Please try again." },
+        { status: 500 },
+      );
+    }
+
     return NextResponse.json({
       plan,
+      run,
       runtime: getAiTeamRuntimeInfo(),
       snapshot,
     });

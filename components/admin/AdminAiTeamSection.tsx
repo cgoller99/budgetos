@@ -6,6 +6,7 @@ import type {
   AiTeamAgent,
   AiTeamAgentId,
   AiTeamPlan,
+  AiTeamRun,
   AiTeamRuntimeInfo,
   AiTeamSnapshot,
   AiTeamTaskStatus,
@@ -15,10 +16,12 @@ type AiTeamGetPayload = {
   agents: AiTeamAgent[];
   runtime: AiTeamRuntimeInfo;
   snapshot: AiTeamSnapshot;
+  recentRuns: AiTeamRun[];
 };
 
 type AiTeamPostPayload = {
   plan: AiTeamPlan;
+  run: AiTeamRun;
   runtime: AiTeamRuntimeInfo;
   snapshot: AiTeamSnapshot;
 };
@@ -46,6 +49,7 @@ export function AdminAiTeamSection() {
   const [runtime, setRuntime] = useState<AiTeamRuntimeInfo | null>(null);
   const [snapshot, setSnapshot] = useState<AiTeamSnapshot | null>(null);
   const [plan, setPlan] = useState<AiTeamPlan | null>(null);
+  const [recentRuns, setRecentRuns] = useState<AiTeamRun[]>([]);
   const [goal, setGoal] = useState("");
   const [loading, setLoading] = useState(true);
   const [planning, setPlanning] = useState(false);
@@ -65,6 +69,7 @@ export function AdminAiTeamSection() {
       setAgents(payload.agents);
       setRuntime(payload.runtime);
       setSnapshot(payload.snapshot);
+      setRecentRuns(payload.recentRuns);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Unable to load AI Team.");
     } finally {
@@ -98,6 +103,10 @@ export function AdminAiTeamSection() {
       setPlan(payload.plan);
       setRuntime(payload.runtime);
       setSnapshot(payload.snapshot);
+      setRecentRuns((current) => [
+        payload.run,
+        ...current.filter((run) => run.id !== payload.run.id),
+      ].slice(0, 20));
     } catch (planError) {
       setError(planError instanceof Error ? planError.message : "Unable to create plan.");
     } finally {
@@ -239,6 +248,63 @@ export function AdminAiTeamSection() {
           </CardContent>
         </Card>
       </div>
+
+      <Card padding="compact">
+        <CardHeader
+          title="Recent runs"
+          description="The latest 20 saved plans and their approval gates."
+          action={<Badge variant="default">{recentRuns.length} saved</Badge>}
+        />
+        <CardContent>
+          {recentRuns.length ? (
+            <div className="divide-y divide-[var(--surface-border)]">
+              {recentRuns.map((run) => {
+                const approvalCount = run.tasks.filter(
+                  (task) => task.requiresApproval,
+                ).length;
+
+                return (
+                  <div
+                    key={run.id}
+                    className="grid gap-2 py-3 first:pt-0 last:pb-0 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <time
+                          dateTime={run.createdAt}
+                          className="text-xs text-[var(--text-muted)]"
+                        >
+                          {new Date(run.createdAt).toLocaleString()}
+                        </time>
+                        <Badge variant={run.source === "ai" ? "success" : "default"}>
+                          {run.source === "ai" ? "AI" : "Fallback"}
+                        </Badge>
+                      </div>
+                      <p className="mt-1 text-sm font-medium text-[var(--foreground)]">
+                        {run.goal}
+                      </p>
+                      <p className="mt-0.5 text-xs text-[var(--text-muted)]">
+                        {run.summary}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2 lg:justify-end">
+                      <Badge variant="accent">{run.tasks.length} tasks</Badge>
+                      <Badge variant={approvalCount > 0 ? "warning" : "default"}>
+                        {approvalCount} approvals
+                      </Badge>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-sm text-[var(--text-muted)]">
+              {loading ? "Loading run history..." : "No AI Team runs have been saved yet."}
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
       {plan ? (
         <Card>
           <CardHeader

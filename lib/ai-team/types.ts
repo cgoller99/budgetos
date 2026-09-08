@@ -60,6 +60,18 @@ export type AiTeamPlan = {
   guardrails: string[];
 };
 
+export type AiTeamRun = {
+  id: string;
+  createdBy: string | null;
+  goal: string;
+  source: AiTeamPlan["source"];
+  model: string | null;
+  summary: string;
+  snapshot: AiTeamSnapshot;
+  createdAt: string;
+  tasks: AiTeamTask[];
+};
+
 export type AiTeamRuntimeInfo = {
   mode: "ai" | "fallback";
   specialistModel: string;

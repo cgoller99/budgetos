@@ -8,11 +8,16 @@ export {
   createAiTeamPlan,
   getAiTeamRuntimeInfo,
 } from "@/lib/ai-team/modelRuntime";
+export {
+  listRecentAiTeamRuns,
+  saveAiTeamRun,
+} from "@/lib/ai-team/runHistory";
 export { getAiTeamSnapshot } from "@/lib/ai-team/snapshot";
 export type {
   AiTeamAgent,
   AiTeamAgentId,
   AiTeamPlan,
+  AiTeamRun,
   AiTeamRuntimeInfo,
   AiTeamSnapshot,
   AiTeamTask,
