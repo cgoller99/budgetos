@@ -661,7 +661,7 @@ export type AdminFeedbackReportRow = {
 
 export type AdminEventLogRow = {
   id: string;
-  event_type: "error" | "stripe" | "plaid" | "auth" | "api_failure";
+  event_type: "error" | "stripe" | "plaid" | "auth" | "api_failure" | "ai_team";
   message: string;
   metadata: Record<string, unknown>;
   user_id: string | null;

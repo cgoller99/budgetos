@@ -30,6 +30,7 @@
     "test:stripe-checkout-privilege": "node scripts/test-stripe-checkout-privilege.mjs",
     "test:beta-registration": "node scripts/test-beta-registration.mjs",
     "test:capacitor-deep-links": "node scripts/test-capacitor-deep-links.mjs",
+    "test:ai-team-safety": "node scripts/test-ai-team-safety.mjs",
     "cap:sync": "npx cap sync ios",
     "cap:open:ios": "npx cap open ios",
     "cap:copy": "npx cap copy ios",
@@ -69,15 +70,17 @@
     "@capgo/native-purchases": "^8.0.4",
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.108.2",
+    "ai": "7.0.93",
     "jose": "^6.2.3",
-    "next": "16.2.9",
+    "next": "16.3.4",
     "plaid": "^42.2.0",
     "posthog-js": "^1.396.6",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-plaid-link": "^4.1.1",
     "server-only": "^0.0.1",
-    "stripe": "^18.5.0"
+    "stripe": "^18.5.0",
+    "zod": "4.5.4"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.5.0",
@@ -88,7 +91,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.2.9",
+    "eslint-config-next": "16.3.4",
     "pg": "^8.16.3",
     "tailwindcss": "^4",
     "typescript": "^5"

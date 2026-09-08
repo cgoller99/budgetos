@@ -642,6 +642,7 @@ export function AdminDashboard() {
             <option value="plaid">Plaid events</option>
             <option value="auth">Authentication events</option>
             <option value="api_failure">API failures</option>
+            <option value="ai_team">AI Team</option>
           </Select>
         </div>
         <div className="overflow-x-auto rounded-2xl border border-[var(--surface-border)]">
