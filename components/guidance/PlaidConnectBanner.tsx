@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui";
 import { useFinance } from "@/context/FinanceContext";
+import { useSubscription } from "@/context/SubscriptionContext";
 import { cn } from "@/components/ui/cn";
 import type { OnboardingProgress } from "@/lib/onboarding/progress";
 import { shouldShowPlaidConnectBanner } from "@/lib/onboarding/progress";
@@ -19,21 +21,30 @@ export function PlaidConnectBanner({
   onboardingProgress = {},
   className,
 }: PlaidConnectBannerProps) {
-  const { bankConnections, accounts } = useFinance();
+  const { bankConnections, accounts, debts, isLoading } = useFinance();
+  const { hasProAccess, isFounder } = useSubscription();
   const [dismissed, setDismissed] = useState(true);
 
   useEffect(() => {
     setDismissed(window.localStorage.getItem(DISMISS_STORAGE_KEY) === "1");
   }, []);
 
-  const hasPlaidConnection = bankConnections.length > 0;
+  // Prefer active (non-disconnected) links — never infer from transactions.
+  const hasPlaidConnection = bankConnections.some(
+    (connection) => connection.status !== "disconnected",
+  ) ||
+    accounts.some((account) => account.isPlaidLinked) ||
+    debts.some((debt) => debt.isPlaidLinked);
 
-  const visible = shouldShowPlaidConnectBanner({
-    dismissed,
-    hasPlaidConnection,
-    progress: onboardingProgress,
-    accountCount: accounts.length,
-  });
+  const visible =
+    !isLoading &&
+    (hasProAccess || isFounder) &&
+    shouldShowPlaidConnectBanner({
+      dismissed,
+      hasPlaidConnection,
+      progress: onboardingProgress,
+      accountCount: accounts.length,
+    });
 
   const dismiss = useCallback(() => {
     window.localStorage.setItem(DISMISS_STORAGE_KEY, "1");

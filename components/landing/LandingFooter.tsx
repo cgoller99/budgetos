@@ -51,18 +51,18 @@ export function LandingFooter() {
               {link.label}
             </Link>
           ))}
-          <a
-            href="mailto:support@buxme.co"
+          <Link
+            href="/support"
             className="text-sm text-[var(--text-muted)] transition-colors hover:text-[var(--foreground)]"
           >
             Support
-          </a>
-          <a
-            href="mailto:support@buxme.co"
+          </Link>
+          <Link
+            href="/support#contact-support"
             className="text-sm text-[var(--text-muted)] transition-colors hover:text-[var(--foreground)]"
           >
             Contact
-          </a>
+          </Link>
         </nav>
       </div>
 

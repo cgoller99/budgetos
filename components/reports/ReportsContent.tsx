@@ -6,6 +6,7 @@ import { CategoryBars } from "@/components/charts/CategoryBars";
 import { CHART_COLORS } from "@/components/charts/constants";
 import { BillsOverviewCard } from "@/components/dashboard/BillsOverviewCard";
 import { NetWorthTimeline } from "@/components/dashboard/NetWorthTimeline";
+import { IosReportsScreen } from "@/components/native/ios/IosReportsScreen";
 import { ProUpgradeBanner } from "@/components/subscription/ProUpgradeBanner";
 import { EventHistoryList } from "@/components/events/EventHistoryList";
 import { HealthScoreCard } from "@/components/HealthScoreCard";
@@ -23,6 +24,7 @@ import { pageContainerWideClassName } from "@/components/ui/tokens";
 import { useFinance } from "@/context/FinanceContext";
 import { getReportEvents } from "@/lib/events";
 import { formatCurrency } from "@/lib/finance/format";
+import { useNativeIos } from "@/lib/native/useNativeIos";
 import {
   computeTotalGoalSavings,
   downloadTransactionsCsv,
@@ -173,6 +175,7 @@ function ReportsSecondarySection({
 
 export function ReportsContent() {
   const finance = useFinance();
+  const nativeIos = useNativeIos();
   const { snapshot, isLoading } = finance;
 
   const monthlyTrends = snapshot.monthlyTrends;
@@ -181,6 +184,10 @@ export function ReportsContent() {
     () => computeTotalGoalSavings(finance),
     [finance.savingsGoals],
   );
+
+  if (nativeIos) {
+    return <IosReportsScreen />;
+  }
 
   if (isLoading) {
     return <SkeletonGrid count={3} />;

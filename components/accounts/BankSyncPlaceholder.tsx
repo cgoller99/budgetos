@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import type { PlaidLinkOnSuccessMetadata } from "react-plaid-link";
 import { Badge, Button, Card, CardContent, CardHeader } from "@/components/ui";
 import { ManualAccountsPlaidMergeModal } from "@/components/plaid/ManualAccountsPlaidMergeModal";
 import { clearPlaidConnectBannerDismissal } from "@/components/guidance/PlaidConnectBanner";
 import { useFinance } from "@/context/FinanceContext";
+import { useSubscription } from "@/context/SubscriptionContext";
 import { useToast } from "@/context/ToastContext";
 import { usePlaidLinkSession } from "@/hooks/usePlaidLinkSession";
 import { bankSyncComingSoonMessage } from "@/lib/integrations/bankSync";
@@ -16,6 +18,7 @@ import {
   isPlaidReconnectRequired,
 } from "@/lib/plaid/clientApi";
 import { isPlaidClientEnabled } from "@/lib/plaid/clientConfig";
+import { PLAID_PRO_REQUIRED_MESSAGE } from "@/lib/plaid/plaidEntitlementGate";
 import {
   storePlaidLinkToken,
   clearStoredPlaidLinkToken,
@@ -28,6 +31,8 @@ type BankSyncConnectProps = {
   mode?: "create" | "update";
   buttonLabel?: string;
   compact?: boolean;
+  /** Button + error only (no card chrome) — for native inline actions. */
+  inline?: boolean;
 };
 
 function BankSyncLinkButton({
@@ -88,9 +93,11 @@ export function BankSyncConnect({
   mode = "create",
   buttonLabel,
   compact = false,
+  inline = false,
 }: BankSyncConnectProps) {
   const { connectBank, reconnectBank, isSyncing, refreshFinance, deleteAccount, accounts } =
     useFinance();
+  const { hasProAccess, isFounder } = useSubscription();
   const { showToast } = useToast();
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [isLoadingToken, setIsLoadingToken] = useState(false);
@@ -103,6 +110,8 @@ export function BankSyncConnect({
   const [plaidAccountCount, setPlaidAccountCount] = useState(0);
   const [isRemovingManual, setIsRemovingManual] = useState(false);
   const plaidEnabled = isPlaidClientEnabled();
+  const canCreatePlaid = hasProAccess || isFounder;
+  const requiresUpgrade = mode === "create" && !canCreatePlaid;
   const label =
     buttonLabel ??
     (mode === "update" ? "Reconnect bank" : "Connect bank");
@@ -238,7 +247,64 @@ export function BankSyncConnect({
     }
   }, []);
 
+  const actions = (
+    <div className="space-y-3">
+      {error && (
+        <p className="text-sm text-amber-300">
+          {error}
+          {isPlaidReconnectRequired({ message: error }) ? " Try reconnecting." : ""}
+        </p>
+      )}
+      <div className="flex flex-wrap gap-2">
+        <BankSyncLinkButton
+          linkToken={linkToken}
+          onLinked={(publicToken) => void handleLinked(publicToken)}
+          onExitMessage={handleExitMessage}
+          buttonLabel={isSyncing ? "Syncing..." : label}
+          compact={compact || inline}
+          disabled={isSyncing}
+          onPrepare={loadLinkToken}
+          isPreparing={isLoadingToken}
+          autoOpen={autoOpenLink}
+        />
+        {linkToken && (
+          <Button
+            variant="secondary"
+            size={compact || inline ? "sm" : "md"}
+            disabled={isLoadingToken}
+            onClick={() => {
+              setLinkToken(null);
+              setAutoOpenLink(false);
+              clearStoredPlaidLinkToken();
+            }}
+          >
+            Reset link
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+
+  const mergeModal = (
+    <ManualAccountsPlaidMergeModal
+      isOpen={mergeModalOpen}
+      manualAccounts={manualAccountsBeforeConnect}
+      plaidAccountCount={plaidAccountCount}
+      isPending={isRemovingManual}
+      onKeepManual={handleKeepManualAccounts}
+      onRemoveManual={handleRemoveManualAccounts}
+    />
+  );
+
   if (!plaidEnabled) {
+    if (inline) {
+      return (
+        <p className="text-sm text-white/45">
+          Bank linking isn’t configured in this build.
+        </p>
+      );
+    }
+
     return (
       <Card padding="lg">
         <CardHeader
@@ -258,6 +324,48 @@ export function BankSyncConnect({
     );
   }
 
+  if (requiresUpgrade) {
+    if (inline) {
+      return (
+        <div className="space-y-3">
+          <p className="text-sm text-white/55">{PLAID_PRO_REQUIRED_MESSAGE}</p>
+          <Link href="/settings?upgrade=pro#billing">
+            <Button size="sm" className="touch-manipulation">
+              Upgrade to Pro
+            </Button>
+          </Link>
+        </div>
+      );
+    }
+
+    return (
+      <Card padding="lg">
+        <CardHeader
+          title="Connect bank"
+          action={<Badge variant="accent">Pro</Badge>}
+        />
+        <CardContent className="space-y-4">
+          <p className="text-sm leading-relaxed text-white/55">
+            {PLAID_PRO_REQUIRED_MESSAGE} Existing linked banks keep syncing if you
+            already connected them.
+          </p>
+          <Link href="/settings?upgrade=pro#billing">
+            <Button size="md">Upgrade to Pro</Button>
+          </Link>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (inline) {
+    return (
+      <>
+        {actions}
+        {mergeModal}
+      </>
+    );
+  }
+
   return (
     <Card padding="lg">
       <CardHeader
@@ -273,48 +381,9 @@ export function BankSyncConnect({
           <li>Sync transactions into Buxme</li>
           <li>Keep manual entry available at any time</li>
         </ul>
-        {error && (
-          <p className="text-sm text-amber-300">
-            {error}
-            {isPlaidReconnectRequired({ message: error }) ? " Try reconnecting." : ""}
-          </p>
-        )}
-        <div className="flex flex-wrap gap-2">
-          <BankSyncLinkButton
-            linkToken={linkToken}
-            onLinked={(publicToken) => void handleLinked(publicToken)}
-            onExitMessage={handleExitMessage}
-            buttonLabel={isSyncing ? "Syncing..." : label}
-            compact={compact}
-            disabled={isSyncing}
-            onPrepare={loadLinkToken}
-            isPreparing={isLoadingToken}
-            autoOpen={autoOpenLink}
-          />
-          {linkToken && (
-            <Button
-              variant="secondary"
-              size={compact ? "sm" : "md"}
-              disabled={isLoadingToken}
-              onClick={() => {
-                setLinkToken(null);
-                setAutoOpenLink(false);
-                clearStoredPlaidLinkToken();
-              }}
-            >
-              Reset link
-            </Button>
-          )}
-        </div>
+        {actions}
       </CardContent>
-      <ManualAccountsPlaidMergeModal
-        isOpen={mergeModalOpen}
-        manualAccounts={manualAccountsBeforeConnect}
-        plaidAccountCount={plaidAccountCount}
-        isPending={isRemovingManual}
-        onKeepManual={handleKeepManualAccounts}
-        onRemoveManual={handleRemoveManualAccounts}
-      />
+      {mergeModal}
     </Card>
   );
 }

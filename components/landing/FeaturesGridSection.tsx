@@ -9,7 +9,8 @@ import {
 const FEATURES = [
   {
     title: "Bank Sync",
-    description: "Connect accounts securely and keep balances and transactions in sync.",
+    description:
+      "Pro and Pro+ connect accounts securely with Plaid and keep balances and transactions in sync.",
     icon: "🏦",
   },
   {

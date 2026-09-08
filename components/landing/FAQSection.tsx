@@ -13,12 +13,12 @@ const FAQ_ITEMS = [
   {
     question: "Is Buxme free?",
     answer:
-      "Yes. Buxme Free includes the full dashboard, accounts, bills, goals, and basic reports at no cost. Pro and Pro+ add household collaboration, advanced reports, and premium support.",
+      "Yes. Free includes the dashboard plus manual accounts, bills, income, goals, and debt tracking. Pro unlocks Plaid bank sync and automation. Pro+ adds advanced reports and premium insights.",
   },
   {
     question: "Can I connect my bank?",
     answer:
-      "Yes. Buxme supports optional bank sync via Plaid when enabled for your account. You can also track everything manually if you prefer full control over your data.",
+      "Yes on Pro and Pro+. Plaid bank connections sync balances and transactions automatically. Free accounts can track everything manually.",
   },
   {
     question: "How secure is Buxme?",
@@ -38,7 +38,7 @@ const FAQ_ITEMS = [
   {
     question: "Do I need Plaid?",
     answer:
-      "No. Plaid is optional for automatic bank sync. Buxme works fully with manual entry — many users prefer the control and privacy of tracking on their own terms.",
+      "No. Free users can track manually. Automatic Plaid bank sync requires Pro or Pro+.",
   },
   {
     question: "Can I import spreadsheets?",

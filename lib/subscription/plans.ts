@@ -16,14 +16,12 @@ export const PLAN_DEFINITIONS: PlanDefinition[] = [
     name: "Free",
     priceLabel: "$0",
     periodLabel: "forever",
-    description: "Everything you need to take control of your finances.",
+    description: "Manual tracking to take control of your finances.",
     features: [
       "Unified dashboard",
-      "Accounts & transactions",
-      "Bills & income tracking",
-      "Savings goals & roadmap",
-      "Debt tracking",
-      "Basic reports",
+      "Manual accounts & transactions",
+      "Bills, income, goals & debt tracking",
+      "Basic cash-flow overview",
     ],
     highlighted: false,
   },
@@ -32,11 +30,15 @@ export const PLAN_DEFINITIONS: PlanDefinition[] = [
     name: "Pro",
     priceLabel: process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE?.trim() || "$7.99",
     periodLabel: "month",
-    description: "Collaborate with your household and unlock priority support.",
+    description:
+      "Connect banks with Plaid and automate balances, transactions, and cash flow.",
     features: [
       "Everything in Free",
+      "Plaid bank, credit, loan & investment sync",
+      "Automatic transaction syncing",
+      "Connected balances & net worth",
+      "Core cash-flow & paycheck automation",
       "Household collaboration",
-      "Shared finances",
       "Priority support",
     ],
     highlighted: true,
@@ -47,18 +49,22 @@ export const PLAN_DEFINITIONS: PlanDefinition[] = [
     priceLabel:
       process.env.NEXT_PUBLIC_STRIPE_PRO_PLUS_PRICE?.trim() || "$14.99",
     periodLabel: "month",
-    description: "Advanced reporting and early access to new Buxme features.",
+    description: "Advanced insights, reporting, and early access tools.",
     features: [
       "Everything in Pro",
-      "Advanced reports",
+      "Advanced reports & premium insights",
       "Early access to new features",
-      "Premium insights",
     ],
     highlighted: false,
   },
 ];
 
-export const PRO_PLUS_ROUTE_PREFIXES = ["/reports"] as const;
+/**
+ * Routes that still hard-redirect unpaid users.
+ * `/reports` is intentionally NOT gated here — Free/Pro users can open Reports
+ * and see in-page upgrade CTAs (avoids Insights → Settings redirects on iOS).
+ */
+export const PRO_PLUS_ROUTE_PREFIXES = [] as const;
 
 export function getRequiredPlanForPath(pathname: string): SubscriptionPlan | null {
   if (

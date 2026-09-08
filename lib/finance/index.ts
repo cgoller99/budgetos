@@ -23,6 +23,7 @@ export type {
 export {
   formatCurrency,
   formatMonthlyChange,
+  formatSignedCurrency,
   getKPIDisplay,
   healthScoreToneClasses,
   insightToneClasses,

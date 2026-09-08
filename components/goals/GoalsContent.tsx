@@ -5,15 +5,18 @@ import { AddMoneyModal } from "@/components/goals/AddMoneyModal";
 import { CreateGoalModal } from "@/components/goals/CreateGoalModal";
 import { EditGoalModal } from "@/components/goals/EditGoalModal";
 import { GoalCard } from "@/components/goals/GoalCard";
+import { IosGoalsScreen } from "@/components/native/ios/IosGoalsScreen";
 import { Button, EmptyState, PageHeader, SkeletonGrid } from "@/components/ui";
 import { pageContainerWideClassName } from "@/components/ui/tokens";
 import { useFinance } from "@/context/FinanceContext";
 import { getGoalProgressList } from "@/lib/finance/goals";
 import type { SavingsGoal } from "@/lib/finance/types";
+import { useNativeIos } from "@/lib/native/useNativeIos";
 import { cn } from "@/components/ui/cn";
 
 export function GoalsContent() {
   const finance = useFinance();
+  const nativeIos = useNativeIos();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [moneyGoal, setMoneyGoal] = useState<SavingsGoal | null>(null);
   const [editGoal, setEditGoal] = useState<SavingsGoal | null>(null);
@@ -25,6 +28,10 @@ export function GoalsContent() {
 
   function findGoal(id: string) {
     return finance.savingsGoals.find((goal) => goal.id === id) ?? null;
+  }
+
+  if (nativeIos) {
+    return <IosGoalsScreen />;
   }
 
   if (finance.isLoading) {

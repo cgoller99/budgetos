@@ -3,7 +3,7 @@ import { APPLE_APP_SITE_ASSOCIATION } from "@/lib/native/appleAppSiteAssociation
 
 /**
  * Serve AASA with the content-type Apple expects.
- * Replace TEAMID with your Apple Team ID before App Store review.
+ * appID uses Apple Team ID Y7UJK54GL9 + bundle id co.buxme.app.
  */
 export async function GET() {
   return NextResponse.json(APPLE_APP_SITE_ASSOCIATION, {

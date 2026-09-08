@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { factoryResetUserFinance } from "@/lib/admin/factoryResetService";
+import {
+  AccountDeletionBlockedError,
+  deleteUserAccount,
+} from "@/lib/account/deleteAccountService";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireStripeApiUser, stripeErrorResponse } from "@/lib/stripe/apiAuth";
 
@@ -9,7 +12,7 @@ type DeleteBody = {
 
 /**
  * App Store–required account deletion.
- * Deletes the authenticated user's data and auth account.
+ * Deletes the authenticated user's data and auth account (server-side only).
  */
 export async function POST(request: Request) {
   try {
@@ -21,28 +24,34 @@ export async function POST(request: Request) {
     const body = (await request.json().catch(() => ({}))) as DeleteBody;
     if (body.confirm !== "DELETE") {
       return NextResponse.json(
-        { error: 'Type DELETE to confirm account deletion.' },
+        { error: "Type DELETE to confirm account deletion." },
         { status: 400 },
       );
     }
 
     const admin = createSupabaseAdminClient();
-    const userId = auth.user.id;
+    const result = await deleteUserAccount({
+      adminSupabase: admin,
+      userId: auth.user.id,
+    });
 
-    await factoryResetUserFinance({ adminSupabase: admin, userId });
-
-    // Best-effort household / waitlist cleanup
-    await admin.from("household_members").delete().eq("user_id", userId);
-    await admin.from("profiles").delete().eq("id", userId);
-    const { error: authDeleteError } = await admin.auth.admin.deleteUser(userId);
-
-    if (authDeleteError) {
-      throw authDeleteError;
-    }
-
-    return NextResponse.json({ ok: true, deleted: true });
+    return NextResponse.json({
+      ok: true,
+      deleted: true,
+      alreadyDeleted: Boolean(result.alreadyDeleted),
+      stripeSubscriptionCanceled: result.stripeSubscriptionCanceled,
+      appleSubscriptionPresent: result.appleSubscriptionPresent,
+    });
   } catch (error) {
     console.error("[account/delete] failed", error);
+
+    if (error instanceof AccountDeletionBlockedError) {
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: 409 },
+      );
+    }
+
     return stripeErrorResponse(error, "Unable to delete account.");
   }
 }

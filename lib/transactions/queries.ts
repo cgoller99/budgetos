@@ -1,5 +1,9 @@
 import type { FinanceData, Transaction, TransactionType } from "@/lib/finance/types";
 import { getLinkedAccountName } from "@/lib/transactions/accountLookup";
+import {
+  filterRealExpenseTransactions,
+  filterRealIncomeTransactions,
+} from "@/lib/transactions/transferDetection";
 
 export type TransactionSortField = "date" | "amount";
 export type TransactionSortDirection = "asc" | "desc";
@@ -166,12 +170,20 @@ export function sumTransactionsByType(
 
 export function getTransactionSummary(data: FinanceData) {
   const currentMonth = getTransactionsForMonth(data);
+  const monthIncome = filterRealIncomeTransactions(
+    data,
+    currentMonth.filter((transaction) => transaction.type === "income"),
+  ).reduce((total, transaction) => total + transaction.amount, 0);
+  const monthExpenses = filterRealExpenseTransactions(
+    data,
+    currentMonth.filter((transaction) => transaction.type === "expense"),
+  ).reduce((total, transaction) => total + transaction.amount, 0);
 
   return {
     count: (data.transactions ?? []).length,
     monthCount: currentMonth.length,
-    monthIncome: sumTransactionsByType(data, "income"),
-    monthExpenses: sumTransactionsByType(data, "expense"),
+    monthIncome,
+    monthExpenses,
     monthTransfers: sumTransactionsByType(data, "transfer"),
   };
 }

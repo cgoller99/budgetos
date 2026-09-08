@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { PayBillSplitModal } from "@/components/bills/PayBillSplitModal";
+import { IosCalendarScreen } from "@/components/native/ios/IosCalendarScreen";
 import {
   Badge,
   Button,
@@ -25,6 +26,7 @@ import {
 import { getBillProgressList } from "@/lib/finance/bills";
 import { formatCurrency } from "@/lib/finance/format";
 import type { BillProgress, CalendarDaySummary } from "@/lib/finance/types";
+import { useNativeIos } from "@/lib/native/useNativeIos";
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -83,6 +85,7 @@ function CalendarDayCell({
 
 export function CalendarContent() {
   const finance = useFinance();
+  const nativeIos = useNativeIos();
   const { markBillSplitPaid } = finance;
   const { showToast } = useToast();
   const today = new Date();
@@ -142,6 +145,10 @@ export function CalendarContent() {
       subtitle: paySplit.name,
     });
     setPaySplit(null);
+  }
+
+  if (nativeIos) {
+    return <IosCalendarScreen />;
   }
 
   if (finance.isLoading) {

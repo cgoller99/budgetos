@@ -23,11 +23,20 @@ Supabase service role, or Apple IAP private keys. Those remain Vercel / server e
 
 ---
 
-## Status of this PR
+## Native UX shell (iOS)
+
+When `Capacitor.isNativePlatform()` is true on iOS, the app uses an app-first shell:
+
+- Bottom tabs: **Home · Accounts · Activity · Bills · More**
+- More sheet: Income, Goals, Investments, Transactions, Reports, Calendar, Settings, Household, …
+- Compact top bar, safe-area chrome, bottom sheets, haptics, pull-to-refresh, scroll restore
+- Web / desktop navigation is unchanged
+
+## Status
 
 - Capacitor 8.5 + iOS platform project are committed.
 - Native detection, deep-link routing, safe-area CSS, IAP UI path, account deletion, AASA,
-  privacy manifest, and dual-billing guards are in code.
+  privacy manifest, dual-billing guards, and iOS UX polish are in code.
 - **This environment cannot run Xcode.** Do **not** treat the app as App Store–ready until
   `Product → Archive` succeeds on a Mac.
 
@@ -61,15 +70,73 @@ Optional Vercel env (server-only, never `NEXT_PUBLIC_`):
 APPLE_IAP_ISSUER_ID=
 APPLE_IAP_KEY_ID=
 APPLE_IAP_PRIVATE_KEY=
+APPLE_IAP_APP_APPLE_ID=
+# optional:
+# APPLE_IAP_BUNDLE_ID=co.buxme.app
+# APPLE_IAP_ENVIRONMENT=Production
+# For Sandbox-only local testing you may set APPLE_IAP_ENVIRONMENT=Sandbox
+# and omit APPLE_IAP_APP_APPLE_ID. Production (default) fails closed without it.
 ```
 
-Replace `TEAMID` in:
+ASN V2 production URL:
 
-- `lib/native/appleAppSiteAssociation.ts`
-- `public/.well-known/apple-app-site-association`
+```text
+https://buxme.co/api/iap/apple/notifications
+```
 
-with your Apple Team ID, then redeploy web so
-`https://buxme.co/.well-known/apple-app-site-association` is live.
+AASA appID is set to `Y7UJK54GL9.co.buxme.app` (Team ID `Y7UJK54GL9`).
+Confirm production serves it at
+`https://buxme.co/.well-known/apple-app-site-association`.
+
+---
+
+## Apple IAP backend architecture (Guideline 3.1.1)
+
+Premium is granted only when **active Stripe** OR **active verified Apple**
+subscription is present. Apple Premium is **never** granted from client-supplied
+product/transaction/expiry fields alone.
+
+| Path | Behavior |
+| --- | --- |
+| `POST /api/iap/apple/verify` | Requires Apple credentials. Verifies StoreKit `signedTransactionInfo` (JWS) and/or looks up `transactionId` via App Store Server API, cryptographically verifies with Apple Root CAs, checks bundle id + allowed product IDs + expiry/revocation, then writes profile. |
+| `POST /api/iap/apple/notifications` | App Store Server Notifications V2. Verifies `signedPayload`, applies renew/expire/refund/revoke/grace states. Idempotent. Never overwrites an active Stripe entitlement. |
+| `GET /api/entitlements` | Shared Premium gate. Apple rows without a future `subscription_current_period_end` fail closed. Expired Apple access is cleared as a hygiene fallback. |
+| Restore purchases | Native restore still calls `/api/iap/apple/verify` (same trusted path). |
+| Ownership binding | New purchases pass the authenticated Buxme user UUID as StoreKit `appAccountToken` via `@capgo/native-purchases` `purchaseProduct({ appAccountToken })`. The client re-reads `supabase.auth.getUser()` immediately before purchase so a stale React auth snapshot cannot send the wrong UUID, and sends that same UUID as `appAccountTokenSent` to `/api/iap/apple/verify`. |
+
+### Stale Apple lineage tokens (purchase path)
+
+StoreKit can return an existing subscription lineage whose signed `appAccountToken` still belongs to a **previous** Buxme UUID — even when the current Free user just completed `purchaseProduct` with their own UUID (“You’re all set”). Apple does not rewrite that token on repurchase.
+
+On that purchase verify path Buxme:
+
+1. Cryptographically verifies the Apple transaction (unchanged).
+2. Logs `authenticatedUserId`, `appAccountTokenSent`, Apple’s returned `appAccountToken`, product id, transaction ids, and environment.
+3. If Apple’s token ≠ authenticated user **and** `appAccountTokenSent` matches the authenticated user **and** no *other* Buxme profile holds an **active** Apple entitlement on that `originalTransactionId`, calls Apple’s [Set App Account Token](https://developer.apple.com/documentation/appstoreserverapi/set-app-account-token) to rebind the lineage to the purchaser, then grants Pro.
+4. If another Buxme account still has an active Apple entitlement on that OTID, ownership is still rejected (`app_account_token_mismatch`).
+
+Restore does **not** send `appAccountTokenSent`, so restore cannot rebind a foreign token.
+
+### `app_account_token_mismatch`
+
+Toast: **This Apple purchase is bound to a different Buxme account.**
+
+Returned when rebind is not allowed (restore path, missing `appAccountTokenSent`, or another active Buxme Apple owner). `/api/iap/apple/verify` includes `details` with both UUIDs, OTID, and `lineage`.
+
+### Legacy / restore without `appAccountToken`
+
+Purchases created before ownership binding may omit `appAccountToken`. For a **cryptographically verified** Apple transaction where `appAccountToken` is absent:
+
+- first-link to the verifying Buxme user is allowed (restore / legacy compatibility)
+- `originalTransactionId` uniqueness still prevents moving a subscription already linked to another Buxme account
+- client fields still never grant Premium
+
+Allowed product IDs (must match App Store Connect exactly):
+
+- `com.buxme.pro.monthly` → Pro ($7.99/month in US storefront; UI shows StoreKit `priceString`)
+- `com.buxme.proplus.monthly` → Pro+ ($14.99/month in US storefront; UI shows StoreKit `priceString`)
+
+> Note: These IDs intentionally do **not** use the `co.buxme.app` bundle-id prefix. ASC products were created as `com.buxme.*`.
 
 ---
 
@@ -114,22 +181,51 @@ Verify flows inside the native shell:
 
 ## Apple dashboard tasks
 
-### App Store Connect
+### App Store Connect — subscriptions
 
 1. Create app with bundle id `co.buxme.app`, name **Buxme**.
-2. Create auto-renewable subscriptions:
-   - `co.buxme.app.pro.monthly` → Pro
-   - `co.buxme.app.proplus.monthly` → Pro+
-3. Attach subscriptions to an App Store subscription group.
-4. Complete Privacy Nutrition Labels to match `PrivacyInfo.xcprivacy`.
-5. Provide App Privacy Policy URL (`https://buxme.co/...` when published).
-6. Account deletion: already available in Settings inside the app.
-7. Add Sandbox testers for IAP.
+2. Create a subscription group (e.g. **Buxme Premium**).
+3. Create auto-renewable subscriptions in that group:
+   - `com.buxme.pro.monthly` → **Buxme Pro** (1 month, e.g. $7.99 US)
+   - `com.buxme.proplus.monthly` → **Buxme Pro+** (1 month, e.g. $14.99 US)
+4. Set pricing, localization, and review screenshot/notes for each product.
+5. Confirm products are in the same subscription group so upgrades/downgrades work.
+6. Do **not** invent yearly Apple products for this release unless intentionally added later.
+7. Add Sandbox testers (Users and Access → Sandbox).
+8. Complete Privacy Nutrition Labels to match `PrivacyInfo.xcprivacy`.
+9. Provide App Privacy Policy URL (`https://buxme.co/privacy`).
+10. Account deletion: Settings → Account → Delete Account.
+
+### App Store Connect — IAP API key + ASN V2
+
+1. Users and Access → Integrations → **In-App Purchase** → create key.
+2. Download the `.p8` once. Store only in Vercel / password manager — never commit.
+3. Note **Issuer ID** and **Key ID**.
+4. App Information → copy numeric **Apple ID** → `APPLE_IAP_APP_APPLE_ID`.
+5. App → App Store Server Notifications → Production / Sandbox URL:
+   - `https://buxme.co/api/iap/apple/notifications`
+6. Prefer Version 2 notifications.
+
+### Vercel Production env (manual; do not auto-deploy from this PR)
+
+```text
+APPLE_IAP_ISSUER_ID=<issuer uuid>
+APPLE_IAP_KEY_ID=<key id>
+APPLE_IAP_PRIVATE_KEY=<PEM with \n newlines>
+APPLE_IAP_APP_APPLE_ID=<numeric app Apple ID>   # required for Production
+# optional
+APPLE_IAP_BUNDLE_ID=co.buxme.app
+APPLE_IAP_ENVIRONMENT=Production
+```
+
+Production verification/ASN **fail closed** if `APPLE_IAP_APP_APPLE_ID` is missing.
+Set `APPLE_IAP_ENVIRONMENT=Sandbox` only for Sandbox-focused testing (App Apple ID may be omitted there).
 
 ### Apple Developer
 
 1. App ID `co.buxme.app` with Associated Domains + In-App Purchase.
-2. Note Team ID and replace `TEAMID` in AASA files.
+2. Team ID `Y7UJK54GL9` is already configured in AASA as `Y7UJK54GL9.co.buxme.app`
+   (unrelated to IAP crypto; leave as-is unless Universal Links fail).
 3. Validate AASA: [Apple CDN validator](https://search.developer.apple.com/appsearch-validation-tool/).
 
 ### Supabase Auth
@@ -152,21 +248,18 @@ Keep production redirect URI:
 
 Web checkout remains on **web only**. The iOS UI hides Stripe Checkout and uses StoreKit.
 Server blocks Stripe checkout when an Apple subscription is active, and blocks Apple sync when
-a Stripe subscription is active.
+a Stripe subscription is active. ASN never clobbers an active Stripe entitlement.
 
 ---
 
 ## Remaining App Store blockers
 
 1. **Xcode Archive must succeed** on a Mac (signing, capabilities, SPM packages).
-2. **Replace `TEAMID`** in AASA and redeploy production.
+2. Confirm production AASA serves `Y7UJK54GL9.co.buxme.app`.
 3. **Create StoreKit products** in App Store Connect matching product IDs above.
-4. **App Store Server API verification** — wire `APPLE_IAP_*` env vars and harden
-   `/api/iap/apple/verify` before review (currently soft-validates until credentials exist).
+4. **Add `APPLE_IAP_*` secrets to Vercel** and configure ASN V2 URL (code is ready; credentials are manual).
 5. **App icons / screenshots / review notes / privacy policy** for Connect metadata.
-6. **Guideline 3.1.1** — confirm reader-app / multiplatform exception if you later expose
-   external Stripe manage links for existing web subscribers (current iOS path uses IAP only
-   for new purchases; web Stripe subscribers are recognized and directed to manage on web).
-7. **Manual device QA** of auth, Plaid OAuth, and IAP sandbox purchases.
+6. **Manual device QA** of auth, Plaid OAuth, sandbox IAP purchase, restore, and Stripe web subscriber access on iOS.
+7. Confirm **In-App Purchase** capability in Xcode.
 
-Until items 1–4 are done, the app is **not** ready for App Store submission.
+Until items 1–4 and sandbox purchase verification are done, the app is **not** ready for App Store submission.

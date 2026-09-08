@@ -9,12 +9,19 @@ import {
   SkeletonGrid,
   StatCard,
 } from "@/components/ui";
+import { IosInvestmentsScreen } from "@/components/native/ios/IosInvestmentsScreen";
 import { pageContainerWideClassName } from "@/components/ui/tokens";
 import { useFinance } from "@/context/FinanceContext";
 import { formatCurrency, formatMonthlyChange } from "@/lib/finance/format";
+import { useNativeIos } from "@/lib/native/useNativeIos";
 
 export function InvestmentsContent() {
   const { isLoading, investments, snapshot, dashboard } = useFinance();
+  const nativeIos = useNativeIos();
+
+  if (nativeIos) {
+    return <IosInvestmentsScreen />;
+  }
 
   if (isLoading) {
     return <SkeletonGrid count={3} />;

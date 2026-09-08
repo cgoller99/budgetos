@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { HouseholdSection } from "@/components/household/HouseholdSection";
+import { IosSettingsScreen } from "@/components/native/ios/IosSettingsScreen";
 import { ConnectedInstitutionsSection } from "@/components/settings/ConnectedInstitutionsSection";
 import { AccountDeletionSection } from "@/components/settings/AccountDeletionSection";
 import { BillingSection } from "@/components/settings/BillingSection";
@@ -22,6 +23,7 @@ import { cn } from "@/components/ui/cn";
 import { useAuth } from "@/context/AuthContext";
 import { useFinance } from "@/context/FinanceContext";
 import { useToast } from "@/context/ToastContext";
+import { useNativeIos } from "@/lib/native/useNativeIos";
 import { DEMO_PROFILES, getDemoProfile } from "@/lib/demo/profiles";
 import {
   DEFAULT_NOTIFICATION_PREFERENCES,
@@ -117,6 +119,7 @@ function formatSessionDate(value: string | number | undefined): string {
 }
 
 export function SettingsContent() {
+  const nativeIos = useNativeIos();
   const router = useRouter();
   const { showToast } = useToast();
   const { user, session, isConfigured, signOut } = useAuth();
@@ -309,6 +312,10 @@ export function SettingsContent() {
     }
   }
 
+  if (nativeIos) {
+    return <IosSettingsScreen />;
+  }
+
   if (isLoading) {
     return <SettingsSkeleton />;
   }
@@ -316,8 +323,11 @@ export function SettingsContent() {
   return (
     <div className={cn(pageContainerClassName)}>
       {isConfigured && (
-        <Card padding="lg">
-          <CardHeader title="Profile" />
+        <Card padding="lg" id="account">
+          <CardHeader
+            title="Account"
+            description="Profile details for your Buxme login."
+          />
           <CardContent className="space-y-5">
             <div className="flex items-center gap-4">
               <div
@@ -353,6 +363,10 @@ export function SettingsContent() {
         </Card>
       )}
 
+      <div id="delete-account">
+        <AccountDeletionSection />
+      </div>
+
       <Card padding="lg">
         <CardHeader
           title="What's New"
@@ -369,8 +383,6 @@ export function SettingsContent() {
       </Card>
 
       {isConfigured && <BillingSection />}
-
-      {isConfigured && <AccountDeletionSection />}
 
       <Card padding="lg">
         <CardHeader

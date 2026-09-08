@@ -1,6 +1,7 @@
 import type { FinanceData } from "@/lib/finance/types";
 import { toMonthlyAmount } from "@/lib/calculations/monthlyAmount";
 import { getTransactionsForMonth } from "@/lib/transactions";
+import { isInternalTransferExpense } from "@/lib/transactions/transferDetection";
 
 function sum(values: number[]): number {
   return values.reduce((total, value) => total + value, 0);
@@ -49,7 +50,10 @@ function getCurrentMonthExpenseTransactions(
   referenceDate = new Date(),
 ) {
   return getTransactionsForMonth(data, referenceDate).filter(
-    (transaction) => transaction.type === "expense" && !transaction.goalId,
+    (transaction) =>
+      transaction.type === "expense" &&
+      !transaction.goalId &&
+      !isInternalTransferExpense(data, transaction),
   );
 }
 

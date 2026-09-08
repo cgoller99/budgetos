@@ -8,12 +8,24 @@ export type AdminUserAction =
   | "reset_finance"
   | "delete_user";
 
+export type AdminEffectivePlan = "free" | "pro" | "pro_plus" | "founder";
+export type AdminEntitlementSource =
+  | "none"
+  | "apple"
+  | "stripe"
+  | "founder"
+  | "manual";
+
 export type AdminUserSummary = {
   id: string;
   email: string | null;
   fullName: string | null;
   subscriptionPlan: string;
   subscriptionStatus: string;
+  subscriptionProvider: string;
+  effectivePlan: AdminEffectivePlan;
+  entitlementSource: AdminEntitlementSource;
+  hasExternalSubscriptionRisk: boolean;
   joinedAt: string;
   lastActiveAt: string | null;
   isDisabled: boolean;

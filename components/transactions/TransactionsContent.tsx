@@ -11,11 +11,13 @@ import {
   TransactionFilters,
 } from "@/components/transactions/TransactionFilters";
 import { TransactionRow } from "@/components/transactions/TransactionRow";
+import { IosTransactionsScreen } from "@/components/native/ios/IosTransactionsScreen";
 import { Button, EmptyState, PageHeader, SkeletonGrid, StatCard } from "@/components/ui";
 import { pageContainerWideClassName } from "@/components/ui/tokens";
 import { useFinance } from "@/context/FinanceContext";
 import { useToast } from "@/context/ToastContext";
 import { formatCurrency } from "@/lib/finance/format";
+import { useNativeIos } from "@/lib/native/useNativeIos";
 import {
   buildTransactionsHref,
   describeTransactionFilters,
@@ -284,10 +286,18 @@ function TransactionsContentInner() {
   );
 }
 
+function TransactionsContentGate() {
+  const nativeIos = useNativeIos();
+  if (nativeIos) {
+    return <IosTransactionsScreen />;
+  }
+  return <TransactionsContentInner />;
+}
+
 export function TransactionsContent() {
   return (
     <Suspense fallback={<SkeletonGrid count={3} />}>
-      <TransactionsContentInner />
+      <TransactionsContentGate />
     </Suspense>
   );
 }

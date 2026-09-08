@@ -4,7 +4,7 @@ export const APPLE_APP_SITE_ASSOCIATION = {
     apps: [] as string[],
     details: [
       {
-        appID: "TEAMID.co.buxme.app",
+        appID: "Y7UJK54GL9.co.buxme.app",
         paths: [
           "*",
           "/auth/*",
@@ -22,6 +22,6 @@ export const APPLE_APP_SITE_ASSOCIATION = {
     ],
   },
   webcredentials: {
-    apps: ["TEAMID.co.buxme.app"],
+    apps: ["Y7UJK54GL9.co.buxme.app"],
   },
 } as const;

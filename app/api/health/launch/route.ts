@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
 import { getStripeConfig } from "@/lib/stripe/config";
+import { getAppleIapConfig } from "@/lib/iap/config";
 
 export const runtime = "nodejs";
 
 export async function GET() {
   const stripe = getStripeConfig();
+  const appleIap = getAppleIapConfig();
   const cronSecretConfigured = Boolean(process.env.CRON_SECRET?.trim());
-  const posthogConfigured = Boolean(process.env.NEXT_PUBLIC_POSTHOG_KEY?.trim());
+  const posthogConfigured = Boolean(
+    process.env.NEXT_PUBLIC_POSTHOG_KEY?.trim(),
+  );
   const stripeWebhookConfigured = Boolean(stripe.webhookSecret);
   const stripeLiveMode = stripe.secretKey?.startsWith("sk_live_") ?? false;
 
@@ -17,6 +21,8 @@ export async function GET() {
     stripeConfigured: stripe.isConfigured,
     stripeWebhookConfigured,
     stripeLiveMode,
+    appleIapConfigured: appleIap.isConfigured,
+    appleIapAppAppleIdSet: appleIap.appAppleId != null,
     cronSecretConfigured,
     siteUrl:
       process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/$/, "") ||

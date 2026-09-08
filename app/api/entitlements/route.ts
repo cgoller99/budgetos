@@ -5,8 +5,12 @@ import {
   getUserSubscription,
   refreshUserSubscriptionFromStripe,
 } from "@/lib/stripe/subscriptionService";
+import { clearAppleSubscriptionOnProfile } from "@/lib/iap/appleSubscriptionService";
 import { getEffectiveEntitlements } from "@/lib/subscription/entitlements.server";
-import { FREE_SUBSCRIPTION } from "@/lib/subscription/types";
+import {
+  FREE_SUBSCRIPTION,
+  hasActiveSubscription,
+} from "@/lib/subscription/types";
 
 export async function GET(request: Request) {
   try {
@@ -25,6 +29,15 @@ export async function GET(request: Request) {
 
     // Always read profile entitlements so Apple IAP subscribers are recognized.
     subscription = await getUserSubscription(auth.supabase, auth.user.id);
+
+    // Hygiene fallback: expired Apple rows must not keep Premium forever if ASN was missed.
+    if (
+      subscription.provider === "apple" &&
+      !hasActiveSubscription(subscription)
+    ) {
+      await clearAppleSubscriptionOnProfile(auth.user.id);
+      subscription = await getUserSubscription(auth.supabase, auth.user.id);
+    }
 
     if (
       isStripeEnabled() &&

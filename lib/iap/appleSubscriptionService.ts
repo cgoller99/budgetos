@@ -1,28 +1,42 @@
 import "server-only";
 
-import type { PaidSubscriptionPlan } from "@/lib/subscription/types";
-import { planFromIapProductId } from "@/lib/iap/products";
+import type { PaidSubscriptionPlan, SubscriptionStatus } from "@/lib/subscription/types";
+import {
+  canApplyAppleEntitlementToProfile,
+  isAllowedAppleProductId,
+  planFromVerifiedAppleProduct,
+  shouldPreserveHigherApplePlan,
+} from "@/lib/iap/appleEntitlementPolicy";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
-export type AppleSubscriptionSyncInput = {
+export type VerifiedAppleSubscriptionSyncInput = {
   userId: string;
   productId: string;
   originalTransactionId: string;
   transactionId?: string | null;
-  expiresAt?: string | null;
-  environment?: "Sandbox" | "Production" | string | null;
+  expiresAt: string;
+  environment?: string | null;
+  status?: Extract<SubscriptionStatus, "active" | "past_due">;
+  /**
+   * Purchase verify must apply the resolved Apple product even when the profile
+   * still has a leftover higher-tier Apple row (different OTID / stale Pro+).
+   * Restore + ASN keep higher-tier preservation for true stale-restore safety.
+   */
+  preserveHigherPlan?: boolean;
 };
 
 /**
- * Applies an Apple IAP entitlement to the user profile.
- * Refuses to activate Apple billing when a paid Stripe subscription is already active.
+ * Applies a *verified* Apple IAP entitlement to the user profile.
+ * Refuses to overwrite an active Stripe subscription.
+ * Refuses to let a lower Apple tier overwrite a higher active Apple tier
+ * when the incoming originalTransactionId differs.
  */
-export async function syncAppleSubscriptionToProfile(
-  input: AppleSubscriptionSyncInput,
-): Promise<{ plan: PaidSubscriptionPlan | "free"; status: string }> {
-  const plan = planFromIapProductId(input.productId);
+export async function syncVerifiedAppleSubscriptionToProfile(
+  input: VerifiedAppleSubscriptionSyncInput,
+): Promise<{ plan: PaidSubscriptionPlan; status: string; preserved?: boolean }> {
+  const plan = planFromVerifiedAppleProduct(input.productId);
 
-  if (!plan) {
+  if (!plan || !isAllowedAppleProductId(input.productId)) {
     throw new Error(`Unknown Apple product: ${input.productId}`);
   }
 
@@ -30,7 +44,7 @@ export async function syncAppleSubscriptionToProfile(
   const { data: profile, error } = await admin
     .from("profiles")
     .select(
-      "id, subscription_plan, subscription_status, subscription_provider, stripe_subscription_id, apple_original_transaction_id",
+      "id, subscription_plan, subscription_status, subscription_provider, stripe_subscription_id, apple_original_transaction_id, subscription_current_period_end",
     )
     .eq("id", input.userId)
     .maybeSingle();
@@ -43,33 +57,71 @@ export async function syncAppleSubscriptionToProfile(
     throw new Error("Profile not found.");
   }
 
-  const stripeActive =
-    (profile.subscription_provider === "stripe" ||
-      Boolean(profile.stripe_subscription_id)) &&
-    (profile.subscription_status === "active" ||
-      profile.subscription_status === "trialing" ||
-      profile.subscription_status === "past_due");
-
   if (
-    stripeActive &&
-    profile.apple_original_transaction_id !== input.originalTransactionId
+    !canApplyAppleEntitlementToProfile({
+      id: profile.id,
+      subscriptionProvider: profile.subscription_provider,
+      subscriptionStatus: profile.subscription_status,
+      stripeSubscriptionId: profile.stripe_subscription_id,
+      appleOriginalTransactionId: profile.apple_original_transaction_id,
+    })
   ) {
     throw new Error(
       "You already have an active web subscription. Manage it on buxme.co or cancel it before buying in the App Store.",
     );
   }
 
+  const preserveHigherPlan = input.preserveHigherPlan !== false;
+
+  if (
+    preserveHigherPlan &&
+    shouldPreserveHigherApplePlan({
+      currentProvider: profile.subscription_provider,
+      currentStatus: profile.subscription_status,
+      currentPlan: profile.subscription_plan,
+      currentOriginalTransactionId: profile.apple_original_transaction_id,
+      currentPeriodEnd: profile.subscription_current_period_end,
+      incomingPlan: plan,
+      incomingOriginalTransactionId: input.originalTransactionId,
+    })
+  ) {
+    return {
+      plan: profile.subscription_plan as PaidSubscriptionPlan,
+      status: profile.subscription_status ?? "active",
+      preserved: true,
+    };
+  }
+
+  const { data: conflictingOwner, error: conflictError } = await admin
+    .from("profiles")
+    .select("id")
+    .eq("apple_original_transaction_id", input.originalTransactionId)
+    .neq("id", input.userId)
+    .maybeSingle();
+
+  if (conflictError) {
+    throw conflictError;
+  }
+
+  if (conflictingOwner) {
+    throw new Error(
+      "This Apple subscription is already linked to another Buxme account.",
+    );
+  }
+
+  const status = input.status ?? "active";
+
   const { error: updateError } = await admin
     .from("profiles")
     .update({
       subscription_plan: plan,
-      subscription_status: "active",
+      subscription_status: status,
       subscription_provider: "apple",
       apple_product_id: input.productId,
       apple_original_transaction_id: input.originalTransactionId,
       apple_transaction_id: input.transactionId ?? null,
       apple_environment: input.environment ?? null,
-      subscription_current_period_end: input.expiresAt ?? null,
+      subscription_current_period_end: input.expiresAt,
       // Clear Stripe subscription pointers so entitlements stay single-sourced.
       stripe_subscription_id: null,
       updated_at: new Date().toISOString(),
@@ -80,5 +132,272 @@ export async function syncAppleSubscriptionToProfile(
     throw updateError;
   }
 
-  return { plan, status: "active" };
+  return { plan, status };
+}
+
+/**
+ * Lists other Buxme profiles that still mirror this originalTransactionId
+ * (active or not). Used for rebind diagnostics.
+ */
+export async function listAppleOwnersOfOriginalTransaction(input: {
+  originalTransactionId: string;
+  excludeUserId: string;
+}): Promise<
+  Array<{
+    id: string;
+    subscriptionProvider: string | null;
+    subscriptionStatus: string | null;
+    subscriptionCurrentPeriodEnd: string | null;
+    isActiveAppleEntitlement: boolean;
+  }>
+> {
+  const admin = createSupabaseAdminClient();
+  const { data, error } = await admin
+    .from("profiles")
+    .select(
+      "id, subscription_provider, subscription_status, subscription_current_period_end",
+    )
+    .eq("apple_original_transaction_id", input.originalTransactionId)
+    .neq("id", input.excludeUserId);
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []).map((row) => {
+    const status = row.subscription_status ?? "none";
+    const statusActive =
+      status === "active" || status === "past_due" || status === "trialing";
+    const end = row.subscription_current_period_end
+      ? Date.parse(row.subscription_current_period_end)
+      : NaN;
+    const isActiveAppleEntitlement =
+      row.subscription_provider === "apple" &&
+      statusActive &&
+      !Number.isNaN(end) &&
+      end > Date.now();
+
+    return {
+      id: row.id,
+      subscriptionProvider: row.subscription_provider,
+      subscriptionStatus: row.subscription_status,
+      subscriptionCurrentPeriodEnd: row.subscription_current_period_end,
+      isActiveAppleEntitlement,
+    };
+  });
+}
+
+/**
+ * Returns another Buxme profile that currently holds an *active* Apple
+ * entitlement for this originalTransactionId (if any).
+ */
+export async function findActiveAppleOwnerOfOriginalTransaction(input: {
+  originalTransactionId: string;
+  excludeUserId: string;
+}): Promise<{ id: string } | null> {
+  const owners = await listAppleOwnersOfOriginalTransaction(input);
+  const active = owners.find((owner) => owner.isActiveAppleEntitlement);
+  return active ? { id: active.id } : null;
+}
+
+/**
+ * Clears apple_* identifiers on inactive profiles that still mirror this OTID
+ * so a rebound purchase can first-link to the authenticated purchaser.
+ * Does not touch profiles with an active Apple entitlement.
+ */
+export async function releaseInactiveAppleOriginalTransaction(input: {
+  originalTransactionId: string;
+  excludeUserId: string;
+}): Promise<void> {
+  const admin = createSupabaseAdminClient();
+  const { data: rows, error } = await admin
+    .from("profiles")
+    .select(
+      "id, subscription_provider, subscription_status, subscription_current_period_end",
+    )
+    .eq("apple_original_transaction_id", input.originalTransactionId)
+    .neq("id", input.excludeUserId);
+
+  if (error) {
+    throw error;
+  }
+
+  for (const row of rows ?? []) {
+    const status = row.subscription_status ?? "none";
+    const statusActive =
+      status === "active" || status === "past_due" || status === "trialing";
+    const end = row.subscription_current_period_end
+      ? Date.parse(row.subscription_current_period_end)
+      : NaN;
+    const stillValid =
+      row.subscription_provider === "apple" &&
+      statusActive &&
+      !Number.isNaN(end) &&
+      end > Date.now();
+
+    if (stillValid) {
+      continue;
+    }
+
+    const { error: clearError } = await admin
+      .from("profiles")
+      .update({
+        apple_product_id: null,
+        apple_original_transaction_id: null,
+        apple_transaction_id: null,
+        apple_environment: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", row.id);
+
+    if (clearError) {
+      throw clearError;
+    }
+  }
+}
+
+/**
+ * Removes Apple Premium access for a user while preserving audit identifiers.
+ */
+export async function clearAppleSubscriptionOnProfile(
+  userId: string,
+  options?: { clearIdentifiers?: boolean },
+): Promise<void> {
+  const admin = createSupabaseAdminClient();
+  const { data: profile, error } = await admin
+    .from("profiles")
+    .select("id, subscription_provider")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!profile) {
+    return;
+  }
+
+  if (profile.subscription_provider === "stripe") {
+    return;
+  }
+
+  const clearIdentifiers = options?.clearIdentifiers === true;
+
+  const { error: updateError } = await admin
+    .from("profiles")
+    .update({
+      subscription_plan: "free",
+      subscription_status: "canceled",
+      subscription_provider: clearIdentifiers ? "none" : "apple",
+      subscription_current_period_end: null,
+      ...(clearIdentifiers
+        ? {
+            apple_product_id: null,
+            apple_original_transaction_id: null,
+            apple_transaction_id: null,
+            apple_environment: null,
+          }
+        : {}),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", userId);
+
+  if (updateError) {
+    throw updateError;
+  }
+}
+
+/**
+ * Applies Apple status by originalTransactionId (ASN path).
+ * Never clobbers an active Stripe entitlement.
+ */
+export async function applyAppleSubscriptionByOriginalTransaction(input: {
+  originalTransactionId: string;
+  productId: string;
+  transactionId?: string | null;
+  expiresAt: string | null;
+  environment?: string | null;
+  status: Extract<SubscriptionStatus, "active" | "past_due" | "canceled">;
+}): Promise<{ updated: boolean; skippedReason?: string; userId?: string }> {
+  const admin = createSupabaseAdminClient();
+  const { data: profile, error } = await admin
+    .from("profiles")
+    .select(
+      "id, subscription_plan, subscription_provider, subscription_status, stripe_subscription_id, apple_original_transaction_id, subscription_current_period_end",
+    )
+    .eq("apple_original_transaction_id", input.originalTransactionId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!profile) {
+    return { updated: false, skippedReason: "no_matching_profile" };
+  }
+
+  if (
+    !canApplyAppleEntitlementToProfile({
+      id: profile.id,
+      subscriptionProvider: profile.subscription_provider,
+      subscriptionStatus: profile.subscription_status,
+      stripeSubscriptionId: profile.stripe_subscription_id,
+      appleOriginalTransactionId: profile.apple_original_transaction_id,
+    })
+  ) {
+    return {
+      updated: false,
+      skippedReason: "active_stripe_entitlement_preserved",
+      userId: profile.id,
+    };
+  }
+
+  if (input.status === "canceled") {
+    await clearAppleSubscriptionOnProfile(profile.id);
+    return { updated: true, userId: profile.id };
+  }
+
+  if (!input.expiresAt) {
+    return { updated: false, skippedReason: "missing_expiry", userId: profile.id };
+  }
+
+  const incomingPlan = planFromVerifiedAppleProduct(input.productId);
+  if (
+    incomingPlan &&
+    shouldPreserveHigherApplePlan({
+      currentProvider: profile.subscription_provider,
+      currentStatus: profile.subscription_status,
+      currentPlan: profile.subscription_plan,
+      currentOriginalTransactionId: profile.apple_original_transaction_id,
+      currentPeriodEnd: profile.subscription_current_period_end,
+      incomingPlan,
+      incomingOriginalTransactionId: input.originalTransactionId,
+    })
+  ) {
+    return {
+      updated: false,
+      skippedReason: "higher_apple_tier_preserved",
+      userId: profile.id,
+    };
+  }
+
+  await syncVerifiedAppleSubscriptionToProfile({
+    userId: profile.id,
+    productId: input.productId,
+    originalTransactionId: input.originalTransactionId,
+    transactionId: input.transactionId,
+    expiresAt: input.expiresAt,
+    environment: input.environment,
+    status: input.status,
+  });
+
+  return { updated: true, userId: profile.id };
+}
+
+/** @deprecated Use syncVerifiedAppleSubscriptionToProfile after Apple verification. */
+export async function syncAppleSubscriptionToProfile() {
+  throw new Error(
+    "Unverified Apple subscription sync is disabled. Use /api/iap/apple/verify with App Store Server API verification.",
+  );
 }

@@ -20,17 +20,17 @@ const stripeEnabled =
 
 const COMPARISON_ROWS = [
   { feature: "Unified dashboard", free: true, pro: true, proPlus: true },
-  { feature: "Accounts & transactions", free: true, pro: true, proPlus: true },
-  { feature: "Bills & income tracking", free: true, pro: true, proPlus: true },
-  { feature: "Savings goals & roadmap", free: true, pro: true, proPlus: true },
-  { feature: "Debt tracking", free: true, pro: true, proPlus: true },
-  { feature: "Basic reports", free: true, pro: true, proPlus: true },
+  { feature: "Manual accounts & transactions", free: true, pro: true, proPlus: true },
+  { feature: "Bills, income, goals & debt", free: true, pro: true, proPlus: true },
+  { feature: "Plaid bank sync", free: false, pro: true, proPlus: true },
+  { feature: "Automatic transaction syncing", free: false, pro: true, proPlus: true },
+  { feature: "Connected balances & net worth", free: false, pro: true, proPlus: true },
+  { feature: "Cash-flow & paycheck automation", free: false, pro: true, proPlus: true },
   { feature: "Household collaboration", free: false, pro: true, proPlus: true },
-  { feature: "Shared finances", free: false, pro: true, proPlus: true },
   { feature: "Priority support", free: false, pro: true, proPlus: true },
   { feature: "Advanced reports", free: false, pro: false, proPlus: true },
-  { feature: "Early access features", free: false, pro: false, proPlus: true },
   { feature: "Premium insights", free: false, pro: false, proPlus: true },
+  { feature: "Early access features", free: false, pro: false, proPlus: true },
 ] as const;
 
 function parseMonthlyPrice(priceLabel: string): number | null {
@@ -93,7 +93,7 @@ export function PricingSection() {
         <SectionHeading
           eyebrow="Pricing"
           title="Simple, transparent pricing"
-          description="Start free. Upgrade to Pro or Pro+ when you need household collaboration or advanced reporting."
+          description="Start free with manual tracking. Upgrade to Pro for Plaid bank sync, or Pro+ for advanced insights."
         />
       </ScrollReveal>
 

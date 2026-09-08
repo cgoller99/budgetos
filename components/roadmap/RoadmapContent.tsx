@@ -3,16 +3,23 @@
 import Link from "next/link";
 import { RoadmapTimeline } from "@/components/roadmap/RoadmapTimeline";
 import { EventHistoryList } from "@/components/events/EventHistoryList";
+import { IosRoadmapScreen } from "@/components/native/ios/IosRoadmapScreen";
 import { Card, CardContent, CardHeader, SkeletonGrid } from "@/components/ui";
 import { pageContainerClassName } from "@/components/ui/tokens";
 import { useFinance } from "@/context/FinanceContext";
 import { getRoadmapEvents } from "@/lib/events";
 import { formatCurrency } from "@/lib/finance/format";
 import { generateRoadmap } from "@/lib/roadmap";
+import { useNativeIos } from "@/lib/native/useNativeIos";
 import { cn } from "@/components/ui/cn";
 
 export function RoadmapContent() {
   const finance = useFinance();
+  const nativeIos = useNativeIos();
+
+  if (nativeIos) {
+    return <IosRoadmapScreen />;
+  }
 
   if (finance.isLoading) {
     return <SkeletonGrid count={3} />;
