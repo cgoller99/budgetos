@@ -58,7 +58,8 @@ type PostPayload = {
 };
 
 type ActivityPayload = {
-  operationId: string;
+  operationId: string | null;
+  runId?: string | null;
   events: AiTeamActivityEvent[];
 };
 
@@ -155,6 +156,7 @@ export function AdminAiTeamSection() {
   const operationVersion = useRef(0);
   const activeOperationId = useRef<string | null>(null);
   const activityInterval = useRef<number | null>(null);
+  const restoredActivityRunId = useRef<string | null>(null);
   const planningRef = useRef(false);
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const v3LoadedRef = useRef<Record<V3TabId, boolean>>({
@@ -293,6 +295,50 @@ export function AdminAiTeamSection() {
     if (isV3Tab(activeTab)) void loadV3Tab(activeTab);
   }, [activeTab, loadV3Tab]);
 
+  useEffect(() => {
+    const latestRunId = runs[0]?.id;
+    if (
+      !latestRunId ||
+      planningRef.current ||
+      activeOperationId.current ||
+      activity.length > 0 ||
+      restoredActivityRunId.current === latestRunId
+    ) {
+      return;
+    }
+
+    restoredActivityRunId.current = latestRunId;
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const response = await fetch(
+          `/api/admin/ai-team/activity?runId=${encodeURIComponent(latestRunId)}`,
+          { cache: "no-store" },
+        );
+        const payload = (await response.json().catch(() => ({}))) as
+          | ActivityPayload
+          | { error?: string };
+        if (
+          cancelled ||
+          planningRef.current ||
+          activeOperationId.current ||
+          !response.ok ||
+          !("events" in payload)
+        ) {
+          return;
+        }
+        setActivity(payload.events);
+      } catch {
+        // Historical trace is optional; the run itself remains authoritative.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [runs, activity.length]);
+
   useEffect(
     () => () => {
       if (activityInterval.current !== null) {
@@ -394,6 +440,7 @@ export function AdminAiTeamSection() {
         activityInterval.current = null;
       }
       await pollActivity();
+      activeOperationId.current = null;
       planningRef.current = false;
       setPlanning(false);
     }

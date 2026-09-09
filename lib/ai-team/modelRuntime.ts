@@ -41,6 +41,57 @@ const AGENT_ACTIVITY_LABELS: Record<AiTeamAgentId, string> = {
   critic: "Critic",
 };
 
+type CompletedAgentOutput =
+  | {
+      kind: "specialist" | "critic";
+      summary: string;
+      recommendations: Array<{ title: string }>;
+    }
+  | {
+      kind: "chief";
+      summary: string;
+      tasks: Array<{ title: string }>;
+    };
+
+const PRIVATE_REASONING_PATTERN =
+  /\b(chain[- ]?of[- ]?thought|hidden reasoning|private reasoning|internal reasoning|thought process|scratchpad|system[- ]prompt|developer[- ]message|step[- ]?by[- ]?step reasoning)\b/i;
+
+function conciseOutputText(value: string, maximum: number): string {
+  const compact = value.replace(/\s+/g, " ").trim();
+  if (!compact) return "";
+  if (PRIVATE_REASONING_PATTERN.test(compact)) {
+    return "Report completed. Private reasoning content was withheld from the operational debrief.";
+  }
+  if (compact.length <= maximum) return compact;
+  return `${compact.slice(0, Math.max(0, maximum - 1)).trimEnd()}…`;
+}
+
+export function formatCompletedAgentOutput(
+  output: CompletedAgentOutput,
+): string {
+  const summary = conciseOutputText(output.summary, 540);
+  const titles =
+    output.kind === "chief"
+      ? output.tasks.slice(0, 4).map((task) => task.title)
+      : output.recommendations
+          .slice(0, 3)
+          .map((recommendation) => recommendation.title);
+  const titleLabel =
+    output.kind === "chief"
+      ? "Final tasks"
+      : output.kind === "critic"
+        ? "Challenges / recommendations"
+        : "Recommendations";
+  const titleLine =
+    titles.length > 0
+      ? `\n${titleLabel}: ${titles
+          .map((title) => conciseOutputText(title, 100))
+          .join(" · ")}`
+      : "";
+
+  return `Summary: ${summary}${titleLine}`.slice(0, 1000).trimEnd();
+}
+
 async function emitProgress(
   onProgress: AiTeamProgressCallback | undefined,
   event: AiTeamProgressEvent,
@@ -297,8 +348,8 @@ function taskFromModel(
   return {
     id: "ai-task-" + (index + 1),
     owner: input.owner,
-    title: input.title,
-    objective: input.objective,
+    title: conciseOutputText(input.title, 140),
+    objective: conciseOutputText(input.objective, 600),
     status: requiresApproval ? "needs_approval" : "queued",
     evidence: [
       ...snapshot.observations.slice(0, 3),
@@ -314,7 +365,7 @@ function taskFromModel(
     ].slice(0, 5),
     requiresApproval,
     approvalReason: requiresApproval
-      ? input.approvalReason?.trim() ||
+      ? conciseOutputText(input.approvalReason ?? "", 300) ||
         "Production-sensitive action requires approval."
       : undefined,
   };
@@ -391,7 +442,11 @@ export async function createAiTeamPlan(
           agentId: id,
           status: "completed",
           label: `${AGENT_ACTIVITY_LABELS[id]} completed`,
-          detail: "Specialist recommendations are ready for review.",
+          detail: formatCompletedAgentOutput({
+            kind: "specialist",
+            summary: generation.output.summary,
+            recommendations: generation.output.recommendations,
+          }),
         });
         return [id, generation] as const;
       } catch (error) {
@@ -448,7 +503,11 @@ export async function createAiTeamPlan(
       agentId: "critic",
       status: "completed",
       label: "Critic review completed",
-      detail: "The specialist direction has completed safety and evidence review.",
+      detail: formatCompletedAgentOutput({
+        kind: "critic",
+        summary: criticResult.output.summary,
+        recommendations: criticResult.output.recommendations,
+      }),
     });
     const critic = criticResult.output;
     const specialistContext = JSON.stringify(
@@ -492,7 +551,11 @@ export async function createAiTeamPlan(
       agentId: "chief_of_staff",
       status: "completed",
       label: "Chief synthesis completed",
-      detail: "A prioritized, approval-aware plan is ready to save.",
+      detail: formatCompletedAgentOutput({
+        kind: "chief",
+        summary: result.output.summary,
+        tasks: result.output.tasks,
+      }),
     });
 
     const tasks = result.output.tasks.map((item, index) =>
@@ -503,7 +566,7 @@ export async function createAiTeamPlan(
       id: "plan-" + Date.now(),
       goal,
       createdAt: new Date().toISOString(),
-      summary: result.output.summary,
+      summary: conciseOutputText(result.output.summary, 800),
       observations: snapshot.observations,
       tasks,
       guardrails: [

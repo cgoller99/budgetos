@@ -124,6 +124,25 @@ export async function listAiTeamActivity(
   return data.map(aiTeamActivityFromRow);
 }
 
+export async function listAiTeamActivityByRun(
+  adminSupabase: BuxmeSupabaseClient,
+  userId: string,
+  runId: string,
+): Promise<AiTeamActivityEvent[]> {
+  const { data, error } = await adminSupabase
+    .from("ai_team_activity_events")
+    .select("*")
+    .eq("created_by", userId)
+    .eq("run_id", runId)
+    .order("ordinal", { ascending: true });
+
+  if (error) {
+    throw new Error("Unable to load AI Team activity by run.", { cause: error });
+  }
+
+  return data.map(aiTeamActivityFromRow);
+}
+
 export async function attachAiTeamActivityRun(
   adminSupabase: BuxmeSupabaseClient,
   userId: string,

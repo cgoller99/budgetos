@@ -15,6 +15,7 @@ export {
   appendAiTeamActivity,
   attachAiTeamActivityRun,
   listAiTeamActivity,
+  listAiTeamActivityByRun,
 } from "@/lib/ai-team/activity";
 export {
   listAiTeamApprovalRuns,
