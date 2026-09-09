@@ -161,10 +161,12 @@ export function buildFounderBriefSections(input: {
 
 export async function getLatestAiTeamFounderBrief(
   adminSupabase: BuxmeSupabaseClient,
+  userId: string,
 ): Promise<AiTeamFounderBrief | null> {
   const { data, error } = await adminSupabase
     .from("ai_team_founder_briefs")
     .select("*")
+    .eq("generated_by", userId)
     .order("brief_date", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -201,7 +203,7 @@ export async function saveAiTeamFounderBrief(
         sections: sections as unknown as Json,
         updated_at: now,
       },
-      { onConflict: "brief_date" },
+      { onConflict: "generated_by,brief_date" },
     )
     .select("*")
     .single();

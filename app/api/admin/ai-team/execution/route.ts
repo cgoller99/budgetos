@@ -17,8 +17,8 @@ export async function GET() {
 
   try {
     const [packets, candidates] = await Promise.all([
-      listAiTeamExecutionPackets(auth.adminSupabase),
-      listAiTeamExecutionCandidates(auth.adminSupabase),
+      listAiTeamExecutionPackets(auth.adminSupabase, auth.user.id),
+      listAiTeamExecutionCandidates(auth.adminSupabase, auth.user.id),
     ]);
 
     return NextResponse.json({
@@ -113,6 +113,12 @@ export async function POST(request: Request) {
         : "";
     if (code === "P0002") {
       return NextResponse.json({ error: "Task not found." }, { status: 404 });
+    }
+    if (code === "42501") {
+      return NextResponse.json(
+        { error: "This task does not belong to your admin account." },
+        { status: 403 },
+      );
     }
     if (code === "23505") {
       return NextResponse.json(

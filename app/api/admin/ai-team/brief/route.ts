@@ -20,7 +20,10 @@ export async function GET() {
 
   try {
     return NextResponse.json({
-      brief: await getLatestAiTeamFounderBrief(auth.adminSupabase),
+      brief: await getLatestAiTeamFounderBrief(
+        auth.adminSupabase,
+        auth.user.id,
+      ),
     });
   } catch (error) {
     console.error("[admin/ai-team/brief] Load failed", error);
@@ -42,9 +45,9 @@ export async function POST() {
         getAiTeamProductAnalytics(auth.adminSupabase),
         getAiTeamRevenueIntelligence(auth.adminSupabase),
         getAiTeamCustomerVoice(auth.adminSupabase),
-        listRecentAiTeamRuns(auth.adminSupabase),
-        listAiTeamApprovalRuns(auth.adminSupabase),
-        listAiTeamExecutionPackets(auth.adminSupabase),
+        listRecentAiTeamRuns(auth.adminSupabase, auth.user.id),
+        listAiTeamApprovalRuns(auth.adminSupabase, auth.user.id),
+        listAiTeamExecutionPackets(auth.adminSupabase, auth.user.id),
       ]);
     const decisionTaskIds = [
       ...new Set(

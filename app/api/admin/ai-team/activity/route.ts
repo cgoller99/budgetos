@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { requireAdminApiUser } from "@/lib/admin/apiAuth";
-import { listAiTeamActivity } from "@/lib/ai-team";
+import {
+  listAiTeamActivity,
+  listAiTeamActivityByRun,
+} from "@/lib/ai-team";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -9,25 +12,36 @@ export async function GET(request: Request) {
   const auth = await requireAdminApiUser();
   if ("response" in auth) return auth.response;
 
-  const operationId = new URL(request.url).searchParams
-    .get("operationId")
-    ?.trim();
+  const searchParams = new URL(request.url).searchParams;
+  const operationId = searchParams.get("operationId")?.trim();
+  const runId = searchParams.get("runId")?.trim();
 
-  if (!operationId || !UUID_PATTERN.test(operationId)) {
+  if (
+    (operationId && runId) ||
+    (!operationId && !runId) ||
+    (operationId && !UUID_PATTERN.test(operationId)) ||
+    (runId && !UUID_PATTERN.test(runId))
+  ) {
     return NextResponse.json(
-      { error: "A valid operationId is required." },
+      { error: "Provide exactly one valid operationId or runId." },
       { status: 400 },
     );
   }
 
   try {
-    const events = await listAiTeamActivity(
-      auth.adminSupabase,
-      auth.user.id,
-      operationId,
-    );
+    const events = operationId
+      ? await listAiTeamActivity(
+          auth.adminSupabase,
+          auth.user.id,
+          operationId,
+        )
+      : await listAiTeamActivityByRun(
+          auth.adminSupabase,
+          auth.user.id,
+          runId!,
+        );
     return NextResponse.json(
-      { operationId, events },
+      { operationId: operationId ?? events[0]?.operationId ?? null, runId: runId ?? events[0]?.runId ?? null, events },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {

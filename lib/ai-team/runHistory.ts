@@ -196,10 +196,12 @@ export async function saveAiTeamRun(
 
 export async function listRecentAiTeamRuns(
   adminSupabase: BuxmeSupabaseClient,
+  userId: string,
 ): Promise<AiTeamRun[]> {
   const { data: runs, error: runsError } = await adminSupabase
     .from("ai_team_runs")
     .select("*")
+    .eq("created_by", userId)
     .order("created_at", { ascending: false })
     .limit(20);
 
@@ -235,10 +237,30 @@ export async function listRecentAiTeamRuns(
 
 export async function listAiTeamApprovalRuns(
   adminSupabase: BuxmeSupabaseClient,
+  userId: string,
 ): Promise<AiTeamRun[]> {
+  const { data: userRuns, error: userRunsError } = await adminSupabase
+    .from("ai_team_runs")
+    .select("id")
+    .eq("created_by", userId)
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (userRunsError) {
+    throw new Error("Unable to load AI Team approval run ownership.", {
+      cause: userRunsError,
+    });
+  }
+
+  if (userRuns.length === 0) return [];
+
   const { data: tasks, error: tasksError } = await adminSupabase
     .from("ai_team_tasks")
     .select("*")
+    .in(
+      "run_id",
+      userRuns.map((run) => run.id),
+    )
     .eq("requires_approval", true)
     .order("created_at", { ascending: false })
     .limit(100);

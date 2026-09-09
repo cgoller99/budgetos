@@ -65,10 +65,12 @@ export function executionPacketFromRow(
 
 export async function listAiTeamExecutionPackets(
   adminSupabase: BuxmeSupabaseClient,
+  userId: string,
 ): Promise<AiTeamExecutionPacket[]> {
   const { data, error } = await adminSupabase
     .from("ai_team_execution_packets")
     .select("*")
+    .eq("created_by", userId)
     .order("created_at", { ascending: false })
     .limit(100);
 
@@ -80,10 +82,29 @@ export async function listAiTeamExecutionPackets(
 
 export async function listAiTeamExecutionCandidates(
   adminSupabase: BuxmeSupabaseClient,
+  userId: string,
 ): Promise<AiTeamExecutionCandidate[]> {
+  const { data: userRuns, error: userRunsError } = await adminSupabase
+    .from("ai_team_runs")
+    .select("id")
+    .eq("created_by", userId)
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (userRunsError) {
+    throw new Error("Unable to load execution candidate ownership.", {
+      cause: userRunsError,
+    });
+  }
+  if (userRuns.length === 0) return [];
+
   const { data: decisions, error: decisionError } = await adminSupabase
     .from("ai_team_approval_decisions")
     .select("*")
+    .in(
+      "run_id",
+      userRuns.map((run) => run.id),
+    )
     .eq("decision", "approved")
     .order("created_at", { ascending: false })
     .limit(100);

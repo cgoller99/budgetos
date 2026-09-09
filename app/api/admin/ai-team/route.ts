@@ -161,8 +161,8 @@ export async function GET() {
     const [snapshot, recentRuns, approvalRuns, playbooks, planningUsed] =
       await Promise.all([
       getAiTeamSnapshot(auth.adminSupabase),
-      listRecentAiTeamRuns(auth.adminSupabase),
-      listAiTeamApprovalRuns(auth.adminSupabase),
+      listRecentAiTeamRuns(auth.adminSupabase, auth.user.id),
+      listAiTeamApprovalRuns(auth.adminSupabase, auth.user.id),
       listAiTeamPlaybooks(auth.adminSupabase, auth.user.id),
       dailyPlanUsage(auth.adminSupabase, auth.user.id, Date.now()),
     ]);
