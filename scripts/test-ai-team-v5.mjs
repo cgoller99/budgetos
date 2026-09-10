@@ -247,7 +247,7 @@ assert.ok(missionsRoute.includes("operationId?: unknown"));
 assert.ok(browserInterfaces.includes("setCapturedFrame(null)"));
 assert.ok(commandCenter.includes("Auto-submit after speech (off by default)"));
 assert.ok(commandCenter.includes("The AI has not analyzed your screen."));
-assert.ok(commandCenter.includes("No external/local action executor connected"));
+assert.ok(commandCenter.includes("No unrestricted executor"));
 assert.ok(commandCenter.includes("requestFullscreen"));
 assert.ok(
   commandCenter.includes(

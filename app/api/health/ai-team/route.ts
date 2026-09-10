@@ -59,7 +59,7 @@ export async function GET() {
   return NextResponse.json(
     {
       ok: ready,
-      version: "5.2.0",
+      version: "5.3.0",
       ready,
       persistenceConfigured,
       runtimeConfigured,
@@ -74,6 +74,7 @@ export async function GET() {
         voiceInterface: true,
         screenPermissionShell: true,
         screenIntelligence: runtimeConfigured,
+        actionBridge: persistenceConfigured,
         autonomyPolicy: true,
         intelligenceReports: persistenceConfigured,
       },

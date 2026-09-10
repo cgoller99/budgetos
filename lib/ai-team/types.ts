@@ -419,6 +419,37 @@ export type AiTeamScreenAnalysis = {
   sensitiveContentDetected: boolean;
 };
 
+export type AiTeamActionKey =
+  | "intelligence.refresh"
+  | "founder_brief.generate";
+
+export type AiTeamActionDefinition = {
+  key: AiTeamActionKey;
+  label: string;
+  description: string;
+  riskClass: AiTeamToolRiskClass;
+  mutates: boolean;
+  minimumAutonomy: AiTeamAutonomyLevel;
+  exampleCommand: string;
+};
+
+export type AiTeamActionExecution = {
+  action: AiTeamActionDefinition;
+  summary: string;
+  findings: string[];
+  changed: boolean;
+  targetType: string | null;
+  targetRef: string | null;
+  changeAction: string | null;
+  beforeSnapshot: Record<string, unknown> | null;
+  afterSnapshot: Record<string, unknown> | null;
+  verificationPassed: boolean;
+  verificationSummary: string;
+  verificationEvidence: Record<string, unknown>;
+  refreshedSnapshot?: AiTeamSnapshot;
+  founderBrief?: AiTeamFounderBrief;
+};
+
 export type AiTeamToolRiskClass =
   | "read"
   | "normal_write"

@@ -57,8 +57,7 @@ assert.ok(browserInterfaces.includes('toDataURL("image/jpeg", 0.72)'));
 assert.ok(browserInterfaces.includes("return frame"));
 assert.ok(browserInterfaces.includes("setCapturedFrame(null)"));
 for (const contract of [
-  "Buxme OS V5.2",
-  "MISSION ENGINE + SCREEN INTELLIGENCE",
+  "Screen intelligence",
   "Analyze frame",
   "/api/admin/ai-team/vision",
   "does not write the screenshot to app storage or mission history",
@@ -66,7 +65,6 @@ for (const contract of [
   "Use findings in mission",
   "that command will be persisted if you start the mission",
   "The AI has not analyzed your screen.",
-  "No external/local action executor connected",
 ]) {
   assert.ok(commandCenter.includes(contract), `Missing V5.2 UI contract: ${contract}`);
 }
@@ -80,7 +78,7 @@ assert.ok(
   capabilities.slice(screenIntelligence, screenIntelligence + 600).includes("available: true"),
   "Screen intelligence must be available",
 );
-assert.ok(health.includes('version: "5.2.0"'));
+assert.match(health, /version: "5\.(?:2|3)\.\d+"/);
 assert.ok(health.includes("screenIntelligence: runtimeConfigured"));
 assert.ok(types.includes("export type AiTeamScreenAnalysis"));
 

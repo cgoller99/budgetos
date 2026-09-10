@@ -36,6 +36,7 @@
     "test:ai-team-v4": "node scripts/test-ai-team-v4.mjs",
     "test:ai-team-v5": "node scripts/test-ai-team-v5.mjs",
     "test:ai-team-v5-2": "node scripts/test-ai-team-v5-2.mjs",
+    "test:ai-team-v5-3": "node scripts/test-ai-team-v5-3.mjs",
     "test:ios-native-nav": "node scripts/test-ios-native-nav.mjs",
     "test:ios-settings-nav": "node scripts/test-ios-settings-nav.mjs",
     "test:ios-nav-insights": "node scripts/test-ios-nav-insights.mjs",
