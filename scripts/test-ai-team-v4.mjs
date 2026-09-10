@@ -43,7 +43,9 @@ const postRoute = await readFile(
 );
 assert.ok(postRoute.includes("operationId?: unknown"));
 assert.ok(postRoute.includes("const operationId = suppliedOperationId ?? randomUUID()"));
-assert.ok(postRoute.includes("createAiTeamPlan(goal, snapshot, recordActivity)"));
+assert.ok(postRoute.includes("createAiTeamPlan("));
+assert.ok(postRoute.includes("recordActivity"));
+assert.ok(postRoute.includes("request.signal"));
 assert.ok(postRoute.includes("attachAiTeamActivityRun"));
 assert.ok(postRoute.includes("operationId,"));
 assert.ok(postRoute.includes("operationId has already been used."));
@@ -209,7 +211,7 @@ const healthRoute = await readFile(
   new URL("../app/api/health/ai-team/route.ts", import.meta.url),
   "utf8",
 );
-assert.ok(healthRoute.includes('version: "4.0.0"'));
+assert.ok(healthRoute.includes('version: "5.1.0"'));
 assert.ok(healthRoute.includes("liveActivityTrace"));
 
 for (const source of [postRoute, activityRoute, activityService, commandUi]) {

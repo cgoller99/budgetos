@@ -4,17 +4,32 @@ import { requireAdminApiUser } from "@/lib/admin/apiAuth";
 import type { BuxmeSupabaseClient } from "@/lib/supabase/client";
 import {
   AI_TEAM_AGENTS,
+  addAiTeamMissionVerification,
   appendAiTeamActivity,
+  appendAiTeamMissionEvent,
   attachAiTeamActivityRun,
+  attachAiTeamMissionRun,
+  createAiTeamMission,
   createAiTeamPlan,
+  finalizeAiTeamMission,
   getAiTeamRuntimeInfo,
   getAiTeamSnapshot,
+  isAiTeamMissionStopRequested,
+  isAiTeamOperationStopRequested,
   listAiTeamApprovalDecisions,
-  listAiTeamApprovalRuns,
   listAiTeamPlaybooks,
+  listRecentAiTeamMissions,
   listRecentAiTeamRuns,
+  loadAiTeamMissionByOperation,
+  requestAiTeamMissionStop,
   saveAiTeamRun,
+  updateAiTeamMissionLifecycle,
 } from "@/lib/ai-team";
+import type {
+  AiTeamAutonomyLevel,
+  AiTeamMission,
+  AiTeamRun,
+} from "@/lib/ai-team/types";
 
 const PLAN_COOLDOWN_MS = 15_000;
 const PLAN_DAILY_LIMIT = 40;
@@ -82,7 +97,8 @@ async function claimPlanLock(
   now: number,
 ): Promise<string | null> {
   const id = planLockId(userId);
-  const lockToken = randomUUID();
+  // Opaque concurrency lease identifier, not an auth/session credential.
+  const leaseId = randomUUID();
   const staleBefore = new Date(now - PLAN_LOCK_STALE_MS).toISOString();
 
   const { error: staleCleanupError } = await adminSupabase
@@ -97,11 +113,11 @@ async function claimPlanLock(
     id,
     event_type: "ai_team",
     message: "AI Team active lock",
-    metadata: { goalLength: goal.length, lockToken },
+    metadata: { goalLength: goal.length, leaseId },
     user_id: userId,
   });
 
-  if (!error) return lockToken;
+  if (!error) return leaseId;
   if (error.code === "23505") return null;
   throw error;
 }
@@ -139,16 +155,72 @@ async function reserveOperationId(
   throw error;
 }
 
+async function releaseOperationId(
+  adminSupabase: BuxmeSupabaseClient,
+  userId: string,
+  operationId: string,
+): Promise<void> {
+  const { error } = await adminSupabase
+    .from("admin_event_logs")
+    .delete()
+    .eq("id", operationReservationId(userId, operationId))
+    .eq("event_type", "ai_team")
+    .eq("message", "AI Team operation reserved")
+    .eq("user_id", userId)
+    .contains("metadata", { operationId });
+
+  if (error) throw error;
+}
+
+async function observeMissionStop(
+  adminSupabase: BuxmeSupabaseClient,
+  userId: string,
+  operationId: string,
+  missionId: string,
+  abortSignal: AbortSignal,
+): Promise<AiTeamMission | null> {
+  const [missionStopRequested, operationStopRequested] = await Promise.all([
+    isAiTeamMissionStopRequested(adminSupabase, userId, missionId),
+    isAiTeamOperationStopRequested(adminSupabase, userId, operationId),
+  ]);
+  if (
+    !abortSignal.aborted &&
+    !missionStopRequested &&
+    !operationStopRequested
+  ) {
+    return null;
+  }
+  return requestAiTeamMissionStop(adminSupabase, userId, missionId);
+}
+
+function stopResponse(operationId: string, mission: AiTeamMission) {
+  const stopped = mission.status === "stopped";
+  return NextResponse.json(
+    {
+      error: stopped
+        ? "Mission stop request observed."
+        : `Mission was already ${mission.status} before the stop transition could win.`,
+      message: stopped
+        ? "The stop was persisted. External work already in flight may take time to observe cancellation."
+        : "The persisted terminal mission state was not overwritten.",
+      stopped,
+      operationId,
+      mission,
+    },
+    { status: 409 },
+  );
+}
+
 async function releasePlanLock(
   adminSupabase: BuxmeSupabaseClient,
   userId: string,
-  lockToken: string,
+  leaseId: string,
 ): Promise<void> {
   const { error } = await adminSupabase
     .from("admin_event_logs")
     .delete()
     .eq("id", planLockId(userId))
-    .contains("metadata", { lockToken });
+    .contains("metadata", { leaseId });
 
   if (error) throw error;
 }
@@ -158,14 +230,17 @@ export async function GET() {
   if ("response" in auth) return auth.response;
 
   try {
-    const [snapshot, recentRuns, approvalRuns, playbooks, planningUsed] =
+    const [snapshot, recentRuns, playbooks, planningUsed, recentMissions] =
       await Promise.all([
       getAiTeamSnapshot(auth.adminSupabase),
       listRecentAiTeamRuns(auth.adminSupabase, auth.user.id),
-      listAiTeamApprovalRuns(auth.adminSupabase, auth.user.id),
       listAiTeamPlaybooks(auth.adminSupabase, auth.user.id),
       dailyPlanUsage(auth.adminSupabase, auth.user.id, Date.now()),
+      listRecentAiTeamMissions(auth.adminSupabase, auth.user.id),
     ]);
+    const approvalRuns = recentRuns.filter((run) =>
+      run.tasks.some((task) => task.requiresApproval),
+    );
     const approvalDecisions = await listAiTeamApprovalDecisions(
       auth.adminSupabase,
       [
@@ -186,6 +261,7 @@ export async function GET() {
       approvalRuns,
       approvalDecisions,
       playbooks,
+      recentMissions,
       planningUsage: { used: planningUsed, limit: PLAN_DAILY_LIMIT },
     });
   } catch (error) {
@@ -201,11 +277,26 @@ export async function POST(request: Request) {
   if ("response" in auth) return auth.response;
 
   const body = (await request.json().catch(() => null)) as
-    | { goal?: unknown; operationId?: unknown }
+    | {
+        goal?: unknown;
+        operationId?: unknown;
+        autonomyLevel?: unknown;
+        context?: unknown;
+      }
     | null;
   const goal = typeof body?.goal === "string" ? body.goal.trim() : "";
   const suppliedOperationId =
     typeof body?.operationId === "string" ? body.operationId.trim() : null;
+  const autonomyLevel =
+    typeof body?.autonomyLevel === "string"
+      ? body.autonomyLevel
+      : "assist";
+  const allowedAutonomy = new Set<AiTeamAutonomyLevel>([
+    "observe",
+    "assist",
+    "act",
+    "autopilot",
+  ]);
 
   if (goal.length < 3 || goal.length > 1000) {
     return NextResponse.json(
@@ -223,32 +314,15 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
+  if (!allowedAutonomy.has(autonomyLevel as AiTeamAutonomyLevel)) {
+    return NextResponse.json(
+      { error: "Invalid autonomy level." },
+      { status: 400 },
+    );
+  }
 
   const operationId = suppliedOperationId ?? randomUUID();
   const userId = auth.user.id;
-
-  try {
-    const reserved = await reserveOperationId(
-      auth.adminSupabase,
-      userId,
-      operationId,
-    );
-    if (!reserved) {
-      return NextResponse.json(
-        { error: "operationId has already been used.", operationId },
-        { status: 409 },
-      );
-    }
-  } catch (operationReservationError) {
-    console.error(
-      "[admin/ai-team] Operation reservation failed",
-      operationReservationError,
-    );
-    return NextResponse.json(
-      { error: "AI Team operation guard is temporarily unavailable." },
-      { status: 503 },
-    );
-  }
 
   const now = Date.now();
   const lastStartedAt = lastPlanStartedAt.get(userId) ?? 0;
@@ -267,7 +341,9 @@ export async function POST(request: Request) {
     );
   }
 
-  let distributedLockToken: string | null = null;
+  let distributedLeaseId: string | null = null;
+  let mission: AiTeamMission | null = null;
+  let operationReserved = false;
 
   try {
     if (!(await hasDailyPlanCapacity(auth.adminSupabase, userId, now))) {
@@ -277,34 +353,209 @@ export async function POST(request: Request) {
       );
     }
 
-    distributedLockToken = await claimPlanLock(
+    distributedLeaseId = await claimPlanLock(
       auth.adminSupabase,
       userId,
       goal,
       now,
     );
-    if (!distributedLockToken) {
+    if (!distributedLeaseId) {
       return NextResponse.json(
         { error: "An AI Team plan is already running." },
         { status: 429 },
       );
     }
 
-    await recordPlanStart(auth.adminSupabase, userId, goal);
-  } catch (rateLimitError) {
-    if (distributedLockToken) {
+    try {
+      operationReserved = await reserveOperationId(
+        auth.adminSupabase,
+        userId,
+        operationId,
+      );
+    } catch (operationReservationError) {
+      console.error(
+        "[admin/ai-team] Operation reservation failed",
+        operationReservationError,
+      );
+      throw new Error("AI Team operation guard is temporarily unavailable.", {
+        cause: operationReservationError,
+      });
+    }
+    if (!operationReserved) {
       await releasePlanLock(
         auth.adminSupabase,
         userId,
-        distributedLockToken,
+        distributedLeaseId,
+      ).catch((releaseError) =>
+        console.error("[admin/ai-team] Lock cleanup failed", releaseError),
+      );
+      distributedLeaseId = null;
+      return NextResponse.json(
+        { error: "operationId has already been used.", operationId },
+        { status: 409 },
+      );
+    }
+
+    if (
+      request.signal.aborted ||
+      (await isAiTeamOperationStopRequested(
+        auth.adminSupabase,
+        userId,
+        operationId,
+      ))
+    ) {
+      await releasePlanLock(
+        auth.adminSupabase,
+        userId,
+        distributedLeaseId,
+      ).catch((releaseError) =>
+        console.error("[admin/ai-team] Lock cleanup failed", releaseError),
+      );
+      distributedLeaseId = null;
+      return NextResponse.json(
+        {
+          error: "Mission stopped before persistent mission creation.",
+          message:
+            "The stop request was persisted before the mission record was created, so planning did not start.",
+          stopped: true,
+          operationId,
+          mission: null,
+        },
+        { status: 409 },
+      );
+    }
+
+    const contextInput =
+      body?.context &&
+      typeof body.context === "object" &&
+      !Array.isArray(body.context)
+        ? (body.context as Record<string, unknown>)
+        : {};
+    const missionContext = {
+      screenSharingActive: contextInput.screenSharingActive === true,
+      displayWidth:
+        typeof contextInput.displayWidth === "number" &&
+        Number.isFinite(contextInput.displayWidth)
+          ? Math.max(0, Math.round(contextInput.displayWidth))
+          : 0,
+      displayHeight:
+        typeof contextInput.displayHeight === "number" &&
+        Number.isFinite(contextInput.displayHeight)
+          ? Math.max(0, Math.round(contextInput.displayHeight))
+          : 0,
+      commandSource:
+        contextInput.commandSource === "voice" ? "voice" : "text",
+    };
+    mission = await createAiTeamMission(auth.adminSupabase, {
+      createdBy: userId,
+      operationId,
+      command: goal,
+      autonomyLevel: autonomyLevel as AiTeamAutonomyLevel,
+      context: missionContext,
+    });
+    const stoppedMission = await observeMissionStop(
+      auth.adminSupabase,
+      userId,
+      operationId,
+      mission.id,
+      request.signal,
+    );
+    if (stoppedMission) {
+      await releasePlanLock(
+        auth.adminSupabase,
+        userId,
+        distributedLeaseId,
+      ).catch((releaseError) =>
+        console.error("[admin/ai-team] Lock cleanup failed", releaseError),
+      );
+      distributedLeaseId = null;
+      return stopResponse(operationId, stoppedMission);
+    }
+    await recordPlanStart(auth.adminSupabase, userId, goal);
+    mission = await updateAiTeamMissionLifecycle(
+      auth.adminSupabase,
+      userId,
+      mission.id,
+      "planning",
+    );
+    if (mission.status === "stopped") {
+      await releasePlanLock(
+        auth.adminSupabase,
+        userId,
+        distributedLeaseId,
+      ).catch((releaseError) =>
+        console.error("[admin/ai-team] Lock cleanup failed", releaseError),
+      );
+      distributedLeaseId = null;
+      return stopResponse(operationId, mission);
+    }
+  } catch (rateLimitError) {
+    if (operationReserved && !mission) {
+      try {
+        mission = await loadAiTeamMissionByOperation(
+          auth.adminSupabase,
+          userId,
+          operationId,
+        );
+        if (!mission) {
+          await releaseOperationId(
+            auth.adminSupabase,
+            userId,
+            operationId,
+          );
+          operationReserved = false;
+        }
+      } catch (reservationReleaseError) {
+        console.error(
+          "[admin/ai-team] Operation reservation cleanup failed",
+          reservationReleaseError,
+        );
+      }
+    }
+    if (distributedLeaseId) {
+      await releasePlanLock(
+        auth.adminSupabase,
+        userId,
+        distributedLeaseId,
       ).catch((releaseError) =>
         console.error("[admin/ai-team] Lock cleanup failed", releaseError),
       );
     }
 
     console.error("[admin/ai-team] Durable rate-limit guard failed", rateLimitError);
+    if (mission) {
+      const stoppedMission = await observeMissionStop(
+        auth.adminSupabase,
+        userId,
+        operationId,
+        mission.id,
+        request.signal,
+      ).catch(() => null);
+      if (stoppedMission) return stopResponse(operationId, stoppedMission);
+      await appendAiTeamMissionEvent(auth.adminSupabase, {
+        missionId: mission.id,
+        createdBy: userId,
+        phase: "initialization",
+        eventType: "failed",
+        status: "failed",
+        summary: "Mission initialization failed",
+        detail: "The mission could not safely enter the planning lifecycle.",
+        ordinal: 1,
+      }).catch(() => undefined);
+      await finalizeAiTeamMission(
+        auth.adminSupabase,
+        userId,
+        mission.id,
+        "failed",
+        null,
+      ).catch(() => undefined);
+    }
     return NextResponse.json(
-      { error: "AI Team guard is temporarily unavailable." },
+      {
+        error: mission
+          ? "AI Team mission initialization failed."
+          : "AI Team guard is temporarily unavailable.",
+      },
       { status: 503 },
     );
   }
@@ -313,7 +564,10 @@ export async function POST(request: Request) {
   lastPlanStartedAt.set(userId, now);
 
   let ordinal = 0;
+  let missionOrdinal = 1;
   let persistedRunId: string | undefined;
+  let persistedRun: AiTeamRun | null = null;
+  let missionTraceHealthy = true;
   const recordActivity = async (event: {
     agentId?: (typeof AI_TEAM_AGENTS)[number]["id"];
     phase: string;
@@ -322,25 +576,58 @@ export async function POST(request: Request) {
     detail?: string;
   }): Promise<void> => {
     const eventOrdinal = ordinal++;
-    try {
-      await appendAiTeamActivity(auth.adminSupabase, {
+    const activityWrite = appendAiTeamActivity(auth.adminSupabase, {
         operationId,
         createdBy: userId,
         runId: persistedRunId,
         ordinal: eventOrdinal,
         ...event,
       });
-    } catch (activityError) {
+    const missionWrite = appendAiTeamMissionEvent(auth.adminSupabase, {
+      missionId: mission!.id,
+      createdBy: userId,
+      phase: event.phase,
+      eventType: event.phase,
+      agentId: event.agentId,
+      status: event.status,
+      summary: event.label,
+      detail: event.detail,
+      ordinal: missionOrdinal++,
+    });
+    const [activityResult, missionResult] = await Promise.allSettled([
+      activityWrite,
+      missionWrite,
+    ]);
+    if (activityResult.status === "rejected") {
       console.error("[admin/ai-team] Activity write failed", {
         operationId,
         ordinal: eventOrdinal,
         phase: event.phase,
-        error: activityError,
+        error: activityResult.reason,
+      });
+    }
+    if (missionResult.status === "rejected") {
+      missionTraceHealthy = false;
+      console.error("[admin/ai-team] Mission event write failed", {
+        operationId,
+        missionId: mission!.id,
+        phase: event.phase,
+        error: missionResult.reason,
       });
     }
   };
 
   try {
+    const stoppedBeforeEvidence = await observeMissionStop(
+      auth.adminSupabase,
+      userId,
+      operationId,
+      mission!.id,
+      request.signal,
+    );
+    if (stoppedBeforeEvidence) {
+      return stopResponse(operationId, stoppedBeforeEvidence);
+    }
     await recordActivity({
       phase: "initializing",
       status: "running",
@@ -362,8 +649,43 @@ export async function POST(request: Request) {
         snapshot.unavailableSources.length === 1 ? "" : "s"
       } unavailable.`,
     });
-    const plan = await createAiTeamPlan(goal, snapshot, recordActivity);
+    const stoppedAfterEvidence = await observeMissionStop(
+      auth.adminSupabase,
+      userId,
+      operationId,
+      mission!.id,
+      request.signal,
+    );
+    if (stoppedAfterEvidence) {
+      return stopResponse(operationId, stoppedAfterEvidence);
+    }
+    const plan = await createAiTeamPlan(
+      goal,
+      snapshot,
+      recordActivity,
+      request.signal,
+    );
     let run;
+    const stoppedAfterPlanning = await observeMissionStop(
+      auth.adminSupabase,
+      userId,
+      operationId,
+      mission!.id,
+      request.signal,
+    );
+    if (stoppedAfterPlanning) {
+      return stopResponse(operationId, stoppedAfterPlanning);
+    }
+
+    const runningMission = await updateAiTeamMissionLifecycle(
+      auth.adminSupabase,
+      userId,
+      mission!.id,
+      "running",
+    );
+    if (runningMission.status === "stopped") {
+      return stopResponse(operationId, runningMission);
+    }
 
     await recordActivity({
       phase: "persistence",
@@ -396,48 +718,214 @@ export async function POST(request: Request) {
       }).catch((activityError) =>
         console.error("[admin/ai-team] Failure activity write failed", activityError),
       );
+      await addAiTeamMissionVerification(auth.adminSupabase, {
+        missionId: mission!.id,
+        createdBy: userId,
+        checkType: "run_persisted",
+        status: "failed",
+        summary: "The generated run was not persisted.",
+      }).catch((verificationError) =>
+        console.error("[admin/ai-team] Failure verification write failed", verificationError),
+      );
+      const failedMission = await finalizeAiTeamMission(
+        auth.adminSupabase,
+        userId,
+        mission!.id,
+        "failed",
+        null,
+      ).catch(() => null);
+      if (failedMission?.status === "stopped") {
+        return stopResponse(operationId, failedMission);
+      }
       return NextResponse.json(
         {
           error: "The plan was generated but could not be saved. Please try again.",
           operationId,
+          mission: failedMission,
         },
         { status: 500 },
       );
     }
 
+    persistedRun = run;
     persistedRunId = run.id;
-    await attachAiTeamActivityRun(
+    const activityAttached = await attachAiTeamActivityRun(
       auth.adminSupabase,
       userId,
       operationId,
       run.id,
-    ).catch((activityAttachError) =>
-      console.error(
+    ).then(
+      () => true,
+      (activityAttachError) => {
+        console.error(
         "[admin/ai-team] Activity run attachment failed",
         activityAttachError,
-      ),
+        );
+        return false;
+      },
     );
+    await attachAiTeamMissionRun(
+      auth.adminSupabase,
+      userId,
+      mission!.id,
+      run.id,
+    );
+    const stoppedAfterPersistence = await observeMissionStop(
+      auth.adminSupabase,
+      userId,
+      operationId,
+      mission!.id,
+      request.signal,
+    );
+    if (stoppedAfterPersistence) {
+      return stopResponse(operationId, stoppedAfterPersistence);
+    }
     await recordActivity({
       phase: "persistence",
       status: "completed",
       label: "Command result saved",
       detail: "The plan, tasks, and operational trace are linked to the run.",
     });
+    const verifyingMission = await updateAiTeamMissionLifecycle(
+      auth.adminSupabase,
+      userId,
+      mission!.id,
+      "verifying",
+    );
+    if (verifyingMission.status === "stopped") {
+      return stopResponse(operationId, verifyingMission);
+    }
+    await recordActivity({
+      phase: "verification",
+      status: "running",
+      label: "Verifying mission result",
+      detail: "Checking persistence, trace linkage, and approval representation.",
+    });
+    const approvalRepresented = run.tasks.every(
+      (task) =>
+        !task.requiresApproval ||
+        (task.status === "needs_approval" && Boolean(task.approvalReason)),
+    );
+    const checks = [
+      {
+        checkType: "run_persisted",
+        passed: Boolean(run.id),
+        summary: "Mission run persisted.",
+        evidence: { runId: run.id },
+      },
+      {
+        checkType: "tasks_persisted",
+        passed: run.tasks.length > 0,
+        summary: `${run.tasks.length} mission task${run.tasks.length === 1 ? "" : "s"} persisted.`,
+        evidence: { taskCount: run.tasks.length },
+      },
+      {
+        checkType: "operational_trace_linked",
+        passed: activityAttached && missionTraceHealthy,
+        summary:
+          activityAttached && missionTraceHealthy
+            ? "Operational activity and mission events are linked."
+            : "One or more operational trace records could not be linked.",
+        evidence: { activityAttached, missionTraceHealthy },
+      },
+      {
+        checkType: "approval_requirements_represented",
+        passed: approvalRepresented,
+        summary: approvalRepresented
+          ? "All approval requirements are represented on persisted tasks."
+          : "An approval requirement was not represented safely.",
+        evidence: {
+          approvalTaskCount: run.tasks.filter((task) => task.requiresApproval)
+            .length,
+        },
+      },
+    ];
+    await Promise.all(
+      checks.map((check) =>
+        addAiTeamMissionVerification(auth.adminSupabase, {
+          missionId: mission!.id,
+          createdBy: userId,
+          checkType: check.checkType,
+          status: check.passed ? "passed" : "failed",
+          summary: check.summary,
+          evidence: check.evidence,
+        }),
+      ),
+    );
+    const verificationPassed = checks.every((check) => check.passed);
+    await recordActivity({
+      phase: "verification",
+      status: verificationPassed ? "completed" : "failed",
+      label: verificationPassed
+        ? "Mission verification passed"
+        : "Mission verification found a problem",
+      detail: verificationPassed
+        ? "The planning result and its operational trace were verified."
+        : "The mission report records the checks that did not pass.",
+    });
     await recordActivity({
       phase: "operation",
-      status: "completed",
-      label: "Command completed",
-      detail: "The final plan is ready for founder review.",
+      status: verificationPassed ? "completed" : "warning",
+      label: verificationPassed ? "Command completed" : "Command partially completed",
+      detail:
+        "The final plan is ready for founder review. No changes were made.",
     });
+    const stoppedAfterVerification = await observeMissionStop(
+      auth.adminSupabase,
+      userId,
+      operationId,
+      mission!.id,
+      request.signal,
+    );
+    if (stoppedAfterVerification) {
+      return stopResponse(operationId, stoppedAfterVerification);
+    }
+    const completedMission = await finalizeAiTeamMission(
+      auth.adminSupabase,
+      userId,
+      mission!.id,
+      verificationPassed ? "completed" : "partial",
+      run,
+    );
+    if (completedMission.status === "stopped") {
+      return stopResponse(operationId, completedMission);
+    }
 
     return NextResponse.json({
       operationId,
       plan,
       run,
-      runtime: getAiTeamRuntimeInfo(),
+      mission: completedMission,
+      runtime: {
+        ...getAiTeamRuntimeInfo(),
+        mode: plan.source,
+      },
       snapshot,
     });
   } catch (error) {
+    const stoppedMission = mission
+      ? await observeMissionStop(
+          auth.adminSupabase,
+          userId,
+          operationId,
+          mission!.id,
+          request.signal,
+        ).catch(() => null)
+      : null;
+
+    if (stoppedMission && mission) {
+      await recordActivity({
+        phase: "control",
+        status: "warning",
+        label: "Mission stop observed",
+        detail:
+          "Mission Control stopped the active request before continuing to later stages.",
+      }).catch((activityError) =>
+        console.error("[admin/ai-team] Stop activity write failed", activityError),
+      );
+      return stopResponse(operationId, stoppedMission);
+    }
+
     console.error("[admin/ai-team] Planning failed", error);
     await recordActivity({
       phase: "operation",
@@ -447,18 +935,37 @@ export async function POST(request: Request) {
     }).catch((activityError) =>
       console.error("[admin/ai-team] Failure activity write failed", activityError),
     );
+    const failedMission = mission
+      ? await finalizeAiTeamMission(
+          auth.adminSupabase,
+          userId,
+          mission.id,
+          persistedRun ? "partial" : "failed",
+          persistedRun,
+        ).catch((finalizeError) => {
+          console.error("[admin/ai-team] Mission failure finalization failed", finalizeError);
+          return null;
+        })
+      : null;
+    if (failedMission?.status === "stopped") {
+      return stopResponse(operationId, failedMission);
+    }
     return NextResponse.json(
-      { error: "Unable to create AI Team plan.", operationId },
+      {
+        error: "Unable to create AI Team plan.",
+        operationId,
+        mission: failedMission,
+      },
       { status: 500 },
     );
   } finally {
     activePlanningUsers.delete(userId);
 
-    if (distributedLockToken) {
+    if (distributedLeaseId) {
       await releasePlanLock(
         auth.adminSupabase,
         userId,
-        distributedLockToken,
+        distributedLeaseId,
       ).catch((releaseError) =>
         console.error("[admin/ai-team] Lock release failed", releaseError),
       );

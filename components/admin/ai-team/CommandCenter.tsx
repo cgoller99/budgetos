@@ -1,6 +1,6 @@
 "use client";
 
-export { CommandCenter } from "./CommandCenterV4";
+export { CommandCenter } from "./CommandCenterV5";
 
 import { Badge, Button, Card, CardContent, CardHeader } from "@/components/ui";
 import {

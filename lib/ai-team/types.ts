@@ -290,3 +290,142 @@ export type AiTeamRuntimeInfo = {
   specialistModel: string;
   orchestratorModel: string;
 };
+
+export type AiTeamMissionStatus =
+  | "received"
+  | "planning"
+  | "running"
+  | "waiting_approval"
+  | "verifying"
+  | "completed"
+  | "partial"
+  | "failed"
+  | "stopped";
+
+export type AiTeamAutonomyLevel =
+  | "observe"
+  | "assist"
+  | "act"
+  | "autopilot";
+
+export type AiTeamMissionEventStatus =
+  | AiTeamActivityStatus
+  | "stopped";
+
+export type AiTeamVerificationStatus =
+  | "passed"
+  | "failed"
+  | "not_applicable";
+
+export type AiTeamMissionEvent = {
+  id: string;
+  missionId: string;
+  createdBy: string;
+  phase: string;
+  eventType: string;
+  agentId: AiTeamAgentId | null;
+  toolName: string | null;
+  status: AiTeamMissionEventStatus;
+  summary: string;
+  detail: string | null;
+  metadata: Record<string, unknown>;
+  ordinal: number;
+  occurredAt: string;
+  createdAt: string;
+};
+
+export type AiTeamMissionChange = {
+  id: string;
+  missionId: string;
+  createdBy: string;
+  targetType: string;
+  targetRef: string;
+  action: string;
+  beforeSnapshot: Record<string, unknown> | null;
+  afterSnapshot: Record<string, unknown> | null;
+  summary: string;
+  verified: boolean;
+  createdAt: string;
+};
+
+export type AiTeamMissionVerification = {
+  id: string;
+  missionId: string;
+  createdBy: string;
+  checkType: string;
+  status: AiTeamVerificationStatus;
+  summary: string;
+  evidence: Record<string, unknown>;
+  createdAt: string;
+};
+
+export type AiTeamIntelligenceReport = {
+  command: string;
+  status: AiTeamMissionStatus;
+  elapsedTimeMs: number;
+  agentsUsed: string[];
+  whatWasRequested: string[];
+  whatTheTeamDid: string[];
+  whatItFound: string[];
+  whatChanged: string[];
+  filesDataActionsAffected: string[];
+  importantFindings: string[];
+  warnings: string[];
+  whatCouldNotBeCompleted: string[];
+  verificationResults: Array<{
+    checkType: string;
+    status: AiTeamVerificationStatus;
+    summary: string;
+  }>;
+  recommendedNextActions: string[];
+};
+
+export type AiTeamMission = {
+  id: string;
+  createdBy: string;
+  runId: string | null;
+  operationId: string;
+  command: string;
+  status: AiTeamMissionStatus;
+  autonomyLevel: AiTeamAutonomyLevel;
+  startedAt: string | null;
+  completedAt: string | null;
+  stopRequestedAt: string | null;
+  elapsedMs: number | null;
+  verified: boolean;
+  finalReport: AiTeamIntelligenceReport | null;
+  context: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+  events: AiTeamMissionEvent[];
+  changes: AiTeamMissionChange[];
+  verifications: AiTeamMissionVerification[];
+};
+
+export type AiTeamToolRiskClass =
+  | "read"
+  | "normal_write"
+  | "sensitive_write"
+  | "destructive"
+  | "external"
+  | "financial"
+  | "security";
+
+export type AiTeamToolRecord = {
+  id: string;
+  label: string;
+  description: string;
+  riskClass: AiTeamToolRiskClass;
+  connected: boolean;
+  available: boolean;
+  approvalRequired: boolean;
+};
+
+export type AiTeamActionRecord = {
+  id: string;
+  toolId: string;
+  riskClass: AiTeamToolRiskClass;
+  status: "planned" | "staged" | "blocked" | "completed" | "failed";
+  summary: string;
+  targetRef: string | null;
+};

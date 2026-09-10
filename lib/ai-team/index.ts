@@ -18,6 +18,29 @@ export {
   listAiTeamActivityByRun,
 } from "@/lib/ai-team/activity";
 export {
+  addAiTeamMissionChange,
+  addAiTeamMissionVerification,
+  appendAiTeamMissionEvent,
+  attachAiTeamMissionRun,
+  createAiTeamMission,
+  finalizeAiTeamMission,
+  isAiTeamMissionStopRequested,
+  listRecentAiTeamMissions,
+  loadAiTeamMission,
+  loadAiTeamMissionByOperation,
+  requestAiTeamMissionStop,
+  updateAiTeamMissionLifecycle,
+} from "@/lib/ai-team/missions";
+export {
+  buildAiTeamIntelligenceReport,
+  NO_CHANGES,
+} from "@/lib/ai-team/missionReports";
+export {
+  isAiTeamOperationStopRequested,
+  requestAiTeamOperationStop,
+} from "@/lib/ai-team/operationControl";
+export { AI_TEAM_CAPABILITIES } from "@/lib/ai-team/capabilities";
+export {
   listAiTeamApprovalRuns,
   listRecentAiTeamRuns,
   saveAiTeamRun,
@@ -49,17 +72,26 @@ export {
   summarizeCustomerVoice,
 } from "@/lib/ai-team/v3Math";
 export type {
+  AiTeamActionRecord,
   AiTeamActivityEvent,
   AiTeamActivityStatus,
   AiTeamAgent,
   AiTeamAgentId,
   AiTeamApprovalDecision,
+  AiTeamAutonomyLevel,
   AiTeamCustomerVoice,
   AiTeamEvidenceState,
   AiTeamExecutionCandidate,
   AiTeamExecutionPacket,
   AiTeamFounderBrief,
   AiTeamFounderBriefSections,
+  AiTeamIntelligenceReport,
+  AiTeamMission,
+  AiTeamMissionChange,
+  AiTeamMissionEvent,
+  AiTeamMissionEventStatus,
+  AiTeamMissionStatus,
+  AiTeamMissionVerification,
   AiTeamPlan,
   AiTeamPlanningUsage,
   AiTeamPlaybook,
@@ -74,4 +106,7 @@ export type {
   AiTeamSnapshot,
   AiTeamTask,
   AiTeamTaskStatus,
+  AiTeamToolRecord,
+  AiTeamToolRiskClass,
+  AiTeamVerificationStatus,
 } from "@/lib/ai-team/types";

@@ -791,6 +791,158 @@ export type AiTeamActivityEventUpdate = Pick<
   "run_id"
 >;
 
+export type AiTeamMissionStatusRow =
+  | "received"
+  | "planning"
+  | "running"
+  | "waiting_approval"
+  | "verifying"
+  | "completed"
+  | "partial"
+  | "failed"
+  | "stopped";
+
+export type AiTeamAutonomyLevelRow =
+  | "observe"
+  | "assist"
+  | "act"
+  | "autopilot";
+
+export type AiTeamMissionRow = {
+  id: string;
+  created_by: string;
+  run_id: string | null;
+  operation_id: string;
+  command: string;
+  status: AiTeamMissionStatusRow;
+  autonomy_level: AiTeamAutonomyLevelRow;
+  started_at: string | null;
+  completed_at: string | null;
+  stop_requested_at: string | null;
+  elapsed_ms: number | null;
+  verified: boolean;
+  final_report: Json | null;
+  context: Json;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AiTeamMissionInsert = {
+  id?: string;
+  created_by: string;
+  run_id?: string | null;
+  operation_id: string;
+  command: string;
+  status?: AiTeamMissionStatusRow;
+  autonomy_level?: AiTeamAutonomyLevelRow;
+  started_at?: string | null;
+  completed_at?: string | null;
+  stop_requested_at?: string | null;
+  elapsed_ms?: number | null;
+  verified?: boolean;
+  final_report?: Json | null;
+  context?: Json;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type AiTeamMissionUpdate = Partial<
+  Omit<AiTeamMissionInsert, "created_by" | "operation_id" | "command">
+>;
+
+export type AiTeamMissionEventStatusRow =
+  | AiTeamActivityStatus
+  | "stopped";
+
+export type AiTeamMissionEventRow = {
+  id: string;
+  mission_id: string;
+  created_by: string;
+  phase: string;
+  event_type: string;
+  agent_id: AiTeamTaskOwner | null;
+  tool_name: string | null;
+  status: AiTeamMissionEventStatusRow;
+  summary: string;
+  detail: string | null;
+  metadata: Json;
+  ordinal: number;
+  occurred_at: string;
+  created_at: string;
+};
+
+export type AiTeamMissionEventInsert = {
+  id?: string;
+  mission_id: string;
+  created_by: string;
+  phase: string;
+  event_type: string;
+  agent_id?: AiTeamTaskOwner | null;
+  tool_name?: string | null;
+  status: AiTeamMissionEventStatusRow;
+  summary: string;
+  detail?: string | null;
+  metadata?: Json;
+  ordinal: number;
+  occurred_at?: string;
+  created_at?: string;
+};
+
+export type AiTeamMissionChangeRow = {
+  id: string;
+  mission_id: string;
+  created_by: string;
+  target_type: string;
+  target_ref: string;
+  action: string;
+  before_snapshot: Json | null;
+  after_snapshot: Json | null;
+  summary: string;
+  verified: boolean;
+  created_at: string;
+};
+
+export type AiTeamMissionChangeInsert = {
+  id?: string;
+  mission_id: string;
+  created_by: string;
+  target_type: string;
+  target_ref: string;
+  action: string;
+  before_snapshot?: Json | null;
+  after_snapshot?: Json | null;
+  summary: string;
+  verified?: boolean;
+  created_at?: string;
+};
+
+export type AiTeamVerificationStatusRow =
+  | "passed"
+  | "failed"
+  | "not_applicable";
+
+export type AiTeamMissionVerificationRow = {
+  id: string;
+  mission_id: string;
+  created_by: string;
+  check_type: string;
+  status: AiTeamVerificationStatusRow;
+  summary: string;
+  evidence: Json;
+  created_at: string;
+};
+
+export type AiTeamMissionVerificationInsert = {
+  id?: string;
+  mission_id: string;
+  created_by: string;
+  check_type: string;
+  status: AiTeamVerificationStatusRow;
+  summary: string;
+  evidence?: Json;
+  created_at?: string;
+};
+
 export type AiTeamApprovalDecisionRow = {
   id: string;
   task_id: string;
@@ -1111,6 +1263,62 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "ai_team_runs";
             referencedColumns: ["id"];
+          },
+        ];
+      };
+      ai_team_missions: {
+        Row: AiTeamMissionRow;
+        Insert: AiTeamMissionInsert;
+        Update: AiTeamMissionUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "ai_team_missions_run_id_fkey";
+            columns: ["run_id"];
+            isOneToOne: false;
+            referencedRelation: "ai_team_runs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      ai_team_mission_events: {
+        Row: AiTeamMissionEventRow;
+        Insert: AiTeamMissionEventInsert;
+        Update: never;
+        Relationships: [
+          {
+            foreignKeyName: "ai_team_mission_events_mission_id_created_by_fkey";
+            columns: ["mission_id", "created_by"];
+            isOneToOne: false;
+            referencedRelation: "ai_team_missions";
+            referencedColumns: ["id", "created_by"];
+          },
+        ];
+      };
+      ai_team_mission_changes: {
+        Row: AiTeamMissionChangeRow;
+        Insert: AiTeamMissionChangeInsert;
+        Update: never;
+        Relationships: [
+          {
+            foreignKeyName: "ai_team_mission_changes_mission_id_created_by_fkey";
+            columns: ["mission_id", "created_by"];
+            isOneToOne: false;
+            referencedRelation: "ai_team_missions";
+            referencedColumns: ["id", "created_by"];
+          },
+        ];
+      };
+      ai_team_mission_verifications: {
+        Row: AiTeamMissionVerificationRow;
+        Insert: AiTeamMissionVerificationInsert;
+        Update: never;
+        Relationships: [
+          {
+            foreignKeyName: "ai_team_mission_verifications_mission_id_created_by_fkey";
+            columns: ["mission_id", "created_by"];
+            isOneToOne: false;
+            referencedRelation: "ai_team_missions";
+            referencedColumns: ["id", "created_by"];
           },
         ];
       };

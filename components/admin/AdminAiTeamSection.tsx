@@ -13,10 +13,12 @@ import type {
   AiTeamActivityEvent,
   AiTeamAgent,
   AiTeamApprovalDecision,
+  AiTeamAutonomyLevel,
   AiTeamCustomerVoice,
   AiTeamExecutionCandidate,
   AiTeamExecutionPacket,
   AiTeamFounderBrief,
+  AiTeamMission,
   AiTeamPlan,
   AiTeamPlanningUsage,
   AiTeamPlaybook,
@@ -46,6 +48,7 @@ type GetPayload = {
   approvalRuns: AiTeamRun[];
   approvalDecisions: AiTeamApprovalDecision[];
   playbooks: AiTeamPlaybook[];
+  recentMissions: AiTeamMission[];
   planningUsage: AiTeamPlanningUsage;
 };
 
@@ -53,6 +56,7 @@ type PostPayload = {
   operationId: string;
   plan: AiTeamPlan;
   run: AiTeamRun;
+  mission: AiTeamMission;
   runtime: AiTeamRuntimeInfo;
   snapshot: AiTeamSnapshot;
 };
@@ -134,6 +138,10 @@ export function AdminAiTeamSection() {
   const [approvalRuns, setApprovalRuns] = useState<AiTeamRun[]>([]);
   const [decisions, setDecisions] = useState<AiTeamApprovalDecision[]>([]);
   const [playbooks, setPlaybooks] = useState<AiTeamPlaybook[]>([]);
+  const [missions, setMissions] = useState<AiTeamMission[]>([]);
+  const [currentMission, setCurrentMission] = useState<AiTeamMission | null>(null);
+  const [autonomyLevel, setAutonomyLevel] =
+    useState<AiTeamAutonomyLevel>("assist");
   const [executionCandidates, setExecutionCandidates] = useState<AiTeamExecutionCandidate[]>([]);
   const [executionPackets, setExecutionPackets] = useState<AiTeamExecutionPacket[]>([]);
   const [productAnalytics, setProductAnalytics] = useState<AiTeamProductAnalytics | null>(null);
@@ -157,6 +165,7 @@ export function AdminAiTeamSection() {
   const activeOperationId = useRef<string | null>(null);
   const activityInterval = useRef<number | null>(null);
   const restoredActivityRunId = useRef<string | null>(null);
+  const missionAbortController = useRef<AbortController | null>(null);
   const planningRef = useRef(false);
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const v3LoadedRef = useRef<Record<V3TabId, boolean>>({
@@ -201,6 +210,7 @@ export function AdminAiTeamSection() {
       setApprovalRuns(data.approvalRuns);
       setDecisions(data.approvalDecisions);
       setPlaybooks(data.playbooks);
+      setMissions(data.recentMissions ?? []);
       setPlanningUsage(data.planningUsage);
       setError(null);
     } catch (loadError) {
@@ -344,20 +354,27 @@ export function AdminAiTeamSection() {
       if (activityInterval.current !== null) {
         window.clearInterval(activityInterval.current);
       }
+      missionAbortController.current?.abort();
     },
     [],
   );
 
-  async function createPlan() {
-    const trimmed = goal.trim();
+  async function createPlan(
+    context: Record<string, unknown> = {},
+    commandOverride?: string,
+  ) {
+    const trimmed = (commandOverride ?? goal).trim();
     if (trimmed.length < 3 || planningRef.current) return;
     const operationId = crypto.randomUUID();
     const version = ++operationVersion.current;
     activeOperationId.current = operationId;
     requestVersion.current += 1;
     planningRef.current = true;
+    const abortController = new AbortController();
+    missionAbortController.current = abortController;
     setPlanning(true);
     setActivity([]);
+    setCurrentMission(null);
     setError(null);
 
     const pollActivity = async () => {
@@ -399,6 +416,29 @@ export function AdminAiTeamSection() {
       } catch {
         // The POST remains authoritative; the next poll can recover the trace.
       }
+      try {
+        const missionResponse = await fetch(
+          `/api/admin/ai-team/missions?operationId=${encodeURIComponent(operationId)}`,
+          { cache: "no-store" },
+        );
+        const missionPayload = (await missionResponse.json().catch(() => ({}))) as {
+          mission?: AiTeamMission | null;
+        };
+        if (
+          missionResponse.ok &&
+          missionPayload.mission &&
+          operationVersion.current === version &&
+          activeOperationId.current === operationId
+        ) {
+          setCurrentMission(missionPayload.mission);
+          setMissions((current) => [
+            missionPayload.mission!,
+            ...current.filter((item) => item.id !== missionPayload.mission!.id),
+          ].slice(0, 20));
+        }
+      } catch {
+        // The final POST response remains authoritative.
+      }
     };
 
     void pollActivity();
@@ -410,7 +450,13 @@ export function AdminAiTeamSection() {
       const response = await fetch("/api/admin/ai-team", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ goal: trimmed, operationId }),
+        body: JSON.stringify({
+          goal: trimmed,
+          operationId,
+          autonomyLevel,
+          context,
+        }),
+        signal: abortController.signal,
       });
       const payload = (await response.json().catch(() => ({}))) as
         | PostPayload
@@ -421,6 +467,11 @@ export function AdminAiTeamSection() {
       const data = payload as PostPayload;
       setRuntime(data.runtime);
       setSnapshot(data.snapshot);
+      setCurrentMission(data.mission);
+      setMissions((current) => [
+        data.mission,
+        ...current.filter((mission) => mission.id !== data.mission.id),
+      ].slice(0, 20));
       setRuns((current) => [data.run, ...current.filter((run) => run.id !== data.run.id)].slice(0, 20));
       if (data.run.tasks.some((task) => task.requiresApproval)) {
         setApprovalRuns((current) => [
@@ -433,7 +484,9 @@ export function AdminAiTeamSection() {
         used: Math.min(current.limit, current.used + 1),
       }));
     } catch (planError) {
-      setError(planError instanceof Error ? planError.message : "Unable to create plan.");
+      if (!(planError instanceof DOMException && planError.name === "AbortError")) {
+        setError(planError instanceof Error ? planError.message : "Unable to create plan.");
+      }
     } finally {
       if (activityInterval.current !== null) {
         window.clearInterval(activityInterval.current);
@@ -441,8 +494,61 @@ export function AdminAiTeamSection() {
       }
       await pollActivity();
       activeOperationId.current = null;
+      if (missionAbortController.current === abortController) {
+        missionAbortController.current = null;
+      }
       planningRef.current = false;
       setPlanning(false);
+    }
+  }
+
+  async function stopMissionSession(): Promise<string> {
+    const missionId = currentMission?.id ?? null;
+    const operationId = activeOperationId.current;
+    operationVersion.current += 1;
+    missionAbortController.current?.abort();
+    missionAbortController.current = null;
+    if (activityInterval.current !== null) {
+      window.clearInterval(activityInterval.current);
+      activityInterval.current = null;
+    }
+    activeOperationId.current = null;
+    planningRef.current = false;
+    setPlanning(false);
+
+    if (!missionId && !operationId) {
+      return "Client request, polling, microphone, and screen sharing stopped. No active mission or operation id was available for a server stop request.";
+    }
+    try {
+      const response = await fetch("/api/admin/ai-team/missions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: missionId ?? undefined,
+          operationId: missionId ? undefined : operationId,
+          action: "stop",
+        }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        mission?: AiTeamMission | null;
+        stopRecorded?: boolean;
+        message?: string;
+        error?: string;
+      };
+      if (!response.ok || !payload.stopRecorded) {
+        return payload.error ?? "Client work stopped, but the server stop request was not recorded.";
+      }
+      if (payload.mission) {
+        setCurrentMission(payload.mission);
+        setMissions((current) => [
+          payload.mission!,
+          ...current.filter((mission) => mission.id !== payload.mission!.id),
+        ].slice(0, 20));
+      }
+      return payload.message ??
+        "Stop request recorded. Already-running server work may take time to observe it.";
+    } catch {
+      return "Client work stopped, but the server stop request could not be confirmed.";
     }
   }
 
@@ -590,7 +696,7 @@ export function AdminAiTeamSection() {
     return (
       <section id="ai-team" className="scroll-mt-28 space-y-5" aria-label="AI Mission Control">
         <div className="rounded-3xl border border-[var(--surface-border)] bg-[var(--surface-soft)] p-8">
-          <Badge variant="accent">AI Team V3</Badge>
+          <Badge variant="accent">Buxme OS V5.1</Badge>
           <h2 className="mt-4 text-2xl font-semibold text-[var(--foreground)]">
             Initializing Mission Control
           </h2>
@@ -630,7 +736,7 @@ export function AdminAiTeamSection() {
   };
 
   return (
-    <section id="ai-team" className="scroll-mt-28 space-y-5" aria-label="AI Mission Control V3">
+    <section id="ai-team" className="scroll-mt-28 space-y-5" aria-label="Buxme OS V5.1 Mission Control">
       {error ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200" role="alert">
           <span>{error}</span>
@@ -679,7 +785,9 @@ export function AdminAiTeamSection() {
           <CommandCenter
             goal={goal}
             setGoal={setGoal}
-            createPlan={() => void createPlan()}
+            createPlan={(context, commandOverride) =>
+              void createPlan(context, commandOverride)
+            }
             planning={planning}
             activity={activity}
             runtime={runtime}
@@ -691,6 +799,11 @@ export function AdminAiTeamSection() {
             agentCount={agents.length}
             onRefresh={() => void load()}
             refreshing={loading}
+            missions={missions}
+            currentMission={currentMission}
+            autonomyLevel={autonomyLevel}
+            setAutonomyLevel={setAutonomyLevel}
+            onStopSession={stopMissionSession}
           />
         ) : null}
         {activeTab === "work" ? <WorkQueue runs={runs} decisions={decisions} /> : null}

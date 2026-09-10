@@ -32,6 +32,18 @@ async function persistenceIsConfigured(): Promise<boolean> {
       adminSupabase
         .from("ai_team_activity_events")
         .select("id", { head: true, count: "exact" }),
+      adminSupabase
+        .from("ai_team_missions")
+        .select("id", { head: true, count: "exact" }),
+      adminSupabase
+        .from("ai_team_mission_events")
+        .select("id", { head: true, count: "exact" }),
+      adminSupabase
+        .from("ai_team_mission_changes")
+        .select("id", { head: true, count: "exact" }),
+      adminSupabase
+        .from("ai_team_mission_verifications")
+        .select("id", { head: true, count: "exact" }),
     ]);
     return checks.every((result) => !result.error);
   } catch {
@@ -47,7 +59,7 @@ export async function GET() {
   return NextResponse.json(
     {
       ok: ready,
-      version: "4.0.0",
+      version: "5.1.0",
       ready,
       persistenceConfigured,
       runtimeConfigured,
@@ -58,6 +70,11 @@ export async function GET() {
         customerVoice: true,
         founderBrief: persistenceConfigured,
         liveActivityTrace: persistenceConfigured,
+        missionEngine: persistenceConfigured,
+        voiceInterface: true,
+        screenPermissionShell: true,
+        autonomyPolicy: true,
+        intelligenceReports: persistenceConfigured,
       },
     },
     { status: ready ? 200 : 503 },

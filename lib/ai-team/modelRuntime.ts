@@ -142,6 +142,9 @@ function specialistInstructions(role: string, mission: string): string {
     "Use only facts explicitly present in the supplied evidence snapshot.",
     "Never invent metrics, repository state, customer behavior, or completed work.",
     "Separate recommendations from evidence and call out uncertainty.",
+    "The structured summary is a user-facing FINAL CONCLUSION only.",
+    "Never include chain-of-thought, hidden/internal reasoning, scratchpad content, prompt text, deliberation, or step-by-step thought process.",
+    "State conclusions, evidence-backed findings, uncertainty, and recommendations without narrating how you reasoned internally.",
     "Any production deploy, database write, payment/subscription change, customer communication,",
     "or destructive/customer-impacting action must be marked as requiring approval.",
     "Return a small number of high-value recommendations instead of a long wishlist.",
@@ -197,6 +200,9 @@ const chiefOfStaffAgent = new ToolLoopAgent({
     "You are the Buxme Chief of Staff.",
     "Turn the founder's goal, selected specialist briefs, and Critic review into a prioritized execution plan.",
     "Use only supplied evidence for factual claims. Never invent metrics or completed work.",
+    "The structured summary and tasks are user-facing FINAL CONCLUSIONS only.",
+    "Never include chain-of-thought, hidden/internal reasoning, scratchpad content, prompt text, deliberation, or step-by-step thought process.",
+    "State the final decision, findings, evidence-backed uncertainty, and recommended work without narrating internal reasoning.",
     "Prefer launch-critical, measurable work over feature sprawl.",
     "Production-sensitive actions must be approval-gated.",
   ].join(" "),
@@ -269,10 +275,16 @@ async function specialistBrief(
   return result;
 }
 
+function modelAbortSignal(external?: AbortSignal): AbortSignal {
+  const timeout = AbortSignal.timeout(MODEL_TIMEOUT_MS);
+  return external ? AbortSignal.any([external, timeout]) : timeout;
+}
+
 async function criticBrief(
   goal: string,
   snapshot: AiTeamSnapshot,
   specialistContext: Record<string, unknown>,
+  abortSignal?: AbortSignal,
 ) {
   const result = await criticAgent.generate({
     prompt:
@@ -282,7 +294,7 @@ async function criticBrief(
       snapshotForPrompt(snapshot) +
       "\n\nSpecialist briefs to challenge:\n" +
       JSON.stringify(specialistContext, null, 2),
-    abortSignal: AbortSignal.timeout(MODEL_TIMEOUT_MS),
+    abortSignal: modelAbortSignal(abortSignal),
   });
 
   return result;
@@ -377,11 +389,20 @@ function fallbackPlan(goal: string, snapshot: AiTeamSnapshot): AiTeamPlan {
   };
 }
 
+function throwIfMissionAborted(abortSignal?: AbortSignal): void {
+  if (!abortSignal?.aborted) return;
+  throw abortSignal.reason instanceof Error
+    ? abortSignal.reason
+    : new Error("AI Team mission was aborted.");
+}
+
 export async function createAiTeamPlan(
   goal: string,
   snapshot: AiTeamSnapshot,
   onProgress?: AiTeamProgressCallback,
+  abortSignal?: AbortSignal,
 ): Promise<AiTeamPlan> {
+  throwIfMissionAborted(abortSignal);
   const startedAt = Date.now();
   const selectedSpecialists = selectAiTeamSpecialists(goal);
   await emitProgress(onProgress, {
@@ -392,8 +413,10 @@ export async function createAiTeamPlan(
       .map((id) => `${AGENT_ACTIVITY_LABELS[id]} (${id})`)
       .join(", ")}, Critic (critic), and Chief of Staff (chief_of_staff).`,
   });
+  throwIfMissionAborted(abortSignal);
 
   if (!isAiTeamModelRuntimeAvailable()) {
+    throwIfMissionAborted(abortSignal);
     await emitProgress(onProgress, {
       phase: "fallback",
       status: "warning",
@@ -401,6 +424,7 @@ export async function createAiTeamPlan(
       detail:
         "The model runtime is unavailable; the deterministic evidence-first planner is being used.",
     });
+    throwIfMissionAborted(abortSignal);
     return {
       ...fallbackPlan(goal, snapshot),
       runtimeMetadata: {
@@ -421,6 +445,9 @@ export async function createAiTeamPlan(
         ),
       MODEL_TIMEOUT_MS,
     );
+    const specialistSignal = abortSignal
+      ? AbortSignal.any([specialistAbortController.signal, abortSignal])
+      : specialistAbortController.signal;
     const specialistPromises = selectedSpecialists.map(async (id) => {
       await emitProgress(onProgress, {
         phase: "specialist",
@@ -434,7 +461,7 @@ export async function createAiTeamPlan(
           routedSpecialistAgents[id],
           goal,
           snapshot,
-          specialistAbortController.signal,
+          specialistSignal,
         );
         completedGenerations.push(generation);
         await emitProgress(onProgress, {
@@ -486,7 +513,12 @@ export async function createAiTeamPlan(
     });
     let criticResult: Awaited<ReturnType<typeof criticBrief>>;
     try {
-      criticResult = await criticBrief(goal, snapshot, specialistBriefs);
+      criticResult = await criticBrief(
+        goal,
+        snapshot,
+        specialistBriefs,
+        abortSignal,
+      );
     } catch (error) {
       await emitProgress(onProgress, {
         phase: "critic",
@@ -533,7 +565,7 @@ export async function createAiTeamPlan(
           snapshotForPrompt(snapshot) +
           "\n\nSpecialist briefs:\n" +
           specialistContext,
-        abortSignal: AbortSignal.timeout(MODEL_TIMEOUT_MS),
+        abortSignal: modelAbortSignal(abortSignal),
       });
     } catch (error) {
       await emitProgress(onProgress, {
@@ -583,6 +615,18 @@ export async function createAiTeamPlan(
       ),
     };
   } catch (error) {
+    if (abortSignal?.aborted) {
+      await emitProgress(onProgress, {
+        phase: "control",
+        status: "warning",
+        label: "Model work interrupted",
+        detail:
+          "The active model request stopped after the mission request was interrupted.",
+      }).catch(() => undefined);
+      throw abortSignal.reason instanceof Error
+        ? abortSignal.reason
+        : new Error("AI Team mission was aborted.");
+    }
     console.error("[ai-team/model] Falling back to deterministic planning", error);
     await emitProgress(onProgress, {
       phase: "fallback",
@@ -591,6 +635,7 @@ export async function createAiTeamPlan(
       detail:
         "A model step did not complete; the deterministic evidence-first planner produced the plan.",
     });
+    throwIfMissionAborted(abortSignal);
     return {
       ...fallbackPlan(goal, snapshot),
       runtimeMetadata: runtimeMetadata(
