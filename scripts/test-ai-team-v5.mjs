@@ -346,7 +346,10 @@ for (const blockedCapability of [
   );
 }
 
-assert.ok(health.includes('version: "5.1.0"'));
+assert.ok(
+  /version:\s*"5\.[0-9]+\.[0-9]+"/.test(health),
+  "V5 compatibility test requires a V5.x health contract",
+);
 for (const feature of [
   "missionEngine",
   "voiceInterface",

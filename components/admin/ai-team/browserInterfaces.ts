@@ -200,7 +200,7 @@ export function useScreenAwareness(): {
   dimensions: { width: number; height: number } | null;
   enable: () => Promise<void>;
   stop: () => void;
-  captureFrame: () => void;
+  captureFrame: () => string | null;
 } {
   const supported =
     typeof navigator !== "undefined" &&
@@ -264,12 +264,23 @@ export function useScreenAwareness(): {
 
   const captureFrame = useCallback(() => {
     const video = videoRef.current;
-    if (!video || !active || !video.videoWidth || !video.videoHeight) return;
+    if (!video || !active || !video.videoWidth || !video.videoHeight) return null;
+
+    const maxDimension = 1600;
+    const scale = Math.min(
+      1,
+      maxDimension / Math.max(video.videoWidth, video.videoHeight),
+    );
     const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext("2d")?.drawImage(video, 0, 0);
-    setCapturedFrame(canvas.toDataURL("image/jpeg", 0.75));
+    canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+    canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+    const context = canvas.getContext("2d");
+    if (!context) return null;
+
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const frame = canvas.toDataURL("image/jpeg", 0.72);
+    setCapturedFrame(frame);
+    return frame;
   }, [active]);
 
   useEffect(() => stop, [stop]);

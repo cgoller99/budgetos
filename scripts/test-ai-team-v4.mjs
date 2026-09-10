@@ -211,7 +211,10 @@ const healthRoute = await readFile(
   new URL("../app/api/health/ai-team/route.ts", import.meta.url),
   "utf8",
 );
-assert.ok(healthRoute.includes('version: "5.1.0"'));
+assert.ok(
+  /version:\s*"5\.[0-9]+\.[0-9]+"/.test(healthRoute),
+  "V4 compatibility test requires a V5.x health contract",
+);
 assert.ok(healthRoute.includes("liveActivityTrace"));
 
 for (const source of [postRoute, activityRoute, activityService, commandUi]) {
