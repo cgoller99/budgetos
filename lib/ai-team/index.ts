@@ -41,6 +41,10 @@ export {
 } from "@/lib/ai-team/operationControl";
 export { AI_TEAM_CAPABILITIES } from "@/lib/ai-team/capabilities";
 export {
+  analyzeAiTeamScreenFrame,
+  getAiTeamVisionRuntimeInfo,
+} from "@/lib/ai-team/screenVision";
+export {
   listAiTeamApprovalRuns,
   listRecentAiTeamRuns,
   saveAiTeamRun,
@@ -103,6 +107,7 @@ export type {
   AiTeamRun,
   AiTeamRuntimeMetadata,
   AiTeamRuntimeInfo,
+  AiTeamScreenAnalysis,
   AiTeamSnapshot,
   AiTeamTask,
   AiTeamTaskStatus,

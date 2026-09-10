@@ -12,6 +12,7 @@ import type {
   AiTeamPlanningUsage,
   AiTeamRun,
   AiTeamRuntimeInfo,
+  AiTeamScreenAnalysis,
   AiTeamSnapshot,
 } from "@/lib/ai-team/types";
 import {
@@ -131,8 +132,14 @@ export function CommandCenter(props: Props) {
   const [autoSubmit, setAutoSubmit] = useState(false);
   const [stopNotice, setStopNotice] = useState<string | null>(null);
   const [commandMode, setCommandMode] = useState(false);
+  const [screenAnalysis, setScreenAnalysis] =
+    useState<AiTeamScreenAnalysis | null>(null);
+  const [screenAnalyzing, setScreenAnalyzing] = useState(false);
+  const [screenAnalysisError, setScreenAnalysisError] =
+    useState<string | null>(null);
   const [clock, setClock] = useState(0);
   const wasListening = useRef(false);
+  const screenAnalysisAbortRef = useRef<AbortController | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const voice = useMissionVoice(planning);
   const voiceMicActive = voice.micActive;
@@ -193,6 +200,20 @@ export function CommandCenter(props: Props) {
     return () => document.removeEventListener("fullscreenchange", onFullscreen);
   }, []);
 
+  useEffect(
+    () => () => screenAnalysisAbortRef.current?.abort(),
+    [],
+  );
+
+  useEffect(() => {
+    if (screenActive || capturedFrame) return;
+    screenAnalysisAbortRef.current?.abort();
+    screenAnalysisAbortRef.current = null;
+    setScreenAnalysis(null);
+    setScreenAnalysisError(null);
+    setScreenAnalyzing(false);
+  }, [capturedFrame, screenActive]);
+
   const events = currentMission?.events.length
     ? currentMission.events
     : activity.map((event) => ({
@@ -245,6 +266,84 @@ export function CommandCenter(props: Props) {
     });
   };
 
+  function turnScreenOff() {
+    screenAnalysisAbortRef.current?.abort();
+    screenAnalysisAbortRef.current = null;
+    setScreenAnalyzing(false);
+    setScreenAnalysis(null);
+    setScreenAnalysisError(null);
+    stopScreen();
+  }
+
+  function captureLocalFrame() {
+    setScreenAnalysis(null);
+    setScreenAnalysisError(null);
+    return captureFrame();
+  }
+
+  async function analyzeCurrentFrame() {
+    setScreenAnalysis(null);
+    const frame = captureFrame();
+    if (!frame) {
+      setScreenAnalysisError("Capture a visible shared surface before analysis.");
+      return;
+    }
+
+    screenAnalysisAbortRef.current?.abort();
+    const controller = new AbortController();
+    screenAnalysisAbortRef.current = controller;
+    setScreenAnalyzing(true);
+    setScreenAnalysisError(null);
+
+    try {
+      const response = await fetch("/api/admin/ai-team/vision", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        signal: controller.signal,
+        body: JSON.stringify({
+          frame,
+          question: goal.trim()
+            ? `The founder is currently working toward: ${goal.trim()}`
+            : undefined,
+        }),
+      });
+      const payload = (await response.json()) as {
+        analysis?: AiTeamScreenAnalysis;
+        error?: string;
+      };
+      if (!response.ok || !payload.analysis) {
+        throw new Error(payload.error || "Screen analysis did not complete.");
+      }
+      setScreenAnalysis(payload.analysis);
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      setScreenAnalysisError(
+        error instanceof Error ? error.message : "Screen analysis failed.",
+      );
+    } finally {
+      if (screenAnalysisAbortRef.current === controller) {
+        screenAnalysisAbortRef.current = null;
+        setScreenAnalyzing(false);
+      }
+    }
+  }
+
+  function useScreenFindings() {
+    if (!screenAnalysis) return;
+    const evidence = [
+      screenAnalysis.summary,
+      ...screenAnalysis.observations.slice(0, 3),
+    ].join(" ");
+    const prefix = goal.trim() ? `${goal.trim()}\n\n` : "";
+    setGoal(
+      `${prefix}Screen evidence approved by founder: ${evidence}`.slice(
+        0,
+        1000,
+      ),
+    );
+  }
+
   async function openMission(id: string) {
     try {
       const response = await fetch(
@@ -261,7 +360,7 @@ export function CommandCenter(props: Props) {
   async function stopSession() {
     voice.stopListening();
     voice.stopSpeaking();
-    stopScreen();
+    turnScreenOff();
     setStopNotice(await onStopSession());
   }
 
@@ -302,13 +401,13 @@ export function CommandCenter(props: Props) {
       <header className="relative flex flex-wrap items-center justify-between gap-4 border-b border-cyan-200/10 px-5 py-4">
         <div>
           <div className="flex items-center gap-2">
-            <Badge variant="accent">Buxme OS V5.1</Badge>
+            <Badge variant="accent">Buxme OS V5.2</Badge>
             <span className={`text-[10px] uppercase tracking-[.18em] ${runtime.mode === "ai" ? "text-emerald-300" : "text-amber-300"}`}>
               {runtime.mode === "ai" ? "AI runtime available" : "Deterministic fallback"}
             </span>
           </div>
           <h2 className="mt-2 text-lg font-semibold tracking-[.16em] text-white">
-            MISSION ENGINE + COMMAND CORE
+            MISSION ENGINE + SCREEN INTELLIGENCE
           </h2>
           <p className="mt-1 text-[10px] text-slate-500">
             Perception → reasoning → team → memory → tools → action → verification → report
@@ -500,17 +599,103 @@ export function CommandCenter(props: Props) {
         <aside className="space-y-4">
           <section className="rounded-2xl border border-cyan-200/15 bg-slate-950/65 p-4">
             <div className="flex justify-between gap-3">
-              <p className="text-[9px] uppercase tracking-[.2em] text-cyan-200/55">Screen awareness</p>
-              <span className={`text-[9px] font-semibold ${screenActive ? "text-emerald-300" : "text-slate-600"}`}>{screenActive ? "● ON" : "OFF"}</span>
+              <p className="text-[9px] uppercase tracking-[.2em] text-cyan-200/55">Screen intelligence</p>
+              <span className={`text-[9px] font-semibold ${screenActive ? "text-emerald-300" : "text-slate-600"}`}>
+                {screenActive ? "● SCREEN ACTIVE" : "OFF"}
+              </span>
             </div>
-            <video ref={setVideoElement} muted playsInline className={`mt-3 aspect-video w-full rounded-lg border border-cyan-200/10 bg-black object-contain ${screenActive ? "block" : "hidden"}`} />
-            {!screenActive ? <p className="mt-3 rounded-lg border border-dashed border-cyan-200/10 p-5 text-center text-[9px] text-slate-600">No shared surface. The AI has not analyzed your screen.</p> : null}
+            <video
+              ref={setVideoElement}
+              muted
+              playsInline
+              className={`mt-3 aspect-video w-full rounded-lg border border-cyan-200/10 bg-black object-contain ${screenActive ? "block" : "hidden"}`}
+            />
+            {!screenActive ? (
+              <p className="mt-3 rounded-lg border border-dashed border-cyan-200/10 p-5 text-center text-[9px] text-slate-600">
+                No shared surface. The AI has not analyzed your screen.
+              </p>
+            ) : null}
+            <p className="mt-3 text-[8px] leading-relaxed text-slate-500">
+              Analyze Frame sends one compressed screenshot to Buxme&apos;s configured AI runtime/provider.
+              This Buxme feature does not write the screenshot to app storage or mission history.
+            </p>
             <div className="mt-3 flex flex-wrap gap-2">
-              <Button size="sm" variant="ghost" onClick={() => void enableScreen()} disabled={!screenSupported || screenActive}>Enable screen access</Button>
-              <Button size="sm" variant="ghost" onClick={stopScreen} disabled={!screenActive}>Screen OFF</Button>
-              <Button size="sm" variant="ghost" onClick={captureFrame} disabled={!screenActive}>Capture locally</Button>
+              <Button size="sm" variant="ghost" onClick={() => void enableScreen()} disabled={!screenSupported || screenActive}>
+                Enable screen access
+              </Button>
+              <Button size="sm" variant="ghost" onClick={turnScreenOff} disabled={!screenActive}>
+                Screen OFF
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => void captureLocalFrame()} disabled={!screenActive}>
+                Capture locally
+              </Button>
+              <Button size="sm" onClick={() => void analyzeCurrentFrame()} disabled={!screenActive || screenAnalyzing}>
+                {screenAnalyzing ? "Analyzing…" : "Analyze frame"}
+              </Button>
             </div>
-            {capturedFrame ? <p className="mt-2 text-[8px] text-emerald-300">Frame held in local client state only; not uploaded.</p> : null}
+            {capturedFrame && !screenAnalysis ? (
+              <p className="mt-2 text-[8px] text-emerald-300">
+                Frame captured. It stays local unless you press Analyze frame.
+              </p>
+            ) : null}
+            {screenAnalysis ? (
+              <div className="mt-3 rounded-xl border border-cyan-300/20 bg-cyan-300/[.04] p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[8px] font-semibold uppercase tracking-[.16em] text-cyan-100/60">
+                    Visual understanding
+                  </p>
+                  <span className="text-[8px] text-emerald-300">NOT SAVED BY BUXME</span>
+                </div>
+                {screenAnalysis.surface ? (
+                  <p className="mt-2 text-[9px] text-slate-500">{screenAnalysis.surface}</p>
+                ) : null}
+                <p className="mt-1 text-[10px] leading-relaxed text-slate-200">{screenAnalysis.summary}</p>
+                {screenAnalysis.observations.length ? (
+                  <ul className="mt-2 space-y-1">
+                    {screenAnalysis.observations.slice(0, 5).map((item) => (
+                      <li key={item} className="text-[9px] leading-relaxed text-slate-400">• {item}</li>
+                    ))}
+                  </ul>
+                ) : null}
+                {screenAnalysis.interactiveElements.length ? (
+                  <div className="mt-3">
+                    <p className="text-[8px] uppercase tracking-[.14em] text-slate-600">Visible controls</p>
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {screenAnalysis.interactiveElements.slice(0, 6).map((item) => (
+                        <span key={`${item.label}-${item.location}`} className="rounded border border-cyan-200/10 px-2 py-1 text-[8px] text-slate-500">
+                          {item.label} · {item.location}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+                {screenAnalysis.suggestedNextActions.length ? (
+                  <div className="mt-3">
+                    <p className="text-[8px] uppercase tracking-[.14em] text-slate-600">Suggested next</p>
+                    <ul className="mt-1 space-y-1">
+                      {screenAnalysis.suggestedNextActions.slice(0, 3).map((item) => (
+                        <li key={item} className="text-[9px] leading-relaxed text-cyan-100/65">→ {item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {screenAnalysis.sensitiveContentDetected ? (
+                  <p className="mt-2 text-[8px] text-amber-300">
+                    Sensitive-looking content was detected and its value was not reproduced.
+                  </p>
+                ) : null}
+                {screenAnalysis.warnings.map((warning) => (
+                  <p key={warning} className="mt-1 text-[8px] text-amber-300">{warning}</p>
+                ))}
+                <Button size="sm" variant="ghost" onClick={useScreenFindings} className="mt-3">
+                  Use findings in mission
+                </Button>
+                <p className="mt-1 text-[8px] text-slate-600">
+                  Using findings adds the text summary to the command; that command will be persisted if you start the mission.
+                </p>
+              </div>
+            ) : null}
+            {screenAnalysisError ? <p className="mt-2 text-[9px] text-amber-300">{screenAnalysisError}</p> : null}
             {screenError ? <p className="mt-2 text-[9px] text-amber-300">{screenError}</p> : null}
           </section>
 

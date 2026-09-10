@@ -402,6 +402,23 @@ export type AiTeamMission = {
   verifications: AiTeamMissionVerification[];
 };
 
+export type AiTeamScreenAnalysis = {
+  analyzedAt: string;
+  model: string;
+  summary: string;
+  surface: string | null;
+  observations: string[];
+  interactiveElements: Array<{
+    label: string;
+    kind: "button" | "link" | "input" | "menu" | "dialog" | "other";
+    location: string;
+    confidence: "low" | "medium" | "high";
+  }>;
+  warnings: string[];
+  suggestedNextActions: string[];
+  sensitiveContentDetected: boolean;
+};
+
 export type AiTeamToolRiskClass =
   | "read"
   | "normal_write"
