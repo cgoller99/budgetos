@@ -1,5 +1,15 @@
 export { AI_TEAM_AGENTS, getAiTeamAgent } from "@/lib/ai-team/agents";
 export {
+  AI_TEAM_ACTIONS,
+  autonomyAllowsAiTeamAction,
+  detectAiTeamActionCommand,
+  getAiTeamActionDefinition,
+} from "@/lib/ai-team/actionCommands";
+export {
+  AiTeamActionStoppedError,
+  executeAiTeamRegisteredAction,
+} from "@/lib/ai-team/actionRuntime";
+export {
   buildAiTeamPlan,
   isProductionSensitiveText,
   requiresApprovalForTaskContext,
@@ -68,6 +78,10 @@ export {
   getLatestAiTeamFounderBrief,
   saveAiTeamFounderBrief,
 } from "@/lib/ai-team/founderBrief";
+export {
+  collectAiTeamFounderBriefInput,
+  generateAiTeamFounderBrief,
+} from "@/lib/ai-team/founderBriefRuntime";
 export { getAiTeamProductAnalytics } from "@/lib/ai-team/productAnalytics";
 export { getAiTeamRevenueIntelligence } from "@/lib/ai-team/revenueIntelligence";
 export { getAiTeamCustomerVoice } from "@/lib/ai-team/customerVoice";
@@ -76,6 +90,9 @@ export {
   summarizeCustomerVoice,
 } from "@/lib/ai-team/v3Math";
 export type {
+  AiTeamActionDefinition,
+  AiTeamActionExecution,
+  AiTeamActionKey,
   AiTeamActionRecord,
   AiTeamActivityEvent,
   AiTeamActivityStatus,

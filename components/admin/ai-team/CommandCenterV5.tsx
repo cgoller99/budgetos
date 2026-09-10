@@ -2,6 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Badge, Button } from "@/components/ui";
+import {
+  autonomyAllowsAiTeamAction,
+  detectAiTeamActionCommand,
+  getAiTeamActionDefinition,
+} from "@/lib/ai-team/actionCommands";
 import { AI_TEAM_CAPABILITIES } from "@/lib/ai-team/capabilities";
 import type {
   AiTeamActivityEvent,
@@ -158,6 +163,13 @@ export function CommandCenter(props: Props) {
   } = useScreenAwareness();
   const reportMission = inspectedMission ?? currentMission ?? missions[0] ?? null;
   const report = reportMission?.finalReport ?? null;
+  const registeredActionKey = detectAiTeamActionCommand(goal);
+  const registeredAction = registeredActionKey
+    ? getAiTeamActionDefinition(registeredActionKey)
+    : null;
+  const registeredActionAllowed = registeredAction
+    ? autonomyAllowsAiTeamAction(autonomyLevel, registeredAction)
+    : false;
 
   useEffect(() => {
     if (!planning) return;
@@ -378,7 +390,7 @@ export function CommandCenter(props: Props) {
     (planning ? "planning" : events.some((event) => event.status === "failed")
       ? "failed"
       : "standby");
-  const noExecutor =
+  const restrictedExecutor =
     autonomyLevel === "act" || autonomyLevel === "autopilot";
 
   return (
@@ -401,13 +413,13 @@ export function CommandCenter(props: Props) {
       <header className="relative flex flex-wrap items-center justify-between gap-4 border-b border-cyan-200/10 px-5 py-4">
         <div>
           <div className="flex items-center gap-2">
-            <Badge variant="accent">Buxme OS V5.2</Badge>
+            <Badge variant="accent">Buxme OS V5.3</Badge>
             <span className={`text-[10px] uppercase tracking-[.18em] ${runtime.mode === "ai" ? "text-emerald-300" : "text-amber-300"}`}>
               {runtime.mode === "ai" ? "AI runtime available" : "Deterministic fallback"}
             </span>
           </div>
           <h2 className="mt-2 text-lg font-semibold tracking-[.16em] text-white">
-            MISSION ENGINE + SCREEN INTELLIGENCE
+            MISSION ENGINE + ACTION BRIDGE
           </h2>
           <p className="mt-1 text-[10px] text-slate-500">
             Perception → reasoning → team → memory → tools → action → verification → report
@@ -564,13 +576,26 @@ export function CommandCenter(props: Props) {
               }}
               maxLength={1000}
               rows={4}
-              placeholder="What should the team investigate, challenge, or plan?"
+              placeholder="What should the team investigate, plan, or execute through a registered action?"
               className="focus-ring mt-2 w-full resize-y rounded-xl border border-cyan-200/15 bg-slate-950/80 p-3 text-sm text-white outline-none placeholder:text-slate-700"
             />
+            {registeredAction ? (
+              <div className="mt-3 rounded-xl border border-cyan-300/20 bg-cyan-300/[.04] p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-[9px] font-semibold text-cyan-100">Registered action · {registeredAction.label}</p>
+                  <span className={`text-[8px] uppercase ${registeredActionAllowed ? "text-emerald-300" : "text-amber-300"}`}>
+                    {registeredActionAllowed ? "authorized by autonomy" : `requires ${registeredAction.minimumAutonomy}`}
+                  </span>
+                </div>
+                <p className="mt-1 text-[8px] leading-relaxed text-slate-500">{registeredAction.description}</p>
+              </div>
+            ) : null}
             <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-              <p className="text-[9px] text-slate-600">{goal.length}/1000 · planning/staging only</p>
+              <p className="text-[9px] text-slate-600">
+                {goal.length}/1000 · {registeredAction ? "server allowlist detected" : "planning/staging only"}
+              </p>
               <Button onClick={submitMission} disabled={planning || goal.trim().length < 3}>
-                {planning ? "Mission active…" : "Start mission"}
+                {planning ? "Mission active…" : registeredAction ? "Run registered action" : "Start mission"}
               </Button>
             </div>
           </section>
@@ -737,12 +762,16 @@ export function CommandCenter(props: Props) {
             </div>
             <p className="mt-3 text-[9px] leading-relaxed text-slate-500">
               {autonomyLevel === "observe"
-                ? "Read and plan only."
+                ? "Read-only registered actions and planning are allowed."
                 : autonomyLevel === "assist"
-                  ? "Recommendations and approval-gated staging."
-                  : "Policy selected for future use. No external/local action executor connected."}
+                  ? "Recommendations, read actions, and approval-gated staging are allowed."
+                  : "Registered internal Buxme actions may execute. Unrestricted external/local execution remains disconnected."}
             </p>
-            {noExecutor ? <p className="mt-2 font-semibold text-[9px] text-amber-300">No actions will execute.</p> : null}
+            {restrictedExecutor ? (
+              <p className="mt-2 font-semibold text-[9px] text-amber-300">
+                Allowlist only — no arbitrary shell, payments, security controls, or customer financial mutations.
+              </p>
+            ) : null}
           </section>
 
           <section className="max-h-[700px] overflow-y-auto rounded-2xl border border-cyan-200/20 bg-[linear-gradient(160deg,rgba(6,31,51,.7),rgba(2,8,18,.98)_55%)] p-4">

@@ -20,6 +20,15 @@ export const AI_TEAM_CAPABILITIES: readonly AiTeamToolRecord[] = [
     approvalRequired: false,
   },
   {
+    id: "action-bridge",
+    label: "Registered action bridge",
+    description: "Runs a small server-side allowlist of verified internal Buxme actions; arbitrary code, payments, and customer financial actions remain blocked.",
+    riskClass: "normal_write",
+    connected: true,
+    available: true,
+    approvalRequired: true,
+  },
+  {
     id: "execution-staging",
     label: "Execution staging",
     description: "Creates approval-gated packets for an external operator.",

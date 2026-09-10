@@ -9,7 +9,10 @@ import {
 } from "react";
 import { Badge, Button, LoadingSkeleton } from "@/components/ui";
 import { cn } from "@/components/ui/cn";
+import { detectAiTeamActionCommand } from "@/lib/ai-team/actionCommands";
 import type {
+  AiTeamActionDefinition,
+  AiTeamActionExecution,
   AiTeamActivityEvent,
   AiTeamAgent,
   AiTeamApprovalDecision,
@@ -59,6 +62,15 @@ type PostPayload = {
   mission: AiTeamMission;
   runtime: AiTeamRuntimeInfo;
   snapshot: AiTeamSnapshot;
+};
+
+type ActionPostPayload = {
+  operationId: string;
+  action: AiTeamActionDefinition;
+  execution: AiTeamActionExecution;
+  mission: AiTeamMission;
+  snapshot: AiTeamSnapshot | null;
+  founderBrief: AiTeamFounderBrief | null;
 };
 
 type ActivityPayload = {
@@ -446,8 +458,13 @@ export function AdminAiTeamSection() {
       void pollActivity();
     }, 800);
 
+    const registeredAction = detectAiTeamActionCommand(trimmed);
+    const endpoint = registeredAction
+      ? "/api/admin/ai-team/actions"
+      : "/api/admin/ai-team";
+
     try {
-      const response = await fetch("/api/admin/ai-team", {
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -460,32 +477,52 @@ export function AdminAiTeamSection() {
       });
       const payload = (await response.json().catch(() => ({}))) as
         | PostPayload
+        | ActionPostPayload
         | { error?: string };
       if (!response.ok) {
-        throw new Error("error" in payload ? payload.error : "Unable to create plan.");
+        throw new Error("error" in payload ? payload.error : "Unable to execute command.");
       }
-      const data = payload as PostPayload;
-      setRuntime(data.runtime);
-      setSnapshot(data.snapshot);
-      setCurrentMission(data.mission);
-      setMissions((current) => [
-        data.mission,
-        ...current.filter((mission) => mission.id !== data.mission.id),
-      ].slice(0, 20));
-      setRuns((current) => [data.run, ...current.filter((run) => run.id !== data.run.id)].slice(0, 20));
-      if (data.run.tasks.some((task) => task.requiresApproval)) {
-        setApprovalRuns((current) => [
-          data.run,
-          ...current.filter((run) => run.id !== data.run.id),
+
+      if (registeredAction) {
+        const data = payload as ActionPostPayload;
+        if (data.snapshot) setSnapshot(data.snapshot);
+        setCurrentMission(data.mission);
+        setMissions((current) => [
+          data.mission,
+          ...current.filter((mission) => mission.id !== data.mission.id),
         ].slice(0, 20));
+        if (data.founderBrief) {
+          setFounderBrief(data.founderBrief);
+          v3LoadedRef.current.brief = true;
+          setV3LoadState((current) => ({
+            ...current,
+            brief: { loaded: true, loading: false, error: null },
+          }));
+        }
+      } else {
+        const data = payload as PostPayload;
+        setRuntime(data.runtime);
+        setSnapshot(data.snapshot);
+        setCurrentMission(data.mission);
+        setMissions((current) => [
+          data.mission,
+          ...current.filter((mission) => mission.id !== data.mission.id),
+        ].slice(0, 20));
+        setRuns((current) => [data.run, ...current.filter((run) => run.id !== data.run.id)].slice(0, 20));
+        if (data.run.tasks.some((task) => task.requiresApproval)) {
+          setApprovalRuns((current) => [
+            data.run,
+            ...current.filter((run) => run.id !== data.run.id),
+          ].slice(0, 20));
+        }
+        setPlanningUsage((current) => ({
+          ...current,
+          used: Math.min(current.limit, current.used + 1),
+        }));
       }
-      setPlanningUsage((current) => ({
-        ...current,
-        used: Math.min(current.limit, current.used + 1),
-      }));
     } catch (planError) {
       if (!(planError instanceof DOMException && planError.name === "AbortError")) {
-        setError(planError instanceof Error ? planError.message : "Unable to create plan.");
+        setError(planError instanceof Error ? planError.message : "Unable to execute command.");
       }
     } finally {
       if (activityInterval.current !== null) {
@@ -696,7 +733,7 @@ export function AdminAiTeamSection() {
     return (
       <section id="ai-team" className="scroll-mt-28 space-y-5" aria-label="AI Mission Control">
         <div className="rounded-3xl border border-[var(--surface-border)] bg-[var(--surface-soft)] p-8">
-          <Badge variant="accent">Buxme OS V5.1</Badge>
+          <Badge variant="accent">Buxme OS V5.3</Badge>
           <h2 className="mt-4 text-2xl font-semibold text-[var(--foreground)]">
             Initializing Mission Control
           </h2>
@@ -736,7 +773,7 @@ export function AdminAiTeamSection() {
   };
 
   return (
-    <section id="ai-team" className="scroll-mt-28 space-y-5" aria-label="Buxme OS V5.1 Mission Control">
+    <section id="ai-team" className="scroll-mt-28 space-y-5" aria-label="Buxme OS V5.3 Mission Control">
       {error ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200" role="alert">
           <span>{error}</span>

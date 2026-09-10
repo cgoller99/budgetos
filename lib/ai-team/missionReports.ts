@@ -32,6 +32,9 @@ export function buildAiTeamIntelligenceReport(
   const warnings = mission.events
     .filter((event) => event.status === "warning")
     .map((event) => event.detail ?? event.summary);
+  const actionFindings = mission.events
+    .filter((event) => event.eventType === "finding")
+    .map((event) => event.detail ?? event.summary);
 
   if (run?.source === "fallback") {
     warnings.unshift(
@@ -40,7 +43,9 @@ export function buildAiTeamIntelligenceReport(
   }
   if (mission.autonomyLevel === "act" || mission.autonomyLevel === "autopilot") {
     warnings.push(
-      "No external/local action executor connected; the selected autonomy policy did not execute actions.",
+      mission.context.actionBridge === true
+        ? "Only the registered internal Buxme action bridge was available; unrestricted external/local execution remains disconnected."
+        : "No external/local action executor connected; the selected autonomy policy did not execute actions.",
     );
   }
 
@@ -75,6 +80,7 @@ export function buildAiTeamIntelligenceReport(
     whatItFound: uniqueText([
       run?.summary,
       ...(run?.snapshot.observations ?? []),
+      ...actionFindings,
     ]),
     whatChanged:
       mission.changes.length === 0
@@ -87,6 +93,7 @@ export function buildAiTeamIntelligenceReport(
       ),
     ),
     importantFindings: uniqueText([
+      ...actionFindings,
       ...(run?.snapshot.observations ?? []),
       ...(run?.tasks
         .flatMap((task) => task.evidence)
