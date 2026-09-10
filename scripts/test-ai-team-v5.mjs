@@ -6,6 +6,7 @@ const read = (path) =>
 
 const [
   migration,
+  fkIndexMigration,
   service,
   report,
   postRoute,
@@ -20,6 +21,7 @@ const [
   modelRuntime,
 ] = await Promise.all([
   read("supabase/migrations/20260915_buxme_os_v5_mission_engine.sql"),
+  read("supabase/migrations/20260916_buxme_os_v5_mission_fk_indexes.sql"),
   read("lib/ai-team/missions.ts"),
   read("lib/ai-team/missionReports.ts"),
   read("app/api/admin/ai-team/route.ts"),
@@ -67,6 +69,21 @@ for (const status of [
 ]) {
   assert.ok(migration.includes(`'${status}'`), `Missing mission status ${status}`);
 }
+for (const indexName of [
+  "ai_team_mission_events_mission_owner_idx",
+  "ai_team_mission_changes_mission_owner_idx",
+  "ai_team_mission_verifications_mission_owner_idx",
+]) {
+  assert.ok(
+    fkIndexMigration.includes(indexName),
+    `Missing V5 composite FK covering index ${indexName}`,
+  );
+}
+assert.ok(
+  fkIndexMigration.includes("(mission_id, created_by)"),
+  "V5 child mission tables must index the composite FK in parent-key order",
+);
+
 for (const level of ["observe", "assist", "act", "autopilot"]) {
   assert.ok(migration.includes(`'${level}'`), `Missing autonomy level ${level}`);
 }
