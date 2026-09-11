@@ -714,7 +714,7 @@ assert.match(billing, /useAuth/);
 assert.match(billing, /getNativeStoreProducts/);
 assert.match(billing, /priceString/);
 assert.match(billing, /storeCatalogStatus/);
-assert.match(billing, /com\.buxme\.pro\.monthly/);
+assert.match(billing, /IAP_PRODUCT_IDS/);
 
 const entitlementsRoute = read("app/api/entitlements/route.ts");
 assert.match(entitlementsRoute, /clearAppleSubscriptionOnProfile/);

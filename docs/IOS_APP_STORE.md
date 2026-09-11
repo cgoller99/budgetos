@@ -37,8 +37,9 @@ When `Capacitor.isNativePlatform()` is true on iOS, the app uses an app-first sh
 - Capacitor 8.5 + iOS platform project are committed.
 - Native detection, deep-link routing, safe-area CSS, IAP UI path, account deletion, AASA,
   privacy manifest, dual-billing guards, and iOS UX polish are in code.
-- **This environment cannot run Xcode.** Do **not** treat the app as App Store–ready until
-  `Product → Archive` succeeds on a Mac.
+- Build 13 release work is now validated on Windows and continues on the authorized Mac.
+- Do **not** treat Build 13 as App Store–ready until the Mac archive/signing gate, App Store Connect preflight, and physical TestFlight purchase test all pass.
+- See docs/APP_STORE_BUILD_13_REVIEW.md for the rejection-specific release gate.
 
 ---
 
@@ -254,12 +255,11 @@ a Stripe subscription is active. ASN never clobbers an active Stripe entitlement
 
 ## Remaining App Store blockers
 
-1. **Xcode Archive must succeed** on a Mac (signing, capabilities, SPM packages).
-2. Confirm production AASA serves `Y7UJK54GL9.co.buxme.app`.
-3. **Create StoreKit products** in App Store Connect matching product IDs above.
-4. **Add `APPLE_IAP_*` secrets to Vercel** and configure ASN V2 URL (code is ready; credentials are manual).
-5. **App icons / screenshots / review notes / privacy policy** for Connect metadata.
-6. **Manual device QA** of auth, Plaid OAuth, sandbox IAP purchase, restore, and Stripe web subscriber access on iOS.
-7. Confirm **In-App Purchase** capability in Xcode.
-
-Until items 1–4 and sandbox purchase verification are done, the app is **not** ready for App Store submission.
+1. **Xcode archive/signing must succeed** on the Mac for Build 13.
+2. Confirm Build 13 uses the correct team, bundle ID, In-App Purchase capability, and iPad support.
+3. **Verify** the existing StoreKit products in App Store Connect: exact IDs, one-month duration, price, localization, availability, review information, subscription levels, and draft-submission linkage.
+4. Confirm Privacy Policy + Apple Standard EULA metadata required by Guideline 3.1.2(c).
+5. Confirm Paid Apps Agreement is Active and no tax/banking action blocks IAP.
+6. Resolve or account for the Production App Store Server API health 401 without weakening purchase verification.
+7. Complete a real TestFlight purchase on physical hardware (including iPad coverage) before resubmitting.
+8. See docs/APP_STORE_BUILD_13_REVIEW.md for the exact release checklist and App Review reply.

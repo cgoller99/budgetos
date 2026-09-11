@@ -78,6 +78,19 @@ export default function TermsPage() {
           renewal date. We may change pricing with reasonable notice where
           required by law.
         </p>
+        <p>
+          Subscriptions purchased through Apple’s App Store are also subject to
+          Apple’s{" "}
+          <a
+            href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"
+            target="_blank"
+            rel="noreferrer"
+            className="text-[var(--accent)] hover:underline"
+          >
+            Standard EULA
+          </a>
+          .
+        </p>
       </LegalSection>
 
       <LegalSection title="Refund policy">

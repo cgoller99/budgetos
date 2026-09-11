@@ -167,7 +167,10 @@ export async function getAppleIapHealthReport(): Promise<AppleIapHealthReport> {
     probeAppleApiAuth(Environment.PRODUCTION),
   ]);
 
-  const apiAuthOk = sandbox.ok || production.ok;
+  const preferredApiAuthOk =
+    config.preferredEnvironment === Environment.SANDBOX
+      ? sandbox.ok
+      : production.ok;
   const formatOk =
     credentialFormats.present &&
     credentialFormats.hasPkcs8Header &&
@@ -175,10 +178,11 @@ export async function getAppleIapHealthReport(): Promise<AppleIapHealthReport> {
     credentialFormats.hasRealNewlines &&
     credentialFormats.issuerIdLooksUuid &&
     credentialFormats.keyIdLooksPresent &&
-    credentialFormats.appAppleIdLooksNumeric;
+    (config.preferredEnvironment === Environment.SANDBOX ||
+      credentialFormats.appAppleIdLooksNumeric);
 
   return {
-    ok: config.isConfigured && apiAuthOk && formatOk,
+    ok: config.isConfigured && preferredApiAuthOk && formatOk,
     service: "apple-iap-health",
     configured: config.isConfigured,
     bundleId: config.bundleId,

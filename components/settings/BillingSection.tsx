@@ -16,9 +16,18 @@ import {
 import { Browser } from "@capacitor/browser";
 import {
   APPLE_MANAGE_SUBSCRIPTIONS_URL,
+  APPLE_STANDARD_EULA_URL,
+  BUXME_PRIVACY_POLICY_URL,
+  IAP_PRODUCT_IDS,
   IAP_PRODUCTS,
   type IapPlan,
 } from "@/lib/iap/products";
+import {
+  STORE_CATALOG_RETRY_DELAYS_MS,
+  evaluateStoreCatalog,
+  indexStoreProductsByPlan,
+  shouldRetryStoreCatalog,
+} from "@/lib/iap/storeCatalogPolicy";
 import type { NativeStoreProduct } from "@/lib/iap/nativePurchases";
 import type { StoreKitCatalogProbe } from "@/lib/iap/storeKitDiagnostics";
 import { isNativePlatform, shouldUseNativeStoreBilling } from "@/lib/native/platform";
@@ -76,13 +85,34 @@ function getPlanPriceLabel(plan: SubscriptionPlan): string {
   return "$0/forever";
 }
 
-async function openAppleManageSubscriptions() {
+async function openExternalUrl(url: string) {
   if (isNativePlatform()) {
-    await Browser.open({ url: APPLE_MANAGE_SUBSCRIPTIONS_URL });
+    await Browser.open({ url });
     return;
   }
 
-  window.open(APPLE_MANAGE_SUBSCRIPTIONS_URL, "_blank", "noopener,noreferrer");
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
+async function reportStoreCatalogDiagnostic(input: {
+  trigger: "initial" | "manual" | "resume" | "online";
+  attempt: number;
+  status: "partial" | "empty" | "error";
+  probe: StoreKitCatalogProbe;
+}) {
+  try {
+    await fetch("/api/iap/apple/catalog-diagnostics", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...input,
+        online: typeof navigator === "undefined" ? null : navigator.onLine,
+      }),
+      keepalive: true,
+    });
+  } catch {
+    // Diagnostics must never block StoreKit recovery or purchasing.
+  }
 }
 
 export function BillingSection() {
@@ -106,110 +136,149 @@ export function BillingSection() {
     Partial<Record<IapPlan, NativeStoreProduct>>
   >({});
   const [storeCatalogStatus, setStoreCatalogStatus] = useState<
-    "idle" | "loading" | "ready" | "empty" | "error"
+    "idle" | "loading" | "ready" | "partial" | "empty" | "error"
   >("idle");
+  const [storeCatalogAttempt, setStoreCatalogAttempt] = useState(0);
   const [storeKitProbe, setStoreKitProbe] = useState<StoreKitCatalogProbe | null>(
     null,
   );
   const checkoutTrackedRef = useRef(false);
+  const storeCatalogRequestRef = useRef(0);
   const upgradePlan = parsePaidPlan(searchParams.get("upgrade") ?? undefined);
 
+  const loadStoreCatalog = useCallback(
+    async (trigger: "initial" | "manual" | "resume" | "online") => {
+      if (!nativeStoreBilling) return;
+
+      const requestId = ++storeCatalogRequestRef.current;
+      setStoreCatalogStatus("loading");
+      setStoreCatalogAttempt(0);
+      setStoreProducts({});
+      setStoreKitProbe(null);
+
+      const { getNativeStoreProducts } = await import("@/lib/iap/nativePurchases");
+      let finalStatus: "partial" | "empty" | "error" = "error";
+      let finalError: unknown = new Error("StoreKit catalog did not load.");
+      const discoveredProducts = new Map<IapPlan, NativeStoreProduct>();
+
+      for (
+        let attemptIndex = 0;
+        attemptIndex < STORE_CATALOG_RETRY_DELAYS_MS.length;
+        attemptIndex += 1
+      ) {
+        const delayMs = STORE_CATALOG_RETRY_DELAYS_MS[attemptIndex];
+        if (delayMs > 0) {
+          await new Promise((resolve) => window.setTimeout(resolve, delayMs));
+        }
+        if (requestId !== storeCatalogRequestRef.current) return;
+        setStoreCatalogAttempt(attemptIndex + 1);
+
+        try {
+          const products = await getNativeStoreProducts();
+          if (requestId !== storeCatalogRequestRef.current) return;
+
+          for (const product of products) {
+            discoveredProducts.set(product.plan, product);
+          }
+          const cumulativeProducts = [...discoveredProducts.values()];
+          const evaluation = evaluateStoreCatalog(
+            cumulativeProducts,
+            IAP_PRODUCT_IDS,
+          );
+          setStoreProducts(indexStoreProductsByPlan(cumulativeProducts));
+          if (evaluation.status === "ready") {
+            setStoreCatalogStatus("ready");
+            return;
+          }
+
+          finalStatus = evaluation.status;
+          finalError = new Error(
+            evaluation.status === "partial"
+              ? `StoreKit returned only ${evaluation.returnedProductIds.length} of 2 Buxme subscriptions.`
+              : "StoreKit returned zero Buxme subscriptions.",
+          );
+          if (shouldRetryStoreCatalog(evaluation.status, attemptIndex)) continue;
+        } catch (loadError) {
+          finalStatus = discoveredProducts.size > 0 ? "partial" : "error";
+          finalError = loadError;
+          if (shouldRetryStoreCatalog("error", attemptIndex)) continue;
+        }
+        break;
+      }
+
+      if (requestId !== storeCatalogRequestRef.current) return;
+      setStoreCatalogStatus(finalStatus);
+      try {
+        const { probeNativeStoreKitCatalog } = await import(
+          "@/lib/iap/storeKitDiagnostics"
+        );
+        const probe = await probeNativeStoreKitCatalog();
+        if (requestId !== storeCatalogRequestRef.current) return;
+        setStoreKitProbe(probe);
+        void reportStoreCatalogDiagnostic({
+          trigger,
+          attempt: STORE_CATALOG_RETRY_DELAYS_MS.length,
+          status: finalStatus,
+          probe,
+        });
+      } catch (probeError) {
+        const { createUnavailableStoreKitCatalogProbe } = await import(
+          "@/lib/iap/storeKitDiagnostics"
+        );
+        const probe = createUnavailableStoreKitCatalogProbe(probeError || finalError);
+        if (requestId !== storeCatalogRequestRef.current) return;
+        setStoreKitProbe(probe);
+        void reportStoreCatalogDiagnostic({
+          trigger,
+          attempt: STORE_CATALOG_RETRY_DELAYS_MS.length,
+          status: finalStatus,
+          probe,
+        });
+      }
+    },
+    [nativeStoreBilling],
+  );
+
   useEffect(() => {
-    if (!nativeStoreBilling) {
+    if (!nativeStoreBilling) return;
+    void loadStoreCatalog("initial");
+    return () => {
+      storeCatalogRequestRef.current += 1;
+    };
+  }, [loadStoreCatalog, nativeStoreBilling]);
+
+  useEffect(() => {
+    if (
+      !nativeStoreBilling ||
+      storeCatalogStatus === "ready" ||
+      storeCatalogStatus === "loading" ||
+      storeCatalogStatus === "idle"
+    ) {
       return;
     }
 
-    let cancelled = false;
-    setStoreCatalogStatus("loading");
-    setStoreKitProbe(null);
-
-    void (async () => {
-      try {
-        const { getNativeStoreProducts } = await import("@/lib/iap/nativePurchases");
-        const {
-          probeNativeStoreKitCatalog,
-        } = await import("@/lib/iap/storeKitDiagnostics");
-        const [products, probe] = await Promise.all([
-          getNativeStoreProducts(),
-          probeNativeStoreKitCatalog(),
-        ]);
-        if (cancelled) {
-          return;
-        }
-
-        const next: Partial<Record<IapPlan, NativeStoreProduct>> = {};
-        for (const product of products) {
-          next[product.plan] = product;
-        }
-        setStoreProducts(next);
-        setStoreKitProbe(probe);
-        setStoreCatalogStatus(products.length > 0 ? "ready" : "empty");
-      } catch (loadError) {
-        // StoreKit catalog may be unavailable; still surface Capgo/StoreKit probe evidence.
-        if (!cancelled) {
-          setStoreCatalogStatus("error");
-          try {
-            const { probeNativeStoreKitCatalog } = await import(
-              "@/lib/iap/storeKitDiagnostics"
-            );
-            const probe = await probeNativeStoreKitCatalog();
-            if (!cancelled) {
-              setStoreKitProbe(probe);
-            }
-          } catch {
-            setStoreKitProbe({
-              probedAt: new Date().toISOString(),
-              platform: "ios",
-              isNativeIos: true,
-              capacitorNative: true,
-              appId: null,
-              appName: null,
-              appVersion: null,
-              appBuild: null,
-              pluginVersion: null,
-              billingSupported: null,
-              storeKitBundleId: null,
-              storeKitEnvironment: null,
-              storeKitAppVersion: null,
-              requestedProductIds: [
-                IAP_PRODUCTS.pro.productId,
-                IAP_PRODUCTS.pro_plus.productId,
-              ],
-              returnedProductIds: [],
-              returnedCount: 0,
-              missingProductIds: [
-                IAP_PRODUCTS.pro.productId,
-                IAP_PRODUCTS.pro_plus.productId,
-              ],
-              perProduct: [],
-              getProductsError:
-                loadError instanceof Error
-                  ? loadError.message
-                  : "StoreKit catalog load failed",
-              appInfoError: null,
-              appTransactionError: null,
-              verdict:
-                loadError instanceof Error
-                  ? loadError.message
-                  : "StoreKit catalog load failed",
-            });
-          }
-        }
+    const handleOnline = () => void loadStoreCatalog("online");
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        void loadStoreCatalog("resume");
       }
-    })();
-
-    return () => {
-      cancelled = true;
     };
-  }, [nativeStoreBilling]);
+
+    window.addEventListener("online", handleOnline);
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [loadStoreCatalog, nativeStoreBilling, storeCatalogStatus]);
 
   function getApplePlanPriceLabel(plan: IapPlan): string {
     const storeProduct = storeProducts[plan];
-    if (storeProduct?.priceString) {
-      return `${storeProduct.priceString}/month`;
+    if (storeProduct?.priceString) return `${storeProduct.priceString}/month`;
+    if (storeCatalogStatus === "loading" || storeCatalogStatus === "idle") {
+      return "Loading App Store price…";
     }
-
-    return `${IAP_PRODUCTS[plan].label} · App Store`;
+    return "Price unavailable — retry App Store";
   }
 
   const runAction = useCallback(
@@ -540,7 +609,11 @@ export function BillingSection() {
                   )}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-white">{plan.name}</p>
+                    <p className="text-sm font-semibold text-white">
+                      {nativeStoreBilling && plan.id !== "free"
+                        ? IAP_PRODUCTS[plan.id as IapPlan].subscriptionTitle
+                        : plan.name}
+                    </p>
                     {isCurrent && <Badge variant="accent">Current</Badge>}
                   </div>
                   <p className="mt-2 text-lg font-semibold text-white">
@@ -550,6 +623,11 @@ export function BillingSection() {
                         ? getApplePlanPriceLabel(plan.id as IapPlan)
                         : getPlanPriceLabel(plan.id)}
                   </p>
+                  {nativeStoreBilling && plan.id !== "free" ? (
+                    <p className="mt-1 text-xs font-medium text-white/55">
+                      {IAP_PRODUCTS[plan.id as IapPlan].durationLabel} · auto-renewable
+                    </p>
+                  ) : null}
                   <p className="mt-2 text-xs leading-relaxed text-white/45">
                     {plan.description}
                   </p>
@@ -586,14 +664,21 @@ export function BillingSection() {
                           <Button
                             size="sm"
                             className="relative z-[1] w-full touch-manipulation"
-                            disabled={pendingAction !== null}
+                            disabled={
+                              pendingAction !== null ||
+                              !storeProducts[plan.id as IapPlan]
+                            }
                             onClick={() =>
                               void handleNativePurchase(plan.id as IapPlan)
                             }
                           >
                             {pendingAction === `iap-${plan.id}`
                               ? "Purchasing..."
-                              : `Subscribe to ${plan.name}`}
+                              : storeProducts[plan.id as IapPlan]
+                                ? `Subscribe to ${plan.name}`
+                                : storeCatalogStatus === "loading"
+                                  ? "Loading App Store…"
+                                  : "Retry App Store below"}
                           </Button>
                         )
                       ) : null
@@ -645,59 +730,96 @@ export function BillingSection() {
           </div>
         )}
 
+        {nativeStoreBilling ? (
+          <div className="rounded-2xl border border-white/[0.08] bg-white/[0.025] px-5 py-4">
+            <p className="text-sm font-semibold text-white">
+              Auto-renewable subscription information
+            </p>
+            <p className="mt-2 text-xs leading-relaxed text-white/50">
+              Buxme Pro and Buxme Pro+ each renew every 1 month unless canceled.
+              The localized price shown above comes directly from the App Store before
+              purchase. Payment is charged to your Apple ID.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs">
+              <button
+                type="button"
+                className="text-[var(--accent-light)] underline underline-offset-2"
+                onClick={() => void openExternalUrl(BUXME_PRIVACY_POLICY_URL)}
+              >
+                Privacy Policy
+              </button>
+              <button
+                type="button"
+                className="text-[var(--accent-light)] underline underline-offset-2"
+                onClick={() => void openExternalUrl(APPLE_STANDARD_EULA_URL)}
+              >
+                Terms of Use (Apple Standard EULA)
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         {error && <p className="text-sm text-amber-300">{error}</p>}
 
         {nativeStoreBilling &&
-          (storeCatalogStatus === "empty" || storeCatalogStatus === "error") && (
-            <div className="space-y-2 text-sm text-amber-300/90">
-              <p>
-                App Store products didn&apos;t load on this device. Capgo called
-                StoreKit <span className="font-medium">Product.products(for:)</span>{" "}
-                for{" "}
-                <span className="font-medium">com.buxme.pro.monthly</span> and{" "}
-                <span className="font-medium">com.buxme.proplus.monthly</span>; an
-                empty result makes purchase fail with &quot;Cannot find product
-                for id …&quot;.
+          (storeCatalogStatus === "partial" ||
+            storeCatalogStatus === "empty" ||
+            storeCatalogStatus === "error") ? (
+            <div className="rounded-2xl border border-amber-400/20 bg-amber-400/[0.06] px-5 py-4 text-sm text-amber-100">
+              <p className="font-medium">App Store prices are temporarily unavailable</p>
+              <p className="mt-2 text-xs leading-relaxed text-amber-100/75">
+                Buxme retried StoreKit {storeCatalogAttempt || STORE_CATALOG_RETRY_DELAYS_MS.length} times.
+                Purchase buttons stay disabled until Apple returns the matching subscription
+                and localized price. You can retry without leaving this screen.
               </p>
-              {storeKitProbe && (
-                <pre className="overflow-x-auto whitespace-pre-wrap rounded-md border border-amber-400/20 bg-black/30 p-3 font-mono text-[11px] leading-relaxed text-amber-100/90">
-                  {storeKitProbe.verdict}
-                  {"\n"}
-                  requested={storeKitProbe.requestedProductIds.join(",")}
-                  {"\n"}
-                  returned({storeKitProbe.returnedCount})=
-                  {storeKitProbe.returnedProductIds.join(",") || "∅"}
-                  {"\n"}
-                  missing={storeKitProbe.missingProductIds.join(",") || "∅"}
-                  {"\n"}
-                  appId={storeKitProbe.appId ?? "n/a"} build=
-                  {storeKitProbe.appBuild ?? "n/a"}
-                  {"\n"}
-                  storeKitBundle={storeKitProbe.storeKitBundleId ?? "n/a"} env=
-                  {storeKitProbe.storeKitEnvironment ?? "n/a"}
-                  {"\n"}
-                  billingSupported=
-                  {String(storeKitProbe.billingSupported ?? "n/a")} plugin=
-                  {storeKitProbe.pluginVersion ?? "n/a"}
-                  {storeKitProbe.getProductsError
-                    ? `\ngetProductsError=${storeKitProbe.getProductsError}`
-                    : ""}
-                  {storeKitProbe.appTransactionError
-                    ? `\nappTransactionError=${storeKitProbe.appTransactionError}`
-                    : ""}
-                  {storeKitProbe.perProduct
-                    .map((row) =>
-                      row.error
-                        ? `\n${row.productId}: ${row.error}`
-                        : row.found
-                          ? `\n${row.productId}: ok ${row.priceString ?? ""}`
-                          : `\n${row.productId}: not returned`,
-                    )
-                    .join("")}
-                </pre>
-              )}
+              <Button
+                variant="secondary"
+                size="sm"
+                className="mt-3 touch-manipulation"
+                disabled={pendingAction !== null}
+                onClick={() => void loadStoreCatalog("manual")}
+              >
+                Retry App Store
+              </Button>
+              {storeKitProbe ? (
+                <details className="mt-3 rounded-xl border border-amber-400/15 bg-black/20 p-3">
+                  <summary className="cursor-pointer text-xs font-medium text-amber-100">
+                    StoreKit diagnostics for App Review
+                  </summary>
+                  <pre className="mt-3 overflow-x-auto whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-amber-100/80">
+                    {storeKitProbe.verdict}
+                    {"\n"}
+                    requested={storeKitProbe.requestedProductIds.join(",")}
+                    {"\n"}
+                    returned({storeKitProbe.returnedCount})=
+                    {storeKitProbe.returnedProductIds.join(",") || "∅"}
+                    {"\n"}
+                    missing={storeKitProbe.missingProductIds.join(",") || "∅"}
+                    {"\n"}
+                    appId={storeKitProbe.appId ?? "n/a"} build={storeKitProbe.appBuild ?? "n/a"}
+                    {"\n"}
+                    storeKitBundle={storeKitProbe.storeKitBundleId ?? "n/a"} env={storeKitProbe.storeKitEnvironment ?? "n/a"}
+                    {"\n"}
+                    storefront={storeKitProbe.storefrontCountryCode ?? "n/a"} storefrontId={storeKitProbe.storefrontId ?? "n/a"}
+                    {"\n"}
+                    billingSupported={String(storeKitProbe.billingSupported ?? "n/a")} plugin={storeKitProbe.pluginVersion ?? "n/a"}
+                    {storeKitProbe.getProductsError ? `\ngetProductsError=${storeKitProbe.getProductsError}` : ""}
+                    {storeKitProbe.appTransactionError ? `\nappTransactionError=${storeKitProbe.appTransactionError}` : ""}
+                    {storeKitProbe.storefrontError ? `\nstorefrontError=${storeKitProbe.storefrontError}` : ""}
+                    {storeKitProbe.perProduct
+                      .map((row) =>
+                        row.error
+                          ? `\n${row.productId}: ${row.error}`
+                          : row.found
+                            ? `\n${row.productId}: ok ${row.priceString ?? ""}`
+                            : `\n${row.productId}: not returned`,
+                      )
+                      .join("")}
+                  </pre>
+                </details>
+              ) : null}
             </div>
-          )}
+          ) : null}
 
         <div className="flex flex-wrap gap-2">
           {nativeStoreBilling && (
@@ -716,7 +838,9 @@ export function BillingSection() {
                 size="md"
                 className="relative z-[1] touch-manipulation"
                 disabled={pendingAction !== null}
-                onClick={() => void openAppleManageSubscriptions()}
+                onClick={() =>
+                  void openExternalUrl(APPLE_MANAGE_SUBSCRIPTIONS_URL)
+                }
               >
                 Manage App Store subscription
               </Button>

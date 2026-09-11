@@ -34,6 +34,9 @@ export type StoreKitCatalogProbe = {
   storeKitBundleId: string | null;
   storeKitEnvironment: string | null;
   storeKitAppVersion: string | null;
+  storefrontCountryCode: string | null;
+  storefrontId: string | null;
+  storefrontError: string | null;
   requestedProductIds: IapProductId[];
   returnedProductIds: string[];
   returnedCount: number;
@@ -66,6 +69,39 @@ function errorMessage(error: unknown): string {
   return "Unknown StoreKit/Capgo error";
 }
 
+export function createUnavailableStoreKitCatalogProbe(
+  error: unknown,
+): StoreKitCatalogProbe {
+  const requestedProductIds = [...IAP_PRODUCT_IDS];
+  const base: Omit<StoreKitCatalogProbe, "verdict"> = {
+    probedAt: new Date().toISOString(),
+    platform: Capacitor.getPlatform(),
+    isNativeIos: isNativeIos(),
+    capacitorNative: Capacitor.isNativePlatform(),
+    appId: null,
+    appName: null,
+    appVersion: null,
+    appBuild: null,
+    pluginVersion: null,
+    billingSupported: null,
+    storeKitBundleId: null,
+    storeKitEnvironment: null,
+    storeKitAppVersion: null,
+    storefrontCountryCode: null,
+    storefrontId: null,
+    storefrontError: null,
+    requestedProductIds,
+    returnedProductIds: [],
+    returnedCount: 0,
+    missingProductIds: [...requestedProductIds],
+    perProduct: [],
+    getProductsError: errorMessage(error),
+    appInfoError: null,
+    appTransactionError: null,
+  };
+  return { ...base, verdict: buildVerdict(base) };
+}
+
 function buildVerdict(probe: Omit<StoreKitCatalogProbe, "verdict">): string {
   if (!probe.isNativeIos) {
     return "Not running inside the native iOS shell — StoreKit is not used.";
@@ -92,14 +128,23 @@ function buildVerdict(probe: Omit<StoreKitCatalogProbe, "verdict">): string {
       ? ` StoreKit environment=${probe.storeKitEnvironment}.`
       : "";
     const bundle = probe.storeKitBundleId || probe.appId;
+    const storefront = probe.storefrontCountryCode
+      ? ` Storefront=${probe.storefrontCountryCode}.`
+      : "";
+    const environmentChecks =
+      probe.storeKitEnvironment?.toLowerCase() === "sandbox"
+        ? " For Sandbox, also verify the sandbox tester and allow time for App Store Connect metadata propagation."
+        : " For App Review/Production, verify storefront availability and that the subscription/group are included in the review submission.";
     return (
       `Product.products(for:) returned 0 of ${probe.requestedProductIds.length} requested IDs` +
       (bundle ? ` for bundle ${bundle}` : "") +
       `. Capgo purchaseProduct fails with "Cannot find product for id …" for the same reason.` +
       env +
-      " Next checks outside app code: ASC product completeness (price + localization; Ready to Submit)," +
-      " In-App Purchase enabled on App ID / provisioning for this binary," +
-      " Sandbox Apple ID signed in on device (Settings → Developer / App Store)."
+      storefront +
+      " StoreKit does not expose a root-cause code for an empty catalog." +
+      " Verify App Store Connect product IDs, subscription duration/price/localization/availability/review state," +
+      " the active Paid Apps Agreement, and the In-App Purchase capability for this binary." +
+      environmentChecks
     );
   }
 
@@ -130,6 +175,9 @@ export async function probeNativeStoreKitCatalog(): Promise<StoreKitCatalogProbe
     storeKitBundleId: null as string | null,
     storeKitEnvironment: null as string | null,
     storeKitAppVersion: null as string | null,
+    storefrontCountryCode: null as string | null,
+    storefrontId: null as string | null,
+    storefrontError: null as string | null,
     requestedProductIds,
     returnedProductIds: [] as string[],
     returnedCount: 0,
@@ -176,6 +224,14 @@ export async function probeNativeStoreKitCatalog(): Promise<StoreKitCatalogProbe
     // Intentionally omit jwsRepresentation — not needed for catalog diagnosis.
   } catch (error) {
     base.appTransactionError = errorMessage(error);
+  }
+
+  try {
+    const storefront = await NativePurchases.getStorefront();
+    base.storefrontCountryCode = storefront.countryCode?.trim() || null;
+    base.storefrontId = storefront.storefrontId?.trim() || null;
+  } catch (error) {
+    base.storefrontError = errorMessage(error);
   }
 
   try {
@@ -230,6 +286,7 @@ export function formatStoreKitCatalogProbe(
     `missing=${probe.missingProductIds.join(",") || "∅"}`,
     `appId=${probe.appId ?? "n/a"} build=${probe.appBuild ?? "n/a"}`,
     `storeKitBundle=${probe.storeKitBundleId ?? "n/a"} env=${probe.storeKitEnvironment ?? "n/a"}`,
+    `storefront=${probe.storefrontCountryCode ?? "n/a"} storefrontId=${probe.storefrontId ?? "n/a"}`,
     `billingSupported=${probe.billingSupported ?? "n/a"} plugin=${probe.pluginVersion ?? "n/a"}`,
   ];
 
@@ -238,6 +295,9 @@ export function formatStoreKitCatalogProbe(
   }
   if (probe.appTransactionError) {
     lines.push(`appTransactionError=${probe.appTransactionError}`);
+  }
+  if (probe.storefrontError) {
+    lines.push(`storefrontError=${probe.storefrontError}`);
   }
 
   for (const row of probe.perProduct) {

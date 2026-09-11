@@ -11,15 +11,24 @@ export const IAP_PRODUCTS: Record<
   {
     productId: IapProductId;
     label: string;
+    subscriptionTitle: string;
+    durationLabel: string;
+    usPriceLabel: string;
   }
 > = {
   pro: {
     productId: "com.buxme.pro.monthly",
     label: "Pro",
+    subscriptionTitle: "Buxme Pro",
+    durationLabel: "1 month",
+    usPriceLabel: "$7.99/month",
   },
   pro_plus: {
     productId: "com.buxme.proplus.monthly",
     label: "Pro+",
+    subscriptionTitle: "Buxme Pro+",
+    durationLabel: "1 month",
+    usPriceLabel: "$14.99/month",
   },
 };
 
@@ -27,6 +36,10 @@ export const IAP_PRODUCT_IDS: IapProductId[] = [
   IAP_PRODUCTS.pro.productId,
   IAP_PRODUCTS.pro_plus.productId,
 ];
+
+export const BUXME_PRIVACY_POLICY_URL = "https://buxme.co/privacy";
+export const APPLE_STANDARD_EULA_URL =
+  "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/";
 
 export function planFromIapProductId(productId: string): IapPlan | null {
   if (productId === IAP_PRODUCTS.pro.productId) {

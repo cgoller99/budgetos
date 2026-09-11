@@ -254,36 +254,12 @@ export async function purchaseNativePlan(
 
   const productId = IAP_PRODUCTS[plan].productId;
 
-  // Fail fast when StoreKit cannot see the product. Capgo's purchaseProduct
-  // rejects with "Cannot find product for id …" after Product.products(for:)
-  // returns []; attach the full catalog probe so TestFlight logs show evidence.
-  try {
-    const { probeNativeStoreKitCatalog, formatStoreKitCatalogProbe } =
-      await import("@/lib/iap/storeKitDiagnostics");
-    const probe = await probeNativeStoreKitCatalog();
-
-    if (probe.billingSupported === false) {
-      throw new Error(
-        "This device cannot make App Store purchases (billing unsupported).",
-      );
-    }
-
-    if (!probe.returnedProductIds.includes(productId)) {
-      throw new Error(
-        `App Store did not return product ${productId}.\n${formatStoreKitCatalogProbe(probe)}`,
-      );
-    }
-  } catch (error) {
-    if (
-      error instanceof Error &&
-      (error.message.includes("App Store did not return product") ||
-        error.message.includes("billing unsupported"))
-    ) {
-      throw error;
-    }
-    // If the probe APIs themselves fail, continue to purchaseProduct —
-    // it will surface Capgo's native error.
-  }
+  // Do not run another blocking catalog probe here. The paywall only enables
+  // this action after the exact StoreKit product has loaded, and Capgo performs
+  // its own Product.products(for: [id]) lookup inside purchaseProduct. Running a
+  // second full probe before that lookup creates an unnecessary transient-failure
+  // window. If purchaseProduct cannot see the product, the catch below enriches
+  // that real failure with a StoreKit diagnostic probe.
 
   try {
     const result = await NativePurchases.purchaseProduct({
@@ -364,6 +340,9 @@ export async function restoreNativePurchases(): Promise<NativePurchaseResult[]> 
   await NativePurchases.restorePurchases();
   const { purchases } = await NativePurchases.getPurchases({
     productType: PURCHASE_TYPE.SUBS,
+    // Active entitlements only: do not let stale historical transactions from a
+    // shared/refurbished device influence restore selection.
+    onlyCurrentEntitlements: true,
   });
 
   return purchases
