@@ -49,7 +49,7 @@ const config: CapacitorConfig = {
     preferredContentMode: "mobile",
     backgroundColor: "#0b0f14",
     scheme: "Buxme",
-    limitsNavigationsToAppBoundDomains: true,
+    limitsNavigationsToAppBoundDomains: false,
   },
 };
 
