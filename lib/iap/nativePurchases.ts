@@ -337,7 +337,15 @@ export async function restoreNativePurchases(): Promise<NativePurchaseResult[]> 
     throw new Error("Restore purchases is only available in the iOS app.");
   }
 
-  await NativePurchases.restorePurchases();
+  try {
+    await NativePurchases.restorePurchases();
+  } catch (error) {
+    // AppStore.sync() can fail transiently in TestFlight/sandbox. We can still
+    // query StoreKit's current entitlements directly instead of turning a
+    // recoverable sync failure into a broken Restore Purchases experience.
+    console.warn("[iap] StoreKit restore sync failed; checking current entitlements", error);
+  }
+
   const { purchases } = await NativePurchases.getPurchases({
     productType: PURCHASE_TYPE.SUBS,
     // Active entitlements only: do not let stale historical transactions from a
