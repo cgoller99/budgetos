@@ -19,7 +19,14 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
   const [isMounted, setIsMounted] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
   const nativeIos = useNativeIos();
+
+  // Keep latest onClose without re-running focus trap when parent re-renders
+  // with a new callback identity (e.g. form typing recreating handleClose).
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (isOpen) {
@@ -65,7 +72,7 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (event.key !== "Tab" || !dialogRef.current) return;
@@ -94,7 +101,7 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
       window.removeEventListener("keydown", handleKeyDown);
       previouslyFocused?.focus();
     };
-  }, [isMounted, isOpen, onClose]);
+  }, [isMounted, isOpen]);
 
   if (!isMounted || typeof document === "undefined") return null;
 
