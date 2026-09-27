@@ -33,6 +33,7 @@ import {
   hasLinkedFinancialAccounts,
 } from "@/lib/transactions/accountLookup";
 import { isPlaidClientEnabled } from "@/lib/plaid/clientConfig";
+import { summarizeUserSyncResults } from "@/lib/plaid/syncFreshness";
 import { cn } from "@/components/ui/cn";
 
 function TransactionsContentInner() {
@@ -84,21 +85,10 @@ function TransactionsContentInner() {
   const handleSyncNow = useCallback(async () => {
     try {
       const results = await syncBank();
-      const added = results.reduce(
-        (sum, result) => sum + result.transactionsAdded,
-        0,
-      );
-      const backfilled = results.reduce(
-        (sum, result) => sum + (result.diagnostics?.backfill?.inserted ?? 0),
-        0,
-      );
-
+      const summary = summarizeUserSyncResults(results);
       showToast({
-        title: added + backfilled > 0 ? "Bank sync complete" : "Sync finished",
-        subtitle:
-          added + backfilled > 0
-            ? `Imported ${added + backfilled} transaction${added + backfilled === 1 ? "" : "s"}.`
-            : "No new transactions yet. If you just linked a credit card, wait a minute and sync again.",
+        title: summary.title,
+        subtitle: summary.subtitle,
       });
     } catch (error) {
       showToast({

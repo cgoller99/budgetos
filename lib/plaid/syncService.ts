@@ -1,7 +1,8 @@
 import "server-only";
 
-import type { Transaction } from "plaid";
+import type { AccountBase, Item, Transaction } from "plaid";
 import {
+  extractPlaidError,
   getPlaidClient,
   getPlaidErrorMessage,
   isPlaidItemLoginRequired,
@@ -16,6 +17,11 @@ import {
   summarizePlaidAccountMapping,
 } from "@/lib/plaid/mappers";
 import { decryptConnectionAccessToken } from "@/lib/plaid/plaidService";
+import {
+  shouldRequestTransactionsRefresh,
+  shouldUseLiveBalances,
+  type PlaidSyncTrigger,
+} from "@/lib/plaid/syncFreshness";
 import {
   backfillHistoricalTransactions,
   selectAccountsNeedingBackfill,
@@ -100,17 +106,68 @@ async function ensureInitialSyncWindow(accessToken: string): Promise<void> {
   });
 }
 
-async function requestTransactionsRefresh(accessToken: string): Promise<boolean> {
+async function requestTransactionsRefresh(accessToken: string): Promise<{
+  requested: boolean;
+  unavailable: boolean;
+}> {
   try {
     const client = getPlaidClient();
     await client.transactionsRefresh({ access_token: accessToken });
-    return true;
+    return { requested: true, unavailable: false };
   } catch (error) {
+    const code = extractPlaidError(error)?.error_code ?? "";
+    const unavailable =
+      code === "PRODUCTS_NOT_SUPPORTED" ||
+      code === "INVALID_PRODUCT" ||
+      code === "ADDITIONAL_CONSENT_REQUIRED" ||
+      /not.*enabled|not supported|not subscribed/i.test(
+        getPlaidErrorMessage(error),
+      );
+
     console.warn("[plaid/sync] transactionsRefresh failed", {
       message: getPlaidErrorMessage(error),
+      code: code || null,
+      unavailable,
     });
-    return false;
+
+    return { requested: false, unavailable };
   }
+}
+
+async function fetchAccountsSnapshot(params: {
+  accessToken: string;
+  preferLiveBalances: boolean;
+}): Promise<{
+  accounts: AccountBase[];
+  item: Item;
+  liveBalances: boolean;
+}> {
+  const client = getPlaidClient();
+
+  if (params.preferLiveBalances) {
+    try {
+      const live = await client.accountsBalanceGet({
+        access_token: params.accessToken,
+      });
+      return {
+        accounts: live.data.accounts,
+        item: live.data.item,
+        liveBalances: true,
+      };
+    } catch (error) {
+      console.warn("[plaid/sync] accountsBalanceGet failed; falling back to accountsGet", {
+        message: getPlaidErrorMessage(error),
+        code: extractPlaidError(error)?.error_code ?? null,
+      });
+    }
+  }
+
+  const cached = await client.accountsGet({ access_token: params.accessToken });
+  return {
+    accounts: cached.data.accounts,
+    item: cached.data.item,
+    liveBalances: false,
+  };
 }
 
 async function resolveInstitutionName(params: {
@@ -275,6 +332,7 @@ async function syncPlaidTransactions(params: {
   accountIdMap: Map<string, string>;
   accountContextMap: Map<string, Pick<PlaidMappedAccount, "recordKind" | "type">>;
   newAccountExternalIds: string[];
+  trigger: PlaidSyncTrigger;
 }): Promise<{
   added: number;
   modified: number;
@@ -283,6 +341,7 @@ async function syncPlaidTransactions(params: {
   nextCursor: string | null;
   pendingError: string | null;
   refreshRequested: boolean;
+  refreshUnavailable: boolean;
   syncAttempts: number;
   fetchedFromPlaid: number;
   addedFromPlaid: number;
@@ -290,13 +349,19 @@ async function syncPlaidTransactions(params: {
   removedFromPlaid: number;
 }> {
   const shouldPrimeInitialWindow = !params.connection.transactions_cursor;
-  const shouldForceRefresh =
-    params.newAccountExternalIds.length > 0 || shouldPrimeInitialWindow;
+  const shouldForceRefresh = shouldRequestTransactionsRefresh({
+    trigger: params.trigger,
+    hasCursor: Boolean(params.connection.transactions_cursor),
+    hasNewAccounts: params.newAccountExternalIds.length > 0,
+  });
 
   let refreshRequested = false;
+  let refreshUnavailable = false;
 
   if (shouldForceRefresh) {
-    refreshRequested = await requestTransactionsRefresh(params.accessToken);
+    const refresh = await requestTransactionsRefresh(params.accessToken);
+    refreshRequested = refresh.requested;
+    refreshUnavailable = refresh.unavailable;
     if (refreshRequested) {
       await sleep(SYNC_RETRY_DELAY_MS);
     }
@@ -318,8 +383,9 @@ async function syncPlaidTransactions(params: {
 
   while (needsRetry() && syncAttempts < MAX_SYNC_ATTEMPTS) {
     syncAttempts += 1;
-    refreshRequested =
-      (await requestTransactionsRefresh(params.accessToken)) || refreshRequested;
+    const refresh = await requestTransactionsRefresh(params.accessToken);
+    refreshRequested = refresh.requested || refreshRequested;
+    refreshUnavailable = refresh.unavailable || refreshUnavailable;
     await sleep(SYNC_RETRY_DELAY_MS * syncAttempts);
     latest = await syncPlaidTransactionsOnce({
       ...params,
@@ -335,6 +401,7 @@ async function syncPlaidTransactions(params: {
     nextCursor: latest.nextCursor,
     pendingError: latest.pendingError,
     refreshRequested,
+    refreshUnavailable,
     syncAttempts,
     fetchedFromPlaid: latest.fetchedFromPlaid,
     addedFromPlaid: latest.addedFromPlaid,
@@ -352,6 +419,7 @@ function buildSyncDiagnostics(params: {
   transactionResult: Awaited<ReturnType<typeof syncPlaidTransactions>>;
   transactionCounts: Map<string, number>;
   backfillResult: PlaidTransactionBackfillResult | null;
+  liveBalances: boolean;
 }): PlaidSyncDiagnostics {
   const inserted = new Set(params.insertedExternalIds);
 
@@ -378,6 +446,8 @@ function buildSyncDiagnostics(params: {
       pending: Boolean(params.transactionResult.pendingError),
       pendingError: params.transactionResult.pendingError,
       refreshRequested: params.transactionResult.refreshRequested,
+      refreshUnavailable: params.transactionResult.refreshUnavailable,
+      liveBalances: params.liveBalances,
       syncAttempts: params.transactionResult.syncAttempts,
     },
     persisted: {
@@ -406,25 +476,29 @@ export async function syncPlaidConnection(params: {
   supabase: BuxmeSupabaseClient;
   userId: string;
   connection: BankConnectionRow;
+  trigger?: PlaidSyncTrigger;
 }): Promise<PlaidSyncResult> {
   const { supabase, userId, connection } = params;
+  const trigger = params.trigger ?? "webhook";
   const repository = new BankConnectionsRepository(supabase);
   const householdId = await resolveUserHouseholdId(supabase, userId);
   const accessToken = decryptConnectionAccessToken(connection);
 
   try {
-    const client = getPlaidClient();
     const priorExternalAccountIds =
       await repository.listExternalAccountIdsForConnection(userId, connection.id);
-    const accountsResponse = await client.accountsGet({ access_token: accessToken });
-    const itemId = accountsResponse.data.item.item_id;
+    const accountsSnapshot = await fetchAccountsSnapshot({
+      accessToken,
+      preferLiveBalances: shouldUseLiveBalances(trigger),
+    });
+    const itemId = accountsSnapshot.item.item_id;
     const institutionName = await resolveInstitutionName({
       connection,
-      itemInstitutionId: accountsResponse.data.item.institution_id ?? null,
+      itemInstitutionId: accountsSnapshot.item.institution_id ?? null,
     });
     const institutionLogoUrl = connection.institution_logo_url;
 
-    const mappedAccounts = accountsResponse.data.accounts.map((account) =>
+    const mappedAccounts = accountsSnapshot.accounts.map((account) =>
       mapPlaidAccount({
         account,
         itemId,
@@ -437,6 +511,8 @@ export async function syncPlaidConnection(params: {
       connectionId: connection.id,
       userId,
       institutionName,
+      trigger,
+      liveBalances: accountsSnapshot.liveBalances,
       accounts: mappedAccounts.map((account) => ({
         externalAccountId: account.externalAccountId,
         name: account.name,
@@ -484,6 +560,7 @@ export async function syncPlaidConnection(params: {
       accountIdMap,
       accountContextMap,
       newAccountExternalIds,
+      trigger,
     });
 
     let transactionCounts = await repository.countTransactionsByAccountIds(
@@ -511,8 +588,14 @@ export async function syncPlaidConnection(params: {
         })),
       });
 
-      await requestTransactionsRefresh(accessToken);
-      await sleep(SYNC_RETRY_DELAY_MS);
+      const refresh = await requestTransactionsRefresh(accessToken);
+      if (refresh.requested) {
+        await sleep(SYNC_RETRY_DELAY_MS);
+      }
+      transactionResult.refreshRequested =
+        refresh.requested || transactionResult.refreshRequested;
+      transactionResult.refreshUnavailable =
+        refresh.unavailable || transactionResult.refreshUnavailable;
 
       backfillResult = await backfillHistoricalTransactions({
         accessToken,
@@ -535,6 +618,7 @@ export async function syncPlaidConnection(params: {
 
     let investmentsSynced = 0;
     let liabilitiesSynced = 0;
+    const client = getPlaidClient();
 
     try {
       const investmentsResponse = await client.investmentsHoldingsGet({
@@ -598,6 +682,7 @@ export async function syncPlaidConnection(params: {
       transactionResult,
       transactionCounts: transactionCountsForDiagnostics,
       backfillResult,
+      liveBalances: accountsSnapshot.liveBalances,
     });
 
     const newCreditAccountsWithoutTransactions = diagnostics.accounts.filter(
@@ -641,6 +726,13 @@ export async function syncPlaidConnection(params: {
       });
     }
 
+    const awaitingBankRefresh =
+      transactionResult.refreshRequested &&
+      transactionResult.added === 0 &&
+      transactionResult.modified === 0 &&
+      !transactionResult.pendingError &&
+      newCreditAccountsWithoutTransactions.length === 0;
+
     await repository.markConnectionSynced({
       connectionId: connection.id,
       userId,
@@ -651,11 +743,17 @@ export async function syncPlaidConnection(params: {
           ? "TRANSACTIONS_PENDING"
           : transactionResult.pendingError
             ? "TRANSACTIONS_PENDING"
-            : null,
+            : awaitingBankRefresh
+              ? "BANK_REFRESH_PENDING"
+              : null,
       errorMessage:
         newCreditAccountsWithoutTransactions.length > 0
           ? "Credit card transactions are still syncing. Tap Sync now again in a minute."
-          : transactionResult.pendingError,
+          : transactionResult.pendingError
+            ? transactionResult.pendingError
+            : awaitingBankRefresh
+              ? "Requested a fresh pull from your bank. New activity usually appears within a few minutes."
+              : null,
     });
 
     console.info("[plaid/sync] connection synced", {
@@ -666,6 +764,7 @@ export async function syncPlaidConnection(params: {
       transactionsModified: transactionResult.modified,
       syncAttempts: transactionResult.syncAttempts,
       refreshRequested: transactionResult.refreshRequested,
+      liveBalances: accountsSnapshot.liveBalances,
       diagnostics,
     });
 
@@ -700,6 +799,7 @@ export async function syncPlaidForUser(params: {
   supabase: BuxmeSupabaseClient;
   userId: string;
   connectionId?: string;
+  trigger?: PlaidSyncTrigger;
 }): Promise<PlaidSyncResult[]> {
   const repository = new BankConnectionsRepository(params.supabase);
   const connections = params.connectionId
@@ -720,6 +820,7 @@ export async function syncPlaidForUser(params: {
         supabase: params.supabase,
         userId: params.userId,
         connection,
+        trigger: params.trigger ?? "webhook",
       }),
     );
   }

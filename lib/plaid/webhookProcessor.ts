@@ -78,6 +78,7 @@ export async function processPlaidWebhookEvent(params: {
       supabase,
       userId: connection.user_id,
       connectionId: connection.id,
+      trigger: "webhook",
     });
 
     return {
@@ -95,16 +96,22 @@ export async function processPlaidWebhookEvent(params: {
       webhookCode === "PENDING_EXPIRATION" ||
       webhookCode === "USER_PERMISSION_REVOKED")
   ) {
+    const plaidErrorCode = event.error?.error_code?.trim() || webhookCode;
+    const isExpiring = webhookCode === "PENDING_EXPIRATION";
+
     await repository.markConnectionSynced({
       connectionId: connection.id,
       userId: connection.user_id,
       transactionsCursor: connection.transactions_cursor,
-      status: "error",
-      errorCode: webhookCode,
-      errorMessage:
-        webhookCode === "USER_PERMISSION_REVOKED"
+      // Pending expiration is a warning — keep syncing until the bank actually revokes access.
+      status: isExpiring ? "connected" : "error",
+      errorCode: plaidErrorCode,
+      errorMessage: isExpiring
+        ? "Bank access expires soon. Reconnect to keep balances and transactions updating."
+        : webhookCode === "USER_PERMISSION_REVOKED"
           ? "Bank access was revoked. Reconnect to continue syncing."
-          : "Bank connection requires re-authentication.",
+          : event.error?.error_message?.trim() ||
+            "Bank connection requires re-authentication.",
     });
 
     return {

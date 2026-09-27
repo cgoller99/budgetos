@@ -22,6 +22,7 @@
     "audit:public-launch": "node scripts/audit-production-remote.mjs --public-launch",
     "test:income-annualization": "node scripts/test-income-annualization.mjs",
     "test:plaid-credit-mapping": "node scripts/test-plaid-credit-mapping.mjs",
+    "test:plaid-sync-freshness": "node scripts/test-plaid-sync-freshness.mjs",
     "test:onboarding-progress": "node scripts/test-onboarding-progress.mjs",
     "test:recurring-bill-detection": "node scripts/test-recurring-bill-detection.mjs",
     "test:finance-calculations": "node scripts/test-finance-calculations.mjs",

@@ -1,4 +1,5 @@
 import type { Account, BankConnection, Debt, FinanceData } from "@/lib/finance/types";
+import { classifyConnectionFreshness } from "@/lib/plaid/syncFreshness";
 import { hasLinkedFinancialAccounts } from "@/lib/transactions/accountLookup";
 
 export type PlaidConnectionUiPhase = "loading" | "empty" | "connected";
@@ -9,24 +10,16 @@ export type PlaidConnectionUiState = {
   activeConnections: BankConnection[];
   /** Connections that need user attention (Plaid error / login required). */
   reconnectConnections: BankConnection[];
+  /** Connected, but fresh bank data is still pending. */
+  pendingConnections: BankConnection[];
+  /** Access will expire soon — reconnect recommended. */
+  expiringConnections: BankConnection[];
   /** True when at least one healthy linked institution/account exists. */
   hasHealthyLink: boolean;
 };
 
 function isReconnectConnection(connection: BankConnection): boolean {
-  if (connection.status === "error") {
-    return true;
-  }
-
-  const code = (connection.errorCode ?? "").toUpperCase();
-  const message = (connection.errorMessage ?? "").toLowerCase();
-
-  return (
-    code.includes("ITEM_LOGIN_REQUIRED") ||
-    code.includes("LOGIN_REQUIRED") ||
-    message.includes("reconnect") ||
-    message.includes("login required")
-  );
+  return classifyConnectionFreshness(connection) === "reconnect";
 }
 
 /**
@@ -44,6 +37,8 @@ export function getPlaidConnectionUiState(input: {
       phase: "loading",
       activeConnections: [],
       reconnectConnections: [],
+      pendingConnections: [],
+      expiringConnections: [],
       hasHealthyLink: false,
     };
   }
@@ -52,6 +47,12 @@ export function getPlaidConnectionUiState(input: {
     (connection) => connection.status !== "disconnected",
   );
   const reconnectConnections = activeConnections.filter(isReconnectConnection);
+  const pendingConnections = activeConnections.filter(
+    (connection) => classifyConnectionFreshness(connection) === "pending",
+  );
+  const expiringConnections = activeConnections.filter(
+    (connection) => classifyConnectionFreshness(connection) === "expiring",
+  );
   const linked = hasLinkedFinancialAccounts({
     bankConnections: input.bankConnections,
     accounts: input.accounts,
@@ -69,6 +70,8 @@ export function getPlaidConnectionUiState(input: {
       phase: "connected",
       activeConnections,
       reconnectConnections,
+      pendingConnections,
+      expiringConnections,
       hasHealthyLink: hasHealthyLink || linked,
     };
   }
@@ -77,6 +80,8 @@ export function getPlaidConnectionUiState(input: {
     phase: "empty",
     activeConnections,
     reconnectConnections,
+    pendingConnections,
+    expiringConnections,
     hasHealthyLink: false,
   };
 }

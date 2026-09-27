@@ -99,6 +99,7 @@ export async function POST(request: Request) {
         supabase: createSupabaseAdminClient(),
         userId: auth.user.id,
         connection,
+        trigger: "initial",
       });
 
       console.info("[plaid/exchange] success", {

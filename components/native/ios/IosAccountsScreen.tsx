@@ -207,6 +207,47 @@ export function IosAccountsScreen() {
         </IosSection>
       ) : null}
 
+      {plaidEnabled && connection.expiringConnections.length > 0 ? (
+        <IosSection title="Expiring Soon">
+          {connection.expiringConnections.map((item) => (
+            <IosBanner
+              key={item.id}
+              tone="warning"
+              title={`${item.institutionName ?? "Bank"} access expires soon`}
+              subtitle={
+                item.errorMessage ??
+                "Reconnect to keep balances and transactions updating"
+              }
+              action={
+                <BankSyncConnect
+                  connectionId={item.id}
+                  mode="update"
+                  compact
+                  inline
+                  buttonLabel="Reconnect"
+                />
+              }
+            />
+          ))}
+        </IosSection>
+      ) : null}
+
+      {plaidEnabled && connection.pendingConnections.length > 0 ? (
+        <IosSection title="Updating">
+          {connection.pendingConnections.map((item) => (
+            <IosBanner
+              key={item.id}
+              tone="accent"
+              title={`${item.institutionName ?? "Bank"} is updating`}
+              subtitle={
+                item.errorMessage ??
+                "Fresh transactions usually appear within a few minutes"
+              }
+            />
+          ))}
+        </IosSection>
+      ) : null}
+
       {groups.length === 0 && connection.phase !== "empty" ? (
         <IosCard padding="md">
           <p className="text-[15px] font-semibold text-[var(--foreground)]">

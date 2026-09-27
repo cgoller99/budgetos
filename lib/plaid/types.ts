@@ -28,6 +28,8 @@ export type PlaidSyncDiagnostics = {
     pending: boolean;
     pendingError: string | null;
     refreshRequested: boolean;
+    refreshUnavailable: boolean;
+    liveBalances: boolean;
     syncAttempts: number;
   };
   persisted: {
