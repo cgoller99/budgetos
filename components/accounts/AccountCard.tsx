@@ -10,6 +10,7 @@ import {
 } from "@/lib/finance/accountTypes";
 import { formatCurrency } from "@/lib/finance/format";
 import type { Account } from "@/lib/finance/types";
+import { formatAccountSyncLabel } from "@/lib/plaid/formatSyncLabel";
 import { cn } from "@/components/ui/cn";
 
 type AccountCardProps = {
@@ -70,9 +71,9 @@ export function AccountCard({ account, onEdit, onDelete }: AccountCardProps) {
           {isLiability ? "-" : ""}
           {formatCurrency(account.balance)}
         </p>
-        {account.isPlaidLinked && account.lastSyncedAt ? (
+        {account.isPlaidLinked ? (
           <p className="mt-1.5 text-[11px] text-[var(--text-muted)]">
-            Synced {new Date(account.lastSyncedAt).toLocaleString()}
+            {formatAccountSyncLabel(account.lastSyncedAt)}
           </p>
         ) : null}
       </CardContent>

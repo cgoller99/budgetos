@@ -253,14 +253,19 @@ function auditSyncPipelines() {
 
   const checks = [
     { ok: sync.includes("accountsGet"), pass: "Balance/account sync: accountsGet", fail: "Missing accountsGet for balance sync" },
+    { ok: sync.includes("accountsBalanceGet"), pass: "User sync can request live accountsBalanceGet", fail: "Missing accountsBalanceGet for user-initiated live balances" },
+    { ok: sync.includes("shouldUseLiveBalances"), pass: "Live balance preference is trigger-gated", fail: "Missing shouldUseLiveBalances gate" },
     { ok: sync.includes("upsertLinkedAccounts"), pass: "Balance/account sync: upsertLinkedAccounts", fail: "Missing upsertLinkedAccounts" },
     { ok: mappers.includes("balances.current"), pass: "Balance mapping: current balance", fail: "Missing current balance mapping" },
     { ok: sync.includes("transactionsSync"), pass: "Transaction sync: transactionsSync", fail: "Missing transactionsSync" },
+    { ok: sync.includes("transactionsRefresh"), pass: "Optional transactionsRefresh for user/initial sync", fail: "Missing transactionsRefresh" },
     { ok: sync.includes("persistSyncedTransactions"), pass: "Transaction sync: persistSyncedTransactions", fail: "Missing persistSyncedTransactions" },
     { ok: sync.includes("investmentsHoldingsGet"), pass: "Investments sync: investmentsHoldingsGet", fail: "Missing investmentsHoldingsGet" },
     { ok: sync.includes("upsertInvestmentHoldings"), pass: "Investments sync: upsertInvestmentHoldings", fail: "Missing upsertInvestmentHoldings" },
     { ok: sync.includes("liabilitiesGet"), pass: "Liabilities sync: liabilitiesGet", fail: "Missing liabilitiesGet" },
     { ok: sync.includes("detectPlaidRecurringCandidates") || fs.existsSync(path.join(ROOT, "lib/plaid/recurringDetectionService.ts")), pass: "Recurring transaction detection present", fail: "Missing recurring detection" },
+    { ok: read("app/api/plaid/sync/route.ts").includes('trigger: "user"'), pass: "Manual sync API marks trigger=user", fail: "Manual sync API missing trigger=user" },
+    { ok: read("lib/plaid/webhookProcessor.ts").includes('trigger: "webhook"'), pass: "Webhook sync marks trigger=webhook", fail: "Webhook sync missing trigger=webhook" },
   ];
 
   for (const check of checks) {

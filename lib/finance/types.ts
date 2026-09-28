@@ -359,6 +359,8 @@ export type BankConnection = {
   institutionId?: string | null;
   externalItemId?: string | null;
   lastSyncedAt: string | null;
+  /** When /accounts/balance/get last succeeded. Absent means balances were not live-checked. */
+  balancesCheckedAt?: string | null;
   errorCode?: string | null;
   errorMessage?: string | null;
 };

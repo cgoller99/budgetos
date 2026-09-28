@@ -505,6 +505,8 @@ export type BankConnectionRow = {
   error_code: string | null;
   error_message: string | null;
   last_synced_at: string | null;
+  transactions_refresh_requested_at?: string | null;
+  balances_checked_at?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -527,6 +529,8 @@ export type BankConnectionInsert = {
   error_code?: string | null;
   error_message?: string | null;
   last_synced_at?: string | null;
+  transactions_refresh_requested_at?: string | null;
+  balances_checked_at?: string | null;
   created_at?: string;
   updated_at?: string;
 };

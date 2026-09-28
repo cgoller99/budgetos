@@ -11,15 +11,25 @@ import { Button, EmptyState, PageHeader, SkeletonGrid } from "@/components/ui";
 import { PreferenceToggle } from "@/components/ui/PreferenceToggle";
 import { pageContainerWideClassName } from "@/components/ui/tokens";
 import { useFinance } from "@/context/FinanceContext";
+import { useToast } from "@/context/ToastContext";
 import { isAccountVisible } from "@/lib/finance/accountPreferences";
 import { getPlaidConnectionUiState } from "@/lib/native/plaidConnectionUi";
 import { useNativeIos } from "@/lib/native/useNativeIos";
 import { isPlaidClientEnabled } from "@/lib/plaid/clientConfig";
+import { summarizeUserSyncResults } from "@/lib/plaid/syncFreshness";
 import { cn } from "@/components/ui/cn";
 
 export function AccountsContent() {
   const finance = useFinance();
-  const { accounts, isLoading, bankConnections, debts } = finance;
+  const {
+    accounts,
+    isLoading,
+    bankConnections,
+    debts,
+    syncBank,
+    isSyncing,
+  } = finance;
+  const { showToast } = useToast();
   const nativeIos = useNativeIos();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editAccountId, setEditAccountId] = useState<string | null>(null);
@@ -58,6 +68,22 @@ export function AccountsContent() {
 
   const hiddenCount = accounts.length - accounts.filter(isAccountVisible).length;
 
+  const handleSyncNow = async () => {
+    try {
+      const results = await syncBank();
+      const summary = summarizeUserSyncResults(results);
+      showToast({
+        title: summary.title,
+        subtitle: summary.subtitle,
+      });
+    } catch (error) {
+      showToast({
+        title: "Sync failed",
+        subtitle: error instanceof Error ? error.message : "Try reconnecting.",
+      });
+    }
+  };
+
   if (nativeIos) {
     return <IosAccountsScreen />;
   }
@@ -70,7 +96,18 @@ export function AccountsContent() {
     <div className={cn(pageContainerWideClassName)}>
       <PageHeader
         action={
-          <Button onClick={() => setIsModalOpen(true)}>Add account</Button>
+          <div className="flex flex-wrap gap-2">
+            {plaidEnabled && connection.phase === "connected" ? (
+              <Button
+                variant="secondary"
+                disabled={isSyncing}
+                onClick={() => void handleSyncNow()}
+              >
+                {isSyncing ? "Syncing..." : "Sync now"}
+              </Button>
+            ) : null}
+            <Button onClick={() => setIsModalOpen(true)}>Add account</Button>
+          </div>
         }
       />
 
@@ -100,6 +137,47 @@ export function AccountsContent() {
                 buttonLabel="Reconnect"
               />
             </div>
+          ))}
+        </div>
+      ) : null}
+
+      {plaidEnabled && connection.expiringConnections.length > 0 ? (
+        <div className="mb-5 space-y-3 rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-4">
+          <p className="text-sm font-medium text-white">Bank access expiring</p>
+          {connection.expiringConnections.map((item) => (
+            <div
+              key={item.id}
+              className="flex flex-wrap items-center justify-between gap-3"
+            >
+              <div>
+                <p className="text-sm text-white/90">
+                  {item.institutionName ?? "Linked institution"}
+                </p>
+                <p className="text-xs text-white/45">
+                  {item.errorMessage ??
+                    "Reconnect soon to keep balances and transactions updating."}
+                </p>
+              </div>
+              <BankSyncConnect
+                connectionId={item.id}
+                mode="update"
+                compact
+                buttonLabel="Reconnect"
+              />
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {plaidEnabled && connection.pendingConnections.length > 0 ? (
+        <div className="mb-5 space-y-2 rounded-2xl border border-sky-500/20 bg-sky-500/10 px-4 py-4">
+          <p className="text-sm font-medium text-white">Fresh data pending</p>
+          {connection.pendingConnections.map((item) => (
+            <p key={item.id} className="text-xs text-white/55">
+              {item.institutionName ?? "Linked institution"}:{" "}
+              {item.errorMessage ??
+                "Your bank is still updating. New activity usually appears within a few minutes."}
+            </p>
           ))}
         </div>
       ) : null}

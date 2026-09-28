@@ -34,6 +34,7 @@ export async function POST(request: Request) {
       supabase: createSupabaseAdminClient(),
       userId: auth.user.id,
       connectionId: body.connectionId,
+      trigger: "user",
     });
 
     return NextResponse.json({ ok: true, results });

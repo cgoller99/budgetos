@@ -28,6 +28,16 @@ const helperSrc = fs.readFileSync(
 );
 assert.match(helperSrc, /hasLinkedFinancialAccounts/);
 assert.match(helperSrc, /never transaction presence/i);
+assert.match(helperSrc, /pendingConnections/);
+assert.match(helperSrc, /expiringConnections/);
 assert.doesNotMatch(helperSrc, /input\.transactions|finance\.transactions/);
+
+const accountsSrcAfter = fs.readFileSync(
+  path.join(ROOT, "components/accounts/AccountsContent.tsx"),
+  "utf8",
+);
+assert.match(accountsSrcAfter, /pendingConnections/);
+assert.match(accountsSrcAfter, /Fresh data pending/);
+assert.match(accountsSrcAfter, /Sync now/);
 
 console.log("✅ Connect Bank UI gating checks passed.");

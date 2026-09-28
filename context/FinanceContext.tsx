@@ -432,6 +432,23 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
   }, [household?.id, refreshFinance]);
 
   useEffect(() => {
+    if (typeof document === "undefined") {
+      return;
+    }
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        void refreshFinance();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [refreshFinance]);
+
+  useEffect(() => {
     let cancelled = false;
 
     async function initializeFinance() {

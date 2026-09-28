@@ -9,6 +9,11 @@ import { DEBT_ACCOUNT_TYPE_LABELS } from "@/lib/finance/debts";
 import { formatCurrency } from "@/lib/finance/format";
 import type { Account, BankConnection, Debt } from "@/lib/finance/types";
 import { isPlaidClientEnabled } from "@/lib/plaid/clientConfig";
+import { formatBankCheckedLabel } from "@/lib/plaid/formatSyncLabel";
+import {
+  classifyConnectionFreshness,
+  summarizeUserSyncResults,
+} from "@/lib/plaid/syncFreshness";
 
 type LinkedAccountItem = {
   id: string;
@@ -109,8 +114,8 @@ function ConnectionAccounts({
               <p className="text-xs text-white/35">
                 {item.typeLabel}
                 {item.lastSyncedAt
-                  ? ` • Last synced ${formatSyncTime(item.lastSyncedAt)}`
-                  : ""}
+                  ? ` • Synced ${formatSyncTime(item.lastSyncedAt)}`
+                  : " • Not synced yet"}
               </p>
             </div>
           </div>
@@ -146,29 +151,55 @@ function ConnectedInstitutionCard({
   isSyncing: boolean;
 }) {
   const [showReconnect, setShowReconnect] = useState(false);
+  const freshness = classifyConnectionFreshness(connection);
   const statusVariant =
-    connection.status === "connected"
-      ? "success"
-      : connection.status === "error"
+    freshness === "reconnect"
+      ? "warning"
+      : freshness === "pending" || freshness === "expiring"
         ? "warning"
-        : "default";
+        : connection.status === "connected"
+          ? "success"
+          : "default";
+  const statusLabel =
+    freshness === "reconnect"
+      ? "Reconnect needed"
+      : freshness === "pending"
+        ? "Update pending"
+        : freshness === "expiring"
+          ? "Expiring soon"
+          : connection.status;
 
   return (
     <Card padding="lg">
       <CardHeader
         title={connection.institutionName ?? "Linked institution"}
-        action={
-          <Badge variant={statusVariant}>
-            {connection.status === "error" ? "Reconnect needed" : connection.status}
-          </Badge>
-        }
+        action={<Badge variant={statusVariant}>{statusLabel}</Badge>}
       />
       <CardContent className="space-y-4">
         <p className="text-sm text-white/45">
-          Last synced {formatSyncTime(connection.lastSyncedAt)}
+          {connection.lastSyncedAt
+            ? `Synced ${formatSyncTime(connection.lastSyncedAt)}`
+            : "Not synced yet"}
         </p>
+        {formatBankCheckedLabel(connection.balancesCheckedAt) ? (
+          <p className="text-sm text-white/45">
+            {formatBankCheckedLabel(connection.balancesCheckedAt)}
+          </p>
+        ) : connection.lastSyncedAt ? (
+          <p className="text-xs text-white/35">
+            Balances are from Plaid&apos;s saved data, not a live bank check.
+          </p>
+        ) : null}
         {connection.errorMessage && (
-          <p className="text-sm text-amber-300">{connection.errorMessage}</p>
+          <p
+            className={
+              freshness === "pending"
+                ? "text-sm text-sky-300"
+                : "text-sm text-amber-300"
+            }
+          >
+            {connection.errorMessage}
+          </p>
         )}
         <ConnectionAccounts items={items} />
         <div className="flex flex-wrap gap-2">
@@ -253,10 +284,11 @@ export function ConnectedInstitutionsSection() {
 
   const handleSync = async (connectionId: string) => {
     try {
-      await syncBank(connectionId);
+      const results = await syncBank(connectionId);
+      const summary = summarizeUserSyncResults(results);
       showToast({
-        title: "Bank sync complete",
-        subtitle: "Balances and transactions were refreshed.",
+        title: summary.title,
+        subtitle: summary.subtitle,
       });
     } catch (error) {
       showToast({
