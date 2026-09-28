@@ -31,6 +31,7 @@ const {
   shouldRequestTransactionsRefresh,
   classifyConnectionFreshness,
   summarizeUserSyncResults,
+  liveBalancesFromBalanceGet,
 } = await import(pathToFileURL(OUT).href);
 
 const syncService = fs.readFileSync(
@@ -98,33 +99,42 @@ assert.match(
 assert.equal(shouldUseLiveBalances("user"), true);
 assert.equal(shouldUseLiveBalances("initial"), true);
 assert.equal(shouldUseLiveBalances("webhook"), false);
+assert.equal(liveBalancesFromBalanceGet("success"), true);
+assert.equal(liveBalancesFromBalanceGet("failed"), false);
+assert.equal(liveBalancesFromBalanceGet("skipped"), false);
 
-assert.equal(
+assert.deepEqual(
   shouldRequestTransactionsRefresh({
     trigger: "user",
     hasCursor: true,
     hasNewAccounts: false,
   }),
-  true,
-  "User Sync now must request transactions/refresh",
+  { request: true, skippedBecauseCooldown: false },
 );
-assert.equal(
+assert.deepEqual(
   shouldRequestTransactionsRefresh({
     trigger: "webhook",
     hasCursor: true,
     hasNewAccounts: false,
   }),
-  false,
-  "Webhook must not force another bank pull when cursor already exists",
+  { request: false, skippedBecauseCooldown: false },
 );
-assert.equal(
+assert.deepEqual(
   shouldRequestTransactionsRefresh({
-    trigger: "webhook",
-    hasCursor: false,
+    trigger: "user",
+    hasCursor: true,
     hasNewAccounts: false,
+    lastRefreshRequestedAt: new Date().toISOString(),
+    nowMs: Date.now(),
   }),
-  true,
-  "First webhook sync without cursor may still prime refresh",
+  { request: false, skippedBecauseCooldown: true },
+);
+
+const refreshCalls = syncService.match(/await requestTransactionsRefresh\(/g) ?? [];
+assert.equal(
+  refreshCalls.length,
+  1,
+  "A single sync may call /transactions/refresh at most once",
 );
 
 assert.equal(
@@ -182,7 +192,8 @@ const pendingSummary = summarizeUserSyncResults([
         pendingError: null,
         refreshRequested: true,
         refreshUnavailable: false,
-        liveBalances: true,
+        refreshSkippedCooldown: false,
+        liveBalances: false,
         syncAttempts: 1,
       },
       persisted: { inserted: 0, updated: 0, deleted: 0, skipped: [] },
@@ -192,5 +203,19 @@ const pendingSummary = summarizeUserSyncResults([
 ]);
 assert.equal(pendingSummary.title, "Refresh requested");
 assert.match(pendingSummary.subtitle, /few minutes/i);
+assert.match(pendingSummary.subtitle, /cached copy/i);
+assert.doesNotMatch(pendingSummary.subtitle, /checked with your bank/i);
+
+const accountCard = fs.readFileSync(
+  path.join(ROOT, "components/accounts/AccountCard.tsx"),
+  "utf8",
+);
+const labelSource = fs.readFileSync(
+  path.join(ROOT, "lib/plaid/formatSyncLabel.ts"),
+  "utf8",
+);
+assert.match(labelSource, /Synced /);
+assert.doesNotMatch(labelSource, /Updated /);
+assert.match(accountCard, /formatAccountSyncLabel/);
 
 console.log("✓ Plaid sync freshness regressions passed");

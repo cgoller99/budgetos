@@ -11,7 +11,28 @@ export function formatAccountSyncLabel(
     return "Never synced";
   }
 
-  return `Updated ${date.toLocaleString("en-US", {
+  return `Synced ${date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  })}`;
+}
+
+export function formatBankCheckedLabel(
+  balancesCheckedAt: string | null | undefined,
+): string | null {
+  if (!balancesCheckedAt) {
+    return null;
+  }
+
+  const date = new Date(balancesCheckedAt);
+
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return `Bank checked ${date.toLocaleString("en-US", {
     month: "short",
     day: "numeric",
     hour: "numeric",

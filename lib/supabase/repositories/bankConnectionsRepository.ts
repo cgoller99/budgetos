@@ -48,6 +48,7 @@ export function mapBankConnectionRow(row: BankConnectionRow): BankConnection {
     institutionId: row.institution_id,
     externalItemId: row.external_item_id,
     lastSyncedAt: row.last_synced_at,
+    balancesCheckedAt: row.balances_checked_at ?? null,
     errorCode: row.error_code,
     errorMessage: row.error_message,
   };
@@ -186,19 +187,49 @@ export class BankConnectionsRepository {
     status: BankConnectionStatus;
     errorCode: string | null;
     errorMessage: string | null;
+    transactionsRefreshRequestedAt?: string;
+    balancesCheckedAt?: string;
   }): Promise<void> {
-    const { error } = await this.supabase
-      .from("bank_connections")
-      .update({
-        transactions_cursor: input.transactionsCursor,
-        status: input.status,
-        error_code: input.errorCode,
-        error_message: input.errorMessage,
-        last_synced_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", input.connectionId)
-      .eq("user_id", input.userId);
+    const timestamp = new Date().toISOString();
+    const payload: Partial<BankConnectionInsert> = {
+      transactions_cursor: input.transactionsCursor,
+      status: input.status,
+      error_code: input.errorCode,
+      error_message: input.errorMessage,
+      last_synced_at: timestamp,
+      updated_at: timestamp,
+    };
+
+    if (input.transactionsRefreshRequestedAt) {
+      payload.transactions_refresh_requested_at = input.transactionsRefreshRequestedAt;
+    }
+
+    if (input.balancesCheckedAt) {
+      payload.balances_checked_at = input.balancesCheckedAt;
+    }
+
+    const update = async (body: Partial<BankConnectionInsert>) =>
+      this.supabase
+        .from("bank_connections")
+        .update(body)
+        .eq("id", input.connectionId)
+        .eq("user_id", input.userId);
+
+    let { error } = await update(payload);
+
+    if (
+      error &&
+      (input.transactionsRefreshRequestedAt || input.balancesCheckedAt) &&
+      /transactions_refresh_requested_at|balances_checked_at|schema cache|PGRST204/i.test(
+        error.message ?? "",
+      )
+    ) {
+      const { transactions_refresh_requested_at: _refresh, balances_checked_at: _checked, ...fallback } =
+        payload;
+      void _refresh;
+      void _checked;
+      ({ error } = await update(fallback));
+    }
 
     if (error) {
       throw error;

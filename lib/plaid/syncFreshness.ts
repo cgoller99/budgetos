@@ -3,6 +3,9 @@ import type { PlaidSyncResult } from "@/lib/plaid/types";
 
 export type PlaidSyncTrigger = "webhook" | "user" | "initial";
 
+/** Minimum gap between billable /transactions/refresh calls for one Item. */
+export const TRANSACTIONS_REFRESH_MIN_INTERVAL_MS = 15 * 60 * 1000;
+
 export type ConnectionFreshnessKind =
   | "healthy"
   | "pending"
@@ -26,17 +29,65 @@ export function shouldUseLiveBalances(trigger: PlaidSyncTrigger): boolean {
   return trigger === "user" || trigger === "initial";
 }
 
+export function isTransactionsRefreshCoolingDown(params: {
+  lastRefreshRequestedAt?: string | null;
+  nowMs?: number;
+}): boolean {
+  if (!params.lastRefreshRequestedAt) {
+    return false;
+  }
+
+  const requestedAt = Date.parse(params.lastRefreshRequestedAt);
+
+  if (Number.isNaN(requestedAt)) {
+    return false;
+  }
+
+  return (
+    (params.nowMs ?? Date.now()) - requestedAt <
+    TRANSACTIONS_REFRESH_MIN_INTERVAL_MS
+  );
+}
+
+/**
+ * At most one /transactions/refresh per sync, and not again until the cooldown
+ * elapses. Webhook syncs with an existing cursor do not refresh: Plaid already
+ * has updates ready, and refresh does not make /transactions/sync contact the bank.
+ */
 export function shouldRequestTransactionsRefresh(params: {
   trigger: PlaidSyncTrigger;
   hasCursor: boolean;
   hasNewAccounts: boolean;
-}): boolean {
-  if (params.trigger === "user" || params.trigger === "initial") {
-    return true;
+  lastRefreshRequestedAt?: string | null;
+  nowMs?: number;
+}): { request: boolean; skippedBecauseCooldown: boolean } {
+  const wantsRefresh =
+    params.trigger === "user" ||
+    params.trigger === "initial" ||
+    params.hasNewAccounts ||
+    !params.hasCursor;
+
+  if (!wantsRefresh) {
+    return { request: false, skippedBecauseCooldown: false };
   }
 
-  // Webhook means Plaid already has updates ready — do not force another bank pull.
-  return params.hasNewAccounts || !params.hasCursor;
+  if (
+    isTransactionsRefreshCoolingDown({
+      lastRefreshRequestedAt: params.lastRefreshRequestedAt,
+      nowMs: params.nowMs,
+    })
+  ) {
+    return { request: false, skippedBecauseCooldown: true };
+  }
+
+  return { request: true, skippedBecauseCooldown: false };
+}
+
+/** True only when /accounts/balance/get itself succeeded. */
+export function liveBalancesFromBalanceGet(
+  outcome: "success" | "failed" | "skipped",
+): boolean {
+  return outcome === "success";
 }
 
 export function classifyConnectionFreshness(
@@ -81,9 +132,6 @@ export function summarizeUserSyncResults(results: PlaidSyncResult[]): {
     (sum, result) => sum + result.transactionsModified,
     0,
   );
-  const liveBalances = results.some(
-    (result) => result.diagnostics?.plaid.liveBalances === true,
-  );
   const refreshRequested = results.some(
     (result) => result.diagnostics?.plaid.refreshRequested === true,
   );
@@ -93,38 +141,53 @@ export function summarizeUserSyncResults(results: PlaidSyncResult[]): {
   const refreshUnavailable = results.some(
     (result) => result.diagnostics?.plaid.refreshUnavailable === true,
   );
+  const refreshCoolingDown = results.some(
+    (result) => result.diagnostics?.plaid.refreshSkippedCooldown === true,
+  );
+  const attemptedLive = results.filter(
+    (result) => result.diagnostics?.plaid.liveBalances !== undefined,
+  );
+  const allLive =
+    attemptedLive.length > 0 &&
+    attemptedLive.every((result) => result.diagnostics?.plaid.liveBalances === true);
+  const balanceNote = allLive
+    ? "Balances were checked with your bank."
+    : "Balances shown are Plaid's cached copy — the bank was not checked just now.";
 
   if (added > 0) {
     return {
       title: "Bank sync complete",
-      subtitle: `Imported ${added} transaction${added === 1 ? "" : "s"}${
-        liveBalances ? " and refreshed live balances" : ""
-      }.`,
+      subtitle: `Imported ${added} transaction${added === 1 ? "" : "s"}. ${balanceNote}`,
+    };
+  }
+
+  if (refreshCoolingDown && !refreshRequested) {
+    return {
+      title: "Sync finished",
+      subtitle: `A bank refresh was already requested in the last 15 minutes. ${balanceNote}`,
     };
   }
 
   if (pending || refreshRequested) {
     return {
       title: "Refresh requested",
-      subtitle:
-        "Balances were updated from Plaid. New transactions usually appear within a few minutes once your bank finishes updating.",
+      subtitle: `Asked your bank for newer transactions. They usually appear within a few minutes. ${balanceNote}`,
     };
   }
 
-  if (modified > 0 || liveBalances) {
+  if (modified > 0 || allLive) {
     return {
-      title: "Balances updated",
-      subtitle: liveBalances
-        ? "Live balances were pulled from your bank. No new transactions yet."
-        : "Account data was refreshed. No new transactions yet.",
+      title: allLive ? "Balances checked" : "Sync finished",
+      subtitle: allLive
+        ? "Balances were checked with your bank. No new transactions yet."
+        : `Saved the latest transactions Plaid already had. ${balanceNote}`,
     };
   }
 
   if (refreshUnavailable) {
     return {
       title: "Sync finished",
-      subtitle:
-        "Pulled the latest data Plaid already has. A forced bank refresh is not enabled for this Item.",
+      subtitle: `A forced bank refresh is not enabled for this connection. ${balanceNote}`,
     };
   }
 

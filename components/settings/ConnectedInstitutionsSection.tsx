@@ -9,6 +9,7 @@ import { DEBT_ACCOUNT_TYPE_LABELS } from "@/lib/finance/debts";
 import { formatCurrency } from "@/lib/finance/format";
 import type { Account, BankConnection, Debt } from "@/lib/finance/types";
 import { isPlaidClientEnabled } from "@/lib/plaid/clientConfig";
+import { formatBankCheckedLabel } from "@/lib/plaid/formatSyncLabel";
 import {
   classifyConnectionFreshness,
   summarizeUserSyncResults,
@@ -113,8 +114,8 @@ function ConnectionAccounts({
               <p className="text-xs text-white/35">
                 {item.typeLabel}
                 {item.lastSyncedAt
-                  ? ` • Last synced ${formatSyncTime(item.lastSyncedAt)}`
-                  : ""}
+                  ? ` • Synced ${formatSyncTime(item.lastSyncedAt)}`
+                  : " • Not synced yet"}
               </p>
             </div>
           </div>
@@ -176,8 +177,19 @@ function ConnectedInstitutionCard({
       />
       <CardContent className="space-y-4">
         <p className="text-sm text-white/45">
-          Last synced {formatSyncTime(connection.lastSyncedAt)}
+          {connection.lastSyncedAt
+            ? `Synced ${formatSyncTime(connection.lastSyncedAt)}`
+            : "Not synced yet"}
         </p>
+        {formatBankCheckedLabel(connection.balancesCheckedAt) ? (
+          <p className="text-sm text-white/45">
+            {formatBankCheckedLabel(connection.balancesCheckedAt)}
+          </p>
+        ) : connection.lastSyncedAt ? (
+          <p className="text-xs text-white/35">
+            Balances are from Plaid&apos;s saved data, not a live bank check.
+          </p>
+        ) : null}
         {connection.errorMessage && (
           <p
             className={

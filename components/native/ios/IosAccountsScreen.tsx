@@ -137,7 +137,7 @@ export function IosAccountsScreen() {
           value={formatCurrency(netWorth)}
           hint={
             connection.phase === "connected"
-              ? `Updated ${formatSyncLabel(latestSync)}`
+              ? `Synced ${formatSyncLabel(latestSync)}`
               : "Assets minus liabilities"
           }
         />
