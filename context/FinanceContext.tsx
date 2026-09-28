@@ -894,18 +894,23 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
 
   const disconnectPlaidAccount = useCallback(
     async (accountId: string, options: DeleteAccountOptions = {}) => {
-      const account = data.accounts.find((item) => item.id === accountId);
+      const linked =
+        data.accounts.find((item) => item.id === accountId) ??
+        data.debts.find((item) => item.id === accountId);
 
-      if (!account?.bankConnectionId) {
+      if (!linked?.bankConnectionId) {
         throw new Error("Account is not linked to Plaid.");
       }
 
-      const connectionId = account.bankConnectionId;
-      const removedAccountIds = new Set(
-        data.accounts
+      const connectionId = linked.bankConnectionId;
+      const removedAccountIds = new Set([
+        ...data.accounts
           .filter((item) => item.bankConnectionId === connectionId)
           .map((item) => item.id),
-      );
+        ...data.debts
+          .filter((item) => item.bankConnectionId === connectionId)
+          .map((item) => item.id),
+      ]);
 
       setIsSyncing(true);
 
@@ -919,6 +924,9 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
           coerceFinanceData({
             ...current,
             accounts: current.accounts.filter(
+              (item) => !removedAccountIds.has(item.id),
+            ),
+            debts: current.debts.filter(
               (item) => !removedAccountIds.has(item.id),
             ),
             transactions: options.deleteTransactions
@@ -959,7 +967,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
         setIsSyncing(false);
       }
     },
-    [data.accounts, refreshFinance, showToast],
+    [data.accounts, data.debts, refreshFinance, showToast],
   );
 
   const addIncome = useCallback(

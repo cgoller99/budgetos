@@ -156,6 +156,15 @@ export function AccountsContent() {
       <EditAccountModal
         account={editAccount}
         onClose={() => setEditAccountId(null)}
+        onRemove={
+          editAccount
+            ? () => {
+                const accountId = editAccount.id;
+                setEditAccountId(null);
+                setDeleteAccountId(accountId);
+              }
+            : undefined
+        }
       />
 
       <DeleteAccountModal

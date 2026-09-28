@@ -16,6 +16,7 @@ import {
   IosSkeletonScreen,
 } from "@/components/native/ios/IosPrimitives";
 import { AddAccountModal } from "@/components/accounts/AddAccountModal";
+import { DeleteAccountModal } from "@/components/accounts/DeleteAccountModal";
 import { BankSyncConnect } from "@/components/accounts/BankSyncPlaceholder";
 import { useFinance } from "@/context/FinanceContext";
 import {
@@ -24,6 +25,7 @@ import {
   calculateInvestments,
   calculateNetWorth,
 } from "@/lib/calculations/netWorth";
+import type { Account, Debt } from "@/lib/finance/types";
 import { formatCurrency } from "@/lib/finance/format";
 import { isAccountVisible } from "@/lib/finance/accountPreferences";
 import { getPlaidConnectionUiState } from "@/lib/native/plaidConnectionUi";
@@ -35,6 +37,22 @@ import {
 import { formatTransactionDate } from "@/lib/transactions";
 import { cn } from "@/components/ui/cn";
 import { triggerHaptic } from "@/lib/native/haptics";
+
+function debtAsAccount(debt: Debt): Account {
+  return {
+    id: debt.id,
+    name: debt.name,
+    institution: debt.institution ?? "",
+    type: "credit_card",
+    balance: debt.balance,
+    monthlyChange: debt.monthlyChange,
+    isPlaidLinked: Boolean(debt.isPlaidLinked),
+    bankConnectionId: debt.bankConnectionId,
+    lastFour: debt.lastFour,
+    institutionLogoUrl: debt.institutionLogoUrl,
+    lastSyncedAt: debt.lastSyncedAt,
+  };
+}
 
 function maskLastFour(value?: string | null): string | null {
   if (!value) return null;
@@ -65,6 +83,7 @@ export function IosAccountsScreen() {
     isSyncing,
   } = finance;
   const [addOpen, setAddOpen] = useState(false);
+  const [removeAccountId, setRemoveAccountId] = useState<string | null>(null);
   const plaidEnabled = isPlaidClientEnabled();
 
   const connection = useMemo(
@@ -243,7 +262,25 @@ export function IosAccountsScreen() {
                     }
                   />
                 }
-                trailing={formatCurrency(account.balance)}
+                trailing={
+                  account.isPlaidLinked ? (
+                    <span className="flex flex-col items-end gap-1">
+                      <span>{formatCurrency(account.balance)}</span>
+                      <button
+                        type="button"
+                        className="text-[12px] font-semibold text-[var(--danger)]"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setRemoveAccountId(account.id);
+                        }}
+                      >
+                        Remove
+                      </button>
+                    </span>
+                  ) : (
+                    formatCurrency(account.balance)
+                  )
+                }
               />
             ))}
           </IosList>
@@ -271,7 +308,22 @@ export function IosAccountsScreen() {
                       tone="danger"
                     />
                   }
-                  trailing={formatCurrency(debt.balance)}
+                  trailing={
+                    debt.isPlaidLinked ? (
+                      <span className="flex flex-col items-end gap-1">
+                        <span>{formatCurrency(debt.balance)}</span>
+                        <button
+                          type="button"
+                          className="text-[12px] font-semibold text-[var(--danger)]"
+                          onClick={() => setRemoveAccountId(debt.id)}
+                        >
+                          Remove
+                        </button>
+                      </span>
+                    ) : (
+                      formatCurrency(debt.balance)
+                    )
+                  }
                   href="/debt"
                 />
               ))}
@@ -390,6 +442,16 @@ export function IosAccountsScreen() {
       ) : null}
 
       <AddAccountModal isOpen={addOpen} onClose={() => setAddOpen(false)} />
+      <DeleteAccountModal
+        account={
+          accounts.find((account) => account.id === removeAccountId) ??
+          (() => {
+            const debt = debts.find((item) => item.id === removeAccountId);
+            return debt ? debtAsAccount(debt) : null;
+          })()
+        }
+        onClose={() => setRemoveAccountId(null)}
+      />
     </IosScreen>
   );
 }

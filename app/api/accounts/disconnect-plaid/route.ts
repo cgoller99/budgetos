@@ -33,12 +33,14 @@ export async function POST(request: Request) {
     const financeService = new FinanceService(auth.supabase);
     const data = await financeService.loadFinanceData(auth.user.id);
     const account = data.accounts.find((item) => item.id === accountId);
+    const debt = data.debts.find((item) => item.id === accountId);
+    const linked = account ?? debt;
 
-    if (!account) {
+    if (!linked) {
       return NextResponse.json({ error: "Account not found." }, { status: 404 });
     }
 
-    if (!account.isPlaidLinked || !account.bankConnectionId) {
+    if (!linked.isPlaidLinked || !linked.bankConnectionId) {
       return NextResponse.json(
         { error: "Account is not linked to Plaid." },
         { status: 400 },
@@ -48,7 +50,7 @@ export async function POST(request: Request) {
     const repository = new BankConnectionsRepository(auth.supabase);
     const connection = await repository.getConnectionById(
       auth.user.id,
-      account.bankConnectionId,
+      linked.bankConnectionId,
     );
 
     if (!connection) {
@@ -58,6 +60,33 @@ export async function POST(request: Request) {
       );
     }
 
+    const removedAccountIds = await repository.listOwnedConnectionAccountIds(
+      auth.user.id,
+      linked.bankConnectionId,
+    );
+
+    if (body.deleteTransactions && removedAccountIds.length > 0) {
+      const { error: transactionError } = await auth.supabase
+        .from("transactions")
+        .delete()
+        .eq("user_id", auth.user.id)
+        .in("account_id", removedAccountIds);
+
+      if (transactionError) {
+        throw transactionError;
+      }
+
+      const { error: transferError } = await auth.supabase
+        .from("transactions")
+        .delete()
+        .eq("user_id", auth.user.id)
+        .in("transfer_to_account_id", removedAccountIds);
+
+      if (transferError) {
+        throw transferError;
+      }
+    }
+
     try {
       const accessToken = decryptConnectionAccessToken(connection);
       await removePlaidItem(accessToken);
@@ -65,31 +94,16 @@ export async function POST(request: Request) {
       // Continue local disconnect even if Plaid item removal fails.
     }
 
-    const removedAccountIds = await repository.removeConnectionAccounts(
-      account.bankConnectionId,
+    await repository.removeConnectionAccounts(
+      linked.bankConnectionId,
       auth.user.id,
     );
 
-    if (body.deleteTransactions) {
-      for (const removedAccountId of removedAccountIds) {
-        await auth.supabase
-          .from("transactions")
-          .delete()
-          .eq("user_id", auth.user.id)
-          .eq("account_id", removedAccountId);
-
-        await auth.supabase
-          .from("transactions")
-          .delete()
-          .eq("user_id", auth.user.id)
-          .eq("transfer_to_account_id", removedAccountId);
-      }
-    }
-
     return NextResponse.json({
       ok: true,
-      connectionId: account.bankConnectionId,
+      connectionId: linked.bankConnectionId,
       removedAccountIds,
+      deleteTransactions: Boolean(body.deleteTransactions),
     });
   } catch (error) {
     console.error("[accounts/disconnect-plaid] Failed to disconnect account", error);
