@@ -16,9 +16,10 @@ import type { Account } from "@/lib/finance/types";
 type EditAccountModalProps = {
   account: Account | null;
   onClose: () => void;
+  onRemove?: () => void;
 };
 
-export function EditAccountModal({ account, onClose }: EditAccountModalProps) {
+export function EditAccountModal({ account, onClose, onRemove }: EditAccountModalProps) {
   const { editAccount } = useFinance();
   const { showToast } = useToast();
   const [form, setForm] = useState(() =>
@@ -81,6 +82,17 @@ export function EditAccountModal({ account, onClose }: EditAccountModalProps) {
               {isSubmitting ? "Saving..." : "Save Changes"}
             </Button>
           </div>
+          {account.isPlaidLinked && onRemove ? (
+            <Button
+              type="button"
+              variant="ghost"
+              fullWidth
+              className="text-rose-400 hover:text-rose-300"
+              onClick={onRemove}
+            >
+              Remove bank account
+            </Button>
+          ) : null}
         </form>
       )}
     </Modal>

@@ -1,5 +1,5 @@
 import { isCashAccountType } from "@/lib/finance/accountTypes";
-import type { Account, FinanceData } from "@/lib/finance/types";
+import type { Account, Debt, FinanceData } from "@/lib/finance/types";
 
 export const ACCOUNT_ICON_OPTIONS = [
   "🏦",
@@ -89,4 +89,58 @@ export function getAccountsOnSameConnection(
   return accounts.filter(
     (item) => item.bankConnectionId === account.bankConnectionId,
   );
+}
+
+export type PlaidConnectionMember = {
+  id: string;
+  name: string;
+  kind: "account" | "debt";
+};
+
+export function listPlaidConnectionMembers(input: {
+  accounts: Account[];
+  debts: Debt[];
+  account: Pick<Account, "id" | "name" | "nickname" | "bankConnectionId">;
+}): PlaidConnectionMember[] {
+  const connectionId = input.account.bankConnectionId;
+
+  if (!connectionId) {
+    return [
+      {
+        id: input.account.id,
+        name: input.account.nickname?.trim() || input.account.name,
+        kind: "account",
+      },
+    ];
+  }
+
+  const accounts = input.accounts
+    .filter((item) => item.bankConnectionId === connectionId)
+    .map((item) => ({
+      id: item.id,
+      name: getAccountDisplayName(item),
+      kind: "account" as const,
+    }));
+  const debts = input.debts
+    .filter((item) => item.bankConnectionId === connectionId)
+    .map((item) => ({
+      id: item.id,
+      name: item.name,
+      kind: "debt" as const,
+    }));
+
+  const members = [...accounts, ...debts];
+
+  if (members.some((item) => item.id === input.account.id)) {
+    return members;
+  }
+
+  return [
+    {
+      id: input.account.id,
+      name: input.account.nickname?.trim() || input.account.name,
+      kind: "account",
+    },
+    ...members,
+  ];
 }

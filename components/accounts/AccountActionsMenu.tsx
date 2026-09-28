@@ -7,9 +7,14 @@ import { cn } from "@/components/ui/cn";
 type AccountActionsMenuProps = {
   onEdit: () => void;
   onDelete: () => void;
+  deleteLabel?: string;
 };
 
-export function AccountActionsMenu({ onEdit, onDelete }: AccountActionsMenuProps) {
+export function AccountActionsMenu({
+  onEdit,
+  onDelete,
+  deleteLabel = "Delete",
+}: AccountActionsMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -83,7 +88,7 @@ export function AccountActionsMenu({ onEdit, onDelete }: AccountActionsMenuProps
             }}
             className="justify-start rounded-none px-4 py-3 text-left text-sm text-rose-400/90 hover:bg-white/[0.04] hover:text-rose-300"
           >
-            Delete
+            {deleteLabel}
           </Button>
         </div>
       )}

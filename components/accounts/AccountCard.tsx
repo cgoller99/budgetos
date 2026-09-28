@@ -57,7 +57,11 @@ export function AccountCard({ account, onEdit, onDelete }: AccountCardProps) {
             </div>
           </div>
         </div>
-        <AccountActionsMenu onEdit={onEdit} onDelete={onDelete} />
+        <AccountActionsMenu
+          onEdit={onEdit}
+          onDelete={onDelete}
+          deleteLabel={account.isPlaidLinked ? "Remove bank account" : "Delete"}
+        />
       </div>
 
       <CardContent className="mt-5 border-t border-[var(--surface-border)] pt-4 pl-2">

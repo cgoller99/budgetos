@@ -8,7 +8,7 @@ import { useToast } from "@/context/ToastContext";
 import {
   getAccountDisplayName,
   getAccountReferenceCounts,
-  getAccountsOnSameConnection,
+  listPlaidConnectionMembers,
 } from "@/lib/finance/accountPreferences";
 import { formatCurrency } from "@/lib/finance/format";
 import type { Account } from "@/lib/finance/types";
@@ -27,9 +27,14 @@ export function DeleteAccountModal({ account, onClose }: DeleteAccountModalProps
 
   const isPlaidLinked = Boolean(account?.isPlaidLinked);
   const counts = account ? getAccountReferenceCounts(finance, account.id) : null;
-  const linkedAccounts = account
-    ? getAccountsOnSameConnection(finance.accounts, account)
+  const connectionMembers = account
+    ? listPlaidConnectionMembers({
+        accounts: finance.accounts,
+        debts: finance.debts,
+        account,
+      })
     : [];
+  const removesWholeConnection = connectionMembers.length > 1;
 
   function handleClose() {
     setDeleteTransactions(false);
@@ -95,10 +100,10 @@ export function DeleteAccountModal({ account, onClose }: DeleteAccountModalProps
       });
 
       showToast({
-        title: `✓ ${account.institution || "Bank"} Disconnected`,
+        title: `✓ ${account.institution || "Bank"} removed`,
         subtitle: deleteTransactions
-          ? "✓ Accounts and linked transactions removed"
-          : "✓ Bank disconnected, transactions kept",
+          ? "Those accounts, balances, and imported transactions were removed."
+          : "Sync stopped. Balances were removed. Imported transactions stay in history.",
       });
 
       handleClose();
@@ -115,53 +120,56 @@ export function DeleteAccountModal({ account, onClose }: DeleteAccountModalProps
     <Modal
       isOpen={account !== null}
       onClose={handleClose}
-      title={isPlaidLinked ? "Disconnect Bank Account" : "Delete Account"}
+        title={isPlaidLinked ? "Remove bank account" : "Delete Account"}
     >
       <div className="space-y-5">
         {isPlaidLinked ? (
           <>
             <p className="text-sm leading-relaxed text-white/60">
-              This will disconnect your bank from Buxme. Existing transactions can
-              be kept or removed.
+              {removesWholeConnection
+                ? `${displayName} shares one bank login with ${connectionMembers.length - 1} other account${connectionMembers.length - 1 === 1 ? "" : "s"}. Removing it stops sync for every account on that login.`
+                : `This removes ${displayName} from Buxme and stops future syncs for this bank login.`}
             </p>
 
             <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] px-4 py-4 text-sm text-white/70">
-              <p>
-                <span className="font-medium text-white">{displayName}</span> is
-                linked to{" "}
-                <span className="font-medium text-white">
-                  {account?.institution || "your bank"}
-                </span>
-                .
+              <p className="font-medium text-white">What will be removed</p>
+              <ul className="mt-2 space-y-1 text-white/55">
+                {connectionMembers.map((member) => (
+                  <li key={member.id}>
+                    {member.name}
+                    {member.kind === "debt" ? " (credit or loan)" : ""}
+                    {" — balance leaves your dashboard"}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-3 text-white/55">
+                {deleteTransactions
+                  ? "Imported transactions and transfer history for these accounts will be deleted."
+                  : "Imported transactions stay in your history. They are kept, but no longer attached to these accounts."}
               </p>
-              {linkedAccounts.length > 1 && (
+              <p className="mt-3 text-white/55">
+                Buxme will not sync this bank again unless you connect it again.
+              </p>
+              {counts && (counts.bills > 0 || counts.incomeSources > 0) ? (
                 <p className="mt-3 text-white/55">
-                  Disconnecting removes all {linkedAccounts.length} linked accounts
-                  from this institution.
+                  Bills or income that use this account will lose that payment account.
                 </p>
-              )}
-              {counts && counts.transactions > 0 && (
-                <p className="mt-3 text-white/55">
-                  {counts.transactions} transaction
-                  {counts.transactions === 1 ? "" : "s"} reference
-                  {linkedAccounts.length > 1 ? " these accounts" : " this account"}.
-                </p>
-              )}
+              ) : null}
             </div>
 
             <div className="flex items-center justify-between gap-4 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-4 py-4">
               <div>
                 <p className="text-sm font-medium text-white">
-                  Remove linked transactions
+                  Also delete imported transactions
                 </p>
                 <p className="mt-1 text-xs text-white/45">
-                  Keep transactions unless you explicitly choose to remove them.
+                  Off by default. History stays unless you turn this on.
                 </p>
               </div>
               <PreferenceToggle
                 checked={deleteTransactions}
                 onChange={setDeleteTransactions}
-                label="Remove linked transactions"
+                label="Also delete imported transactions"
               />
             </div>
 
@@ -182,7 +190,11 @@ export function DeleteAccountModal({ account, onClose }: DeleteAccountModalProps
                 disabled={isSubmitting}
                 className="bg-rose-500 hover:bg-rose-600"
               >
-                {isSubmitting ? "Disconnecting..." : "Disconnect"}
+                {isSubmitting
+                  ? "Removing..."
+                  : removesWholeConnection
+                    ? `Remove all ${connectionMembers.length} accounts`
+                    : "Remove bank account"}
               </Button>
             </div>
           </>
