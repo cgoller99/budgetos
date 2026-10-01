@@ -57,6 +57,8 @@ export type PlaidSyncResult = {
   transactionsRemoved: number;
   investmentsSynced: number;
   liabilitiesSynced: number;
+  /** True when 730-day historical backfill was deferred (exchange fast-path). */
+  historyImportDeferred?: boolean;
   diagnostics?: PlaidSyncDiagnostics;
 };
 

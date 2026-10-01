@@ -80,6 +80,29 @@ import {
   resolveUserHouseholdId,
 } from "@/lib/supabase/householdFinance";
 import type { OnboardingState } from "@/lib/onboarding/types";
+import {
+  ACCOUNT_SELECT_COLUMNS,
+  BILL_SELECT_COLUMNS,
+  BILL_SPLIT_SELECT_COLUMNS,
+  GOAL_SELECT_COLUMNS,
+  INVESTMENT_SELECT_COLUMNS,
+  TRANSACTION_SELECT_COLUMNS,
+} from "@/lib/finance/queryColumns";
+import {
+  FINANCE_TRANSACTION_BOOTSTRAP_LIMIT,
+  FINANCE_TRANSACTION_LOOKBACK_DAYS,
+  FINANCE_TRANSACTION_PAGE_SIZE,
+  buildTransactionsLoadMeta,
+  getTransactionLookbackStartIso,
+} from "@/lib/finance/transactionWindow";
+import type {
+  AccountRow,
+  BillRow,
+  BillSplitRow,
+  GoalRow,
+  InvestmentRow,
+  TransactionRow,
+} from "@/lib/supabase/database.types";
 
 export class FinanceService {
   private readonly notifications: NotificationsRepository;
@@ -154,9 +177,27 @@ export class FinanceService {
   async loadFinanceData(userId: string): Promise<FinanceData> {
     const householdId = await resolveUserHouseholdId(this.supabase, userId);
     const scopeFilter = householdFinanceOrFilter(userId, householdId);
+    const lookbackStart = getTransactionLookbackStartIso();
 
-    const scopedSelect = (table: string) => {
-      let query = this.supabase.from(table).select("*");
+    const scopedSelect = (table: string, columns: string) => {
+      let query = this.supabase.from(table).select(columns);
+
+      if (scopeFilter) {
+        query = query.or(scopeFilter);
+      } else {
+        query = query.eq("user_id", userId);
+      }
+
+      return query;
+    };
+
+    const scopedTransactions = () => {
+      let query = this.supabase
+        .from("transactions")
+        .select(TRANSACTION_SELECT_COLUMNS)
+        .gte("transaction_date", lookbackStart)
+        .order("transaction_date", { ascending: false })
+        .limit(FINANCE_TRANSACTION_BOOTSTRAP_LIMIT);
 
       if (scopeFilter) {
         query = query.or(scopeFilter);
@@ -176,12 +217,12 @@ export class FinanceService {
       investmentsResult,
       events,
     ] = await Promise.all([
-      scopedSelect("accounts"),
-      scopedSelect("bills"),
-      scopedSelect("bill_splits"),
-      scopedSelect("goals"),
-      scopedSelect("transactions"),
-      scopedSelect("investments"),
+      scopedSelect("accounts", ACCOUNT_SELECT_COLUMNS),
+      scopedSelect("bills", BILL_SELECT_COLUMNS),
+      scopedSelect("bill_splits", BILL_SPLIT_SELECT_COLUMNS),
+      scopedSelect("goals", GOAL_SELECT_COLUMNS),
+      scopedTransactions(),
+      scopedSelect("investments", INVESTMENT_SELECT_COLUMNS),
       this.notifications.loadEvents(userId),
     ]);
 
@@ -206,22 +247,29 @@ export class FinanceService {
       }
     }
 
-    const incomePlanData = await this.incomePlans.loadIncomePlanData(userId);
-    const allocationData = await this.allocations.loadAllocationData(userId);
-    const [connectionRows, recurringDismissals] = await Promise.all([
-      this.bankConnections.listConnections(userId),
-      this.bankConnections.listRecurringDismissals(userId),
-    ]);
+    const [incomePlanData, allocationData, connectionRows, recurringDismissals] =
+      await Promise.all([
+        this.incomePlans.loadIncomePlanData(userId),
+        this.allocations.loadAllocationData(userId),
+        this.bankConnections.listConnections(userId),
+        this.bankConnections.listRecurringDismissals(userId),
+      ]);
 
     const mapped = mapFinanceData(
-      accountsResult.data ?? [],
-      billsResult.data ?? [],
-      goalsResult.data ?? [],
-      transactionsResult.data ?? [],
-      investmentsResult.data ?? [],
+      (accountsResult.data ?? []) as AccountRow[],
+      (billsResult.data ?? []) as BillRow[],
+      (goalsResult.data ?? []) as GoalRow[],
+      (transactionsResult.data ?? []) as unknown as TransactionRow[],
+      (investmentsResult.data ?? []) as InvestmentRow[],
       events,
-      billSplitRows,
+      billSplitRows as BillSplitRow[],
     );
+
+    const loadedCount = mapped.transactions.length;
+    const oldestLoadedDate = mapped.transactions.at(-1)?.date?.slice(0, 10) ?? "";
+    const truncated =
+      loadedCount >= FINANCE_TRANSACTION_BOOTSTRAP_LIMIT ||
+      (loadedCount > 0 && oldestLoadedDate <= lookbackStart.slice(0, 10));
 
     return {
       ...mapped,
@@ -233,6 +281,57 @@ export class FinanceService {
       allocationLedger: allocationData.allocationLedger,
       bankConnections: connectionRows.map(mapBankConnectionRow),
       plaidRecurringDismissals: recurringDismissals,
+      transactionsMeta: buildTransactionsLoadMeta({
+        transactions: mapped.transactions,
+        truncated,
+        lookbackDays: FINANCE_TRANSACTION_LOOKBACK_DAYS,
+        limit: FINANCE_TRANSACTION_BOOTSTRAP_LIMIT,
+      }),
+    };
+  }
+
+  /**
+   * Load an older page of transactions for the Transactions screen.
+   * Does not replace the full finance graph.
+   */
+  async loadOlderTransactions(
+    userId: string,
+    options: { beforeDate: string; limit?: number } ,
+  ): Promise<{ transactions: FinanceData["transactions"]; exhausted: boolean }> {
+    const householdId = await resolveUserHouseholdId(this.supabase, userId);
+    const scopeFilter = householdFinanceOrFilter(userId, householdId);
+    const limit = options.limit ?? FINANCE_TRANSACTION_PAGE_SIZE;
+
+    let query = this.supabase
+      .from("transactions")
+      .select(TRANSACTION_SELECT_COLUMNS)
+      .lt("transaction_date", options.beforeDate)
+      .order("transaction_date", { ascending: false })
+      .limit(limit);
+
+    if (scopeFilter) {
+      query = query.or(scopeFilter);
+    } else {
+      query = query.eq("user_id", userId);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      throw error;
+    }
+
+    const mapped = mapFinanceData(
+      [],
+      [],
+      [],
+      (data ?? []) as unknown as TransactionRow[],
+      [],
+      [],
+      [],
+    );
+    return {
+      transactions: mapped.transactions,
+      exhausted: (data?.length ?? 0) < limit,
     };
   }
 
@@ -340,7 +439,7 @@ export class FinanceService {
     userId: string,
     input: AddAccountInput,
     id?: string,
-  ): Promise<FinanceData> {
+  ): Promise<FinanceData | null> {
     const householdId = await resolveUserHouseholdId(this.supabase, userId);
     const { error } = await this.supabase.from("accounts").insert(
       this.withHouseholdId(
@@ -362,14 +461,14 @@ export class FinanceService {
     );
 
     if (error) throw error;
-    return this.loadFinanceData(userId);
+    return null;
   }
 
   async updateAccount(
     userId: string,
     accountId: string,
     input: EditAccountInput,
-  ): Promise<FinanceData> {
+  ): Promise<FinanceData | null> {
     const current = await this.loadFinanceData(userId);
     const existing = current.accounts.find((item) => item.id === accountId);
 
@@ -407,11 +506,11 @@ export class FinanceService {
         .eq("record_kind", "account");
 
       if (fallbackError) throw fallbackError;
-      return this.loadFinanceData(userId);
+      return null;
     }
 
     if (error) throw error;
-    return this.loadFinanceData(userId);
+    return null;
   }
 
   private async deleteTransactionsForAccounts(
@@ -482,7 +581,7 @@ export class FinanceService {
     userId: string,
     input: AddIncomeInput,
     id?: string,
-  ): Promise<FinanceData> {
+  ): Promise<FinanceData | null> {
     const householdId = await resolveUserHouseholdId(this.supabase, userId);
     const frequency = normalizeIncomeFrequency(input.frequency);
     const referenceDate = new Date();
@@ -513,14 +612,14 @@ export class FinanceService {
     );
 
     if (error) throw error;
-    return this.loadFinanceData(userId);
+    return null;
   }
 
   async updateIncome(
     userId: string,
     incomeId: string,
     input: EditIncomeInput,
-  ): Promise<FinanceData> {
+  ): Promise<FinanceData | null> {
     const current = await this.loadFinanceData(userId);
     const normalized = normalizeRecurringFinanceData(current);
     const existing = normalized.income.find((source) => source.id === incomeId);
@@ -538,10 +637,10 @@ export class FinanceService {
       .eq("transaction_type", "income");
 
     if (error) throw error;
-    return this.loadFinanceData(userId);
+    return null;
   }
 
-  async deleteIncome(userId: string, incomeId: string): Promise<FinanceData> {
+  async deleteIncome(userId: string, incomeId: string): Promise<FinanceData | null> {
     const { error } = await this.supabase
       .from("transactions")
       .delete()
@@ -551,7 +650,7 @@ export class FinanceService {
       .not("frequency", "is", null);
 
     if (error) throw error;
-    return this.loadFinanceData(userId);
+    return null;
   }
 
   async setIncomePaused(
@@ -601,7 +700,7 @@ export class FinanceService {
     userId: string,
     input: AddDebtInput,
     id?: string,
-  ): Promise<FinanceData> {
+  ): Promise<FinanceData | null> {
     const householdId = await resolveUserHouseholdId(this.supabase, userId);
     const debtId = id ?? crypto.randomUUID();
     const debt = {
@@ -623,14 +722,14 @@ export class FinanceService {
       );
 
     if (error) throw error;
-    return this.loadFinanceData(userId);
+    return null;
   }
 
   async updateDebt(
     userId: string,
     debtId: string,
     input: EditDebtInput,
-  ): Promise<FinanceData> {
+  ): Promise<FinanceData | null> {
     const current = await this.loadFinanceData(userId);
     const existing = current.debts.find((debt) => debt.id === debtId);
 
@@ -647,10 +746,10 @@ export class FinanceService {
       .eq("record_kind", "debt");
 
     if (error) throw error;
-    return this.loadFinanceData(userId);
+    return null;
   }
 
-  async deleteDebt(userId: string, debtId: string): Promise<FinanceData> {
+  async deleteDebt(userId: string, debtId: string): Promise<FinanceData | null> {
     const { error } = await this.supabase
       .from("accounts")
       .delete()
@@ -659,7 +758,7 @@ export class FinanceService {
       .eq("record_kind", "debt");
 
     if (error) throw error;
-    return this.loadFinanceData(userId);
+    return null;
   }
 
   async makeDebtPayment(
@@ -742,7 +841,7 @@ export class FinanceService {
     if (insertError) throw insertError;
   }
 
-  async createBill(userId: string, input: AddBillInput, id?: string): Promise<FinanceData> {
+  async createBill(userId: string, input: AddBillInput, id?: string): Promise<FinanceData | null> {
     const householdId = await resolveUserHouseholdId(this.supabase, userId);
     const frequency = normalizeBillFrequency(input.frequency ?? "monthly");
     const referenceDate = new Date();
@@ -805,14 +904,14 @@ export class FinanceService {
       { ...input, amount: totalAmount, dueDay: primarySplit.dueDay },
     );
 
-    return this.loadFinanceData(userId);
+    return null;
   }
 
   async updateBill(
     userId: string,
     billId: string,
     input: EditBillInput,
-  ): Promise<FinanceData> {
+  ): Promise<FinanceData | null> {
     const current = await this.loadFinanceData(userId);
     const normalized = normalizeRecurringFinanceData(current);
     const existing = normalized.bills.find((bill) => bill.id === billId);
@@ -852,10 +951,10 @@ export class FinanceService {
       },
     );
 
-    return this.loadFinanceData(userId);
+    return null;
   }
 
-  async deleteBill(userId: string, billId: string): Promise<FinanceData> {
+  async deleteBill(userId: string, billId: string): Promise<FinanceData | null> {
     const { error } = await this.supabase
       .from("bills")
       .delete()
@@ -863,7 +962,7 @@ export class FinanceService {
       .eq("user_id", userId);
 
     if (error) throw error;
-    return this.loadFinanceData(userId);
+    return null;
   }
 
   async markBillSplitPaid(
@@ -944,7 +1043,7 @@ export class FinanceService {
     userId: string,
     input: CreateGoalInput,
     id?: string,
-  ): Promise<FinanceData> {
+  ): Promise<FinanceData | null> {
     const householdId = await resolveUserHouseholdId(this.supabase, userId);
     const meta = getGoalTypeMeta(input.type);
 
@@ -964,14 +1063,14 @@ export class FinanceService {
     );
 
     if (error) throw error;
-    return this.loadFinanceData(userId);
+    return null;
   }
 
   async updateGoal(
     userId: string,
     goalId: string,
     input: EditGoalInput,
-  ): Promise<FinanceData> {
+  ): Promise<FinanceData | null> {
     const meta = getGoalTypeMeta(input.type);
 
     const { error } = await this.supabase
@@ -987,7 +1086,7 @@ export class FinanceService {
       .eq("user_id", userId);
 
     if (error) throw error;
-    return this.loadFinanceData(userId);
+    return null;
   }
 
   async addMoneyToGoal(
@@ -1253,7 +1352,8 @@ export class FinanceService {
       throw failed.error;
     }
 
-    return this.loadFinanceData(userId);
+    // Caller already holds the optimistic finance graph; avoid a full reload.
+    return data;
   }
 }
 

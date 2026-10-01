@@ -26,6 +26,7 @@ import {
   trackEvent,
 } from "@/lib/analytics/client";
 import { ensureBetaRegistration } from "@/lib/beta/register.client";
+import { clearAllFinanceCaches } from "@/lib/finance/financeCache";
 
 export type SignUpResult = {
   needsEmailVerification: boolean;
@@ -272,6 +273,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (!isConfigured) {
       return;
     }
+
+    // Clear finance SWR before auth teardown so another account never sees it.
+    clearAllFinanceCaches();
 
     const supabase = getSupabaseClient();
     const { error } = await supabase.auth.signOut();

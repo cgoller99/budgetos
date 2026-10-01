@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { assertPlaidConfigured, getPlaidConfig } from "@/lib/plaid/config";
 import { requirePlaidApiUser, plaidErrorResponse } from "@/lib/plaid/apiAuth";
 import {
@@ -95,23 +95,66 @@ export async function POST(request: Request) {
     }
 
     try {
+      const admin = createSupabaseAdminClient();
       const syncResult = await syncPlaidConnection({
-        supabase: createSupabaseAdminClient(),
+        supabase: admin,
         userId: auth.user.id,
         connection,
+        // Return after incremental sync so Link UX is not blocked by 730-day backfill.
+        awaitHistoricalBackfill: false,
       });
+
+      const historyImportPending = Boolean(syncResult.historyImportDeferred);
+
+      // Reliable fallback when webhooks are delayed/missing: finish historical
+      // import after the response is sent (does not depend on client Sync).
+      if (historyImportPending) {
+        const connectionId = connection.id;
+        const userId = auth.user.id;
+        after(async () => {
+          try {
+            const latest =
+              (await new BankConnectionsRepository(admin).getConnectionById(
+                userId,
+                connectionId,
+              )) ?? connection;
+            console.info("[plaid/exchange] starting deferred historical backfill", {
+              userId,
+              connectionId,
+            });
+            await syncPlaidConnection({
+              supabase: admin,
+              userId,
+              connection: latest,
+              awaitHistoricalBackfill: true,
+            });
+            console.info("[plaid/exchange] deferred historical backfill complete", {
+              userId,
+              connectionId,
+            });
+          } catch (backfillError) {
+            console.warn("[plaid/exchange] deferred historical backfill failed", {
+              userId,
+              connectionId,
+              syncError: getPlaidErrorMessage(backfillError),
+            });
+          }
+        });
+      }
 
       console.info("[plaid/exchange] success", {
         userId: auth.user.id,
         connectionId: connection.id,
         itemId: exchangeResult.itemId,
         institutionName: connection.institution_name,
+        historyImportPending,
       });
 
       return NextResponse.json({
         ok: true,
         connectionId: connection.id,
         institutionName: connection.institution_name,
+        historyImportPending,
         sync: syncResult,
       });
     } catch (syncError) {

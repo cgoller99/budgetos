@@ -16,6 +16,7 @@ import {
   exchangePlaidPublicToken,
   isPlaidOAuthMisconfigurationExit,
   isPlaidReconnectRequired,
+  syncPlaidBank,
 } from "@/lib/plaid/clientApi";
 import { isPlaidClientEnabled } from "@/lib/plaid/clientConfig";
 import { PLAID_PRO_REQUIRED_MESSAGE } from "@/lib/plaid/plaidEntitlementGate";
@@ -156,7 +157,9 @@ export function BankSyncConnect({
         });
         showToast({
           title: "Bank connected",
-          subtitle: result.institutionName ?? "Your accounts are syncing.",
+          subtitle: result.historyImportPending
+            ? `${result.institutionName ?? "Your bank"} is connected. Importing transaction history in the background.`
+            : result.institutionName ?? "Your accounts are syncing.",
         });
 
         if (result.syncError) {
@@ -167,6 +170,25 @@ export function BankSyncConnect({
         }
 
         const refreshed = await refreshFinance({ openRecurringBillsModal: true });
+
+        // Client fallback if server `after()` / webhook is delayed: kick a full sync
+        // without flipping global isSyncing (keeps navigation usable while history imports).
+        if (result.historyImportPending && result.connectionId) {
+          void syncPlaidBank(result.connectionId)
+            .then(async () => {
+              await refreshFinance();
+              showToast({
+                title: "History import finished",
+                subtitle: "Older transactions are now available.",
+              });
+            })
+            .catch(() => {
+              showToast({
+                title: "Still importing history",
+                subtitle: "Tap Sync now in a minute if older transactions are missing.",
+              });
+            });
+        }
 
         if (mode === "create" && manualBeforeConnect.length > 0 && refreshed) {
           const importedCount = refreshed.accounts.filter((account) => account.bankConnectionId)
