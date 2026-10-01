@@ -1826,14 +1826,22 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
             });
             break;
           }
-          case "apply_paycheck":
-            await markIncomePlanPaycheckReceived();
+          case "apply_paycheck": {
+            const payload = suggestion.primaryAction.payload ?? {};
+            const sourceTransactionId =
+              typeof payload.transactionId === "string"
+                ? payload.transactionId
+                : undefined;
+            await markIncomePlanPaycheckReceived(
+              sourceTransactionId ? { sourceTransactionId } : {},
+            );
             showToast({
               title: "Income Plan applied",
               subtitle: "Allocations updated across your dashboard.",
               type: "success",
             });
             break;
+          }
           case "navigate":
             if (suggestion.primaryAction.href) {
               window.location.href = suggestion.primaryAction.href;
