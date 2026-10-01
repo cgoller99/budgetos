@@ -111,7 +111,13 @@ export function getAllocationSummaryFromPlan(
   );
 
   const percentageAllocated = roundCurrency(
-    paycheckAmount * (percentageTotal / 100),
+    allocations
+      .filter((item) => getAllocationType(item) === "percentage")
+      .reduce(
+        (total, item) =>
+          total + roundCurrency(paycheckAmount * ((item.percentage ?? 0) / 100)),
+        0,
+      ),
   );
 
   const allocated = roundCurrency(fixedAllocated + percentageAllocated);

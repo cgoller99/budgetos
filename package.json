@@ -57,6 +57,7 @@
     "test:subscription-fail-closed": "node scripts/test-subscription-fail-closed.mjs",
     "test:controlled-input-patterns": "node scripts/test-controlled-input-patterns.mjs",
     "test:bank-connection-client-select": "node scripts/test-bank-connection-client-select.mjs",
+    "test:allocation-summary-precision": "node scripts/test-allocation-summary-precision.mjs",
     "cap:sync": "npx cap sync ios",
     "cap:open:ios": "npx cap open ios",
     "cap:copy": "npx cap copy ios",
