@@ -38,6 +38,10 @@ function dueDayFromIsoDate(value: string | null | undefined): number | null {
   return day;
 }
 
+/** Columns safe to return to authenticated browser clients (no token ciphertext). */
+const BANK_CONNECTION_CLIENT_COLUMNS =
+  "id, user_id, household_id, provider, status, institution_name, institution_logo_url, institution_id, external_item_id, last_synced_at, error_code, error_message, created_at, updated_at, transactions_cursor, investments_cursor" as const;
+
 export function mapBankConnectionRow(row: BankConnectionRow): BankConnection {
   return {
     id: row.id,
@@ -59,7 +63,7 @@ export class BankConnectionsRepository {
   async listConnections(userId: string): Promise<BankConnectionRow[]> {
     const { data, error } = await this.supabase
       .from("bank_connections")
-      .select("*")
+      .select(BANK_CONNECTION_CLIENT_COLUMNS)
       .eq("user_id", userId)
       .order("created_at", { ascending: false });
 
@@ -67,7 +71,7 @@ export class BankConnectionsRepository {
       throw error;
     }
 
-    return data ?? [];
+    return (data ?? []) as BankConnectionRow[];
   }
 
   async getConnectionById(

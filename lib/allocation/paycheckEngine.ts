@@ -163,10 +163,20 @@ export function executePaycheckAllocations(
     throw new Error("Income plan is not active.");
   }
 
-  const depositAccountId = resolvePaymentAccountId(
-    data,
-    plan.depositAccountId,
-  );
+  const sourceTransactionId = input.sourceTransactionId?.trim() || null;
+  const existingSource =
+    sourceTransactionId == null
+      ? null
+      : data.transactions.find(
+          (transaction) => transaction.id === sourceTransactionId,
+        );
+
+  const depositAccountId =
+    (existingSource?.accountId &&
+    data.accounts.some((account) => account.id === existingSource.accountId)
+      ? existingSource.accountId
+      : null) ??
+    resolvePaymentAccountId(data, plan.depositAccountId);
 
   if (!depositAccountId) {
     throw new Error("Add a checking account to receive paychecks.");
@@ -179,21 +189,31 @@ export function executePaycheckAllocations(
   const paycheckEventId = crypto.randomUUID();
   const ledgerEntries: AllocationLedgerEntry[] = [];
 
-  const incomeTransaction = createTransaction({
-    amount: plan.paycheckAmount,
-    type: "income",
-    category: "Paycheck",
-    accountId: depositAccountId,
-    transferAccountId: null,
-    date,
-    notes: "Income Plan paycheck received",
-  });
+  // Prefer an already-imported deposit (Plaid) so we do not invent a second income row
+  // or re-apply balance effects that the bank sync already reflected.
+  let incomeTransaction: Transaction;
+  let next: FinanceData;
 
-  let next: FinanceData = {
-    ...data,
-    transactions: [incomeTransaction, ...data.transactions],
-  };
-  next = applyTransactionEffect(next, incomeTransaction);
+  if (existingSource && existingSource.type === "income") {
+    incomeTransaction = existingSource;
+    next = data;
+  } else {
+    incomeTransaction = createTransaction({
+      amount: plan.paycheckAmount,
+      type: "income",
+      category: "Paycheck",
+      accountId: depositAccountId,
+      transferAccountId: null,
+      date,
+      notes: "Income Plan paycheck received",
+    });
+
+    next = {
+      ...data,
+      transactions: [incomeTransaction, ...data.transactions],
+    };
+    next = applyTransactionEffect(next, incomeTransaction);
+  }
 
   const allocationEvents: IncomePlanPaycheckEvent["allocationEvents"] = [];
   let virtualEnvelopes = buildVirtualEnvelopes(next, plan);

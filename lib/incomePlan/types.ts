@@ -97,6 +97,12 @@ export type SaveIncomePlanInput = {
 export type MarkPaycheckReceivedInput = {
   customAllocations?: Record<string, number>;
   isExtraPaycheck?: boolean;
+  /**
+   * When applying an Income Plan against an already-imported bank deposit
+   * (e.g. automation "paycheck detected"), reuse that transaction instead of
+   * creating a synthetic income row that would double-count balance + income.
+   */
+  sourceTransactionId?: string;
 };
 
 export const INCOME_PLAN_SCHEDULE_LABELS: Record<IncomePlanSchedule, string> = {
