@@ -86,6 +86,7 @@ export async function fetchPlaidLinkToken(input?: {
 export async function exchangePlaidPublicToken(publicToken: string): Promise<{
   connectionId: string;
   institutionName: string | null;
+  historyImportPending?: boolean;
   sync?: PlaidSyncResult;
   syncError?: string;
 }> {

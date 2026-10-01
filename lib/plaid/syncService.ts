@@ -503,6 +503,7 @@ export async function syncPlaidConnection(params: {
     );
 
     let backfillResult: PlaidTransactionBackfillResult | null = null;
+    let historyImportDeferred = false;
     const accountsNeedingBackfill = selectAccountsNeedingBackfill({
       mappedAccounts,
       accountIdMap,
@@ -543,6 +544,7 @@ export async function syncPlaidConnection(params: {
         [...accountIdMap.values()],
       );
     } else if (accountsNeedingBackfill.length > 0) {
+      historyImportDeferred = true;
       console.info("[plaid/sync] deferring historical backfill for faster user response", {
         connectionId: connection.id,
         userId,
@@ -664,13 +666,14 @@ export async function syncPlaidConnection(params: {
       transactionsCursor: transactionResult.nextCursor,
       status: "connected",
       errorCode:
-        newCreditAccountsWithoutTransactions.length > 0
+        historyImportDeferred || newCreditAccountsWithoutTransactions.length > 0
           ? "TRANSACTIONS_PENDING"
           : transactionResult.pendingError
             ? "TRANSACTIONS_PENDING"
             : null,
-      errorMessage:
-        newCreditAccountsWithoutTransactions.length > 0
+      errorMessage: historyImportDeferred
+        ? "Importing transaction history in the background. Recent activity is already available."
+        : newCreditAccountsWithoutTransactions.length > 0
           ? "Credit card transactions are still syncing. Tap Sync now again in a minute."
           : transactionResult.pendingError,
     });
@@ -683,6 +686,7 @@ export async function syncPlaidConnection(params: {
       transactionsModified: transactionResult.modified,
       syncAttempts: transactionResult.syncAttempts,
       refreshRequested: transactionResult.refreshRequested,
+      historyImportDeferred,
       diagnostics,
     });
 
@@ -694,6 +698,7 @@ export async function syncPlaidConnection(params: {
       transactionsRemoved: transactionResult.removed,
       investmentsSynced,
       liabilitiesSynced,
+      historyImportDeferred,
       diagnostics,
     };
   } catch (error) {

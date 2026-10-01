@@ -49,6 +49,8 @@ assert.doesNotMatch(
 
 const exchange = read("app/api/plaid/exchange/route.ts");
 assert.match(exchange, /awaitHistoricalBackfill:\s*false/);
+assert.match(exchange, /after\(/);
+assert.match(exchange, /historyImportPending/);
 
 const syncService = read("lib/plaid/syncService.ts");
 assert.match(syncService, /awaitHistoricalBackfill/);

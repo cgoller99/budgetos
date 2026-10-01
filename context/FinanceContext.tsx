@@ -137,7 +137,7 @@ import { syncNotificationPreferencesFromServer } from "@/lib/notifications/prefe
 import type { DashboardSectionId } from "@/lib/ui/dashboardSections";
 import { ProfilesRepository } from "@/lib/supabase/repositories/profilesRepository";
 import {
-  clearFinanceCache,
+  clearAllFinanceCaches,
   getFinanceCacheAgeLabel,
   readFinanceCache,
   writeFinanceCache,
@@ -546,10 +546,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
 
       if (authConfigured && !authUser) {
         if (!cancelled) {
-          const previousUserId = userIdRef.current;
-          if (previousUserId) {
-            clearFinanceCache(previousUserId);
-          }
+          clearAllFinanceCaches();
           setData(emptyFinanceData);
           setFinanceDataUpdatedAt(null);
           setIsLoading(false);
@@ -563,13 +560,13 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
         return;
       }
 
+      const previousUserId = userIdRef.current;
+
       setIsLoading(true);
       setError(null);
       setOnboardingComplete(false);
       setOnboardingMode(null);
       setDemoProfileId(null);
-      repositoryRef.current = null;
-      userIdRef.current = null;
 
       try {
         const supabase = getSupabaseClient();
@@ -580,17 +577,24 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
           return;
         }
 
+        // Cross-user isolation: never keep prior account finance in memory or storage.
+        if (previousUserId && previousUserId !== userId) {
+          clearAllFinanceCaches();
+          setData(emptyFinanceData);
+          setFinanceDataUpdatedAt(null);
+        }
+
         repositoryRef.current = repository;
         userIdRef.current = userId;
 
         const cached = readFinanceCache(userId);
-        if (cached) {
+        if (cached && cached.userId === userId) {
           applyFinanceData(cached.data, {
             cache: false,
             updatedAt: cached.savedAt,
           });
           setIsLoading(false);
-        } else {
+        } else if (!previousUserId || previousUserId !== userId) {
           setData(emptyFinanceData);
           setFinanceDataUpdatedAt(null);
         }
