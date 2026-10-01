@@ -42,6 +42,7 @@
 | **NEW** `test:subscription-fail-closed` | Pass | |
 | **NEW** `test:controlled-input-patterns` | Pass | |
 | **NEW** `test:bank-connection-client-select` | Pass | |
+| **NEW** `test:allocation-summary-precision` | Pass | 1¢ summary/resolve parity |
 
 **Not run live:** device smoke (`docs/SMOKE_TEST.md`), real Plaid Link, StoreKit purchase, production RLS against live DB (no credentials in this environment for interactive finance load timing).
 
@@ -60,6 +61,12 @@
 | B7 | Household Pro soft-gate only when `isStripeClientEnabled()` | Medium consistency — **deferred** |
 | B8 | Test harness failures (`esbuild` path, `.ts` import) blocked CI-adjacent scripts | Low (fixed) |
 | B9 | Modal one-char input class — shared Modal already fixed (#69); forms use local draft state | Pattern audit clean; residual risk if new modals skip Modal |
+| B10 | `getAllocationSummaryFromPlan` could disagree with `resolveAllocations` by 1¢ on % lines | Low (fixed) |
+| B11 | Leave/remove household does **not** clear `household_id` on finance rows — data stays shared | High privacy — **reported** |
+| B12 | Household `FOR ALL` policies omit `auth.uid() = user_id` — JWT could mutate peers’ tagged rows | High — **reported** |
+| B13 | Household can SELECT full `profiles` rows (email/subscription/Apple fields) | Medium — **reported** |
+| B14 | Onboarding Plaid connect has no client entitlement check (server still 403) | Low UX — **deferred** |
+| B15 | Income Plan bill/investment allocation lines update envelopes/ledger but may not move cash | Product/engine gap — **deferred** |
 
 ---
 
@@ -68,7 +75,8 @@
 1. **Paycheck source link** — `MarkPaycheckReceivedInput.sourceTransactionId`; `executePaycheckAllocations` reuses existing income tx and skips balance re-credit; automation Apply passes payload id.
 2. **Subscription fail-closed** — outside provider: Free, no Pro/Pro+.
 3. **Bank connection client select allowlist** — `listConnections` omits `access_token_*`.
-4. **Test harness** — wire orphans; fix plaid-account-removal + app-store-review runners; add Stage 2 regression scripts.
+4. **Allocation summary % rounding** — per-line round then sum (matches resolve; avoids 1¢ validation drift).
+5. **Test harness** — wire orphans; fix plaid-account-removal + app-store-review runners; add Stage 2 regression scripts.
 
 ---
 
@@ -166,10 +174,17 @@ Members can manage household-tagged finance rows (accounts/bills/goals/transacti
 
 ### STOP-AND-REPORT
 
-**Serious residual issue:** Even after Stage 2 app-layer select hardening, a household member authenticated to Supabase can still `.from('bank_connections').select('*')` and receive encrypted token material if they craft a request. Ciphertext ≠ plaintext, but it is still a credential-adjacent secret that should not be client-readable. **Do not ship an RLS change in Stage 2 without a reviewed migration** (recommended later: revoke token columns from `authenticated` via view or column privileges; keep decrypt server-only).
+**Serious residual issues (no schema/RLS changes in Stage 2):**
+
+1. **Bank token ciphertext via household SELECT** — Even after Stage 2 app-layer select hardening, a household member authenticated to Supabase can still `.from('bank_connections').select('*')` and receive encrypted token material. Ciphertext ≠ plaintext, but it is still credential-adjacent. Recommended later: revoke token columns from `authenticated` via view/column privileges; keep decrypt server-only.
+
+2. **Leave/remove does not unshare finance** — `leave_household` / remove member clears membership + `profiles.household_id` only. Rows that were stamped with `household_id` remain readable/writable by remaining members.
+
+3. **Household write policies omit owner binding** — `FOR ALL` with `household_id in user_household_ids()` does not require `auth.uid() = user_id`, so a member JWT could theoretically mutate peers’ tagged rows via PostgREST (app mutation paths usually add `.eq("user_id", …)` as defense-in-depth only).
+
+4. **Personal income is RLS-shared** despite `personalIncomeScope` UI filtering — income lives in `transactions` and is auto-stamped on join.
 
 **No schema/RLS changes made in Stage 2.**
-
 ---
 
 ## 7. Money precision findings
@@ -194,8 +209,8 @@ Members can manage household-tagged finance rows (accounts/bills/goals/transacti
 
 ### Isolated safe fixes in Stage 2
 
-None beyond existing round helpers — no production data risk taken. Recommend Stage 3+ introduce a shared `roundMoney` / integer-cents helper for **new** calc paths first; full migration later.
-
+- Fixed `getAllocationSummaryFromPlan` to sum per-line percentage rounds (matches `resolveAllocations`).
+- No production balance migration. Recommend Stage 3+ introduce a shared `roundMoney` / integer-cents helper for **new** calc paths first; full migration later.
 ---
 
 ## 8. Controlled-input / focus findings
@@ -285,6 +300,7 @@ Environment lacked interactive authenticated session timings. **Static baseline 
 - `context/FinanceContext.tsx`
 - `lib/incomePlan/types.ts`
 - `lib/allocation/paycheckEngine.ts`
+- `lib/allocation/allocationEngine.ts`
 - `lib/supabase/repositories/bankConnectionsRepository.ts`
 - `package.json`
 - `scripts/test-plaid-account-removal.mjs`
@@ -293,6 +309,7 @@ Environment lacked interactive authenticated session timings. **Static baseline 
 - `scripts/test-subscription-fail-closed.mjs` **(new)**
 - `scripts/test-controlled-input-patterns.mjs` **(new)**
 - `scripts/test-bank-connection-client-select.mjs` **(new)**
+- `scripts/test-allocation-summary-precision.mjs` **(new)**
 - `docs/BUXME_2_STAGE2_BASELINE.md` **(this file)**
 
 ---
@@ -306,13 +323,15 @@ Environment lacked interactive authenticated session timings. **Static baseline 
 ## 14. Remaining risks
 
 1. Household bank_connections SELECT still allows token ciphertext via crafted client query  
-2. Full household data sharing vs user privacy expectations  
-3. Pro+ marketing mismatch if future hard-gates shrink Free/Pro  
-4. Finance megacontext + unbounded txs still dominate performance  
-5. Float debt-interest accumulation edge cases  
-6. Paycheck cron/manual path still creates synthetic income (by design for non-Plaid) — ensure UX doesn’t apply twice via schedule + automation  
-7. No live device smoke in this Stage 2 environment  
-
+2. Leave household does not revoke previously tagged finance sharing  
+3. Household write policies allow peer-row mutation at RLS layer  
+4. Full household data sharing vs user privacy expectations / personal income RLS overshare  
+5. Pro+ marketing mismatch if future hard-gates shrink Free/Pro  
+6. Finance megacontext + unbounded txs still dominate performance  
+7. Float debt-interest accumulation edge cases  
+8. Paycheck cron/manual path still creates synthetic income (by design for non-Plaid) — ensure UX doesn’t apply twice via schedule + automation  
+9. No live device smoke in this Stage 2 environment  
+10. Income Plan bill/investment allocation lines may not move cash (envelope/ledger only)
 ---
 
 ## 15. Recommendation: is Stage 3 safe to begin?
