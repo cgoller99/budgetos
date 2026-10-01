@@ -164,6 +164,13 @@ When `useNativeIos()` is true:
 
 **Verdict:** Mobile shell Phase 4 should **extend** `components/native/ios` + `lib/mobile/navigation.ts`, not replace Capacitor or rebuild auth/data.
 
+### Additional mobile IA / UX notes (from UI audit)
+
+- **Global Search is web-only** (`TopBar`); iOS header has notifications/profile but no search.
+- **`useNativeIos()` hydrates false→true** after mount — first paint can flash web chrome before iOS shell.
+- Dual trees (`*Content` vs `Ios*Screen`) mean redesign cost is roughly 2× unless primitives stay shared.
+- Unused / orphaned dashboard cards still in tree (`MobileSafeToSpendCard`, `QuickActions`, `DashboardAtAGlance`, etc.) — cleanup candidate, not Stage 2 blockers.
+- No `/budgets` route; budgeting today = Income Plans + envelopes + Safe To Spend.
 ---
 
 ## 4. Current automation inventory
@@ -295,18 +302,19 @@ Cold/warm launch timings, bundle size, and render profiling were **not** instrum
 
 ### Concerns / gaps
 
-1. **Household RLS is coarse** — members can read/manage shared finance rows; no server-enforced private accounts. UI-only hiding (`is_hidden`) is **owner preference**, not household privacy.
-2. **Finance mutations rely on RLS + client-supplied entity IDs** — generally OK with auth.uid(); still audit admin and invite endpoints carefully before expanding automation.
-3. **Founder / admin email allowlists** — powerful; compromised mailbox = full admin + service-role APIs.
-4. **`is_disabled` enforced in AuthGate UI only** — API auth helpers (`requireStripeApiUser`, etc.) do not consistently re-check disabled profiles.
-5. **`useSubscription` fail-open** outside provider (see bugs) can falsely unlock client-only soft gates.
-6. **`past_due` still grants Pro access** — intentional grace, but product/security tradeoff should stay explicit.
-7. **Powerful cron/migration routes** — most require `CRON_SECRET`; some also accept Vercel cron headers; secret hygiene critical.
-8. **Large admin AI Team attack surface** — separate from consumer app but shares DB; keep RLS/grants tight.
-9. **Error leakage** — Stage 2 should verify Plaid/Supabase failure UX never shows raw stack/Plaid JSON.
-10. **Do not weaken** privilege guard / IAP / Stripe guards when adding automation.
-11. Historical ops note: `admin_feedback_reports` RLS must remain enabled in production (`docs/LAUNCH_READINESS.md`).
-
+1. **Household RLS is coarse** — members can read/manage shared finance rows; no server-enforced private accounts. UI-only hiding (`is_hidden`) is **owner preference**, not household privacy. No viewer-vs-editor household role split.
+2. **`bank_connections` ciphertext reaches the browser** — client `listConnections` uses `.select("*")`, so `access_token_encrypted` / `iv` / `tag` are fetched over the authenticated Supabase client before `mapBankConnectionRow` drops them. Household SELECT policy also allows members to read those rows. Tokens are encrypted at rest (good), but ciphertext should not ship to clients — prefer column-restricted selects / a view / server-only reads. **Stage 2 security fix candidate.**
+3. **Finance mutations rely on RLS + client-supplied entity IDs** — generally OK with auth.uid(); still audit admin and invite endpoints carefully before expanding automation.
+4. **Founder / admin email allowlists** — powerful; compromised mailbox = full admin + service-role APIs.
+5. **`is_disabled` enforced in AuthGate UI only** — API auth helpers (`requireStripeApiUser`, etc.) do not consistently re-check disabled profiles.
+6. **`useSubscription` fail-open** outside provider (see bugs) can falsely unlock client-only soft gates.
+7. **`past_due` still grants Pro access** — intentional grace, but product/security tradeoff should stay explicit.
+8. **Powerful cron/migration routes** — most require `CRON_SECRET`; some also accept Vercel cron headers; secret hygiene critical.
+9. **Large admin AI Team attack surface** — separate from consumer app but shares DB; keep RLS/grants tight.
+10. **Error leakage** — Stage 2 should verify Plaid/Supabase failure UX never shows raw stack/Plaid JSON.
+11. **Do not weaken** privilege guard / IAP / Stripe guards when adding automation.
+12. Historical ops note: `admin_feedback_reports` RLS must remain enabled in production (`docs/LAUNCH_READINESS.md`).
+13. **`schema.sql` is incomplete** vs migrations — do not bootstrap production from it alone.
 ---
 
 ## 8. Technical debt relevant to Buxme 2.0
@@ -350,7 +358,7 @@ Cold/warm launch timings, bundle size, and render profiling were **not** instrum
 | Net worth | Calculations + timeline | Range selectors / sparse-data honesty |
 | Financial health | Scored metrics with reasons | Prefer transparent metrics in UI |
 | Household | Invites, shared RLS, bill splits | **Private vs shared** enforcement |
-| Global search | Client substring search | Query language / amounts / date ranges |
+| Global search | Client substring search | Query language / amounts / date ranges; **add to iOS shell** |
 | Notifications | In-app + coarse prefs | Push + granular types; anti-spam |
 | Entitlements Free/Pro/Pro+/Founder | Solid billing plumbing | Align feature matrix carefully |
 
@@ -418,10 +426,10 @@ Establish a **regression baseline** and fix **confirmed** product bugs only. No 
 3. **Fix confirmed open bugs (priority order)**  
    - **P0:** Link Income Plan Apply to detected Plaid deposit (`transactionId`) — prevent double income  
    - **P0:** Make `useSubscription` fail-closed outside provider  
+   - **P0/P1:** Stop shipping `bank_connections` ciphertext columns to the client (`select` allowlist / view)  
    - **P1:** Align household Pro gate with entitlements even when Stripe client flag is off  
    - **P1:** Plaid webhook behavior when duplicate `item_id` rows exist  
    - Controlled-input / focus hunt across finance forms (bills, transactions, income plan, debt, goals)
-
 4. **Lifecycle smoke (manual checklist)** against `docs/SMOKE_TEST.md`  
    - Auth → onboarding → Plaid (if credentials) → CRUD → billing surfaces → logout/login  
    - Free vs Pro entitlement UI for Plaid CTA  
