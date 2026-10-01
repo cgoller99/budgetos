@@ -229,6 +229,15 @@ Stripe products: web. Apple products: `com.buxme.pro.monthly`, `com.buxme.proplu
 8. **Sequential second-wave loads in `loadFinanceData`**  
    Core tables parallelized; then income plan + allocations sequential; then bank connections. Opportunity to parallelize more without schema change.
 
+9. **Plaid sync N+1 persistence**  
+   Sync upserts accounts/transactions with per-row select+write patterns; first sync + 730-day backfill can generate thousands of round-trips. Exchange and webhook runs sync **inline** (timeout risk).
+
+10. **Household realtime stampede**  
+    `postgres_changes` on household finance tables triggers full `refreshFinance()` with no debounce — multiplies unbounded loads.
+
+11. **Transaction count helper smell**  
+    Some Plaid paths load all `account_id` rows into memory to count instead of SQL `count(*)`.
+
 ### Measurement not yet run in this stage
 
 Cold/warm launch timings, bundle size, and render profiling were **not** instrumented here (Stage 3). Findings above are from code structure, not production APM.
@@ -242,10 +251,20 @@ Cold/warm launch timings, bundle size, and render profiling were **not** instrum
 | Issue | Fix | Risk |
 | --- | --- | --- |
 | Modal focus trap stole focus every keystroke (one-char-at-a-time inputs) | #69 `Modal.tsx` — `onClose` via ref | Any new modal effect deps can reintroduce |
-| Regression test added | #70 `test-modal-focus-stability.mjs` | Keep in Stage 2 suite |
+| Regression test added | #70 `test-modal-focus-stability.mjs` | Keep in Stage 2 suite — **script exists but is not in `package.json` / CI** |
 | Apple Pro purchase resolving as Pro+ (stale lineage) | Multiple IAP commits | High sensitivity; do not casually rewrite IAP |
 | StoreKit restore fallback hardened | recent main | |
 | iOS WebView navigation Build 14 | recent main | |
+
+### Confirmed open (code-verified in Stage 1)
+
+| Issue | Evidence | Stage |
+| --- | --- | --- |
+| **Paycheck automation Apply double-counts income** | Suggestion payload includes `transactionId`, but `MarkPaycheckReceivedInput` has no such field and `completeAutomationSuggestion` calls `markIncomePlanPaycheckReceived()` with **no args**. Apply always creates a synthetic “Income Plan paycheck received” income tx even when a Plaid deposit already exists. | **Stage 2 fix** |
+| **Pro+ has no exclusive hard gates** | `PRO_PLUS_ROUTE_PREFIXES = []`; reports/insights fully usable on Free with soft banners only | Document before Stage 12; don’t “fix” by gating existing Free UX without product decision |
+| **`useSubscription` fail-open** | Outside `SubscriptionProvider`, hook returns `hasProAccess: true` / `hasProPlusAccess: true` | Stage 2 harden to fail-closed |
+| **Household soft-gate tied to Stripe flag** | Invite/create UI + API soft-block only when Stripe client enabled; Apple-only paid users can diverge from intended Pro gate | Stage 2 review |
+| **Plaid webhook skip on duplicate item_id** | Webhook path ignores sync when >1 `bank_connections` share an Item | Stage 2 investigate / fix |
 
 ### Likely / architectural risks
 
@@ -256,7 +275,10 @@ Cold/warm launch timings, bundle size, and render profiling were **not** instrum
 5. **Smart insights fallbacks** — can show generic “Add income and bills…” style copy; fails “no meaningless motivational messages” bar when data thin
 6. **Docs vs nav drift** — `IOS_APP_STORE.md` tab list ≠ `lib/mobile/navigation.ts`
 7. **Cron migration one-shots** still in tree (`apply-*-migration` cron routes) — operational clutter / footgun if secrets misused
-8. **TODO/FIXME grep** returned empty in source — debt is mostly implicit (large contexts, AI Team surface area), not annotated
+8. **Dual recurring detectors** (`lib/plaid/recurringBillDetection.ts` + `lib/automation/detectRecurringBills.ts`) can surface overlapping suggestions
+9. **Schedule auto-run + cron + manual apply races** on Income Plan `next_pay_date` without requiring a linked deposit
+10. **Disconnect inconsistency** — connection disconnect may null IDs while leaving accounts/txs; account disconnect deletes accounts optionally leaving orphan txs
+11. **TODO/FIXME grep** returned empty in source — debt is mostly implicit (large contexts, AI Team surface area), not annotated
 
 ---
 
@@ -264,7 +286,7 @@ Cold/warm launch timings, bundle size, and render profiling were **not** instrum
 
 ### Strong
 
-- Supabase **service role** confined to server (`lib/supabase/admin.ts`); not shipped to client
+- Supabase **service role** confined to server (`lib/supabase/admin.ts` + `server-only`); not shipped to client
 - Profile **privilege guard** trigger blocks client self-elevation of subscription/admin/beta fields
 - Apple IAP verify uses crypto + ownership binding (`appAccountToken`) with fail-closed expiry rules
 - Stripe webhook privilege path; checkout privilege tests exist
@@ -275,10 +297,15 @@ Cold/warm launch timings, bundle size, and render profiling were **not** instrum
 
 1. **Household RLS is coarse** — members can read/manage shared finance rows; no server-enforced private accounts. UI-only hiding (`is_hidden`) is **owner preference**, not household privacy.
 2. **Finance mutations rely on RLS + client-supplied entity IDs** — generally OK with auth.uid(); still audit admin and invite endpoints carefully before expanding automation.
-3. **Founder email env allowlist** — powerful; treat as production secret hygiene.
-4. **Large admin AI Team attack surface** — separate from consumer app but shares DB; keep RLS/grants tight (recent migrations harden this).
-5. **Error leakage** — many APIs map to user-safe messages; Stage 2 should verify Plaid/Supabase failure UX never shows raw stack/Plaid JSON.
-6. **Do not weaken** privilege guard / IAP / Stripe guards when adding automation.
+3. **Founder / admin email allowlists** — powerful; compromised mailbox = full admin + service-role APIs.
+4. **`is_disabled` enforced in AuthGate UI only** — API auth helpers (`requireStripeApiUser`, etc.) do not consistently re-check disabled profiles.
+5. **`useSubscription` fail-open** outside provider (see bugs) can falsely unlock client-only soft gates.
+6. **`past_due` still grants Pro access** — intentional grace, but product/security tradeoff should stay explicit.
+7. **Powerful cron/migration routes** — most require `CRON_SECRET`; some also accept Vercel cron headers; secret hygiene critical.
+8. **Large admin AI Team attack surface** — separate from consumer app but shares DB; keep RLS/grants tight.
+9. **Error leakage** — Stage 2 should verify Plaid/Supabase failure UX never shows raw stack/Plaid JSON.
+10. **Do not weaken** privilege guard / IAP / Stripe guards when adding automation.
+11. Historical ops note: `admin_feedback_reports` RLS must remain enabled in production (`docs/LAUNCH_READINESS.md`).
 
 ---
 
@@ -289,13 +316,16 @@ Cold/warm launch timings, bundle size, and render profiling were **not** instrum
 | God-object `FinanceContext` | Blocks fast nav, causes input bugs, hard to add background refresh |
 | Full-table finance fetch | Blocks “thousands of transactions” and Speed Test |
 | Dual web/iOS presentation | Good start; needs discipline so web doesn’t regress |
-| Entitlement marketing ≠ code gates | Must document before re-tiering features |
+| Entitlement marketing ≠ code gates | Must document before re-tiering features; only **hard** paid gate today is **new Plaid links** (+ household when Stripe enabled) |
+| Paycheck apply not deposit-linked | Automation spine is suggestion + schedule, not closed-loop |
+| Dual recurring detectors | Unify before expanding subscription intelligence |
 | Insights are shallow heuristics | 2.0 Insights should build on `financialEngine` / calculations, not replace with LLM invention |
 | Allocation + Income Plan already complex | Expand Paycheck Planner 2.0 **on top** of `lib/incomePlan` + `lib/allocation` |
-| AI Team / Mission Control codebase weight | Noise for consumer work; keep out of consumer PRs |
+| AI Team / Mission Control codebase weight | Noise for consumer work; keep out of consumer PRs; `CommandCenterV4` appears unreferenced |
 | Schema.sql vs migrations | `schema.sql` is partial baseline; **migrations** are source of truth |
-| Test scripts are Node assert suites, not e2e browser | Good unit coverage islands; need Stage 2 manual + expand calc tests |
-| No crash reporting (Sentry etc.) | Observability gap for production iOS WebView failures |
+| Test scripts are Node assert suites, not e2e browser | ~34 scripts; CI runs only ~7; several high-value tests (modal focus, Apple IAP, Plaid entitlements) not in CI |
+| Orphan test scripts | e.g. `test-modal-focus-stability.mjs` not wired in `package.json` |
+| No crash reporting (Sentry etc.) | Observability gap for production iOS WebView failures; PostHog optional and silent when unset |
 
 ---
 
@@ -371,36 +401,42 @@ Establish a **regression baseline** and fix **confirmed** product bugs only. No 
 
 ### Stage 2 workstreams
 
-1. **Automated baseline (run & record)**  
-   - `npm run test:modal-focus-stability`  
-   - `npm run test:finance-calculations`  
-   - `npm run test:recurring-bill-detection`  
-   - `npm run test:plaid-entitlements`  
-   - `npm run test:plaid-account-removal`  
-   - `npm run test:apple-iap` + `test:apple-iap-crypto`  
-   - `npm run test:ios-native-nav` + `test:ios-settings-nav` + `test:ios-nav-insights`  
-   - `npm run test:account-deletion`  
-   - `npm run test:profile-privilege-guard`  
+1. **Wire missing regression harness pieces**  
+   - Add `test:modal-focus-stability` (and other orphan high-value scripts) to `package.json`  
+   - Run CI-relevant suite locally and record results  
+   - Prefer importing app modules over duplicated logic in orphan scripts
+
+2. **Automated baseline (run & record)**  
+   - Modal focus stability  
+   - `test:finance-calculations`, `test:recurring-bill-detection`, `test:plaid-credit-mapping`  
+   - `test:plaid-entitlements`, `test:plaid-account-removal`  
+   - `test:apple-iap`, `test:apple-iap-crypto`  
+   - `test:ios-native-nav`, `test:ios-settings-nav`, `test:ios-nav-insights`  
+   - `test:account-deletion`, `test:profile-privilege-guard`, `test:stripe-checkout-privilege`  
    - `npm run lint` + `npm run build`
 
-2. **Controlled-input / focus hunt**  
-   - Catalogue all modals/forms that call `useFinance()` while typing  
-   - Ensure local draft state (pattern from Modal fix)  
-   - Especially: bills, transactions, income plan, debt, goals, settings billing
+3. **Fix confirmed open bugs (priority order)**  
+   - **P0:** Link Income Plan Apply to detected Plaid deposit (`transactionId`) — prevent double income  
+   - **P0:** Make `useSubscription` fail-closed outside provider  
+   - **P1:** Align household Pro gate with entitlements even when Stripe client flag is off  
+   - **P1:** Plaid webhook behavior when duplicate `item_id` rows exist  
+   - Controlled-input / focus hunt across finance forms (bills, transactions, income plan, debt, goals)
 
-3. **Lifecycle smoke (manual checklist)** against `docs/SMOKE_TEST.md`  
+4. **Lifecycle smoke (manual checklist)** against `docs/SMOKE_TEST.md`  
    - Auth → onboarding → Plaid (if credentials) → CRUD → billing surfaces → logout/login  
    - Free vs Pro entitlement UI for Plaid CTA  
+   - Paycheck detect → Apply path (verify no duplicate income)  
    - iOS shell nav: primary tabs + More destinations  
    - Record failures as Stage 2 tickets; fix only confirmed bugs
 
-4. **Edge-case static review (code + targeted tests)**  
-   - Pending→posted duplicates, transfers, refunds, credit mapping (`test:plaid-credit-mapping`)  
+5. **Edge-case static review (code + targeted tests)**  
+   - Pending→posted duplicates, transfers, refunds, credit mapping  
    - Empty / no-account Home empty states  
    - Plaid reauth UI (`plaidConnectionUi`)  
-   - Expired Apple entitlement fail-closed
+   - Expired Apple entitlement fail-closed  
+   - `is_disabled` API auth consistency (document or harden)
 
-5. **Deliverables**  
+6. **Deliverables**  
    - Stage 2 report: bugs found / fixed / deferred  
    - Updated smoke checklist results  
    - Explicit go/no-go for Stage 3 performance work  
@@ -412,7 +448,8 @@ Establish a **regression baseline** and fix **confirmed** product bugs only. No 
 - Home visual redesign  
 - New tables / smart budgets / Money Plan  
 - Refactors of `FinanceContext` beyond bugfix necessity  
-- Entitlement matrix product changes  
+- Entitlement matrix product changes (except fail-closed / gate consistency fixes above)  
+- Non-blocking webhook worker / sync batching (Stage 3 unless it blocks a bug fix)
 
 ---
 
@@ -462,10 +499,13 @@ Defined in `lib/analytics/events.ts`: login, onboarding, Plaid connect/fail, das
 ## Tests performed in Stage 1
 
 - Static repository audit (routes, libs, migrations, recent git history, entitlement/IAP/Plaid/finance paths)
+- Cross-checked deep-dive findings from parallel audits of auth/billing, Plaid/finance pipelines, and bugs/debt/security
+- Code-verified paycheck Apply double-count path and subscription fail-open behavior
 - No production data access; no interactive App Store / Plaid live exercise in this stage
 
 ## Remaining risks entering Stage 2
 
 - Live environment / credentials may be required for full lifecycle smoke
 - Production transaction volume unknown until measured
-- Subagent/deep live verification of every edge case not substituted for device QA
+- Confirmed paycheck double-count and subscription fail-open should be fixed before expanding automation
+- Device QA still required; static audit does not replace `docs/SMOKE_TEST.md`
