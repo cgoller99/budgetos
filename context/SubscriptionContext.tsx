@@ -130,15 +130,16 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
 export function useSubscription(): SubscriptionContextValue {
   const context = useContext(SubscriptionContext);
 
+  // Fail closed outside SubscriptionProvider — never grant paid access by default.
   if (!context) {
     return {
       subscription: FREE_SUBSCRIPTION,
       isLoading: false,
       isFounder: false,
       refreshSubscription: async () => undefined,
-      hasProAccess: true,
-      hasProPlusAccess: true,
-      hasMinimumPlan: () => true,
+      hasProAccess: false,
+      hasProPlusAccess: false,
+      hasMinimumPlan: (plan) => plan === "free",
     };
   }
 

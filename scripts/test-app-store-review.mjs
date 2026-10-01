@@ -1,17 +1,34 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import {
-  STORE_CATALOG_RETRY_DELAYS_MS,
-  evaluateStoreCatalog,
-  shouldRetryStoreCatalog,
-} from "../lib/iap/storeCatalogPolicy.ts";
+import { pathToFileURL } from "node:url";
 
 const root = path.resolve(import.meta.dirname, "..");
+const OUT = "/tmp/app-store-review-policy-test.mjs";
 const read = (relativePath) =>
   fs.readFileSync(path.join(root, relativePath), "utf8");
 
+execFileSync(
+  process.platform === "win32" ? "npx.cmd" : "npx",
+  [
+    "--yes",
+    "esbuild",
+    path.join(root, "lib/iap/storeCatalogPolicy.ts"),
+    "--bundle",
+    "--platform=node",
+    "--format=esm",
+    `--outfile=${OUT}`,
+  ],
+  { stdio: "inherit", cwd: root },
+);
+
+const {
+  STORE_CATALOG_RETRY_DELAYS_MS,
+  evaluateStoreCatalog,
+  shouldRetryStoreCatalog,
+} = await import(pathToFileURL(OUT).href);
 const pro = {
   productId: "com.buxme.pro.monthly",
   plan: "pro",

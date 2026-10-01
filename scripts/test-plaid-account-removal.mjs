@@ -12,8 +12,10 @@ const ROOT = path.resolve(import.meta.dirname, "..");
 const OUT = "/tmp/plaid-removal-test.mjs";
 
 execFileSync(
-  path.join(ROOT, "node_modules/.bin/esbuild"),
+  process.platform === "win32" ? "npx.cmd" : "npx",
   [
+    "--yes",
+    "esbuild",
     path.join(ROOT, "lib/finance/accountPreferences.ts"),
     "--bundle",
     "--platform=node",
@@ -21,7 +23,7 @@ execFileSync(
     `--outfile=${OUT}`,
     `--alias:@=${ROOT}`,
   ],
-  { stdio: "inherit" },
+  { stdio: "inherit", cwd: ROOT },
 );
 
 const { listPlaidConnectionMembers } = await import(pathToFileURL(OUT).href);
