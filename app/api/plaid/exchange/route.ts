@@ -99,6 +99,8 @@ export async function POST(request: Request) {
         supabase: createSupabaseAdminClient(),
         userId: auth.user.id,
         connection,
+        // Return after incremental sync so Link UX is not blocked by 730-day backfill.
+        awaitHistoricalBackfill: false,
       });
 
       console.info("[plaid/exchange] success", {

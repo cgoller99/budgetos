@@ -548,6 +548,8 @@ export type FinanceData = {
   debts: Debt[];
   investments: Investment[];
   transactions: Transaction[];
+  /** Present when bootstrap load used a bounded transaction window. */
+  transactionsMeta?: import("@/lib/finance/transactionWindow").TransactionsLoadMeta;
   events: FinanceEvent[];
   incomePlan: IncomePlan | null;
   incomePlanPaychecks: IncomePlanPaycheckEvent[];

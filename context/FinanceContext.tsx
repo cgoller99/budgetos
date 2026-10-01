@@ -136,6 +136,13 @@ import {
 import { syncNotificationPreferencesFromServer } from "@/lib/notifications/preferences";
 import type { DashboardSectionId } from "@/lib/ui/dashboardSections";
 import { ProfilesRepository } from "@/lib/supabase/repositories/profilesRepository";
+import {
+  clearFinanceCache,
+  getFinanceCacheAgeLabel,
+  readFinanceCache,
+  writeFinanceCache,
+} from "@/lib/finance/financeCache";
+import { buildTransactionsLoadMeta } from "@/lib/finance/transactionWindow";
 
 type FinanceRepositoryLike = FinanceService;
 
@@ -171,6 +178,10 @@ export type FinanceContextValue = FinanceData & {
   demoProfileId: DemoProfileId | null;
   isDemoMode: boolean;
   refreshFinance: (options?: { openRecurringBillsModal?: boolean }) => Promise<FinanceData | undefined>;
+  loadOlderTransactions: () => Promise<void>;
+  isLoadingOlderTransactions: boolean;
+  financeDataUpdatedAt: string | null;
+  financeDataFreshnessLabel: string | null;
   completeOnboarding: (
     mode: OnboardingMode,
     demoProfileId?: DemoProfileId,
@@ -256,7 +267,11 @@ export type FinanceContextValue = FinanceData & {
 
 type RunMutationOptions = {
   events?: FinanceEvent[];
+  /** Keep optimistic client state after a successful write (skip applying a full server reload). */
+  retainOptimistic?: boolean;
 };
+
+const REALTIME_REFRESH_DEBOUNCE_MS = 900;
 
 function buildEventsForTodayActivity(
   activity: TodayActivity,
@@ -311,6 +326,8 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
   const [data, setData] = useState<FinanceData>(emptyFinanceData);
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isLoadingOlderTransactions, setIsLoadingOlderTransactions] = useState(false);
+  const [financeDataUpdatedAt, setFinanceDataUpdatedAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [onboardingComplete, setOnboardingComplete] = useState(false);
   const [onboardingMode, setOnboardingMode] = useState<OnboardingMode | null>(
@@ -330,6 +347,22 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
   const repositoryRef = useRef<FinanceService | null>(null);
   const userIdRef = useRef<string | null>(null);
   const dataRef = useRef<FinanceData>(emptyFinanceData);
+  const realtimeRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const applyFinanceData = useCallback(
+    (next: FinanceData, options?: { cache?: boolean; updatedAt?: string | null }) => {
+      const coerced = coerceFinanceData(next);
+      setData(coerced);
+      const stamp = options?.updatedAt === undefined ? new Date().toISOString() : options.updatedAt;
+      setFinanceDataUpdatedAt(stamp);
+      const userId = userIdRef.current;
+      if (options?.cache !== false && userId && stamp) {
+        writeFinanceCache(userId, coerced);
+      }
+      return coerced;
+    },
+    [],
+  );
 
   useEffect(() => {
     dataRef.current = data;
@@ -379,13 +412,58 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
     }
 
     const next = await repository.loadFinanceData(userId);
-    const coerced = coerceFinanceData(next);
-    setData(coerced);
+    const coerced = applyFinanceData(next);
     refreshRecurringBillCandidates(coerced, {
       openModal: options?.openRecurringBillsModal,
     });
     return coerced;
-  }, [refreshRecurringBillCandidates]);
+  }, [applyFinanceData, refreshRecurringBillCandidates]);
+
+  const loadOlderTransactions = useCallback(async () => {
+    const repository = repositoryRef.current;
+    const userId = userIdRef.current;
+    const current = dataRef.current;
+    const beforeDate =
+      current.transactionsMeta?.oldestLoadedDate ??
+      current.transactions
+        .map((transaction) => transaction.date)
+        .filter(Boolean)
+        .sort()[0];
+
+    if (!repository || !userId || !beforeDate || current.transactionsMeta?.truncated === false) {
+      return;
+    }
+
+    setIsLoadingOlderTransactions(true);
+    try {
+      const page = await repository.loadOlderTransactions(userId, { beforeDate });
+      const mergedById = new Map<string, FinanceData["transactions"][number]>();
+      for (const transaction of [...current.transactions, ...page.transactions]) {
+        mergedById.set(transaction.id, transaction);
+      }
+      const transactions = [...mergedById.values()].sort((left, right) =>
+        right.date.localeCompare(left.date),
+      );
+      applyFinanceData({
+        ...current,
+        transactions,
+        transactionsMeta: buildTransactionsLoadMeta({
+          transactions,
+          truncated: !page.exhausted,
+          lookbackDays: current.transactionsMeta?.lookbackDays,
+          limit: current.transactionsMeta?.limit,
+        }),
+      });
+    } catch (loadError) {
+      showToast({
+        title: "Unable to load older transactions",
+        subtitle: getErrorMessage(loadError),
+        type: "error",
+      });
+    } finally {
+      setIsLoadingOlderTransactions(false);
+    }
+  }, [applyFinanceData, showToast]);
 
   const { household } = useHousehold();
 
@@ -398,6 +476,8 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
 
     const supabase = getSupabaseClient();
     const channel = supabase.channel(`household-finance-${householdId}`);
+    // Intentionally omit bank_connections — credentials are owner-only and
+    // household peers must not observe or react to connection secret rows.
     const tables = [
       "accounts",
       "bills",
@@ -406,8 +486,17 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
       "investments",
       "income_plans",
       "income_plan_paycheck_events",
-      "bank_connections",
     ] as const;
+
+    const scheduleRefresh = () => {
+      if (realtimeRefreshTimerRef.current) {
+        clearTimeout(realtimeRefreshTimerRef.current);
+      }
+      realtimeRefreshTimerRef.current = setTimeout(() => {
+        realtimeRefreshTimerRef.current = null;
+        void refreshFinance();
+      }, REALTIME_REFRESH_DEBOUNCE_MS);
+    };
 
     for (const table of tables) {
       channel.on(
@@ -418,15 +507,17 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
           table,
           filter: `household_id=eq.${householdId}`,
         },
-        () => {
-          void refreshFinance();
-        },
+        scheduleRefresh,
       );
     }
 
     channel.subscribe();
 
     return () => {
+      if (realtimeRefreshTimerRef.current) {
+        clearTimeout(realtimeRefreshTimerRef.current);
+        realtimeRefreshTimerRef.current = null;
+      }
       void supabase.removeChannel(channel);
     };
   }, [household?.id, refreshFinance]);
@@ -438,6 +529,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
       if (!getSupabaseConfig().isConfigured) {
         if (!cancelled) {
           setData(emptyFinanceData);
+          setFinanceDataUpdatedAt(null);
           setError(
             "Supabase is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to .env.local.",
           );
@@ -454,7 +546,12 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
 
       if (authConfigured && !authUser) {
         if (!cancelled) {
+          const previousUserId = userIdRef.current;
+          if (previousUserId) {
+            clearFinanceCache(previousUserId);
+          }
           setData(emptyFinanceData);
+          setFinanceDataUpdatedAt(null);
           setIsLoading(false);
           setError(null);
           setOnboardingComplete(false);
@@ -468,7 +565,6 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
 
       setIsLoading(true);
       setError(null);
-      setData(emptyFinanceData);
       setOnboardingComplete(false);
       setOnboardingMode(null);
       setDemoProfileId(null);
@@ -479,6 +575,26 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
         const supabase = getSupabaseClient();
         const repository = new FinanceService(supabase);
         const userId = await repository.getUserId();
+
+        if (cancelled) {
+          return;
+        }
+
+        repositoryRef.current = repository;
+        userIdRef.current = userId;
+
+        const cached = readFinanceCache(userId);
+        if (cached) {
+          applyFinanceData(cached.data, {
+            cache: false,
+            updatedAt: cached.savedAt,
+          });
+          setIsLoading(false);
+        } else {
+          setData(emptyFinanceData);
+          setFinanceDataUpdatedAt(null);
+        }
+
         const [next, onboarding] = await Promise.all([
           repository.loadFinanceData(userId),
           repository.loadOnboardingState(userId),
@@ -488,24 +604,24 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
           return;
         }
 
-        repositoryRef.current = repository;
-        userIdRef.current = userId;
         applyOnboardingState(onboarding, {
           setOnboardingComplete,
           setOnboardingMode,
           setDemoProfileId,
         });
-        setData(coerceFinanceData(next));
+        const coerced = applyFinanceData(next);
+        refreshRecurringBillCandidates(coerced);
 
         void new ProfilesRepository(supabase)
           .loadNotificationPreferences(userId)
           .then(syncNotificationPreferencesFromServer)
           .catch(() => undefined);
-
-        refreshRecurringBillCandidates(coerceFinanceData(next));
       } catch (loadError) {
         if (!cancelled) {
-          setData(emptyFinanceData);
+          if (!dataRef.current.accounts.length && !dataRef.current.transactions.length) {
+            setData(emptyFinanceData);
+            setFinanceDataUpdatedAt(null);
+          }
           setError(getErrorMessage(loadError));
         }
       } finally {
@@ -520,7 +636,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
     return () => {
       cancelled = true;
     };
-  }, [authConfigured, authLoading, authUser?.id]);
+  }, [applyFinanceData, authConfigured, authLoading, authUser?.id, refreshRecurringBillCandidates]);
 
   const runMutation = useCallback(
     async (
@@ -528,7 +644,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
       mutation: (
         repository: FinanceRepositoryLike,
         userId: string,
-      ) => Promise<FinanceData>,
+      ) => Promise<FinanceData | null>,
       options?: RunMutationOptions,
     ) => {
       const repository = repositoryRef.current;
@@ -547,7 +663,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
         ...derivedEvents,
       ]);
 
-      setData(coerceFinanceData(withEvents));
+      applyFinanceData(withEvents);
       setError(null);
       setIsSyncing(true);
 
@@ -556,9 +672,13 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
 
         await repository.saveEvents(userId, withEvents.events);
 
-        setData(coerceFinanceData({ ...next, events: withEvents.events }));
+        if (options?.retainOptimistic || next === null) {
+          applyFinanceData({ ...withEvents, events: withEvents.events });
+        } else {
+          applyFinanceData({ ...next, events: withEvents.events });
+        }
       } catch (mutationError) {
-        setData(snapshot);
+        applyFinanceData(snapshot, { cache: false, updatedAt: financeDataUpdatedAt });
         const message = getErrorMessage(mutationError);
         setError(message);
         showToast({ title: "Sync failed", subtitle: message, type: "error" });
@@ -567,7 +687,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
         setIsSyncing(false);
       }
     },
-    [error, showToast],
+    [applyFinanceData, error, financeDataUpdatedAt, showToast],
   );
 
   const markNotificationRead = useCallback((notificationId: string) => {
@@ -1916,6 +2036,9 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
     [automationSuggestions.length, hub.unreadNotificationCount],
   );
   const isDemoMode = isUserInDemoMode(onboardingMode, data);
+  const financeDataFreshnessLabel = financeDataUpdatedAt
+    ? getFinanceCacheAgeLabel(financeDataUpdatedAt)
+    : null;
 
   const value = useMemo<FinanceContextValue>(
     () => ({
@@ -1928,12 +2051,16 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
       automationSuggestions,
       isLoading,
       isSyncing,
+      isLoadingOlderTransactions,
+      financeDataUpdatedAt,
+      financeDataFreshnessLabel,
       error,
       onboardingComplete,
       onboardingMode,
       demoProfileId,
       isDemoMode,
       refreshFinance,
+      loadOlderTransactions,
       completeOnboarding,
       completeGuidedOnboarding,
       switchDemoProfile,
@@ -2046,6 +2173,9 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
       automationSuggestions,
       isLoading,
       isSyncing,
+      isLoadingOlderTransactions,
+      financeDataUpdatedAt,
+      financeDataFreshnessLabel,
       isDemoMode,
       markAllNotificationsRead,
       deleteNotification,
@@ -2063,6 +2193,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
       onboardingMode,
       pauseIncome,
       refreshFinance,
+      loadOlderTransactions,
       resumeIncome,
       switchDemoProfile,
     ],

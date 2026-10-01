@@ -406,8 +406,19 @@ export async function syncPlaidConnection(params: {
   supabase: BuxmeSupabaseClient;
   userId: string;
   connection: BankConnectionRow;
+  /**
+   * When false, skip the blocking 730-day historical backfill so user-facing
+   * connect/sync can return after incremental sync. Accounts still needing
+   * backfill are picked up on the next sync/webhook (default true).
+   */
+  awaitHistoricalBackfill?: boolean;
 }): Promise<PlaidSyncResult> {
-  const { supabase, userId, connection } = params;
+  const {
+    supabase,
+    userId,
+    connection,
+    awaitHistoricalBackfill = true,
+  } = params;
   const repository = new BankConnectionsRepository(supabase);
   const householdId = await resolveUserHouseholdId(supabase, userId);
   const accessToken = decryptConnectionAccessToken(connection);
@@ -498,7 +509,7 @@ export async function syncPlaidConnection(params: {
       transactionCounts,
     });
 
-    if (accountsNeedingBackfill.length > 0) {
+    if (accountsNeedingBackfill.length > 0 && awaitHistoricalBackfill) {
       console.info("[plaid/sync] backfilling accounts with zero persisted transactions", {
         connectionId: connection.id,
         userId,
@@ -531,6 +542,12 @@ export async function syncPlaidConnection(params: {
         userId,
         [...accountIdMap.values()],
       );
+    } else if (accountsNeedingBackfill.length > 0) {
+      console.info("[plaid/sync] deferring historical backfill for faster user response", {
+        connectionId: connection.id,
+        userId,
+        deferredAccounts: accountsNeedingBackfill.length,
+      });
     }
 
     let investmentsSynced = 0;
@@ -700,6 +717,7 @@ export async function syncPlaidForUser(params: {
   supabase: BuxmeSupabaseClient;
   userId: string;
   connectionId?: string;
+  awaitHistoricalBackfill?: boolean;
 }): Promise<PlaidSyncResult[]> {
   const repository = new BankConnectionsRepository(params.supabase);
   const connections = params.connectionId
@@ -720,6 +738,7 @@ export async function syncPlaidForUser(params: {
         supabase: params.supabase,
         userId: params.userId,
         connection,
+        awaitHistoricalBackfill: params.awaitHistoricalBackfill,
       }),
     );
   }

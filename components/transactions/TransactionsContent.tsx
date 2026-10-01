@@ -267,6 +267,20 @@ function TransactionsContentInner() {
               onDelete={() => setDeleteTransactionId(transaction.id)}
             />
           ))}
+          {finance.transactionsMeta?.truncated ? (
+            <div className="flex justify-center pt-2">
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={finance.isLoadingOlderTransactions}
+                onClick={() => void finance.loadOlderTransactions()}
+              >
+                {finance.isLoadingOlderTransactions
+                  ? "Loading older transactions..."
+                  : "Load older transactions"}
+              </Button>
+            </div>
+          ) : null}
         </div>
       )}
 
