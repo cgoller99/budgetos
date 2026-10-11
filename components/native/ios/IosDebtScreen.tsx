@@ -6,8 +6,6 @@ import {
   IosCard,
   IosHeroMetric,
   IosIconButton,
-  IosList,
-  IosListRow,
   IosProgressBar,
   IosRing,
   IosScreen,
@@ -160,33 +158,43 @@ export function IosDebtScreen() {
           ) : null}
 
           <IosSection title="Debts">
-            <IosList>
+            <div className="flex flex-col gap-3">
               {rows.map((row) => (
-                <IosListRow
+                <button
                   key={row.id}
-                  title={row.name}
-                  subtitle={`${row.interestRate}% APR · ${row.accountTypeLabel}`}
-                  leading={
-                    <IosAvatar
-                      fallback={row.name.slice(0, 1).toUpperCase()}
-                      tone="danger"
-                    />
-                  }
-                  trailing={
-                    <span className="flex flex-col items-end">
-                      <span>{formatCurrency(row.balance)}</span>
-                      <span className="text-[11px] font-medium text-[var(--text-muted)]">
-                        {row.progressLabel}
-                      </span>
-                    </span>
-                  }
+                  type="button"
+                  className="w-full rounded-[16px] bg-[var(--surface)] p-3.5 text-left active:bg-white/[0.04]"
                   onClick={() => {
                     void triggerHaptic("selection");
                     setSelectedDebtId(row.id);
                   }}
-                />
+                >
+                  <div className="flex items-center gap-3">
+                    <IosAvatar
+                      fallback={row.name.slice(0, 1).toUpperCase()}
+                      tone="danger"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[15px] font-semibold text-[var(--foreground)]">
+                        {row.name}
+                      </p>
+                      <p className="mt-0.5 text-[12px] text-[var(--text-muted)]">
+                        {row.interestRate}% APR · {row.accountTypeLabel}
+                      </p>
+                    </div>
+                    <p className="shrink-0 text-[15px] font-semibold tabular-nums text-[var(--foreground)]">
+                      {formatCurrency(row.balance)}
+                    </p>
+                  </div>
+                  <div className="mt-3 flex items-center gap-3">
+                    <IosProgressBar value={row.progressPercent} className="flex-1" />
+                    <span className="text-[12px] font-medium tabular-nums text-[var(--text-muted)]">
+                      {row.progressLabel}
+                    </span>
+                  </div>
+                </button>
               ))}
-            </IosList>
+            </div>
           </IosSection>
         </>
       ) : (

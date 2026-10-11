@@ -5,11 +5,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   IosAvatar,
   IosCard,
+  IosDonut,
   IosHeroMetric,
   IosIconButton,
   IosList,
   IosListRow,
   IosScreen,
+  IosPrimaryButton,
   IosSection,
   IosSegmentedControl,
   IosSkeletonScreen,
@@ -26,7 +28,7 @@ import { useFinance } from "@/context/FinanceContext";
 import { useToast } from "@/context/ToastContext";
 import { formatCurrency } from "@/lib/finance/format";
 import { resolveAllocationAmounts } from "@/lib/incomePlan/allocations";
-import { describePaySchedule, formatPayDate } from "@/lib/incomePlan/payDates";
+import { advancePayDate, describePaySchedule, formatPayDate } from "@/lib/incomePlan/payDates";
 import { INCOME_PLAN_SCHEDULE_LABELS } from "@/lib/incomePlan/types";
 import {
   getIncomeDashboardSummary,
@@ -112,6 +114,63 @@ function PaycheckPlan({
           </div>
         </div>
       </IosCard>
+      {resolved.length > 0 ? (
+        <IosCard padding="md">
+          <p className="mb-3 text-[15px] font-semibold text-[var(--foreground)]">Planned allocation</p>
+          <IosDonut
+            segments={resolved.map((item) => ({ value: item.amount }))}
+            centerValue={formatCurrency(plan.paycheckAmount)}
+            centerLabel="Total"
+          />
+          <div className="mt-4 flex flex-col gap-2">
+            {resolved.map((item) => {
+              const share =
+                plan.paycheckAmount > 0
+                  ? Math.round((item.amount / plan.paycheckAmount) * 100)
+                  : 0;
+              return (
+                <div key={item.allocation.id} className="flex items-center justify-between gap-3">
+                  <p className="truncate text-[13px] text-[var(--text-secondary)]">
+                    {item.allocation.name}
+                    <span className="text-[var(--text-muted)]"> · {share}%</span>
+                  </p>
+                  <p className="shrink-0 text-[13px] font-semibold tabular-nums text-[var(--foreground)]">
+                    {formatCurrency(item.amount)}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </IosCard>
+      ) : null}
+      <IosPrimaryButton onClick={onToggleEditor}>
+        {showEditor ? "Hide plan editor" : "Review plan"}
+      </IosPrimaryButton>
+      {(() => {
+        const dates = [plan.nextPayDate];
+        let cursor = plan;
+        for (let index = 0; index < 2; index += 1) {
+          const next = advancePayDate(cursor);
+          if (!next || dates.includes(next)) break;
+          dates.push(next);
+          cursor = { ...plan, nextPayDate: next };
+        }
+        return (
+          <IosSection title="Upcoming paychecks">
+            <IosList>
+              {dates.map((date) => (
+                <IosListRow
+                  key={date}
+                  title={formatPayDate(date)}
+                  subtitle={describePaySchedule(plan)}
+                  leading={<IosAvatar fallback="$" tone="success" />}
+                  trailing={formatCurrency(plan.paycheckAmount)}
+                />
+              ))}
+            </IosList>
+          </IosSection>
+        );
+      })()}
       <IosSection title="Allocations">
         {resolved.length === 0 ? (
           <IosCard padding="md">
@@ -133,9 +192,6 @@ function PaycheckPlan({
           </IosList>
         )}
       </IosSection>
-      <IosTextButton onClick={onToggleEditor}>
-        {showEditor ? "Hide plan editor" : "Adjust plan"}
-      </IosTextButton>
       {showEditor ? (
         <div className="ios-embedded-panel [&_.page-header]:hidden [&_h1]:text-[17px] [&_h2]:text-[15px]">
           <IncomePlanContent embedded />

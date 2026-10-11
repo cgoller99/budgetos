@@ -94,25 +94,42 @@ export function IosGoalsScreen() {
             </button>
           }
         >
-          <IosList>
+          <div className="flex flex-col gap-3">
             {goals.map((goal) => (
-              <IosListRow
+              <button
                 key={goal.id}
-                title={goal.name}
-                subtitle={`${formatCurrency(goal.current)} of ${formatCurrency(goal.target)} · ${goal.percentComplete}%`}
-                leading={<IosAvatar fallback={goal.icon || goal.name.slice(0, 1)} tone="warning" />}
-                trailing={
-                  goal.estimatedCompletionDate
-                    ? formatGoalDate(goal.estimatedCompletionDate)
-                    : "TBD"
-                }
+                type="button"
+                className="w-full rounded-[16px] bg-[var(--surface)] p-3.5 text-left active:bg-white/[0.04]"
                 onClick={() => {
                   void triggerHaptic("selection");
                   setSelectedGoalId(goal.id);
                 }}
-              />
+              >
+                <div className="flex items-center gap-3">
+                  <IosAvatar fallback={goal.icon || goal.name.slice(0, 1)} tone="accent" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="truncate text-[15px] font-semibold text-[var(--foreground)]">
+                        {goal.name}
+                      </p>
+                      <p className="text-[13px] font-semibold tabular-nums text-[var(--text-secondary)]">
+                        {goal.percentComplete}%
+                      </p>
+                    </div>
+                    <p className="mt-0.5 text-[12px] text-[var(--text-muted)]">
+                      {formatCurrency(goal.current)} of {formatCurrency(goal.target)}
+                    </p>
+                  </div>
+                </div>
+                <IosProgressBar value={goal.percentComplete} className="mt-3" />
+                <p className="mt-2 text-[12px] text-[var(--text-muted)]">
+                  {goal.estimatedCompletionDate
+                    ? formatGoalDate(goal.estimatedCompletionDate)
+                    : "TBD"}
+                </p>
+              </button>
             ))}
-          </IosList>
+          </div>
         </IosSection>
       )}
 

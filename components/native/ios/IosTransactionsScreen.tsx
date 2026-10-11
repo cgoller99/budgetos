@@ -312,7 +312,7 @@ function IosTransactionsScreenInner() {
                         <span
                           className={cn(
                             "shrink-0 text-[15px] font-medium tabular-nums",
-                            isIncome ? "text-[var(--success)]" : "text-[var(--foreground)]",
+                            isIncome ? "text-[var(--success)]" : "text-[var(--danger)]",
                           )}
                         >
                           {isIncome ? "+" : "−"}
