@@ -46,7 +46,7 @@ export function detectPaycheckSuggestions(
     id: `automation-paycheck-${transaction.id}`,
     kind: "paycheck_detected" as const,
     title: "Paycheck detected.",
-    description: "Apply your Income Plan?",
+    description: "Apply your existing Income Plan allocations to this paycheck?",
     icon: "💵",
     tone: "accent" as const,
     priority: 100,

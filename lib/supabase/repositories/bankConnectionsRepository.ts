@@ -13,6 +13,11 @@ import type {
   Database,
 } from "@/lib/supabase/database.types";
 import type { BuxmeSupabaseClient } from "@/lib/supabase/client";
+import {
+  buildMerchantCategoryMemory,
+  categoryForSyncedTransaction,
+} from "@/lib/automation/categoryMemory";
+import { merchantGroupKey } from "@/lib/bills/merchantMatch";
 import { mapPlaidAccount } from "@/lib/plaid/mappers";
 
 function toNumber(value: number | string | null | undefined): number {
@@ -535,6 +540,22 @@ export class BankConnectionsRepository {
     let skippedMissingAccount = 0;
     let skippedPending = 0;
     const timestamp = new Date().toISOString();
+    const { data: rememberedRows, error: memoryError } = await this.supabase
+      .from("transactions")
+      .select("notes, name, category, transaction_date")
+      .eq("user_id", input.userId)
+      .order("transaction_date", { ascending: false })
+      .limit(2000);
+    const categoryMemory = memoryError
+      ? new Map<string, string>()
+      : buildMerchantCategoryMemory(
+          (rememberedRows ?? []).map((row) => ({
+            notes: row.notes,
+            name: row.name,
+            category: row.category,
+            date: row.transaction_date.slice(0, 10),
+          })),
+        );
 
     for (const transaction of input.transactions) {
       if (transaction.isPending) {
@@ -551,7 +572,7 @@ export class BankConnectionsRepository {
 
       const { data: existing, error: existingError } = await this.supabase
         .from("transactions")
-        .select("id")
+        .select("id, category")
         .eq("user_id", input.userId)
         .eq("external_transaction_id", transaction.externalTransactionId)
         .maybeSingle();
@@ -560,13 +581,25 @@ export class BankConnectionsRepository {
         throw existingError;
       }
 
+      const merchantKey = merchantGroupKey(transaction.notes || transaction.name);
+      const category = categoryForSyncedTransaction({
+        isNew: !existing?.id,
+        existingCategory: existing?.category,
+        incomingCategory: transaction.category,
+        merchantKey,
+        memory: categoryMemory,
+      });
+      if (merchantKey.length >= 3 && category.trim() && !categoryMemory.has(merchantKey)) {
+        categoryMemory.set(merchantKey, category);
+      }
+
       const payload = {
         user_id: input.userId,
         household_id: input.householdId,
         transaction_type: transaction.type,
         name: transaction.name,
         amount: transaction.amount,
-        category: transaction.category,
+        category,
         account_id: accountId,
         transfer_to_account_id: null,
         notes: transaction.notes,

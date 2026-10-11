@@ -1,3 +1,4 @@
+import { merchantGroupKey } from "@/lib/bills/merchantMatch";
 import type { Bill, BillFrequency, FinanceData, Transaction } from "@/lib/finance/types";
 import type { PlaidMappedTransaction, RecurringBillCandidate } from "@/lib/plaid/types";
 
@@ -34,7 +35,7 @@ const KNOWN_UTILITY_MERCHANTS = [
 ];
 
 function normalizeMerchantKey(value: string): string {
-  return value.toLowerCase().replace(/\s+/g, " ").trim();
+  return merchantGroupKey(value);
 }
 
 function displayMerchantName(value: string): string {
