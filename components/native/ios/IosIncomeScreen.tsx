@@ -37,7 +37,7 @@ import {
 import type { IncomeSource, IncomeTableRow } from "@/lib/finance/types";
 import { triggerHaptic } from "@/lib/native/haptics";
 
-type IncomeTab = "sources" | "plan" | "more";
+type IncomeTab = "upcoming" | "plan" | "sources" | "history";
 
 function PaycheckPlan({
   finance,
@@ -209,12 +209,16 @@ export function IosIncomeScreen() {
   const searchParams = useSearchParams();
   const tabParam = searchParams.get("tab");
   const initialTab: IncomeTab =
-    tabParam === "plan" ? "plan" : tabParam === "history" || tabParam === "forecast"
-      ? "more"
-      : "sources";
+    tabParam === "plan"
+      ? "plan"
+      : tabParam === "sources"
+        ? "sources"
+        : tabParam === "history" || tabParam === "forecast"
+          ? "history"
+          : "upcoming";
   const [tab, setTab] = useState<IncomeTab>(initialTab);
   const [details, setDetails] = useState<"history" | "forecast" | null>(
-    tabParam === "forecast" ? "forecast" : tabParam === "history" ? "history" : null,
+    tabParam === "forecast" ? "forecast" : "history",
   );
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editIncomeId, setEditIncomeId] = useState<string | null>(null);
@@ -229,12 +233,12 @@ export function IosIncomeScreen() {
     void triggerHaptic("selection");
     setTab(next);
     const params = new URLSearchParams(searchParams.toString());
-    if (next === "plan") {
-      params.set("tab", "plan");
-    } else if (next === "more") {
-      params.set("tab", details ?? "history");
-    } else {
+    if (next === "upcoming") {
       params.delete("tab");
+    } else if (next === "history") {
+      params.set("tab", details === "forecast" ? "forecast" : "history");
+    } else {
+      params.set("tab", next);
     }
     const query = params.toString();
     router.replace(query ? `/income?${query}` : "/income");
@@ -256,8 +260,12 @@ export function IosIncomeScreen() {
     <IosScreen>
       <div className="flex items-start justify-between gap-3">
         <IosHeroMetric
-          label="Monthly income"
-          value={formatCurrency(summary.monthlyIncome)}
+          label={tab === "sources" ? "Monthly income" : "Income plan"}
+          value={formatCurrency(
+            tab === "sources"
+              ? summary.monthlyIncome
+              : summary.nextPaycheck?.amount ?? finance.incomePlan?.paycheckAmount ?? summary.monthlyIncome,
+          )}
           hint={
             summary.nextPaycheck
               ? `Next: ${summary.nextPaycheck.name} · ${summary.nextPaycheck.formattedDate}`
@@ -276,35 +284,35 @@ export function IosIncomeScreen() {
         </IosIconButton>
       </div>
 
-      {summary.nextPaycheck ? (
-        <IosCard padding="md" className="border-[var(--success)]/20 bg-[var(--success)]/10">
-          <p className="text-[12px] font-medium text-[var(--success)]">Next paycheck</p>
-          <div className="mt-1 flex items-end justify-between gap-3">
-            <div>
-              <p className="text-[17px] font-semibold text-[var(--foreground)]">
-                {summary.nextPaycheck.name}
-              </p>
-              <p className="text-[12px] text-[var(--text-muted)]">
-                {summary.nextPaycheck.formattedDate}
-              </p>
-            </div>
-            <p className="text-[18px] font-semibold tabular-nums text-[var(--success)]">
-              +{formatCurrency(summary.nextPaycheck.amount)}
-            </p>
-          </div>
-        </IosCard>
-      ) : null}
-
       <IosSegmentedControl
         variant="pills"
         value={tab}
         onChange={setIncomeTab}
         options={[
-          { value: "sources", label: "Sources" },
+          { value: "upcoming", label: "Upcoming" },
           { value: "plan", label: "Plan" },
-          { value: "more", label: "More" },
+          { value: "sources", label: "Sources" },
+          { value: "history", label: "History" },
         ]}
       />
+
+      {tab === "upcoming" ? (
+        <PaycheckPlan
+          finance={finance}
+          nextPaycheck={summary.nextPaycheck}
+          showEditor={showPlanEditor}
+          onToggleEditor={() => {
+            void triggerHaptic("light");
+            setShowPlanEditor((current) => !current);
+          }}
+        />
+      ) : null}
+
+      {tab === "plan" ? (
+        <div className="ios-embedded-panel [&_.page-header]:hidden [&_h1]:text-[17px] [&_h2]:text-[15px]">
+          <IncomePlanContent embedded />
+        </div>
+      ) : null}
 
       {tab === "sources" ? (
         rows.length === 0 ? (
@@ -356,60 +364,25 @@ export function IosIncomeScreen() {
         )
       ) : null}
 
-      {tab === "plan" ? (
-        <PaycheckPlan
-          finance={finance}
-          nextPaycheck={summary.nextPaycheck}
-          showEditor={showPlanEditor}
-          onToggleEditor={() => {
-            void triggerHaptic("light");
-            setShowPlanEditor((current) => !current);
-          }}
-        />
-      ) : null}
-
-      {tab === "more" ? (
-        <IosSection title="Details">
-          <IosList>
-            <IosListRow
-              title="Allocation history"
-              subtitle="Past paycheck runs"
-              leading={<IosAvatar fallback="H" tone="accent" />}
-              onClick={() => setDetails(details === "history" ? null : "history")}
-              trailing={
-                <span className="text-[var(--accent-light)]">
-                  {details === "history" ? "Hide" : "View"}
-                </span>
-              }
-            />
-            <IosListRow
-              title="Income forecast"
-              subtitle="Projected cash flow"
-              leading={<IosAvatar fallback="F" tone="warning" />}
-              onClick={() => setDetails(details === "forecast" ? null : "forecast")}
-              trailing={
-                <span className="text-[var(--accent-light)]">
-                  {details === "forecast" ? "Hide" : "View"}
-                </span>
-              }
-            />
-          </IosList>
-          {details === "history" ? (
-            <div className="ios-embedded-panel mt-3">
-              <IncomeLedgerPanel />
-            </div>
-          ) : null}
+      {tab === "history" ? (
+        <div className="flex flex-col gap-3">
+          <div className="ios-embedded-panel">
+            <IncomeLedgerPanel />
+          </div>
+          <IosTextButton
+            onClick={() => {
+              void triggerHaptic("selection");
+              setDetails(details === "forecast" ? "history" : "forecast");
+            }}
+          >
+            {details === "forecast" ? "Hide forecast" : "Income forecast"}
+          </IosTextButton>
           {details === "forecast" ? (
-            <div className="ios-embedded-panel mt-3">
+            <div className="ios-embedded-panel">
               <IncomeForecastPanel />
             </div>
           ) : null}
-          <div className="mt-2 flex justify-end">
-            <IosTextButton onClick={() => setIncomeTab("plan")}>
-              Open paycheck plan
-            </IosTextButton>
-          </div>
-        </IosSection>
+        </div>
       ) : null}
 
       <IosBottomSheet

@@ -11,6 +11,7 @@ import {
   IosProgressBar,
   IosScreen,
   IosSection,
+  IosSegmentedControl,
   IosSkeletonScreen,
 } from "@/components/native/ios/IosPrimitives";
 import { IosBottomSheet } from "@/components/native/ios/IosBottomSheet";
@@ -23,14 +24,31 @@ import { formatGoalDate, getGoalProgressList } from "@/lib/finance/goals";
 import type { SavingsGoal } from "@/lib/finance/types";
 import { triggerHaptic } from "@/lib/native/haptics";
 
+type GoalFilter = "all" | "saving" | "debt_payoff" | "investing";
+
+function matchesGoalFilter(
+  type: string,
+  filter: GoalFilter,
+) {
+  if (filter === "all") return true;
+  if (filter === "debt_payoff") return type === "debt_payoff";
+  if (filter === "investing") return type === "investments";
+  return type !== "debt_payoff" && type !== "investments";
+}
+
 export function IosGoalsScreen() {
   const finance = useFinance();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [moneyGoal, setMoneyGoal] = useState<SavingsGoal | null>(null);
   const [editGoal, setEditGoal] = useState<SavingsGoal | null>(null);
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
+  const [filter, setFilter] = useState<GoalFilter>("all");
 
   const goals = useMemo(() => getGoalProgressList(finance), [finance]);
+  const visibleGoals = useMemo(
+    () => goals.filter((goal) => matchesGoalFilter(goal.type, filter)),
+    [filter, goals],
+  );
   const totalSaved = useMemo(
     () => goals.reduce((sum, goal) => sum + goal.current, 0),
     [goals],
@@ -60,6 +78,23 @@ export function IosGoalsScreen() {
         }
         tone="positive"
       />
+
+      {goals.length > 0 ? (
+        <IosSegmentedControl
+          variant="pills"
+          value={filter}
+          onChange={(value) => {
+            void triggerHaptic("selection");
+            setFilter(value);
+          }}
+          options={[
+            { value: "all", label: "All" },
+            { value: "saving", label: "Saving" },
+            { value: "debt_payoff", label: "Debt payoff" },
+            { value: "investing", label: "Investing" },
+          ]}
+        />
+      ) : null}
 
       {goals.length === 0 ? (
         <IosCard padding="md">
@@ -95,7 +130,17 @@ export function IosGoalsScreen() {
           }
         >
           <div className="flex flex-col gap-3">
-            {goals.map((goal) => (
+            {visibleGoals.length === 0 ? (
+              <IosCard padding="md">
+                <p className="text-[15px] font-semibold text-[var(--foreground)]">
+                  No goals in this group
+                </p>
+                <p className="mt-1 text-[13px] text-[var(--text-muted)]">
+                  Switch filters to see the rest of your goals.
+                </p>
+              </IosCard>
+            ) : null}
+            {visibleGoals.map((goal) => (
               <button
                 key={goal.id}
                 type="button"
