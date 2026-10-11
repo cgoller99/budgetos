@@ -2,8 +2,6 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
-import { Sparkline } from "@/components/charts/Sparkline";
-import { CHART_COLORS } from "@/components/charts/constants";
 import {
   IosAvatar,
   IosBanner,
@@ -35,7 +33,6 @@ export function IosHomeScreen() {
   const {
     isLoading,
     dashboard,
-    snapshot,
     transactions,
     bankConnections,
     accounts,
@@ -68,13 +65,8 @@ export function IosHomeScreen() {
     [transactions],
   );
 
-  const netWorthSpark = useMemo(
-    () => snapshot.monthlyTrends.map((point) => point.income - point.spending),
-    [snapshot.monthlyTrends],
-  );
-
   if (isLoading) {
-    return <IosSkeletonScreen rows={4} />;
+    return <IosSkeletonScreen rows={4} variant="home" />;
   }
 
   const netWorth = dashboard.kpiMetrics.find((metric) => metric.label === "Net Worth");
@@ -82,13 +74,12 @@ export function IosHomeScreen() {
   const debt = dashboard.kpiMetrics.find((metric) => metric.label === "Debt");
   const moneyFlow = dashboard.moneyFlow;
   const safeToSpend = moneyFlow.safeToSpend;
-  const plannedBudget = Math.max(moneyFlow.income, 1);
-  const safeProgress = Math.max(
-    0,
-    Math.min(100, (Math.max(safeToSpend, 0) / plannedBudget) * 100),
-  );
   const health = dashboard.financialHealthScore;
   const nextPaycheck = dashboard.nextPaycheck;
+  const nextGoal = dashboard.nextGoal;
+  const spendHint = nextPaycheck
+    ? `Until ${nextPaycheck.name} · ${nextPaycheck.formattedDate}`
+    : "After bills, debt, and goals";
 
   const checking = accounts
     .filter((account) => account.type === "checking")
@@ -121,76 +112,62 @@ export function IosHomeScreen() {
 
   return (
     <IosScreen>
-      <IosCard padding="lg" className="bg-gradient-to-br from-[var(--accent)]/16 via-[var(--surface)] to-[var(--surface)]">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-[13px] font-medium text-[var(--text-muted)]">Net Worth</p>
-            <p className="mt-1.5 text-[34px] font-semibold leading-none tracking-tight tabular-nums text-[var(--foreground)]">
-              {netWorth ? formatCurrency(netWorth.value) : "—"}
+      <IosCard
+        padding="lg"
+        className="ios-home-hero bg-gradient-to-br from-[var(--accent)]/18 via-[#11161d] to-[#11161d]"
+      >
+        <div className="flex items-start justify-between gap-3" data-home-hero="safe-to-spend">
+          <div className="min-w-0">
+            <p className="text-[13px] font-medium text-[var(--text-muted)]">Safe to Spend</p>
+            <p
+              className={cn(
+                "mt-1.5 text-[40px] font-semibold leading-none tracking-tight tabular-nums",
+                safeToSpend < 0 ? "text-[var(--danger)]" : "text-[var(--foreground)]",
+              )}
+            >
+              {formatCurrency(safeToSpend)}
             </p>
-            {netWorth ? (
-              <p
-                className={cn(
-                  "mt-2 text-[13px] font-medium",
-                  (netWorth.monthlyChange ?? 0) >= 0
-                    ? "text-[var(--success)]"
-                    : "text-[var(--danger)]",
-                )}
-              >
-                {formatMonthlyChange(netWorth.monthlyChange)}
-              </p>
-            ) : null}
+            <p className="mt-2 text-[13px] leading-snug text-[var(--text-secondary)]">{spendHint}</p>
           </div>
-          <Sparkline
-            values={netWorthSpark.length > 1 ? netWorthSpark : [0, 2, 1, 4, 3, 5]}
-            color={CHART_COLORS.primary}
-            width={112}
-            height={48}
-            className="mt-1 opacity-90"
-          />
+          <div className="flex flex-col items-end gap-2">
+            <IosRing value={health.score} label={`${health.score}`} size={56} />
+            <p className="text-[11px] font-medium text-[var(--text-muted)]">Health</p>
+          </div>
         </div>
+        <div className="mt-4 grid grid-cols-3 gap-2">
+          <Link
+            href="/accounts"
+            className="ios-metric-chip flex min-h-11 flex-col justify-center gap-0.5 rounded-xl bg-white/[0.06] px-2.5 py-2 active:bg-white/[0.12]"
+          >
+            <span className="text-[11px] font-medium text-[var(--text-muted)]">Cash</span>
+            <strong className="text-[13px] font-semibold tabular-nums text-[var(--foreground)]">
+              {cash ? formatCurrency(cash.value) : formatCurrency(0)}
+            </strong>
+          </Link>
+          <Link
+            href="/debt"
+            className="ios-metric-chip flex min-h-11 flex-col justify-center gap-0.5 rounded-xl bg-white/[0.06] px-2.5 py-2 active:bg-white/[0.12]"
+          >
+            <span className="text-[11px] font-medium text-[var(--text-muted)]">Debt</span>
+            <strong className="text-[13px] font-semibold tabular-nums text-[var(--foreground)]">
+              {debt ? formatCurrency(debt.value) : formatCurrency(0)}
+            </strong>
+          </Link>
+          <Link
+            href="/accounts"
+            className="ios-metric-chip flex min-h-11 flex-col justify-center gap-0.5 rounded-xl bg-white/[0.06] px-2.5 py-2 active:bg-white/[0.12]"
+          >
+            <span className="text-[11px] font-medium text-[var(--text-muted)]">Net Worth</span>
+            <strong className="text-[13px] font-semibold tabular-nums text-[var(--foreground)]">
+              {netWorth ? formatCurrency(netWorth.value) : "—"}
+            </strong>
+          </Link>
+        </div>
+        <p className="mt-2 text-[11px] leading-snug text-[var(--text-subtle)]">
+          Checking {formatCurrency(checking)} · Savings {formatCurrency(savings)}
+          {netWorth ? ` · ${formatMonthlyChange(netWorth.monthlyChange)}` : ""}
+        </p>
       </IosCard>
-
-      <div className="grid grid-cols-2 gap-3">
-        <IosCard padding="md">
-          <p className="text-[12px] font-medium text-[var(--text-muted)]">Cash</p>
-          <p className="mt-1 text-[20px] font-semibold tabular-nums text-[var(--foreground)]">
-            {cash ? formatCurrency(cash.value) : formatCurrency(0)}
-          </p>
-          <p className="mt-2 text-[11px] leading-snug text-[var(--text-subtle)]">
-            Checking {formatCurrency(checking)} · Savings {formatCurrency(savings)}
-          </p>
-        </IosCard>
-
-        <IosCard padding="md">
-          <p className="text-[12px] font-medium text-[var(--text-muted)]">Debt</p>
-          <p className="mt-1 text-[20px] font-semibold tabular-nums text-[var(--foreground)]">
-            {debt ? formatCurrency(debt.value) : formatCurrency(0)}
-          </p>
-          <p className="mt-2 text-[11px] text-[var(--text-subtle)]">
-            {debt ? formatMonthlyChange(debt.monthlyChange) : "No balances"}
-          </p>
-        </IosCard>
-
-        <IosCard padding="md">
-          <p className="text-[12px] font-medium text-[var(--text-muted)]">Safe to Spend</p>
-          <p className="mt-1 text-[20px] font-semibold tabular-nums text-[var(--foreground)]">
-            {formatCurrency(safeToSpend)}
-          </p>
-          <IosProgressBar value={safeProgress} className="mt-3" />
-        </IosCard>
-
-        <IosCard padding="md" className="flex items-center justify-between gap-2">
-          <div>
-            <p className="text-[12px] font-medium text-[var(--text-muted)]">Health</p>
-            <p className="mt-1 text-[20px] font-semibold tabular-nums text-[var(--foreground)]">
-              {health.score}
-              <span className="text-[12px] font-medium text-[var(--text-muted)]">/100</span>
-            </p>
-          </div>
-          <IosRing value={health.score} label={`${health.score}`} size={52} />
-        </IosCard>
-      </div>
 
       {connection.reconnectConnections.length > 0 ? (
         <IosBanner
@@ -285,6 +262,30 @@ export function IosHomeScreen() {
           )}
         </IosList>
       </IosSection>
+
+      {nextGoal ? (
+        <IosSection title="Goal" action={<IosLink href="/savings">See All</IosLink>}>
+          <IosCard padding="md">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate text-[15px] font-semibold text-[var(--foreground)]">
+                  {nextGoal.name}
+                </p>
+                <p className="mt-1 text-[12px] text-[var(--text-muted)]">
+                  {formatCurrency(nextGoal.remaining)} left
+                  {nextGoal.estimatedCompletionDate
+                    ? ` · ${nextGoal.estimatedCompletionDate}`
+                    : ""}
+                </p>
+              </div>
+              <p className="text-[15px] font-semibold tabular-nums text-[var(--foreground)]">
+                {nextGoal.percentComplete}%
+              </p>
+            </div>
+            <IosProgressBar value={nextGoal.percentComplete} className="mt-3" />
+          </IosCard>
+        </IosSection>
+      ) : null}
 
       <IosSection
         title="Recent"

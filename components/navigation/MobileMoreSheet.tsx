@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { NavIcon } from "@/components/NavIcon";
 import { cn } from "@/components/ui/cn";
@@ -52,6 +52,10 @@ export function MobileMoreSheet({
   const routes = nativeIos ? IOS_MORE_NAV : MOBILE_MORE_NAV;
   const [visible, setVisible] = useState(false);
   const [animating, setAnimating] = useState(false);
+  const [dragOffset, setDragOffset] = useState(0);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const dragOrigin = useRef<number | null>(null);
+  const dragOffsetRef = useRef(0);
 
   const iosGroups = useMemo(() => {
     if (!nativeIos) return [];
@@ -71,9 +75,44 @@ export function MobileMoreSheet({
     }
 
     setAnimating(false);
-    const timeout = window.setTimeout(() => setVisible(false), 220);
+    dragOffsetRef.current = 0;
+    setDragOffset(0);
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const timeout = window.setTimeout(() => setVisible(false), reduceMotion ? 0 : 220);
     return () => window.clearTimeout(timeout);
   }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open, onClose]);
+
+  useEffect(() => {
+    if (animating) {
+      sheetRef.current?.focus();
+    }
+  }, [animating]);
+
+  function setDrag(next: number) {
+    dragOffsetRef.current = next;
+    setDragOffset(next);
+  }
+
+  function endDrag() {
+    const shouldClose = dragOffsetRef.current > 96;
+    dragOrigin.current = null;
+    setDrag(0);
+    if (shouldClose) onClose();
+  }
 
   if (!visible) {
     return null;
@@ -120,6 +159,8 @@ export function MobileMoreSheet({
         onClick={onClose}
       />
       <div
+        ref={sheetRef}
+        tabIndex={-1}
         className={cn(
           "fixed inset-x-0 bottom-0 z-50 max-h-[78vh] overflow-y-auto rounded-t-[22px] border border-[var(--surface-border)] bg-[var(--background)] px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 transition-transform duration-220 ease-out lg:hidden",
           nativeIos &&
@@ -128,11 +169,31 @@ export function MobileMoreSheet({
             ? "pointer-events-auto translate-y-0"
             : "pointer-events-none translate-y-full",
         )}
+        style={
+          dragOffset > 0
+            ? { transform: `translateY(${dragOffset}px)`, transition: "none" }
+            : undefined
+        }
         role="dialog"
         aria-modal="true"
         aria-label="More navigation"
       >
-        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-white/20" />
+        <div
+          className="mx-auto mb-3 flex h-7 w-full touch-none items-center justify-center"
+          data-sheet-handle="true"
+          onPointerDown={(event) => {
+            dragOrigin.current = event.clientY;
+            event.currentTarget.setPointerCapture(event.pointerId);
+          }}
+          onPointerMove={(event) => {
+            if (dragOrigin.current == null) return;
+            setDrag(Math.max(0, event.clientY - dragOrigin.current));
+          }}
+          onPointerUp={endDrag}
+          onPointerCancel={endDrag}
+        >
+          <div className="h-1 w-10 rounded-full bg-white/25" />
+        </div>
         <div className="mb-3 flex items-center justify-between px-1">
           <p
             className={cn(
