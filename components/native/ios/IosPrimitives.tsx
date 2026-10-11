@@ -444,6 +444,76 @@ export function IosRing({
   );
 }
 
+const DONUT_COLORS = [
+  "var(--accent)",
+  "var(--success)",
+  "var(--warning)",
+  "var(--purple)",
+  "var(--danger)",
+  "var(--accent-light)",
+];
+
+export function IosDonut({
+  segments,
+  centerValue,
+  centerLabel,
+}: {
+  segments: { value: number }[];
+  centerValue: string;
+  centerLabel: string;
+}) {
+  const size = 148;
+  const stroke = 16;
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const total = segments.reduce((sum, segment) => sum + Math.max(segment.value, 0), 0) || 1;
+  const arcs = segments.map((segment, index) => {
+    const length = (Math.max(segment.value, 0) / total) * circumference;
+    const dashOffset = segments
+      .slice(0, index)
+      .reduce((sum, earlier) => sum + (Math.max(earlier.value, 0) / total) * circumference, 0);
+    return { index, length, dashOffset };
+  });
+
+  return (
+    <div className="relative mx-auto" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90" aria-hidden>
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="rgba(255,255,255,0.08)"
+          strokeWidth={stroke}
+        />
+        {arcs.map((arc) => {
+          if (arc.length <= 0) return null;
+          return (
+            <circle
+              key={arc.index}
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              fill="none"
+              stroke={DONUT_COLORS[arc.index % DONUT_COLORS.length]}
+              strokeWidth={stroke}
+              strokeLinecap="butt"
+              strokeDasharray={`${arc.length} ${circumference - arc.length}`}
+              strokeDashoffset={-arc.dashOffset}
+            />
+          );
+        })}
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-[18px] font-semibold tabular-nums text-[var(--foreground)]">
+          {centerValue}
+        </span>
+        <span className="text-[11px] font-medium text-[var(--text-muted)]">{centerLabel}</span>
+      </div>
+    </div>
+  );
+}
+
 export function IosSegmentedControl<T extends string>({
   options,
   value,

@@ -247,13 +247,16 @@ export function IosBillsScreen() {
     <IosScreen>
       <div className="flex items-end justify-between gap-3 px-0.5">
         <div>
-          <p className="text-[13px] font-medium text-[var(--text-muted)]">Bills</p>
-          <p className="mt-1 text-[28px] font-semibold tracking-tight text-[var(--foreground)]">
+          <p className="text-[13px] font-medium text-[var(--text-muted)]">Total upcoming</p>
+          <p className="mt-1 text-[34px] font-semibold leading-none tracking-tight tabular-nums text-[var(--foreground)]">
+            {formatCurrency(dueTotal)}
+          </p>
+          <p className="mt-2 text-[13px] text-[var(--text-secondary)]">
             {overdue.length > 0
               ? `${overdue.length} overdue`
-              : dueSoon.length > 0
-                ? `${dueSoon.length} due soon`
-                : "All clear"}
+              : dueSoon[0]
+                ? `Next: ${dueSoon[0].name}`
+                : "Nothing due soon"}
           </p>
         </div>
         <IosTextButton
@@ -274,7 +277,7 @@ export function IosBillsScreen() {
           setTab(value);
         }}
         options={[
-          { value: "due_soon", label: "Due Soon" },
+          { value: "due_soon", label: "Upcoming" },
           { value: "overdue", label: "Overdue" },
           { value: "paid", label: "Paid" },
         ]}
