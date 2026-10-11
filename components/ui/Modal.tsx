@@ -21,6 +21,9 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
   const nativeIos = useNativeIos();
+  const [dragOffset, setDragOffset] = useState(0);
+  const dragOrigin = useRef<number | null>(null);
+  const dragOffsetRef = useRef(0);
 
   // Keep latest onClose without re-running focus trap when parent re-renders
   // with a new callback identity (e.g. form typing recreating handleClose).
@@ -47,7 +50,8 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
     }
 
     setIsAnimating(false);
-    unlockBodyScroll();
+    dragOffsetRef.current = 0;
+    setDragOffset(0);
 
     const timeout = window.setTimeout(() => setIsMounted(false), 300);
     return () => window.clearTimeout(timeout);
@@ -103,6 +107,18 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
     };
   }, [isMounted, isOpen]);
 
+  function setDrag(next: number) {
+    dragOffsetRef.current = next;
+    setDragOffset(next);
+  }
+
+  function endDrag() {
+    const shouldClose = dragOffsetRef.current > 96;
+    dragOrigin.current = null;
+    setDrag(0);
+    if (shouldClose) onCloseRef.current();
+  }
+
   if (!isMounted || typeof document === "undefined") return null;
 
   return createPortal(
@@ -130,7 +146,7 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
         className={cn(
           "relative flex h-[100dvh] max-h-[100dvh] w-full max-w-none flex-col overflow-hidden rounded-none border border-[var(--surface-border)] bg-[var(--surface)] shadow-2xl sm:h-auto sm:max-h-[min(90dvh,calc(100vh-2rem))] sm:max-w-md sm:rounded-3xl",
           nativeIos &&
-            "h-auto max-h-[92dvh] rounded-t-[22px] rounded-b-none border-b-0 sm:h-auto sm:max-h-[92dvh] sm:max-w-none sm:rounded-t-[22px] sm:rounded-b-none",
+            "native-modal-panel native-keyboard-avoid h-auto max-h-[92dvh] rounded-t-[22px] rounded-b-none border-b-0 sm:h-auto sm:max-h-[92dvh] sm:max-w-none sm:rounded-t-[22px] sm:rounded-b-none",
           isAnimating
             ? nativeIos
               ? "native-modal-panel-enter"
@@ -139,9 +155,29 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
               ? "translate-y-full opacity-100"
               : "translate-y-3 scale-[0.97] opacity-0",
         )}
+        style={
+          nativeIos && dragOffset > 0
+            ? { transform: `translateY(${dragOffset}px)`, transition: "none" }
+            : undefined
+        }
       >
         {nativeIos ? (
-          <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-white/20" />
+          <div
+            className="mx-auto mt-2 flex h-7 w-full shrink-0 touch-none items-center justify-center"
+            data-sheet-handle="true"
+            onPointerDown={(event) => {
+              dragOrigin.current = event.clientY;
+              event.currentTarget.setPointerCapture(event.pointerId);
+            }}
+            onPointerMove={(event) => {
+              if (dragOrigin.current == null) return;
+              setDrag(Math.max(0, event.clientY - dragOrigin.current));
+            }}
+            onPointerUp={endDrag}
+            onPointerCancel={endDrag}
+          >
+            <div className="h-1 w-10 rounded-full bg-white/20" />
+          </div>
         ) : null}
         <div
           className={cn(

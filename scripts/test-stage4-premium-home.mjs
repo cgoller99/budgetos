@@ -39,7 +39,7 @@ assert.match(transition, /native-page-enter/);
 
 assert.match(sheet, /data-sheet-handle="true"/);
 assert.match(sheet, /Escape/);
-assert.match(sheet, /document\.body\.style\.overflow/);
+assert.match(sheet, /lockBodyScroll/);
 assert.match(sheet, /dragOffsetRef\.current > 96/);
 
 assert.match(nav, /native-tab-active/);

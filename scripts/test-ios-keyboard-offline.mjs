@@ -17,5 +17,12 @@ assert.match(chrome, /You are offline/);
 assert.match(chrome, /navigator\.onLine/);
 assert.match(layout, /NativeIosChrome/);
 assert.match(chrome, /if \(!nativeIos\) return/);
+assert.match(chrome, /--keyboard-inset/);
+assert.match(chrome, /keyboardOverlapPx/);
+
+const layoutSource = fs.readFileSync(path.join(root, "components/AppLayout.tsx"), "utf8");
+assert.match(layoutSource, /wasOffline/);
+assert.match(layoutSource, /addEventListener\("online", refreshAfterReconnect\)/);
+assert.match(layoutSource, /refreshFinance\(\)/);
 
 console.log("✅ iOS keyboard and offline chrome checks passed.");

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import {
   IosAvatar,
   IosCard,
+  IosDetailLine,
   IosHeroMetric,
   IosList,
   IosListRow,
@@ -203,18 +204,21 @@ export function IosGoalsScreen() {
               <p className="text-center text-[34px] font-semibold leading-none tabular-nums text-[var(--foreground)]">
                 {goal.percentComplete}%
               </p>
+              <p className="mt-2 text-center text-[13px] text-[var(--text-muted)]">
+                {formatCurrency(goal.current)} of {formatCurrency(goal.target)}
+              </p>
               <IosProgressBar value={goal.percentComplete} tone="warning" className="mt-4" />
-              <div className="mt-4 rounded-[16px] bg-white/[0.04] px-3.5 py-3 text-[14px] text-[var(--text-secondary)]">
-                <p>
-                  {formatCurrency(goal.current)} saved of {formatCurrency(goal.target)}
-                </p>
-                <p className="mt-1">{formatCurrency(goal.remaining)} left</p>
-                <p className="mt-1">
-                  Projected {formatGoalDate(goal.estimatedCompletionDate)}
-                </p>
-                <p className="mt-1">
-                  {formatCurrency(goal.monthlyContribution)} / month · {goal.contributionSourceLabel}
-                </p>
+              <div className="mt-5 rounded-[16px] bg-white/[0.04] px-3.5">
+                <IosDetailLine label="Remaining" value={formatCurrency(goal.remaining)} />
+                <IosDetailLine
+                  label="Projected"
+                  value={formatGoalDate(goal.estimatedCompletionDate)}
+                />
+                <IosDetailLine
+                  label="Monthly"
+                  value={`${formatCurrency(goal.monthlyContribution)} / month`}
+                />
+                <IosDetailLine label="Source" value={goal.contributionSourceLabel} />
               </div>
               <div className="mt-4 flex gap-2">
                 {!goal.isComplete ? (

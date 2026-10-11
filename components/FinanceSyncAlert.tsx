@@ -19,7 +19,8 @@ export function FinanceSyncAlert() {
           role="alert"
           className={cn(
             "rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-300",
-            nativeIos && "rounded-[10px] border-0 px-3.5 py-2.5 text-[13px]",
+            nativeIos &&
+              "rounded-[10px] border-0 bg-[color-mix(in_srgb,var(--danger)_14%,transparent)] px-3.5 py-2.5 text-[13px] text-[var(--danger)]",
           )}
         >
           {error}

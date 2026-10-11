@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/components/ui/cn";
 import { inputBaseClassName } from "@/components/ui/tokens";
+import { lockBodyScroll, unlockBodyScroll } from "@/lib/ui/bodyScrollLock";
 import { useFinance } from "@/context/FinanceContext";
 import { useNativeIos } from "@/lib/native/useNativeIos";
 import { formatCurrency } from "@/lib/finance/format";
@@ -83,11 +84,11 @@ export function GlobalSearch({ className, variant = "bar" }: GlobalSearchProps) 
       return;
     }
 
-    document.body.style.overflow = "hidden";
+    lockBodyScroll();
     const frame = window.requestAnimationFrame(() => inputRef.current?.focus());
 
     return () => {
-      document.body.style.overflow = "";
+      unlockBodyScroll();
       window.cancelAnimationFrame(frame);
     };
   }, [isOpen]);
@@ -181,7 +182,7 @@ export function GlobalSearch({ className, variant = "bar" }: GlobalSearchProps) 
             className={cn(
               "relative w-full overflow-hidden border border-[var(--surface-border)] bg-[var(--background)] shadow-2xl",
               nativeIos
-                ? "max-h-[85dvh] rounded-t-[22px] border-b-0 pb-[env(safe-area-inset-bottom)]"
+                ? "native-keyboard-avoid max-h-[85dvh] rounded-t-[22px] border-b-0 pb-[env(safe-area-inset-bottom)]"
                 : "max-w-xl rounded-3xl bg-[var(--surface-elevated)]",
             )}
           >
