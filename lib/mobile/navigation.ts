@@ -6,12 +6,12 @@ export const MOBILE_PRIMARY_NAV = [
   { href: "/bills", label: "Bills", icon: "bills" as const },
 ] as const;
 
-/** iOS Capacitor primary tabs — app-first IA (web unchanged). */
+/** iOS Capacitor primary tabs — approved Stage 4 direction (web unchanged). */
 export const IOS_PRIMARY_NAV = [
   { href: "/dashboard", label: "Home", icon: "home" as const },
+  { href: "/transactions", label: "Transactions", icon: "transactions" as const },
+  { href: "/income", label: "Plan", icon: "income" as const },
   { href: "/accounts", label: "Accounts", icon: "accounts" as const },
-  { href: "/bills", label: "Bills", icon: "bills" as const },
-  { href: "/debt", label: "Debt", icon: "debt" as const },
 ] as const;
 
 /** Web mobile “More” sheet — secondary destinations. */
@@ -29,17 +29,12 @@ export const MOBILE_MORE_NAV = [
   { href: "/support", label: "Support", icon: "settings" as const, action: "feedback" as const },
 ] as const;
 
-/** iOS More menu — secondary destinations (Debt is a primary tab). */
+/** iOS More menu — screens that are not primary tabs. */
 export const IOS_MORE_NAV = [
-  { href: "/income", label: "Income", icon: "income" as const, group: "money" as const },
+  { href: "/bills", label: "Bills", icon: "bills" as const, group: "money" as const },
   { href: "/savings", label: "Goals", icon: "savings" as const, group: "money" as const },
+  { href: "/debt", label: "Debt", icon: "debt" as const, group: "money" as const },
   { href: "/investments", label: "Investments", icon: "reports" as const, group: "money" as const },
-  {
-    href: "/transactions",
-    label: "Transactions",
-    icon: "transactions" as const,
-    group: "money" as const,
-  },
   { href: "/reports", label: "Reports", icon: "reports" as const, group: "insights" as const },
   { href: "/calendar", label: "Calendar", icon: "calendar" as const, group: "insights" as const },
   // Household lives under App — not Insights — so Insights taps never imply Settings.

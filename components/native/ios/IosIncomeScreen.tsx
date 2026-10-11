@@ -240,6 +240,7 @@ export function IosIncomeScreen() {
       ) : null}
 
       <IosSegmentedControl
+        variant="pills"
         value={tab}
         onChange={setIncomeTab}
         options={[

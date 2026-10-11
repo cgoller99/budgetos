@@ -32,24 +32,26 @@ const iosPrimary = src.slice(
   src.indexOf("MOBILE_MORE_NAV"),
 );
 assert.match(iosPrimary, /label: "Home"/);
+assert.match(iosPrimary, /label: "Transactions"/);
+assert.match(iosPrimary, /label: "Plan"/);
 assert.match(iosPrimary, /label: "Accounts"/);
-assert.match(iosPrimary, /label: "Bills"/);
-assert.match(iosPrimary, /label: "Debt"/);
-assert.match(iosPrimary, /\/debt/);
-assert.doesNotMatch(iosPrimary, /\/transactions/);
+assert.match(iosPrimary, /\/transactions/);
+assert.match(iosPrimary, /\/income/);
+assert.doesNotMatch(iosPrimary, /label: "Bills"/);
+assert.doesNotMatch(iosPrimary, /label: "Debt"/);
 assert.doesNotMatch(iosPrimary, /Activity/);
-assert.doesNotMatch(iosPrimary, /\/income/);
 
 const iosMore = src.slice(src.indexOf("IOS_MORE_NAV"));
-assert.match(iosMore, /\/income/);
-assert.match(iosMore, /\/transactions/);
+assert.match(iosMore, /\/bills/);
+assert.match(iosMore, /label: "Debt"/);
+assert.match(iosMore, /\/savings/);
 assert.match(iosMore, /\/settings/);
 assert.match(iosMore, /Household/);
 assert.match(iosMore, /What's New/);
 assert.match(iosMore, /Roadmap/);
 assert.match(iosMore, /Support/);
-// Debt is a primary tab — must not appear again in More
-assert.doesNotMatch(iosMore, /label: "Debt"/);
+assert.doesNotMatch(iosMore, /label: "Transactions"/);
+assert.doesNotMatch(iosMore, /label: "Income"/);
 // Household must not live under Insights (Build 7 Insights → Settings bug)
 assert.doesNotMatch(
   iosMore.match(/href: "\/settings#household"[\s\S]*?group: "\w+"/)?.[0] ?? "",

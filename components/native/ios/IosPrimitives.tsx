@@ -448,11 +448,38 @@ export function IosSegmentedControl<T extends string>({
   options,
   value,
   onChange,
+  variant = "bar",
 }: {
   options: { value: T; label: string }[];
   value: T;
   onChange: (value: T) => void;
+  variant?: "bar" | "pills";
 }) {
+  if (variant === "pills") {
+    return (
+      <div className="flex gap-2 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {options.map((option) => {
+          const active = option.value === value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => onChange(option.value)}
+              className={cn(
+                "min-h-9 shrink-0 rounded-full px-3.5 text-[13px] font-semibold transition-colors active:opacity-80",
+                active
+                  ? "bg-[var(--accent)] text-white shadow-[0_0_16px_rgba(59,130,246,0.35)]"
+                  : "bg-white/[0.06] text-[var(--text-secondary)]",
+              )}
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
   return (
     <div className="flex rounded-[12px] bg-white/[0.05] p-1">
       {options.map((option) => {

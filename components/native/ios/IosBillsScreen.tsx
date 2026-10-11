@@ -267,6 +267,7 @@ export function IosBillsScreen() {
       </div>
 
       <IosSegmentedControl
+        variant="pills"
         value={tab}
         onChange={(value) => {
           void triggerHaptic("selection");

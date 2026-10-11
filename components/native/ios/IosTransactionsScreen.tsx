@@ -212,6 +212,7 @@ function IosTransactionsScreenInner() {
       </div>
 
       <IosSegmentedControl
+        variant="pills"
         value={tab}
         onChange={setTab}
         options={[
