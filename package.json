@@ -90,7 +90,8 @@
     "configure:public-launch": "node --env-file=.env.local scripts/configure-public-launch.mjs",
     "import:finance-spreadsheet": "node --env-file=.env.local scripts/import-finance-spreadsheet.mjs",
     "verify:bank-connections-owner-rls-live": "node --env-file=.env.local scripts/verify-bank-connections-owner-rls-live.mjs",
-    "test:stage3-validation": "node scripts/test-stage3-validation.mjs"
+    "test:stage3-validation": "node scripts/test-stage3-validation.mjs",
+    "test:stage4-premium-home": "node scripts/test-stage4-premium-home.mjs"
   },
   "dependencies": {
     "@apple/app-store-server-library": "^3.1.0",

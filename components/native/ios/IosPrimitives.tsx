@@ -260,16 +260,29 @@ export function IosBanner({
   );
 }
 
-export function IosSkeletonScreen({ rows = 4 }: { rows?: number }) {
+export function IosSkeletonScreen({
+  rows = 4,
+  variant = "list",
+}: {
+  rows?: number;
+  variant?: "list" | "home";
+}) {
   return (
     <div className="ios-screen flex flex-col gap-4" aria-busy="true">
-      <div className="h-[120px] animate-pulse rounded-[16px] bg-white/[0.05]" />
+      <div
+        className={cn(
+          "animate-pulse rounded-[16px] bg-white/[0.05]",
+          variant === "home" ? "h-[168px]" : "h-[120px]",
+        )}
+      />
+      {variant === "home" ? null : (
       <div className="grid grid-cols-2 gap-3">
         <div className="h-[88px] animate-pulse rounded-[16px] bg-white/[0.05]" />
         <div className="h-[88px] animate-pulse rounded-[16px] bg-white/[0.05]" />
         <div className="h-[88px] animate-pulse rounded-[16px] bg-white/[0.05]" />
         <div className="h-[88px] animate-pulse rounded-[16px] bg-white/[0.05]" />
       </div>
+      )}
       <div className="overflow-hidden rounded-[16px] bg-[var(--surface)]">
         {Array.from({ length: rows }).map((_, index) => (
           <div

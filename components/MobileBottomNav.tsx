@@ -61,7 +61,7 @@ export function MobileBottomNav({ activeHref }: { activeHref: string }) {
                   !nativeIos && (isActive ? sidebarActiveClassName : sidebarInactiveClassName),
                   nativeIos &&
                     (isActive
-                      ? "text-[var(--accent-light)]"
+                      ? "native-tab-active text-[var(--accent-light)]"
                       : "text-[var(--text-muted)]"),
                 )}
               >
@@ -103,7 +103,7 @@ export function MobileBottomNav({ activeHref }: { activeHref: string }) {
               !nativeIos && (isMoreActive ? sidebarActiveClassName : sidebarInactiveClassName),
               nativeIos &&
                 (isMoreActive
-                  ? "text-[var(--accent-light)]"
+                  ? "native-tab-active text-[var(--accent-light)]"
                   : "text-[var(--text-muted)]"),
             )}
           >
