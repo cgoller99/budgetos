@@ -14,6 +14,7 @@ import {
   IosSkeletonScreen,
   IosTextButton,
 } from "@/components/native/ios/IosPrimitives";
+import { IosBottomSheet } from "@/components/native/ios/IosBottomSheet";
 import { AddBillModal } from "@/components/bills/AddBillModal";
 import { EditBillModal } from "@/components/bills/EditBillModal";
 import { useFinance } from "@/context/FinanceContext";
@@ -24,21 +25,24 @@ import {
   getUpcomingBills,
 } from "@/lib/finance/bills";
 import { formatCurrency } from "@/lib/finance/format";
+import { getBillFrequencyLabel } from "@/lib/recurring/frequencies";
 import type { Bill, BillProgress } from "@/lib/finance/types";
 import { triggerHaptic } from "@/lib/native/haptics";
 
 type BillsTab = "due_soon" | "overdue" | "paid";
 
+function billRowKey(bill: BillProgress) {
+  return `${bill.billId}:${bill.splitId}`;
+}
+
 function BillRows({
   items,
   empty,
-  onEdit,
-  onMarkPaid,
+  onOpen,
 }: {
   items: BillProgress[];
   empty?: string;
-  onEdit: (billId: string) => void;
-  onMarkPaid: (billId: string, splitId: string) => void;
+  onOpen: (bill: BillProgress) => void;
 }) {
   if (items.length === 0) {
     return empty ? (
@@ -52,9 +56,16 @@ function BillRows({
     <IosList>
       {items.map((bill) => (
         <IosListRow
-          key={`${bill.billId}-${bill.splitId}`}
+          key={billRowKey(bill)}
           title={bill.name}
-          subtitle={`${bill.statusLabel} · ${bill.formattedDueDate}`}
+          subtitle={[
+            bill.statusLabel,
+            bill.formattedDueDate,
+            bill.recurring ? "Recurring" : null,
+            bill.autopay ? "Autopay" : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
           leading={
             <IosAvatar
               fallback={bill.name.slice(0, 1).toUpperCase()}
@@ -67,25 +78,94 @@ function BillRows({
               }
             />
           }
-          trailing={
-            <div className="flex flex-col items-end gap-1">
-              <span>{formatCurrency(bill.remainingAmount || bill.amount)}</span>
-              {bill.status !== "paid" ? (
-                <button
-                  type="button"
-                  className="text-[12px] font-semibold text-[var(--accent-light)]"
-                  onClick={() => onMarkPaid(bill.billId, bill.splitId)}
-                >
-                  Mark paid
-                </button>
-              ) : null}
-            </div>
-          }
-          onClick={() => onEdit(bill.billId)}
+          trailing={formatCurrency(bill.remainingAmount || bill.amount)}
+          onClick={() => {
+            void triggerHaptic("selection");
+            onOpen(bill);
+          }}
           danger={bill.status === "overdue"}
         />
       ))}
     </IosList>
+  );
+}
+
+function DetailLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start justify-between gap-4 border-b border-white/[0.06] py-3 last:border-b-0">
+      <p className="text-[13px] text-[var(--text-muted)]">{label}</p>
+      <p className="max-w-[65%] text-right text-[15px] font-medium text-[var(--foreground)]">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function BillDetail({
+  bill,
+  source,
+  onMarkPaid,
+  onEdit,
+}: {
+  bill: BillProgress;
+  source: Bill | null;
+  onMarkPaid: () => void;
+  onEdit: () => void;
+}) {
+  const frequency = source?.frequency ? getBillFrequencyLabel(source.frequency) : null;
+
+  return (
+    <div>
+      <p className="text-center text-[34px] font-semibold leading-none tracking-tight tabular-nums text-[var(--foreground)]">
+        {formatCurrency(bill.remainingAmount || bill.amount)}
+      </p>
+      <p className="mt-2 text-center text-[13px] text-[var(--text-muted)]">
+        {bill.status === "paid" ? "Paid" : "Remaining"} · {bill.formattedDueDate}
+      </p>
+      <div className="mt-5 rounded-[16px] bg-white/[0.04] px-3.5">
+        <DetailLine label="Status" value={bill.statusLabel} />
+        <DetailLine label="Due" value={bill.formattedDueDate} />
+        <DetailLine label="Category" value={bill.category || "Bill"} />
+        <DetailLine
+          label="Schedule"
+          value={
+            bill.recurring
+              ? frequency
+                ? `Recurring · ${frequency}`
+                : "Recurring"
+              : "One time"
+          }
+        />
+        <DetailLine label="Autopay" value={bill.autopay ? "On" : "Off"} />
+        {bill.paidAmount > 0 ? (
+          <DetailLine label="Paid so far" value={formatCurrency(bill.paidAmount)} />
+        ) : null}
+      </div>
+      <div className="mt-4 flex gap-2">
+        {bill.status !== "paid" ? (
+          <button
+            type="button"
+            className="min-h-12 flex-1 rounded-[14px] bg-[var(--accent)] text-[16px] font-semibold text-white active:opacity-90"
+            onClick={() => {
+              void triggerHaptic("light");
+              onMarkPaid();
+            }}
+          >
+            Mark paid
+          </button>
+        ) : null}
+        <button
+          type="button"
+          className="min-h-12 flex-1 rounded-[14px] bg-white/[0.06] text-[16px] font-semibold text-[var(--foreground)] active:opacity-90"
+          onClick={() => {
+            void triggerHaptic("light");
+            onEdit();
+          }}
+        >
+          Edit
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -101,6 +181,7 @@ export function IosBillsScreen() {
   const { showToast } = useToast();
   const [createOpen, setCreateOpen] = useState(false);
   const [editBillId, setEditBillId] = useState<string | null>(null);
+  const [selectedBill, setSelectedBill] = useState<BillProgress | null>(null);
   const [tab, setTab] = useState<BillsTab>("due_soon");
 
   const upcoming = useMemo(() => getUpcomingBills(finance), [finance]);
@@ -248,8 +329,7 @@ export function IosBillsScreen() {
                 ? "No paid bills this month yet."
                 : "Nothing due soon."
           }
-          onEdit={setEditBillId}
-          onMarkPaid={(billId, splitId) => void handleMarkPaid(billId, splitId)}
+          onOpen={setSelectedBill}
         />
       )}
 
@@ -274,6 +354,26 @@ export function IosBillsScreen() {
         </IosCard>
       </IosSection>
 
+      <IosBottomSheet
+        open={selectedBill !== null}
+        title={selectedBill?.name}
+        onClose={() => setSelectedBill(null)}
+      >
+        {selectedBill ? (
+          <BillDetail
+            bill={selectedBill}
+            source={bills.find((item) => item.id === selectedBill.billId) ?? null}
+            onMarkPaid={() => {
+              void handleMarkPaid(selectedBill.billId, selectedBill.splitId);
+              setSelectedBill(null);
+            }}
+            onEdit={() => {
+              setEditBillId(selectedBill.billId);
+              setSelectedBill(null);
+            }}
+          />
+        ) : null}
+      </IosBottomSheet>
       <AddBillModal isOpen={createOpen} onClose={() => setCreateOpen(false)} />
       <EditBillModal bill={editBill as Bill | null} onClose={() => setEditBillId(null)} />
     </IosScreen>
