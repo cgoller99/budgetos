@@ -10,6 +10,32 @@ export function normalizeMerchantKey(value: string): string {
     .trim();
 }
 
+const MERCHANT_NOISE_TOKENS = new Set([
+  "com",
+  "net",
+  "org",
+  "www",
+  "pos",
+  "ach",
+  "debit",
+  "credit",
+  "purchase",
+  "checkcard",
+]);
+
+/** Grouping key for the same merchant across bank description variants. */
+export function merchantGroupKey(value: string): string {
+  return normalizeMerchantKey(value)
+    .split(" ")
+    .filter(
+      (token) =>
+        token.length > 0 &&
+        !MERCHANT_NOISE_TOKENS.has(token) &&
+        !/^\d{2,}$/.test(token),
+    )
+    .join(" ");
+}
+
 export function transactionLabel(transaction: {
   notes?: string | null;
   category?: string | null;

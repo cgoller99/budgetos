@@ -2,6 +2,7 @@ import type { FinanceEventTone } from "@/lib/events/types";
 
 export type AutomationSuggestionKind =
   | "recurring_bill"
+  | "bill_price_increase"
   | "paycheck_detected"
   | "goal_fundable"
   | "extra_paycheck_month"

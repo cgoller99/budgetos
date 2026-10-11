@@ -44,6 +44,9 @@ export function IncomeForecastPanel() {
             description={`${forecast.paycheckCount} paychecks · ${forecast.horizonDays} days`}
           />
           <CardContent className="space-y-3">
+            <p className="text-xs text-[var(--text-muted)]">
+              Estimate from your Income Plan. Not a confirmed transaction.
+            </p>
             {forecast.envelopes.slice(0, 6).map((envelope) => (
               <div
                 key={envelope.envelopeId}
