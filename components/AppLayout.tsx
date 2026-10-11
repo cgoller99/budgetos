@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { DemoModeBanner } from "@/components/demo/DemoModeBanner";
 import { RecurringBillsPrompt } from "@/components/bills/RecurringBillsPrompt";
@@ -53,6 +53,27 @@ export function AppLayout({ children }: AppLayoutProps) {
     await refreshFinance();
     router.refresh();
   }, [refreshFinance, router]);
+
+  useEffect(() => {
+    if (!nativeIos) return;
+    let wasOffline = navigator.onLine === false;
+
+    const markOffline = () => {
+      wasOffline = true;
+    };
+    const refreshAfterReconnect = () => {
+      if (!wasOffline) return;
+      wasOffline = false;
+      void refreshFinance();
+    };
+
+    window.addEventListener("offline", markOffline);
+    window.addEventListener("online", refreshAfterReconnect);
+    return () => {
+      window.removeEventListener("offline", markOffline);
+      window.removeEventListener("online", refreshAfterReconnect);
+    };
+  }, [nativeIos, refreshFinance]);
 
   const content = (
     <>

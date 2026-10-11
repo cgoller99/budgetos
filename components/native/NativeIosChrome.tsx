@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { keyboardOverlapPx } from "@/lib/native/keyboardInset";
 import { useNativeIos } from "@/lib/native/useNativeIos";
 
 function isEditableField(target: EventTarget | null): target is HTMLElement {
@@ -51,14 +52,30 @@ export function NativeIosChrome() {
       }
     };
 
+    const syncKeyboardInset = () => {
+      const viewport = window.visualViewport;
+      const overlap = keyboardOverlapPx({
+        innerHeight: window.innerHeight,
+        viewportHeight: viewport?.height ?? window.innerHeight,
+        offsetTop: viewport?.offsetTop ?? 0,
+      });
+      document.documentElement.style.setProperty("--keyboard-inset", `${overlap}px`);
+    };
+
     document.addEventListener("focusin", onFocusIn);
     window.visualViewport?.addEventListener("resize", onViewportResize);
+    window.visualViewport?.addEventListener("resize", syncKeyboardInset);
+    window.visualViewport?.addEventListener("scroll", syncKeyboardInset);
+    syncKeyboardInset();
 
     return () => {
       window.removeEventListener("online", syncConnection);
       window.removeEventListener("offline", syncConnection);
       document.removeEventListener("focusin", onFocusIn);
       window.visualViewport?.removeEventListener("resize", onViewportResize);
+      window.visualViewport?.removeEventListener("resize", syncKeyboardInset);
+      window.visualViewport?.removeEventListener("scroll", syncKeyboardInset);
+      document.documentElement.style.setProperty("--keyboard-inset", "0px");
     };
   }, [nativeIos]);
 

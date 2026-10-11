@@ -97,7 +97,8 @@
     "test:ios-bills-sheet": "node scripts/test-ios-bills-sheet.mjs",
     "test:ios-plan-sheets": "node scripts/test-ios-plan-sheets.mjs",
     "test:ios-keyboard-offline": "node scripts/test-ios-keyboard-offline.mjs",
-    "test:ios-remaining-screens": "node scripts/test-ios-remaining-screens.mjs"
+    "test:ios-remaining-screens": "node scripts/test-ios-remaining-screens.mjs",
+    "test:ios-sheet-editing": "node --experimental-strip-types scripts/test-ios-sheet-editing.mjs"
   },
   "dependencies": {
     "@apple/app-store-server-library": "^3.1.0",

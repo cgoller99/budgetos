@@ -17,6 +17,7 @@ import {
 import { navigateSettingsDeepLink } from "@/lib/native/navigateSettingsHash";
 import { triggerHaptic } from "@/lib/native/haptics";
 import { useNativeIos } from "@/lib/native/useNativeIos";
+import { lockBodyScroll, unlockBodyScroll } from "@/lib/ui/bodyScrollLock";
 import { IosTintIcon } from "@/components/native/ios/IosPrimitives";
 
 const IOS_MORE_ICON_TONE: Record<
@@ -56,6 +57,11 @@ export function MobileMoreSheet({
   const sheetRef = useRef<HTMLDivElement>(null);
   const dragOrigin = useRef<number | null>(null);
   const dragOffsetRef = useRef(0);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   const iosGroups = useMemo(() => {
     if (!nativeIos) return [];
@@ -84,17 +90,16 @@ export function MobileMoreSheet({
 
   useEffect(() => {
     if (!open) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    lockBodyScroll();
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") onCloseRef.current();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => {
-      document.body.style.overflow = previousOverflow;
+      unlockBodyScroll();
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [open, onClose]);
+  }, [open]);
 
   useEffect(() => {
     if (animating) {
@@ -164,7 +169,7 @@ export function MobileMoreSheet({
         className={cn(
           "fixed inset-x-0 bottom-0 z-50 max-h-[78vh] overflow-y-auto rounded-t-[22px] border border-[var(--surface-border)] bg-[var(--background)] px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 transition-transform duration-220 ease-out lg:hidden",
           nativeIos &&
-            "native-sheet ios-more-sheet max-h-[92vh] rounded-t-[14px] border-white/[0.08] bg-[#0b0f14] px-3 pt-2",
+            "native-sheet native-keyboard-avoid ios-more-sheet max-h-[92vh] rounded-t-[14px] border-white/[0.08] bg-[#0b0f14] px-3 pt-2",
           animating
             ? "pointer-events-auto translate-y-0"
             : "pointer-events-none translate-y-full",

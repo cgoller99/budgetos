@@ -8,6 +8,7 @@ import { formatCurrency, formatMonthlyChange } from "@/lib/finance/format";
 import type { Account, BankConnection, Transaction } from "@/lib/finance/types";
 import { triggerHaptic } from "@/lib/native/haptics";
 import { cn } from "@/components/ui/cn";
+import { lockBodyScroll, unlockBodyScroll } from "@/lib/ui/bodyScrollLock";
 
 type IosAccountDetailSheetProps = {
   account: Account | null;
@@ -62,15 +63,14 @@ export function IosAccountDetailSheet({
       const frame = window.requestAnimationFrame(() => {
         window.requestAnimationFrame(() => setAnimating(true));
       });
-      const previousOverflow = document.body.style.overflow;
-      document.body.style.overflow = "hidden";
+      lockBodyScroll();
       const onKeyDown = (event: KeyboardEvent) => {
         if (event.key === "Escape") onCloseRef.current();
       };
       window.addEventListener("keydown", onKeyDown);
       return () => {
         window.cancelAnimationFrame(frame);
-        document.body.style.overflow = previousOverflow;
+        unlockBodyScroll();
         window.removeEventListener("keydown", onKeyDown);
       };
     }
@@ -119,7 +119,7 @@ export function IosAccountDetailSheet({
         aria-modal="true"
         aria-label="Account details"
         className={cn(
-          "native-sheet absolute inset-x-0 bottom-0 max-h-[88dvh] overflow-y-auto rounded-t-[22px] border border-white/[0.08] border-b-0 bg-[#0b0f14] px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-2 transition-transform duration-200 ease-out",
+          "native-sheet native-keyboard-avoid absolute inset-x-0 bottom-0 max-h-[88dvh] overflow-y-auto rounded-t-[22px] border border-white/[0.08] border-b-0 bg-[#0b0f14] px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-2 transition-transform duration-200 ease-out",
           animating ? "translate-y-0" : "translate-y-full",
         )}
         style={

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   IosAvatar,
   IosCard,
+  IosDetailLine,
   IosDonut,
   IosHeroMetric,
   IosIconButton,
@@ -398,9 +399,15 @@ export function IosIncomeScreen() {
             <p className="mt-2 text-center text-[13px] text-[var(--text-muted)]">
               {selectedSource.frequencyLabel} · {selectedSource.statusLabel}
             </p>
-            <div className="mt-5 rounded-[16px] bg-white/[0.04] px-3.5 py-3 text-[14px] text-[var(--text-secondary)]">
-              <p>Next pay {selectedSource.nextPayDate || "not scheduled"}</p>
-              <p className="mt-1">Deposits to {selectedSource.depositAccountName || "unassigned"}</p>
+            <div className="mt-5 rounded-[16px] bg-white/[0.04] px-3.5">
+              <IosDetailLine
+                label="Next pay"
+                value={selectedSource.nextPayDate || "not scheduled"}
+              />
+              <IosDetailLine
+                label="Deposits to"
+                value={selectedSource.depositAccountName || "unassigned"}
+              />
             </div>
             <div className="mt-4 flex gap-2">
               {selectedSource.canMarkReceived ? (
@@ -425,6 +432,7 @@ export function IosIncomeScreen() {
                 type="button"
                 className="min-h-12 flex-1 rounded-[14px] bg-white/[0.06] text-[16px] font-semibold text-[var(--foreground)]"
                 onClick={() => {
+                  void triggerHaptic("light");
                   const source = findIncome(selectedSource.id);
                   setSelectedSource(null);
                   if (source) setEditIncomeId(source.id);

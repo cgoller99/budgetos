@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import {
   IosAvatar,
   IosCard,
+  IosDetailLine,
   IosHeroMetric,
   IosIconButton,
   IosProgressBar,
@@ -206,11 +207,12 @@ export function IosDebtScreen() {
                 {row.progressLabel} · {row.interestRate}% APR
               </p>
               <IosProgressBar value={row.progressPercent} className="mt-4" />
-              <div className="mt-4 rounded-[16px] bg-white/[0.04] px-3.5 py-3 text-[14px] text-[var(--text-secondary)]">
-                <p>Minimum {formatCurrency(row.minimumPayment)}</p>
-                <p className="mt-1">Due {row.dueDate}</p>
-                <p className="mt-1">{row.accountTypeLabel}</p>
-                <p className="mt-1">Debt-free target {summary.estimatedDebtFreeDate}</p>
+              <div className="mt-5 rounded-[16px] bg-white/[0.04] px-3.5">
+                <IosDetailLine label="Minimum" value={formatCurrency(row.minimumPayment)} />
+                <IosDetailLine label="APR" value={`${row.interestRate}%`} />
+                <IosDetailLine label="Due" value={row.dueDate} />
+                <IosDetailLine label="Type" value={row.accountTypeLabel} />
+                <IosDetailLine label="Debt-free" value={summary.estimatedDebtFreeDate} />
               </div>
               <div className="mt-4 flex gap-2">
                 <button
