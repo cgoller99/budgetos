@@ -1,5 +1,6 @@
 import type { FinanceData, Transaction } from "@/lib/finance/types";
 import { getDisplayCategory } from "@/lib/transactions/categoryPresentation";
+import { isRefundActivity } from "@/lib/transactions/refunds";
 
 /** Peer-payment apps — do NOT treat as internal transfers unless paired. */
 const PEER_PAYMENT_PATTERNS = [
@@ -190,7 +191,9 @@ export function filterRealIncomeTransactions(
   transactions: Transaction[],
 ): Transaction[] {
   return transactions.filter(
-    (transaction) => !isInternalTransferIncome(data, transaction),
+    (transaction) =>
+      !isInternalTransferIncome(data, transaction) &&
+      !isRefundActivity(transaction),
   );
 }
 

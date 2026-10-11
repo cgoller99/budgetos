@@ -31,6 +31,7 @@ export function TransactionRow({
   const transferName = transaction.transferAccountId
     ? getLinkedAccountName(data, transaction.transferAccountId)
     : null;
+  const isRefund = transaction.type === "expense" && transaction.amount < 0;
   const signedAmount =
     transaction.type === "expense"
       ? -transaction.amount
@@ -61,8 +62,8 @@ export function TransactionRow({
         <p
           className={cn(
             listRowAmountClassName,
-            transaction.type === "income" && "text-[var(--success)]",
-            transaction.type === "expense" && "text-[var(--danger)]",
+            (transaction.type === "income" || isRefund) && "text-[var(--success)]",
+            transaction.type === "expense" && !isRefund && "text-[var(--danger)]",
             transaction.type === "transfer" && "text-[var(--accent-light)]",
           )}
         >

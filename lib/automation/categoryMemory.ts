@@ -1,4 +1,5 @@
 import { merchantGroupKey } from "@/lib/bills/merchantMatch";
+import { getDisplayCategory } from "@/lib/transactions/categoryPresentation";
 
 export type RememberedCategory = {
   notes?: string | null;
@@ -29,7 +30,9 @@ export function buildMerchantCategoryMemory(
 
 /**
  * Existing rows keep the stored category so a later sync cannot undo an edit.
- * New rows reuse the latest category saved for that merchant.
+ * New rows reuse a real correction. A remembered label in the same display
+ * bucket is upgraded to the canonical category instead of freezing the raw
+ * Plaid string.
  */
 export function categoryForSyncedTransaction(input: {
   isNew: boolean;
@@ -38,6 +41,8 @@ export function categoryForSyncedTransaction(input: {
   merchantKey: string;
   memory: Map<string, string>;
 }): string {
+  const canonicalIncoming = getDisplayCategory(input.incomingCategory);
+
   if (!input.isNew) {
     const existing = input.existingCategory?.trim();
     if (existing) {
@@ -46,9 +51,13 @@ export function categoryForSyncedTransaction(input: {
   }
 
   const remembered = input.memory.get(input.merchantKey)?.trim();
-  if (remembered) {
-    return remembered;
+  if (!remembered) {
+    return canonicalIncoming;
   }
 
-  return input.incomingCategory;
+  if (getDisplayCategory(remembered) === canonicalIncoming) {
+    return canonicalIncoming;
+  }
+
+  return remembered;
 }

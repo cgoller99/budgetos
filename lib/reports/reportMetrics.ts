@@ -8,6 +8,7 @@ import {
   calculateMonthlySpendingFromLedger,
 } from "@/lib/calculations/spending";
 import { getDisplayCategory } from "@/lib/transactions/categoryPresentation";
+import { isRefundActivity } from "@/lib/transactions/refunds";
 import {
   filterRealExpenseTransactions,
   filterRealIncomeTransactions,
@@ -116,21 +117,34 @@ export function computeCategoryBreakdown(
   );
 
   for (const transaction of realExpenses) {
-    // Presentation label only — raw category remains on the transaction.
     const category = getDisplayCategory(transaction.category);
     totals.set(category, (totals.get(category) ?? 0) + transaction.amount);
   }
 
-  const grandTotal = Array.from(totals.values()).reduce(
-    (sum, amount) => sum + amount,
-    0,
-  );
+  for (const transaction of data.transactions ?? []) {
+    if (transaction.type !== "income" || !isRefundActivity(transaction)) {
+      continue;
+    }
 
-  return Array.from(totals.entries())
+    const display = getDisplayCategory(transaction.category);
+    const bucket =
+      display === "Income" ||
+      display === "Payroll" ||
+      display === "Interest" ||
+      display === "Transfers"
+        ? "Refund"
+        : display;
+    totals.set(bucket, (totals.get(bucket) ?? 0) - Math.abs(transaction.amount));
+  }
+
+  const positive = Array.from(totals.entries()).filter(([, amount]) => amount > 0);
+  const positiveTotal = positive.reduce((sum, [, amount]) => sum + amount, 0);
+
+  return positive
     .map(([category, amount]) => ({
       category,
       amount,
-      percent: grandTotal > 0 ? (amount / grandTotal) * 100 : 0,
+      percent: positiveTotal > 0 ? (amount / positiveTotal) * 100 : 0,
     }))
     .sort((left, right) => right.amount - left.amount);
 }

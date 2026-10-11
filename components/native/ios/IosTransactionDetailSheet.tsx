@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { formatCurrency } from "@/lib/finance/format";
 import type { FinanceData, Transaction } from "@/lib/finance/types";
 import { getLinkedAccountName } from "@/lib/transactions/accountLookup";
+import { isDisplayedInflow } from "@/lib/transactions/refunds";
 import { isConfidentInternalTransfer } from "@/lib/transactions/transferDetection";
 import { formatTransactionDate, getTransactionTypeLabel } from "@/lib/transactions";
 import {
@@ -102,7 +103,7 @@ export function IosTransactionDetailSheet({
   }
 
   const isTransfer = isConfidentInternalTransfer(finance, shown);
-  const isIncome = shown.type === "income" && !isTransfer;
+  const isInflow = !isTransfer && isDisplayedInflow(shown);
   const label = getDisplayMerchant({
     notes: shown.notes,
     category: shown.category,
@@ -165,10 +166,10 @@ export function IosTransactionDetailSheet({
         <p
           className={cn(
             "text-center text-[34px] font-semibold leading-none tracking-tight tabular-nums",
-            isIncome ? "text-[var(--success)]" : isTransfer ? "text-[var(--foreground)]" : "text-[var(--danger)]",
+            isInflow ? "text-[var(--success)]" : isTransfer ? "text-[var(--foreground)]" : "text-[var(--danger)]",
           )}
         >
-          {isIncome ? "+" : isTransfer ? "" : "−"}
+          {isInflow ? "+" : isTransfer ? "" : "−"}
           {formatCurrency(Math.abs(shown.amount))}
         </p>
         <p className="mt-2 text-center text-[17px] font-semibold text-[var(--foreground)]">
@@ -180,7 +181,16 @@ export function IosTransactionDetailSheet({
 
         <div className="mt-5 rounded-[16px] bg-white/[0.04] px-3.5">
           <DetailRow label="Category" value={category} />
-          <DetailRow label="Type" value={isTransfer ? "Transfer" : getTransactionTypeLabel(shown.type)} />
+          <DetailRow
+            label="Type"
+            value={
+              isTransfer
+                ? "Transfer"
+                : shown.type === "expense" && shown.amount < 0
+                  ? "Refund"
+                  : getTransactionTypeLabel(shown.type)
+            }
+          />
           <DetailRow label="Account" value={accountName} />
           {transferName ? <DetailRow label="Transfer to" value={transferName} /> : null}
           {billName ? <DetailRow label="Bill" value={billName} /> : null}

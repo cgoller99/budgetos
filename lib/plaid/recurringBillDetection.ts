@@ -247,7 +247,7 @@ function toDetectionItemsFromPlaid(
   financeData?: FinanceData,
 ): DetectionItem[] {
   return transactions
-    .filter((transaction) => transaction.type === "expense")
+    .filter((transaction) => transaction.type === "expense" && transaction.amount > 0)
     .map((transaction) => {
       const internal = financeData?.transactions.find(
         (item) => item.externalTransactionId === transaction.externalTransactionId,

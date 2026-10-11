@@ -113,6 +113,8 @@ export type PlaidMappedTransaction = {
   notes: string;
   name: string;
   isPending?: boolean;
+  /** Plaid id of the pending row this posted transaction replaces. */
+  pendingTransactionId?: string | null;
 };
 
 export type PlaidRecurringCandidate = RecurringBillCandidate;

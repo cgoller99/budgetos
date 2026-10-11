@@ -12,15 +12,18 @@ import {
   isIncomeSourceActive,
 } from "@/lib/finance/effectiveIncome";
 import { filterPersonalIncomeSources } from "@/lib/finance/personalIncomeScope";
+import { isRefundActivity } from "@/lib/transactions/refunds";
 
 function sum(values: number[]): number {
   return values.reduce((total, value) => total + value, 0);
 }
 
-function hasPlaidIncomeHistory(data: FinanceData): boolean {
+export function hasPlaidIncomeHistory(data: FinanceData): boolean {
   return (data.transactions ?? []).some(
     (transaction) =>
-      Boolean(transaction.externalTransactionId) && transaction.type === "income",
+      Boolean(transaction.externalTransactionId) &&
+      transaction.type === "income" &&
+      !isRefundActivity(transaction),
   );
 }
 

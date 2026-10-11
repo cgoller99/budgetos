@@ -1,6 +1,7 @@
 import type { FinanceData } from "@/lib/finance/types";
 import { toMonthlyAmount } from "@/lib/calculations/monthlyAmount";
 import { getTransactionsForMonth } from "@/lib/transactions";
+import { isRefundActivity } from "@/lib/transactions/refunds";
 import { isInternalTransferExpense } from "@/lib/transactions/transferDetection";
 
 function sum(values: number[]): number {
@@ -43,6 +44,19 @@ function matchesRecurringBill(params: {
 
   const tolerance = Math.max(params.billAmount * 0.05, 1);
   return Math.abs(params.transactionAmount - params.billAmount) <= tolerance;
+}
+
+/**
+ * Refunds already stored as income are not expenses, so subtract them once.
+ * Negative expense amounts already reduce the expense sum.
+ */
+function incomeRefundOffset(data: FinanceData, referenceDate: Date): number {
+  return getTransactionsForMonth(data, referenceDate)
+    .filter(
+      (transaction) =>
+        transaction.type === "income" && isRefundActivity(transaction),
+    )
+    .reduce((total, transaction) => total + Math.abs(transaction.amount), 0);
 }
 
 function getCurrentMonthExpenseTransactions(
@@ -151,6 +165,7 @@ export function calculateMonthlySpendingForMoneyFlow(
   referenceDate = new Date(),
 ): number {
   const recurringBills = recurringBillMonthlyTotal(data);
+  const refundOffset = incomeRefundOffset(data, referenceDate);
   const ledgerExpenses = sum(
     getCurrentMonthExpenseTransactions(data, referenceDate).map(
       (transaction) => transaction.amount,
@@ -158,11 +173,11 @@ export function calculateMonthlySpendingForMoneyFlow(
   );
 
   if (recurringBills <= 0) {
-    return ledgerExpenses;
+    return ledgerExpenses - refundOffset;
   }
 
   const discretionary = sumDiscretionaryExpenses(data, referenceDate);
-  return recurringBills + discretionary;
+  return recurringBills + discretionary - refundOffset;
 }
 
 /**
@@ -172,10 +187,12 @@ export function calculateMonthlySpendingFromLedger(
   data: FinanceData,
   referenceDate = new Date(),
 ): number {
-  return sum(
-    getCurrentMonthExpenseTransactions(data, referenceDate).map(
-      (transaction) => transaction.amount,
-    ),
+  return (
+    sum(
+      getCurrentMonthExpenseTransactions(data, referenceDate).map(
+        (transaction) => transaction.amount,
+      ),
+    ) - incomeRefundOffset(data, referenceDate)
   );
 }
 
