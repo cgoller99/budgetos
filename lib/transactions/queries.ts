@@ -1,5 +1,6 @@
 import type { FinanceData, Transaction, TransactionType } from "@/lib/finance/types";
 import { getLinkedAccountName } from "@/lib/transactions/accountLookup";
+import { isRefundActivity } from "@/lib/transactions/refunds";
 import {
   filterRealExpenseTransactions,
   filterRealIncomeTransactions,
@@ -174,10 +175,18 @@ export function getTransactionSummary(data: FinanceData) {
     data,
     currentMonth.filter((transaction) => transaction.type === "income"),
   ).reduce((total, transaction) => total + transaction.amount, 0);
-  const monthExpenses = filterRealExpenseTransactions(
-    data,
-    currentMonth.filter((transaction) => transaction.type === "expense"),
-  ).reduce((total, transaction) => total + transaction.amount, 0);
+  const incomeRefunds = currentMonth
+    .filter(
+      (transaction) =>
+        transaction.type === "income" && isRefundActivity(transaction),
+    )
+    .reduce((total, transaction) => total + Math.abs(transaction.amount), 0);
+  const monthExpenses =
+    filterRealExpenseTransactions(
+      data,
+      currentMonth.filter((transaction) => transaction.type === "expense"),
+    ).reduce((total, transaction) => total + transaction.amount, 0) -
+    incomeRefunds;
 
   return {
     count: (data.transactions ?? []).length,

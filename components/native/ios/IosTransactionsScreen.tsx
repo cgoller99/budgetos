@@ -36,6 +36,7 @@ import {
   getDisplayCategory,
   getDisplayMerchant,
 } from "@/lib/transactions/categoryPresentation";
+import { isDisplayedInflow } from "@/lib/transactions/refunds";
 import { isConfidentInternalTransfer } from "@/lib/transactions/transferDetection";
 import { hasLinkedFinancialAccounts } from "@/lib/transactions/accountLookup";
 import { isPlaidClientEnabled } from "@/lib/plaid/clientConfig";
@@ -277,7 +278,7 @@ function IosTransactionsScreenInner() {
                     category: transaction.category,
                     type: isTransfer ? "transfer" : transaction.type,
                   });
-                  const isIncome = transaction.type === "income" && !isTransfer;
+                  const isInflow = !isTransfer && isDisplayedInflow(transaction);
                   const highlighted = highlightedTransactionId === transaction.id;
 
                   return (
@@ -299,7 +300,7 @@ function IosTransactionsScreenInner() {
                       >
                         <IosAvatar
                           fallback={label.slice(0, 1).toUpperCase()}
-                          tone={isIncome ? "success" : "muted"}
+                          tone={isInflow ? "success" : "muted"}
                         />
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-[15px] font-medium text-[var(--foreground)]">
@@ -312,10 +313,10 @@ function IosTransactionsScreenInner() {
                         <span
                           className={cn(
                             "shrink-0 text-[15px] font-medium tabular-nums",
-                            isIncome ? "text-[var(--success)]" : "text-[var(--danger)]",
+                            isInflow ? "text-[var(--success)]" : "text-[var(--danger)]",
                           )}
                         >
-                          {isIncome ? "+" : "−"}
+                          {isInflow ? "+" : "−"}
                           {formatCurrency(Math.abs(transaction.amount))}
                         </span>
                       </button>

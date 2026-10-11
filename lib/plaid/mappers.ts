@@ -8,6 +8,12 @@ import type {
   PlaidRecurringCandidate,
 } from "@/lib/plaid/types";
 import { detectRecurringBillCandidatesFromPlaidTransactions } from "@/lib/plaid/recurringBillDetection";
+import {
+  categoryForMerchantRefund,
+  cleanMerchantName,
+  isMerchantRefund,
+} from "@/lib/plaid/transactionIntelligence";
+import { getDisplayCategory } from "@/lib/transactions/categoryPresentation";
 
 function toNumber(value: number | null | undefined): number {
   if (typeof value !== "number" || Number.isNaN(value)) {
@@ -263,6 +269,14 @@ function resolvePlaidTransactionType(
     return "transfer";
   }
 
+  if (primary === "LOAN_PAYMENTS") {
+    return "transfer";
+  }
+
+  if (isMerchantRefund(transaction)) {
+    return "expense";
+  }
+
   const amount = toNumber(transaction.amount);
   const isCreditCard =
     accountContext?.recordKind === "debt" &&
@@ -280,10 +294,6 @@ function resolvePlaidTransactionType(
     return "income";
   }
 
-  if (primary === "LOAN_PAYMENTS") {
-    return "transfer";
-  }
-
   return amount < 0 ? "income" : "expense";
 }
 
@@ -292,22 +302,31 @@ export function mapPlaidTransaction(
   accountContext?: Pick<PlaidMappedAccount, "recordKind" | "type">,
 ): PlaidMappedTransaction {
   const amount = toNumber(transaction.amount);
-  const normalizedAmount = Math.abs(amount);
-  const merchantName =
-    transaction.merchant_name?.trim() ||
-    transaction.name?.trim() ||
-    "Transaction";
+  const type = resolvePlaidTransactionType(transaction, accountContext);
+  const merchantName = cleanMerchantName(
+    transaction.merchant_name?.trim() || transaction.name?.trim() || "",
+  );
+  const canonicalCategory = getDisplayCategory(mapPlaidCategory(transaction));
+  const category =
+    type === "expense" && isMerchantRefund(transaction)
+      ? categoryForMerchantRefund(transaction, canonicalCategory)
+      : canonicalCategory;
+  const normalizedAmount =
+    type === "expense" && isMerchantRefund(transaction)
+      ? -Math.abs(amount)
+      : Math.abs(amount);
 
   return {
     externalTransactionId: transaction.transaction_id,
     externalAccountId: transaction.account_id,
     amount: normalizedAmount,
-    type: resolvePlaidTransactionType(transaction, accountContext),
-    category: mapPlaidCategory(transaction),
+    type,
+    category,
     date: transaction.date,
     notes: merchantName,
     name: merchantName,
     isPending: transaction.pending === true,
+    pendingTransactionId: transaction.pending_transaction_id ?? null,
   };
 }
 

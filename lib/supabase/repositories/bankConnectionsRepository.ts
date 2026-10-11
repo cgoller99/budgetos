@@ -19,6 +19,10 @@ import {
 } from "@/lib/automation/categoryMemory";
 import { merchantGroupKey } from "@/lib/bills/merchantMatch";
 import { mapPlaidAccount } from "@/lib/plaid/mappers";
+import {
+  pendingIdsSupersededByPosted,
+  reclassifyOwnedAccountTransfers,
+} from "@/lib/plaid/transactionIntelligence";
 
 function toNumber(value: number | string | null | undefined): number {
   if (typeof value === "number") return value;
@@ -540,6 +544,7 @@ export class BankConnectionsRepository {
     let skippedMissingAccount = 0;
     let skippedPending = 0;
     const timestamp = new Date().toISOString();
+    const transactions = reclassifyOwnedAccountTransfers(input.transactions);
     const { data: rememberedRows, error: memoryError } = await this.supabase
       .from("transactions")
       .select("notes, name, category, transaction_date")
@@ -557,7 +562,7 @@ export class BankConnectionsRepository {
           })),
         );
 
-    for (const transaction of input.transactions) {
+    for (const transaction of transactions) {
       if (transaction.isPending) {
         skippedPending += 1;
         continue;
@@ -632,12 +637,19 @@ export class BankConnectionsRepository {
       added += 1;
     }
 
-    if (input.removedExternalIds.length > 0) {
+    const idsToRemove = [
+      ...new Set([
+        ...input.removedExternalIds,
+        ...pendingIdsSupersededByPosted(transactions),
+      ]),
+    ];
+
+    if (idsToRemove.length > 0) {
       const { data, error } = await this.supabase
         .from("transactions")
         .delete()
         .eq("user_id", input.userId)
-        .in("external_transaction_id", input.removedExternalIds)
+        .in("external_transaction_id", idsToRemove)
         .select("id");
 
       if (error) {

@@ -5,6 +5,7 @@ import { getGoalProgressList } from "@/lib/finance/goals";
 import { getSafeToSpend } from "@/lib/finance/safeToSpend";
 import type { FinanceData, Transaction } from "@/lib/finance/types";
 import { getDisplayCategory } from "@/lib/transactions/categoryPresentation";
+import { isRefundActivity } from "@/lib/transactions/refunds";
 import { isConfidentInternalTransfer } from "@/lib/transactions/transferDetection";
 
 export type FinancialInsight = {
@@ -43,7 +44,7 @@ function confirmedExpenses(data: FinanceData): Transaction[] {
   return (data.transactions ?? []).filter(
     (transaction) =>
       transaction.type === "expense" &&
-      transaction.amount > 0 &&
+      transaction.amount !== 0 &&
       !isConfidentInternalTransfer(data, transaction),
   );
 }
@@ -214,6 +215,7 @@ export function buildFinancialInsights(
           transaction.type === "income" &&
           transaction.date >= cutoff &&
           transaction.amount > planAmount * 1.08 &&
+          !isRefundActivity(transaction) &&
           !isConfidentInternalTransfer(data, transaction),
       )
       .sort((left, right) => right.date.localeCompare(left.date))[0];

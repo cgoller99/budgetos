@@ -20,7 +20,9 @@ function signedFlow(transaction: ActivityTransaction, accountId: string): number
   }
   if (transaction.accountId !== accountId) return 0;
   if (transaction.type === "income") return amount;
-  if (transaction.type === "expense") return -amount;
+  if (transaction.type === "expense") {
+    return transaction.amount < 0 ? amount : -amount;
+  }
   return 0;
 }
 

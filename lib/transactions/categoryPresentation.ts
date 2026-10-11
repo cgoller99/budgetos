@@ -1,7 +1,7 @@
 /**
- * Presentation-only category normalization.
- * Preserves raw Plaid / ledger category strings in storage;
- * converts them to clean Buxme labels for UI and report grouping.
+ * Category labels used in the product.
+ * New Plaid rows store these labels. Older rows may still have raw Plaid
+ * strings; getDisplayCategory normalizes both for UI and report grouping.
  */
 
 export type DisplayCategory =
@@ -132,7 +132,7 @@ const TITLE_CASE_KNOWN: Record<string, DisplayCategory | string> = {
   salary: "Income",
   freelance: "Income",
   investment: "Income",
-  refund: "Income",
+  refund: "Refund",
   housing: "Home",
   utilities: "Utilities",
   food: "Food & Drink",

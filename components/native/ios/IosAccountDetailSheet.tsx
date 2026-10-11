@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { Sparkline } from "@/components/charts/Sparkline";
 import { CHART_COLORS } from "@/components/charts/constants";
 import { formatCurrency, formatMonthlyChange } from "@/lib/finance/format";
+import { isDisplayedInflow } from "@/lib/transactions/refunds";
 import type { Account, BankConnection, Transaction } from "@/lib/finance/types";
 import { triggerHaptic } from "@/lib/native/haptics";
 import { cn } from "@/components/ui/cn";
@@ -190,14 +191,14 @@ export function IosAccountDetailSheet({
                 <p
                   className={cn(
                     "shrink-0 text-[14px] font-medium tabular-nums",
-                    transaction.type === "income"
+                    isDisplayedInflow(transaction)
                       ? "text-[var(--success)]"
                       : transaction.type === "expense"
                         ? "text-[var(--danger)]"
                         : "text-[var(--text-secondary)]",
                   )}
                 >
-                  {transaction.type === "income" ? "+" : transaction.type === "expense" ? "−" : ""}
+                  {isDisplayedInflow(transaction) ? "+" : transaction.type === "expense" ? "−" : ""}
                   {formatCurrency(Math.abs(transaction.amount))}
                 </p>
               </li>

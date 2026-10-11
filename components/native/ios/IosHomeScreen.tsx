@@ -31,6 +31,7 @@ import {
   getDisplayCategory,
   getDisplayMerchant,
 } from "@/lib/transactions/categoryPresentation";
+import { isDisplayedInflow } from "@/lib/transactions/refunds";
 import { isConfidentInternalTransfer } from "@/lib/transactions/transferDetection";
 import { getPlaidConnectionUiState } from "@/lib/native/plaidConnectionUi";
 import { isPlaidClientEnabled } from "@/lib/plaid/clientConfig";
@@ -371,7 +372,7 @@ export function IosHomeScreen() {
           <IosList>
             {recentTxns.map((transaction) => {
               const isTransfer = isConfidentInternalTransfer(finance, transaction);
-              const isIncome = transaction.type === "income" && !isTransfer;
+              const isInflow = !isTransfer && isDisplayedInflow(transaction);
               const label = getDisplayMerchant({
                 notes: transaction.notes,
                 category: transaction.category,
@@ -388,16 +389,16 @@ export function IosHomeScreen() {
                   leading={
                     <IosAvatar
                       fallback={label.slice(0, 1).toUpperCase()}
-                      tone={isIncome ? "success" : "muted"}
+                      tone={isInflow ? "success" : "muted"}
                     />
                   }
                   trailing={
                     <span
                       className={cn(
-                        isIncome ? "text-[var(--success)]" : "text-[var(--foreground)]",
+                        isInflow ? "text-[var(--success)]" : "text-[var(--foreground)]",
                       )}
                     >
-                      {isIncome ? "+" : "−"}
+                      {isInflow ? "+" : "−"}
                       {formatCurrency(Math.abs(transaction.amount))}
                     </span>
                   }
