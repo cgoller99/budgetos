@@ -165,10 +165,10 @@ export function IosTransactionDetailSheet({
         <p
           className={cn(
             "text-center text-[34px] font-semibold leading-none tracking-tight tabular-nums",
-            isIncome ? "text-[var(--success)]" : "text-[var(--foreground)]",
+            isIncome ? "text-[var(--success)]" : isTransfer ? "text-[var(--foreground)]" : "text-[var(--danger)]",
           )}
         >
-          {isIncome ? "+" : "−"}
+          {isIncome ? "+" : isTransfer ? "" : "−"}
           {formatCurrency(Math.abs(shown.amount))}
         </p>
         <p className="mt-2 text-center text-[17px] font-semibold text-[var(--foreground)]">

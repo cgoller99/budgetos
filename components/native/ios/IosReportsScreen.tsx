@@ -84,7 +84,7 @@ export function IosReportsScreen() {
           <p className="text-[12px] font-medium text-[var(--text-muted)]">
             Spending this month
           </p>
-          <p className="mt-1 text-[18px] font-semibold tabular-nums text-[var(--foreground)]">
+          <p className="mt-1 text-[18px] font-semibold tabular-nums text-[var(--danger)]">
             {formatCurrency(spending)}
           </p>
         </IosCard>
@@ -223,7 +223,7 @@ export function IosReportsScreen() {
           </IosCard>
           <IosCard padding="md">
             <p className="text-[12px] text-[var(--text-muted)]">Spending</p>
-            <p className="mt-1 text-[16px] font-semibold tabular-nums text-[var(--foreground)]">
+            <p className="mt-1 text-[16px] font-semibold tabular-nums text-[var(--danger)]">
               {formatCurrency(spending)}
             </p>
           </IosCard>

@@ -18,6 +18,7 @@ type TopBarProps = {
 function resolveIosTitle(path: string, title: string): string {
   if (path === "/dashboard") return "Home";
   if (path === "/transactions") return "Transactions";
+  if (path === "/income") return "Plan";
   if (path === "/savings") return "Goals";
   if (path === "/whats-new") return "What's New";
   return title;
@@ -49,6 +50,7 @@ export function TopBar({
         }
         trailing={
           <>
+            <GlobalSearch variant="icon" />
             {notificationCenter}
             {isHome ? null : <ProfileMenu />}
           </>

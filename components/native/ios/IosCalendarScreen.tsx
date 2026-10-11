@@ -5,8 +5,6 @@ import Link from "next/link";
 import {
   IosAvatar,
   IosCard,
-  IosList,
-  IosListRow,
   IosScreen,
   IosSection,
   IosSkeletonScreen,
@@ -175,39 +173,51 @@ export function IosCalendarScreen() {
             <p className="text-[13px] text-[var(--text-muted)]">Nothing due this day.</p>
           </IosCard>
         ) : (
-          <IosList>
+          <ul className="overflow-hidden rounded-[16px] bg-[var(--surface)]">
             {selectedBills.map((bill) => (
-              <IosListRow
+              <li
                 key={`${bill.billId}-${bill.splitId}`}
-                title={bill.name}
-                subtitle={bill.statusLabel}
-                leading={
+                className="flex items-center gap-2 border-b border-white/[0.05] px-3 py-2.5 last:border-b-0"
+              >
+                <div className="flex min-w-0 flex-1 items-center gap-3">
                   <IosAvatar
                     fallback={bill.name.slice(0, 1).toUpperCase()}
                     tone={bill.status === "overdue" ? "danger" : "accent"}
                   />
-                }
-                trailing={
-                  <div className="flex flex-col items-end gap-1">
-                    <span>{formatCurrency(bill.remainingAmount || bill.amount)}</span>
-                    {bill.status !== "paid" ? (
-                      <button
-                        type="button"
-                        className="text-[12px] font-semibold text-[var(--accent-light)]"
-                        onClick={() => {
-                          void triggerHaptic("light");
-                          setPaySplit(bill);
-                        }}
-                      >
-                        Pay
-                      </button>
-                    ) : null}
+                  <div className="min-w-0">
+                    <p
+                      className={cn(
+                        "truncate text-[15px] font-medium",
+                        bill.status === "overdue"
+                          ? "text-[var(--danger)]"
+                          : "text-[var(--foreground)]",
+                      )}
+                    >
+                      {bill.name}
+                    </p>
+                    <p className="mt-0.5 truncate text-[12px] text-[var(--text-muted)]">
+                      {bill.statusLabel}
+                    </p>
                   </div>
-                }
-                danger={bill.status === "overdue"}
-              />
+                </div>
+                <span className="shrink-0 text-[15px] font-semibold tabular-nums text-[var(--foreground)]">
+                  {formatCurrency(bill.remainingAmount || bill.amount)}
+                </span>
+                {bill.status !== "paid" ? (
+                  <button
+                    type="button"
+                    className="min-h-8 shrink-0 rounded-full bg-[var(--accent)] px-3 text-[13px] font-semibold text-white active:opacity-80"
+                    onClick={() => {
+                      void triggerHaptic("light");
+                      setPaySplit(bill);
+                    }}
+                  >
+                    Pay
+                  </button>
+                ) : null}
+              </li>
             ))}
-          </IosList>
+          </ul>
         )}
       </IosSection>
 
