@@ -15,8 +15,10 @@ import {
   IosSection,
   IosSkeletonScreen,
 } from "@/components/native/ios/IosPrimitives";
+import { IosAccountDetailSheet } from "@/components/native/ios/IosAccountDetailSheet";
 import { AddAccountModal } from "@/components/accounts/AddAccountModal";
 import { DeleteAccountModal } from "@/components/accounts/DeleteAccountModal";
+import { EditAccountModal } from "@/components/accounts/EditAccountModal";
 import { BankSyncConnect } from "@/components/accounts/BankSyncPlaceholder";
 import { useFinance } from "@/context/FinanceContext";
 import {
@@ -26,6 +28,7 @@ import {
   calculateNetWorth,
 } from "@/lib/calculations/netWorth";
 import type { Account, Debt } from "@/lib/finance/types";
+import { monthlyAccountActivity } from "@/lib/finance/accountActivity";
 import { formatCurrency } from "@/lib/finance/format";
 import { isAccountVisible } from "@/lib/finance/accountPreferences";
 import { getPlaidConnectionUiState } from "@/lib/native/plaidConnectionUi";
@@ -84,6 +87,8 @@ export function IosAccountsScreen() {
   } = finance;
   const [addOpen, setAddOpen] = useState(false);
   const [removeAccountId, setRemoveAccountId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [editAccountId, setEditAccountId] = useState<string | null>(null);
   const plaidEnabled = isPlaidClientEnabled();
 
   const connection = useMemo(
@@ -262,25 +267,11 @@ export function IosAccountsScreen() {
                     }
                   />
                 }
-                trailing={
-                  account.isPlaidLinked ? (
-                    <span className="flex flex-col items-end gap-1">
-                      <span>{formatCurrency(account.balance)}</span>
-                      <button
-                        type="button"
-                        className="text-[12px] font-semibold text-[var(--danger)]"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setRemoveAccountId(account.id);
-                        }}
-                      >
-                        Remove
-                      </button>
-                    </span>
-                  ) : (
-                    formatCurrency(account.balance)
-                  )
-                }
+                trailing={formatCurrency(account.balance)}
+                onClick={() => {
+                  void triggerHaptic("selection");
+                  setSelectedId(account.id);
+                }}
               />
             ))}
           </IosList>
@@ -308,23 +299,11 @@ export function IosAccountsScreen() {
                       tone="danger"
                     />
                   }
-                  trailing={
-                    debt.isPlaidLinked ? (
-                      <span className="flex flex-col items-end gap-1">
-                        <span>{formatCurrency(debt.balance)}</span>
-                        <button
-                          type="button"
-                          className="text-[12px] font-semibold text-[var(--danger)]"
-                          onClick={() => setRemoveAccountId(debt.id)}
-                        >
-                          Remove
-                        </button>
-                      </span>
-                    ) : (
-                      formatCurrency(debt.balance)
-                    )
-                  }
-                  href="/debt"
+                  trailing={formatCurrency(debt.balance)}
+                  onClick={() => {
+                    void triggerHaptic("selection");
+                    setSelectedId(debt.id);
+                  }}
                 />
               ))}
           </IosList>
@@ -441,6 +420,64 @@ export function IosAccountsScreen() {
         </div>
       ) : null}
 
+      <IosAccountDetailSheet
+        account={
+          accounts.find((account) => account.id === selectedId) ??
+          (() => {
+            const debt = debts.find((item) => item.id === selectedId);
+            return debt ? debtAsAccount(debt) : null;
+          })()
+        }
+        connection={
+          bankConnections.find((item) => {
+            const selected =
+              accounts.find((account) => account.id === selectedId) ??
+              debts.find((debt) => debt.id === selectedId);
+            return selected?.bankConnectionId && item.id === selected.bankConnectionId;
+          }) ?? null
+        }
+        activity={monthlyAccountActivity(transactions, selectedId ?? "")}
+        recent={[...transactions]
+          .sort((left, right) => right.date.localeCompare(left.date))
+          .filter(
+            (transaction) =>
+              transaction.accountId === selectedId ||
+              transaction.transferAccountId === selectedId,
+          )
+          .slice(0, 5)}
+        onClose={() => setSelectedId(null)}
+        onEdit={
+          accounts.some((account) => account.id === selectedId)
+            ? () => {
+                setEditAccountId(selectedId);
+                setSelectedId(null);
+              }
+            : undefined
+        }
+        onRemove={
+          (
+            accounts.find((account) => account.id === selectedId) ??
+            debts.find((debt) => debt.id === selectedId)
+          )?.isPlaidLinked
+            ? () => {
+                setRemoveAccountId(selectedId);
+                setSelectedId(null);
+              }
+            : undefined
+        }
+      />
+      <EditAccountModal
+        account={accounts.find((account) => account.id === editAccountId) ?? null}
+        onClose={() => setEditAccountId(null)}
+        onRemove={
+          accounts.find((account) => account.id === editAccountId)?.isPlaidLinked
+            ? () => {
+                setRemoveAccountId(editAccountId);
+                setEditAccountId(null);
+              }
+            : undefined
+        }
+      />
       <AddAccountModal isOpen={addOpen} onClose={() => setAddOpen(false)} />
       <DeleteAccountModal
         account={

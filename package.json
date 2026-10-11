@@ -92,7 +92,8 @@
     "verify:bank-connections-owner-rls-live": "node --env-file=.env.local scripts/verify-bank-connections-owner-rls-live.mjs",
     "test:stage3-validation": "node scripts/test-stage3-validation.mjs",
     "test:stage4-premium-home": "node scripts/test-stage4-premium-home.mjs",
-    "test:transaction-day-groups": "node --experimental-strip-types scripts/test-transaction-day-groups.mjs"
+    "test:transaction-day-groups": "node --experimental-strip-types scripts/test-transaction-day-groups.mjs",
+    "test:account-activity": "node --experimental-strip-types scripts/test-account-activity.mjs"
   },
   "dependencies": {
     "@apple/app-store-server-library": "^3.1.0",
