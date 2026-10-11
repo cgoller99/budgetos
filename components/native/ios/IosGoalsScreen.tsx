@@ -13,6 +13,7 @@ import {
   IosSection,
   IosSkeletonScreen,
 } from "@/components/native/ios/IosPrimitives";
+import { IosBottomSheet } from "@/components/native/ios/IosBottomSheet";
 import { AddMoneyModal } from "@/components/goals/AddMoneyModal";
 import { CreateGoalModal } from "@/components/goals/CreateGoalModal";
 import { EditGoalModal } from "@/components/goals/EditGoalModal";
@@ -27,6 +28,7 @@ export function IosGoalsScreen() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [moneyGoal, setMoneyGoal] = useState<SavingsGoal | null>(null);
   const [editGoal, setEditGoal] = useState<SavingsGoal | null>(null);
+  const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
 
   const goals = useMemo(() => getGoalProgressList(finance), [finance]);
   const totalSaved = useMemo(
@@ -92,52 +94,25 @@ export function IosGoalsScreen() {
             </button>
           }
         >
-          <div className="space-y-3">
+          <IosList>
             {goals.map((goal) => (
-              <IosCard key={goal.id} padding="md">
-                <button
-                  type="button"
-                  className="flex w-full items-start gap-3 text-left"
-                  onClick={() => setEditGoal(findGoal(goal.id))}
-                >
-                  <IosAvatar fallback={goal.icon || goal.name.slice(0, 1)} tone="warning" />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="truncate text-[15px] font-semibold text-[var(--foreground)]">
-                        {goal.name}
-                      </p>
-                      <p className="text-[13px] tabular-nums text-[var(--text-muted)]">
-                        {goal.percentComplete}%
-                      </p>
-                    </div>
-                    <IosProgressBar
-                      value={goal.percentComplete}
-                      tone="warning"
-                      className="mt-2"
-                    />
-                    <p className="mt-2 text-[12px] text-[var(--text-muted)]">
-                      {formatCurrency(goal.current)} of {formatCurrency(goal.target)}
-                      {goal.estimatedCompletionDate
-                        ? ` · target ${formatGoalDate(goal.estimatedCompletionDate)}`
-                        : ""}
-                    </p>
-                  </div>
-                </button>
-                {!goal.isComplete ? (
-                  <button
-                    type="button"
-                    className="mt-3 min-h-11 w-full rounded-[12px] bg-[var(--accent)]/14 text-[14px] font-semibold text-[var(--accent-light)]"
-                    onClick={() => {
-                      void triggerHaptic("light");
-                      setMoneyGoal(findGoal(goal.id));
-                    }}
-                  >
-                    Add money
-                  </button>
-                ) : null}
-              </IosCard>
+              <IosListRow
+                key={goal.id}
+                title={goal.name}
+                subtitle={`${formatCurrency(goal.current)} of ${formatCurrency(goal.target)} · ${goal.percentComplete}%`}
+                leading={<IosAvatar fallback={goal.icon || goal.name.slice(0, 1)} tone="warning" />}
+                trailing={
+                  goal.estimatedCompletionDate
+                    ? formatGoalDate(goal.estimatedCompletionDate)
+                    : "TBD"
+                }
+                onClick={() => {
+                  void triggerHaptic("selection");
+                  setSelectedGoalId(goal.id);
+                }}
+              />
             ))}
-          </div>
+          </IosList>
         </IosSection>
       )}
 
@@ -153,6 +128,62 @@ export function IosGoalsScreen() {
         </IosList>
       )}
 
+      <IosBottomSheet
+        open={selectedGoalId !== null}
+        title={goals.find((goal) => goal.id === selectedGoalId)?.name}
+        onClose={() => setSelectedGoalId(null)}
+      >
+        {(() => {
+          const goal = goals.find((item) => item.id === selectedGoalId);
+          if (!goal) return null;
+          return (
+            <div>
+              <p className="text-center text-[34px] font-semibold leading-none tabular-nums text-[var(--foreground)]">
+                {goal.percentComplete}%
+              </p>
+              <IosProgressBar value={goal.percentComplete} tone="warning" className="mt-4" />
+              <div className="mt-4 rounded-[16px] bg-white/[0.04] px-3.5 py-3 text-[14px] text-[var(--text-secondary)]">
+                <p>
+                  {formatCurrency(goal.current)} saved of {formatCurrency(goal.target)}
+                </p>
+                <p className="mt-1">{formatCurrency(goal.remaining)} left</p>
+                <p className="mt-1">
+                  Projected {formatGoalDate(goal.estimatedCompletionDate)}
+                </p>
+                <p className="mt-1">
+                  {formatCurrency(goal.monthlyContribution)} / month · {goal.contributionSourceLabel}
+                </p>
+              </div>
+              <div className="mt-4 flex gap-2">
+                {!goal.isComplete ? (
+                  <button
+                    type="button"
+                    className="min-h-12 flex-1 rounded-[14px] bg-[var(--accent)] text-[16px] font-semibold text-white"
+                    onClick={() => {
+                      void triggerHaptic("light");
+                      setMoneyGoal(findGoal(goal.id));
+                      setSelectedGoalId(null);
+                    }}
+                  >
+                    Add money
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="min-h-12 flex-1 rounded-[14px] bg-white/[0.06] text-[16px] font-semibold text-[var(--foreground)]"
+                  onClick={() => {
+                    void triggerHaptic("light");
+                    setEditGoal(findGoal(goal.id));
+                    setSelectedGoalId(null);
+                  }}
+                >
+                  Edit
+                </button>
+              </div>
+            </div>
+          );
+        })()}
+      </IosBottomSheet>
       <CreateGoalModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} />
       <AddMoneyModal goal={moneyGoal} onClose={() => setMoneyGoal(null)} />
       <EditGoalModal goal={editGoal} onClose={() => setEditGoal(null)} />

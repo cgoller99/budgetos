@@ -94,7 +94,8 @@
     "test:stage4-premium-home": "node scripts/test-stage4-premium-home.mjs",
     "test:transaction-day-groups": "node --experimental-strip-types scripts/test-transaction-day-groups.mjs",
     "test:account-activity": "node --experimental-strip-types scripts/test-account-activity.mjs",
-    "test:ios-bills-sheet": "node scripts/test-ios-bills-sheet.mjs"
+    "test:ios-bills-sheet": "node scripts/test-ios-bills-sheet.mjs",
+    "test:ios-plan-sheets": "node scripts/test-ios-plan-sheets.mjs"
   },
   "dependencies": {
     "@apple/app-store-server-library": "^3.1.0",
