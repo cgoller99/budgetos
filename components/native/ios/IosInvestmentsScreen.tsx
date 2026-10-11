@@ -6,9 +6,8 @@ import {
   IosAvatar,
   IosCard,
   IosHeroMetric,
-  IosList,
-  IosListRow,
   IosPrimaryButton,
+  IosProgressBar,
   IosScreen,
   IosSection,
   IosSkeletonScreen,
@@ -81,22 +80,41 @@ export function IosInvestmentsScreen() {
 
       {portfolio.hasHoldings ? (
         <IosSection title="Holdings">
-          <IosList>
-            {portfolio.holdings.map((holding) => (
-              <IosListRow
-                key={holding.id}
-                title={holding.name}
-                subtitle={holding.subtitle}
-                leading={
-                  <IosAvatar
-                    fallback={holding.name.slice(0, 1).toUpperCase()}
-                    tone="warning"
-                  />
-                }
-                trailing={formatCurrency(holding.value)}
-              />
-            ))}
-          </IosList>
+          <div className="flex flex-col gap-3">
+            {portfolio.holdings.map((holding) => {
+              const share =
+                portfolio.portfolioValue > 0
+                  ? Math.round((holding.value / portfolio.portfolioValue) * 100)
+                  : 0;
+              return (
+                <div key={holding.id} className="rounded-[16px] bg-[var(--surface)] p-3.5">
+                  <div className="flex items-center gap-3">
+                    <IosAvatar
+                      fallback={holding.name.slice(0, 1).toUpperCase()}
+                      tone="accent"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[15px] font-semibold text-[var(--foreground)]">
+                        {holding.name}
+                      </p>
+                      <p className="mt-0.5 truncate text-[12px] text-[var(--text-muted)]">
+                        {holding.subtitle}
+                      </p>
+                    </div>
+                    <p className="shrink-0 text-[15px] font-semibold tabular-nums text-[var(--foreground)]">
+                      {formatCurrency(holding.value)}
+                    </p>
+                  </div>
+                  <div className="mt-3 flex items-center gap-3">
+                    <IosProgressBar value={share} className="flex-1" />
+                    <span className="text-[12px] font-medium tabular-nums text-[var(--text-muted)]">
+                      {share}%
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
           <div className="mt-3 flex justify-end px-0.5">
             <Link
               href="/settings#connections"

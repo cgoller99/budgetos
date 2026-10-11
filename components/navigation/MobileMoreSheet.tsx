@@ -221,7 +221,7 @@ export function MobileMoreSheet({
                 <p className="mb-1.5 px-3 text-[12px] font-semibold uppercase tracking-[0.06em] text-[var(--text-subtle)]">
                   {group.label}
                 </p>
-                <ul className="overflow-hidden rounded-[12px] bg-white/[0.04]">
+                <ul className="overflow-hidden rounded-[16px] bg-[var(--surface)]">
                   {group.items.map((route) => {
                     const active = isActive(route.href);
 

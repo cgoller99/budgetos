@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/components/ui/cn";
 import { inputBaseClassName } from "@/components/ui/tokens";
 import { useFinance } from "@/context/FinanceContext";
+import { useNativeIos } from "@/lib/native/useNativeIos";
 import { formatCurrency } from "@/lib/finance/format";
 import {
   getSearchResultTypeLabel,
@@ -23,10 +24,12 @@ const TYPE_ICONS: Record<SearchResult["type"], string> = {
 
 type GlobalSearchProps = {
   className?: string;
+  variant?: "bar" | "icon";
 };
 
-export function GlobalSearch({ className }: GlobalSearchProps) {
+export function GlobalSearch({ className, variant = "bar" }: GlobalSearchProps) {
   const finance = useFinance();
+  const nativeIos = useNativeIos();
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -141,20 +144,29 @@ export function GlobalSearch({ className }: GlobalSearchProps) {
         type="button"
         onClick={open}
         className={cn(
-          "inline-flex min-h-11 items-center gap-3 rounded-2xl border border-white/[0.04] bg-white/[0.02] px-4 py-2 text-sm text-white/45 transition-colors hover:bg-white/[0.04] hover:text-white/70",
+          variant === "icon"
+            ? "focus-ring flex size-8 items-center justify-center rounded-full text-[var(--text-secondary)] active:bg-white/[0.06]"
+            : "inline-flex min-h-11 items-center gap-3 rounded-2xl border border-white/[0.04] bg-white/[0.02] px-4 py-2 text-sm text-white/45 transition-colors hover:bg-white/[0.04] hover:text-white/70",
           className,
         )}
         aria-label="Search"
       >
-        <span aria-hidden>🔍</span>
-        <span className="hidden sm:inline">Search</span>
-        <kbd className="hidden rounded-lg border border-white/[0.06] bg-white/[0.03] px-2 py-0.5 text-[11px] font-medium text-white/30 sm:inline">
-          ⌘K
-        </kbd>
+        <span aria-hidden>{variant === "icon" ? "⌕" : "🔍"}</span>
+        {variant === "icon" ? null : <span className="hidden sm:inline">Search</span>}
+        {variant === "icon" ? null : (
+          <kbd className="hidden rounded-lg border border-white/[0.06] bg-white/[0.03] px-2 py-0.5 text-[11px] font-medium text-white/30 sm:inline">
+            ⌘K
+          </kbd>
+        )}
       </button>
 
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[12vh] sm:p-6">
+        <div
+          className={cn(
+            "fixed inset-0 z-50 flex justify-center",
+            nativeIos ? "items-end" : "items-start p-4 pt-[12vh] sm:p-6",
+          )}
+        >
           <button
             type="button"
             aria-label="Close search"
@@ -166,7 +178,12 @@ export function GlobalSearch({ className }: GlobalSearchProps) {
             role="dialog"
             aria-modal="true"
             aria-label="Global search"
-            className="relative w-full max-w-xl overflow-hidden rounded-3xl border border-[var(--surface-border)] bg-[var(--surface-elevated)] shadow-2xl"
+            className={cn(
+              "relative w-full overflow-hidden border border-[var(--surface-border)] bg-[var(--background)] shadow-2xl",
+              nativeIos
+                ? "max-h-[85dvh] rounded-t-[22px] border-b-0 pb-[env(safe-area-inset-bottom)]"
+                : "max-w-xl rounded-3xl bg-[var(--surface-elevated)]",
+            )}
           >
             <div className="border-b border-white/[0.04] p-4">
               <input
@@ -204,10 +221,12 @@ export function GlobalSearch({ className }: GlobalSearchProps) {
               )}
             </div>
 
-            <div className="flex items-center justify-between border-t border-white/[0.04] px-4 py-3 text-[11px] text-white/30">
-              <span>↑↓ navigate</span>
-              <span>↵ open · esc close</span>
-            </div>
+            {nativeIos ? null : (
+              <div className="flex items-center justify-between border-t border-white/[0.04] px-4 py-3 text-[11px] text-white/30">
+                <span>↑↓ navigate</span>
+                <span>↵ open · esc close</span>
+              </div>
+            )}
           </div>
         </div>
       )}

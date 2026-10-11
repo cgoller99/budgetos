@@ -187,7 +187,17 @@ export function IosAccountDetailSheet({
                 <p className="truncate text-[14px] text-[var(--foreground)]">
                   {transaction.notes || transaction.category}
                 </p>
-                <p className="shrink-0 text-[14px] font-medium tabular-nums text-[var(--text-secondary)]">
+                <p
+                  className={cn(
+                    "shrink-0 text-[14px] font-medium tabular-nums",
+                    transaction.type === "income"
+                      ? "text-[var(--success)]"
+                      : transaction.type === "expense"
+                        ? "text-[var(--danger)]"
+                        : "text-[var(--text-secondary)]",
+                  )}
+                >
+                  {transaction.type === "income" ? "+" : transaction.type === "expense" ? "−" : ""}
                   {formatCurrency(Math.abs(transaction.amount))}
                 </p>
               </li>

@@ -446,11 +446,11 @@ export function NotificationCenter() {
             className={cn(
               "notification-panel-enter pointer-events-auto fixed z-10 flex flex-col overflow-hidden",
               "border border-[var(--surface-border)] bg-[var(--background)] shadow-2xl shadow-black/50",
-              "max-lg:inset-x-3 max-lg:top-[calc(4.25rem+env(safe-area-inset-top))]",
-              "max-lg:max-h-[calc(100dvh-5.5rem-env(safe-area-inset-top))] max-lg:rounded-[var(--radius-card)]",
-              "lg:rounded-[var(--radius-card)]",
+              nativeIos
+                ? "inset-x-0 bottom-0 max-h-[80dvh] rounded-t-[22px] border-b-0 pb-[env(safe-area-inset-bottom)]"
+                : "max-lg:inset-x-3 max-lg:top-[calc(4.25rem+env(safe-area-inset-top))] max-lg:max-h-[calc(100dvh-5.5rem-env(safe-area-inset-top))] max-lg:rounded-[var(--radius-card)] lg:rounded-[var(--radius-card)]",
             )}
-            style={isMobile ? undefined : panelStyle}
+            style={nativeIos || isMobile ? undefined : panelStyle}
           >
             <div className="border-b border-[var(--surface-border)] bg-[var(--surface-soft)] px-4 py-3.5 sm:px-5">
               <div className="flex items-center justify-between gap-3">
