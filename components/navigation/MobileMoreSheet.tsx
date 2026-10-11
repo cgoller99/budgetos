@@ -23,10 +23,10 @@ const IOS_MORE_ICON_TONE: Record<
   string,
   "accent" | "success" | "warning" | "danger" | "purple" | "muted"
 > = {
-  Income: "success",
+  Bills: "accent",
   Goals: "warning",
+  Debt: "danger",
   Investments: "purple",
-  Transactions: "accent",
   Reports: "accent",
   Calendar: "warning",
   Household: "muted",

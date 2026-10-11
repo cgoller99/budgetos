@@ -7,11 +7,9 @@ import {
   IosHeroMetric,
   IosIconButton,
   IosProgressBar,
-  IosRing,
   IosScreen,
   IosSection,
   IosSkeletonScreen,
-  IosTextButton,
 } from "@/components/native/ios/IosPrimitives";
 import { IosBottomSheet } from "@/components/native/ios/IosBottomSheet";
 import { AddDebtModal } from "@/components/debt/AddDebtModal";
@@ -27,7 +25,6 @@ import {
 } from "@/lib/finance/debts";
 import type { Debt, DebtStrategy } from "@/lib/finance/types";
 import { triggerHaptic } from "@/lib/native/haptics";
-import { cn } from "@/components/ui/cn";
 
 export function IosDebtScreen() {
   const finance = useFinance();
@@ -81,81 +78,23 @@ export function IosDebtScreen() {
 
       {summary.activeDebtCount > 0 ? (
         <>
-          <div className="grid grid-cols-2 gap-3">
-            <IosCard padding="md">
-              <p className="text-[12px] font-medium text-[var(--text-muted)]">
-                Monthly Payment
-              </p>
-              <p className="mt-1 text-[18px] font-semibold tabular-nums text-[var(--foreground)]">
-                {formatCurrency(summary.totalMinimumPayments)}
-              </p>
-            </IosCard>
-            <IosCard padding="md">
-              <p className="text-[12px] font-medium text-[var(--text-muted)]">
-                Debt Free Date
-              </p>
-              <p
-                className={cn(
-                  "mt-1 font-semibold tracking-tight text-[var(--foreground)]",
-                  summary.estimatedDebtFreeDate === "Add payment plan"
-                    ? "text-[15px] leading-snug text-[var(--accent-light)]"
-                    : "text-[18px]",
-                )}
-              >
-                {summary.estimatedDebtFreeDate}
-              </p>
-            </IosCard>
-          </div>
-
-          <IosCard padding="md">
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <p className="text-[14px] font-semibold text-[var(--foreground)]">
-                Payoff Progress
-              </p>
-              <p className="text-[13px] tabular-nums text-[var(--text-muted)]">
-                {Math.round(summary.debtFreeProgress)}%
-              </p>
-            </div>
-            <IosProgressBar value={summary.debtFreeProgress} />
-          </IosCard>
-
-          <IosCard padding="md" className="flex items-center gap-4">
-            <IosRing
-              value={summary.debtFreeProgress}
-              size={72}
-              stroke={7}
-              label={`${Math.round(summary.debtFreeProgress)}%`}
-            />
-            <div className="min-w-0">
-              <p className="text-[15px] font-semibold text-[var(--foreground)]">
-                {Math.round(summary.debtFreeProgress)}% of total debt paid off
-              </p>
-              <p className="mt-1 text-[13px] text-[var(--text-muted)]">
-                {summary.estimatedDebtFreeDate === "Add payment plan"
-                  ? "Add a monthly payment to estimate your debt-free date"
-                  : `You’ll be debt free ${summary.estimatedDebtFreeDate}`}
-              </p>
-              <IosTextButton
-                className="mt-1 px-0"
-                onClick={() => {
-                  void triggerHaptic("selection");
-                  setShowDetails((current) => !current);
-                }}
-              >
-                {showDetails ? "Hide Details" : "View Details"}
-              </IosTextButton>
-            </div>
-          </IosCard>
-
-          {showDetails ? (
-            <IosSection title="Payoff strategy">
-              <DebtStrategyPanel
-                data={finance}
-                strategy={strategy}
-                onStrategyChange={setStrategy}
-              />
-            </IosSection>
-          ) : null}
+          <p className="px-0.5 text-[13px] text-[var(--text-secondary)]">
+            {formatCurrency(summary.totalMinimumPayments)} / month
+            {" · "}
+            <span
+              className={
+                summary.estimatedDebtFreeDate === "Add payment plan"
+                  ? "font-semibold text-[var(--accent-light)]"
+                  : undefined
+              }
+            >
+              {summary.estimatedDebtFreeDate === "Add payment plan"
+                ? "Add payment plan"
+                : `Debt-free ${summary.estimatedDebtFreeDate}`}
+            </span>
+            {" · "}
+            {Math.round(summary.debtFreeProgress)}% paid off
+          </p>
 
           <IosSection title="Debts">
             <div className="flex flex-col gap-3">
@@ -196,6 +135,38 @@ export function IosDebtScreen() {
               ))}
             </div>
           </IosSection>
+
+          <button
+            type="button"
+            className="flex min-h-[64px] w-full items-center justify-between gap-3 rounded-[16px] bg-[var(--surface)] px-3.5 py-3 text-left active:bg-white/[0.04]"
+            onClick={() => {
+              void triggerHaptic("selection");
+              setShowDetails((current) => !current);
+            }}
+          >
+            <span>
+              <span className="block text-[15px] font-semibold text-[var(--foreground)]">
+                Payoff strategy
+              </span>
+              <span className="mt-0.5 block text-[12px] text-[var(--text-muted)]">
+                {summary.estimatedDebtFreeDate === "Add payment plan"
+                  ? "Add a monthly payment to estimate your debt-free date"
+                  : `You’ll be debt free ${summary.estimatedDebtFreeDate}`}
+              </span>
+            </span>
+            <span className="text-[13px] font-semibold text-[var(--accent-light)]">
+              {showDetails ? "Hide" : "View"}
+            </span>
+          </button>
+          {showDetails ? (
+            <IosSection title="Payoff strategy">
+              <DebtStrategyPanel
+                data={finance}
+                strategy={strategy}
+                onStrategyChange={setStrategy}
+              />
+            </IosSection>
+          ) : null}
         </>
       ) : (
         <IosCard padding="md">
