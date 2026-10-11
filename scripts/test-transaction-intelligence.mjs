@@ -12,9 +12,11 @@ import {
 } from "../lib/automation/categoryMemory.ts";
 import { emptyFinanceData } from "../lib/finance/emptyFinanceData.ts";
 import { calculateMonthlySpendingFromLedger } from "../lib/calculations/spending.ts";
+import { calculateCashFlow, calculateMonthlySpending } from "../lib/calculations/cashFlow.ts";
+import { calculateMonthlyIncome, hasPlaidIncomeHistory } from "../lib/calculations/income.ts";
 import { getPersonalLedgerIncomeForMonth } from "../lib/calculations/incomeLedger.ts";
-import { hasPlaidIncomeHistory } from "../lib/calculations/income.ts";
-import { computeCategoryBreakdown } from "../lib/reports/reportMetrics.ts";
+import { getSafeToSpend } from "../lib/finance/safeToSpend.ts";
+import { computeCategoryBreakdown, computeMonthlyTrends } from "../lib/reports/reportMetrics.ts";
 import { getTransactionSummary } from "../lib/transactions/queries.ts";
 import { monthlyAccountActivity } from "../lib/finance/accountActivity.ts";
 
@@ -272,6 +274,11 @@ assert.equal(paired.find((item) => item.externalTransactionId === "pay").type, "
 const memory = buildMerchantCategoryMemory([
   { notes: "WHOLE FOODS", category: "FOOD AND DRINK GROCERIES", date: "2026-09-01" },
   { notes: "Netflix", category: "Subscriptions", date: "2026-09-05" },
+  { notes: "AMAZON MARKETPLACE", category: "Groceries", date: "2026-09-02" },
+  { notes: "AMAZON MARKETPLACE", category: "Shopping", date: "2026-08-01" },
+  { notes: "WALMART", category: "Shopping", date: "2026-09-03" },
+  { notes: "TARGET", category: "Shopping", date: "2026-09-04" },
+  { notes: "PAYPAL", category: "Shopping", date: "2026-09-06" },
 ]);
 assert.equal(
   categoryForSyncedTransaction({
@@ -300,6 +307,70 @@ assert.equal(
     memory,
   }),
   "FOOD AND DRINK GROCERIES",
+);
+assert.equal(
+  categoryForSyncedTransaction({
+    isNew: true,
+    incomingCategory: "Shopping",
+    merchantKey: "amazon marketplace",
+    memory,
+  }),
+  "Shopping",
+);
+assert.equal(
+  categoryForSyncedTransaction({
+    isNew: true,
+    incomingCategory: "FOOD AND DRINK GROCERIES",
+    merchantKey: "amazon marketplace",
+    memory,
+  }),
+  "Groceries",
+);
+assert.equal(
+  categoryForSyncedTransaction({
+    isNew: true,
+    incomingCategory: "Groceries",
+    merchantKey: "walmart",
+    memory,
+  }),
+  "Groceries",
+);
+assert.equal(
+  categoryForSyncedTransaction({
+    isNew: true,
+    incomingCategory: "Transfers",
+    merchantKey: "paypal",
+    memory,
+  }),
+  "Transfers",
+);
+assert.equal(
+  categoryForSyncedTransaction({
+    isNew: true,
+    incomingCategory: "Uncategorized",
+    merchantKey: "target",
+    memory,
+  }),
+  "Shopping",
+);
+assert.equal(
+  categoryForSyncedTransaction({
+    isNew: true,
+    incomingCategory: "Uncategorized",
+    merchantKey: "amazon marketplace",
+    memory,
+  }),
+  "Uncategorized",
+);
+assert.equal(
+  categoryForSyncedTransaction({
+    isNew: false,
+    existingCategory: "Groceries",
+    incomingCategory: "Shopping",
+    merchantKey: "amazon marketplace",
+    memory,
+  }),
+  "Groceries",
 );
 
 const reference = new Date("2026-10-15T12:00:00Z");
@@ -363,6 +434,110 @@ const groceriesTotal = breakdown.find((item) => item.category === "Groceries");
 const shoppingTotal = breakdown.find((item) => item.category === "Shopping");
 assert.equal(groceriesTotal.amount, 100);
 assert.equal(shoppingTotal, undefined);
+
+const now = new Date();
+const coverageDay = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-15`;
+const coverageAccount = {
+  id: "checking",
+  name: "Checking",
+  institution: "Bank",
+  type: "checking",
+  balance: 5000,
+  monthlyChange: 0,
+};
+const coverage = {
+  ...emptyFinanceData,
+  accounts: [coverageAccount],
+  bills: [
+    {
+      id: "rent",
+      name: "Rent",
+      amount: 500,
+      dueDay: 1,
+      autopay: false,
+      recurring: true,
+      category: "Rent",
+      paidMonth: null,
+      frequency: "monthly",
+    },
+  ],
+  transactions: [
+    ledger({
+      id: "groceries",
+      amount: 100,
+      type: "expense",
+      category: "Groceries",
+      notes: "Whole Foods",
+      date: coverageDay,
+    }),
+    ledger({
+      id: "target",
+      amount: 40,
+      type: "expense",
+      category: "Shopping",
+      notes: "Target",
+      date: coverageDay,
+    }),
+    ledger({
+      id: "target-refund",
+      amount: -15,
+      type: "expense",
+      category: "Shopping",
+      notes: "Target",
+      date: coverageDay,
+    }),
+    ledger({
+      id: "amazon-refund",
+      amount: 20,
+      type: "income",
+      category: "Shopping",
+      notes: "Amazon refund",
+      date: coverageDay,
+      externalTransactionId: "plaid-amazon-refund",
+    }),
+    ledger({
+      id: "wages",
+      amount: 2000,
+      type: "income",
+      category: "Payroll",
+      notes: "Acme Payroll",
+      date: coverageDay,
+      externalTransactionId: "plaid-wages",
+    }),
+  ],
+};
+
+assert.equal(calculateMonthlyIncome(coverage, now), 2000);
+assert.equal(calculateMonthlySpending(coverage, now), 605);
+const cashFlow = calculateCashFlow(coverage, now);
+assert.equal(cashFlow.income, 2000);
+assert.equal(cashFlow.spending, 605);
+assert.equal(cashFlow.netFlow, 1395);
+assert.equal(getSafeToSpend(coverage, now), 1395);
+
+const capped = getSafeToSpend(
+  {
+    ...coverage,
+    accounts: [
+      {
+        ...coverageAccount,
+        balance: 400,
+        availableBalance: 400,
+        externalAccountId: "plaid-checking",
+      },
+    ],
+  },
+  now,
+);
+assert.equal(capped, 400);
+
+const coverageBreakdown = computeCategoryBreakdown(coverage);
+assert.equal(coverageBreakdown.find((item) => item.category === "Groceries").amount, 100);
+assert.equal(coverageBreakdown.find((item) => item.category === "Shopping").amount, 5);
+const coverageMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+const trend = computeMonthlyTrends(coverage, now).find((item) => item.key === coverageMonth);
+assert.equal(trend.spending, 605);
+assert.equal(trend.income, 2000);
 
 const activity = monthlyAccountActivity(
   [{ date: "2026-10-03", amount: -18, type: "expense", accountId: "checking" }],
