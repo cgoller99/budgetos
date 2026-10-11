@@ -10,6 +10,7 @@ import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { DashboardSectionFocus } from "@/components/dashboard/DashboardSectionFocus";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import { PageTransition } from "@/components/PageTransition";
+import { NativeIosChrome } from "@/components/native/NativeIosChrome";
 import { PullToRefresh } from "@/components/native/PullToRefresh";
 import { useScrollRestoration } from "@/components/native/useScrollRestoration";
 import { Sidebar } from "@/components/Sidebar";
@@ -55,6 +56,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   const content = (
     <>
+      <NativeIosChrome />
       <DemoModeBanner />
       <FinanceSyncAlert />
       <RecurringBillsPrompt />
