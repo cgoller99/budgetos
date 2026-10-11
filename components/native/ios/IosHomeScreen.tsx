@@ -10,14 +10,17 @@ import {
   IosList,
   IosListRow,
   IosProgressBar,
-  IosRing,
   IosScreen,
   IosSection,
   IosSkeletonScreen,
 } from "@/components/native/ios/IosPrimitives";
 import { useFinance } from "@/context/FinanceContext";
 import { getBillsDueThisWeek } from "@/lib/finance/bills";
-import { formatCurrency, formatMonthlyChange } from "@/lib/finance/format";
+import {
+  formatCurrency,
+  formatMonthlyChange,
+  formatSignedCurrency,
+} from "@/lib/finance/format";
 import { formatTransactionDate } from "@/lib/transactions";
 import {
   getDisplayCategory,
@@ -27,6 +30,20 @@ import { isConfidentInternalTransfer } from "@/lib/transactions/transferDetectio
 import { getPlaidConnectionUiState } from "@/lib/native/plaidConnectionUi";
 import { isPlaidClientEnabled } from "@/lib/plaid/clientConfig";
 import { cn } from "@/components/ui/cn";
+
+function metricDelta(value: number, monthlyChange: number, favorableWhenDown = false) {
+  const previous = value - monthlyChange;
+  const percent =
+    previous !== 0 && Number.isFinite(previous)
+      ? (monthlyChange / Math.abs(previous)) * 100
+      : null;
+  const label =
+    percent !== null && Number.isFinite(percent)
+      ? `${percent > 0 ? "+" : ""}${percent.toFixed(1)}%`
+      : formatSignedCurrency(monthlyChange);
+  const favorable = favorableWhenDown ? monthlyChange <= 0 : monthlyChange >= 0;
+  return { label, favorable };
+}
 
 export function IosHomeScreen() {
   const finance = useFinance();
@@ -110,64 +127,90 @@ export function IosHomeScreen() {
   ];
   const flowTotal = Math.max(moneyFlow.income, 1);
 
+  const cashDelta = metricDelta(cash?.value ?? 0, cash?.monthlyChange ?? 0);
+  const debtDelta = metricDelta(debt?.value ?? 0, debt?.monthlyChange ?? 0, true);
+  const netWorthDelta = metricDelta(netWorth?.value ?? 0, netWorth?.monthlyChange ?? 0);
+
   return (
     <IosScreen>
-      <IosCard
-        padding="lg"
-        className="ios-home-hero bg-gradient-to-br from-[var(--accent)]/18 via-[#11161d] to-[#11161d]"
+      <section
+        className="ios-home-hero rounded-[22px] bg-gradient-to-br from-[var(--accent-light)] to-[var(--accent-hover)] p-5 text-white shadow-[0_16px_40px_rgba(37,99,235,0.28)]"
+        data-home-hero="safe-to-spend"
       >
-        <div className="flex items-start justify-between gap-3" data-home-hero="safe-to-spend">
-          <div className="min-w-0">
-            <p className="text-[13px] font-medium text-[var(--text-muted)]">Safe to Spend</p>
-            <p
-              className={cn(
-                "mt-1.5 text-[40px] font-semibold leading-none tracking-tight tabular-nums",
-                safeToSpend < 0 ? "text-[var(--danger)]" : "text-[var(--foreground)]",
-              )}
-            >
-              {formatCurrency(safeToSpend)}
-            </p>
-            <p className="mt-2 text-[13px] leading-snug text-[var(--text-secondary)]">{spendHint}</p>
-          </div>
-          <div className="flex flex-col items-end gap-2">
-            <IosRing value={health.score} label={`${health.score}`} size={56} />
-            <p className="text-[11px] font-medium text-[var(--text-muted)]">Health</p>
-          </div>
-        </div>
-        <div className="mt-4 grid grid-cols-3 gap-2">
-          <Link
-            href="/accounts"
-            className="ios-metric-chip flex min-h-11 flex-col justify-center gap-0.5 rounded-xl bg-white/[0.06] px-2.5 py-2 active:bg-white/[0.12]"
-          >
-            <span className="text-[11px] font-medium text-[var(--text-muted)]">Cash</span>
-            <strong className="text-[13px] font-semibold tabular-nums text-[var(--foreground)]">
-              {cash ? formatCurrency(cash.value) : formatCurrency(0)}
-            </strong>
-          </Link>
-          <Link
-            href="/debt"
-            className="ios-metric-chip flex min-h-11 flex-col justify-center gap-0.5 rounded-xl bg-white/[0.06] px-2.5 py-2 active:bg-white/[0.12]"
-          >
-            <span className="text-[11px] font-medium text-[var(--text-muted)]">Debt</span>
-            <strong className="text-[13px] font-semibold tabular-nums text-[var(--foreground)]">
-              {debt ? formatCurrency(debt.value) : formatCurrency(0)}
-            </strong>
-          </Link>
-          <Link
-            href="/accounts"
-            className="ios-metric-chip flex min-h-11 flex-col justify-center gap-0.5 rounded-xl bg-white/[0.06] px-2.5 py-2 active:bg-white/[0.12]"
-          >
-            <span className="text-[11px] font-medium text-[var(--text-muted)]">Net Worth</span>
-            <strong className="text-[13px] font-semibold tabular-nums text-[var(--foreground)]">
-              {netWorth ? formatCurrency(netWorth.value) : "—"}
-            </strong>
-          </Link>
-        </div>
-        <p className="mt-2 text-[11px] leading-snug text-[var(--text-subtle)]">
-          Checking {formatCurrency(checking)} · Savings {formatCurrency(savings)}
-          {netWorth ? ` · ${formatMonthlyChange(netWorth.monthlyChange)}` : ""}
+        <p className="text-[13px] font-medium text-white/80">Safe to Spend</p>
+        <p
+          className={cn(
+            "mt-1.5 text-[40px] font-semibold leading-none tracking-tight tabular-nums",
+            safeToSpend < 0 ? "text-[var(--danger)]" : "text-white",
+          )}
+        >
+          {formatCurrency(safeToSpend)}
         </p>
-      </IosCard>
+        <p className="mt-2 text-[13px] leading-snug text-white/75">
+          {moneyFlow.income > 0
+            ? `of ${formatCurrency(moneyFlow.income)} this month`
+            : spendHint}
+        </p>
+        <p className="mt-3 text-[12px] font-medium text-white/70">Health {health.score}</p>
+      </section>
+
+      <div className="grid grid-cols-3 gap-2">
+        <Link
+          href="/accounts"
+          className="ios-metric-chip flex min-h-[72px] flex-col justify-center gap-0.5 rounded-[16px] bg-[var(--surface)] px-3 py-2.5 active:bg-white/[0.06]"
+        >
+          <span className="text-[11px] font-medium text-[var(--text-muted)]">Cash</span>
+          <strong className="text-[15px] font-semibold tabular-nums text-[var(--foreground)]">
+            {formatCurrency(cash?.value ?? 0)}
+          </strong>
+          <span
+            className={cn(
+              "text-[11px] font-semibold tabular-nums",
+              cashDelta.favorable ? "text-[var(--success)]" : "text-[var(--danger)]",
+            )}
+          >
+            {cashDelta.label}
+          </span>
+        </Link>
+        <Link
+          href="/debt"
+          className="ios-metric-chip flex min-h-[72px] flex-col justify-center gap-0.5 rounded-[16px] bg-[var(--surface)] px-3 py-2.5 active:bg-white/[0.06]"
+        >
+          <span className="text-[11px] font-medium text-[var(--text-muted)]">Debt</span>
+          <strong className="text-[15px] font-semibold tabular-nums text-[var(--foreground)]">
+            {formatCurrency(debt?.value ?? 0)}
+          </strong>
+          <span
+            className={cn(
+              "text-[11px] font-semibold tabular-nums",
+              debtDelta.favorable ? "text-[var(--success)]" : "text-[var(--danger)]",
+            )}
+          >
+            {debtDelta.label}
+          </span>
+        </Link>
+        <Link
+          href="/accounts"
+          className="ios-metric-chip flex min-h-[72px] flex-col justify-center gap-0.5 rounded-[16px] bg-[var(--surface)] px-3 py-2.5 active:bg-white/[0.06]"
+        >
+          <span className="text-[11px] font-medium text-[var(--text-muted)]">Net Worth</span>
+          <strong className="text-[15px] font-semibold tabular-nums text-[var(--foreground)]">
+            {netWorth ? formatCurrency(netWorth.value) : "—"}
+          </strong>
+          <span
+            className={cn(
+              "text-[11px] font-semibold tabular-nums",
+              netWorthDelta.favorable ? "text-[var(--success)]" : "text-[var(--danger)]",
+            )}
+          >
+            {netWorthDelta.label}
+          </span>
+        </Link>
+      </div>
+      <p className="px-0.5 text-[11px] leading-snug text-[var(--text-subtle)]">
+        Checking {formatCurrency(checking)} · Savings {formatCurrency(savings)}
+        {netWorth ? ` · ${formatMonthlyChange(netWorth.monthlyChange)}` : ""}
+      </p>
 
       {connection.reconnectConnections.length > 0 ? (
         <IosBanner
@@ -264,26 +307,41 @@ export function IosHomeScreen() {
       </IosSection>
 
       {nextGoal ? (
-        <IosSection title="Goal" action={<IosLink href="/savings">See All</IosLink>}>
-          <IosCard padding="md">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="truncate text-[15px] font-semibold text-[var(--foreground)]">
-                  {nextGoal.name}
-                </p>
-                <p className="mt-1 text-[12px] text-[var(--text-muted)]">
-                  {formatCurrency(nextGoal.remaining)} left
-                  {nextGoal.estimatedCompletionDate
-                    ? ` · ${nextGoal.estimatedCompletionDate}`
-                    : ""}
-                </p>
+        <IosSection title="Next Goal" action={<IosLink href="/savings">See All</IosLink>}>
+          <Link href="/savings" className="block active:opacity-90">
+            <IosCard padding="md">
+              <div className="flex items-center gap-3">
+                <IosAvatar fallback={nextGoal.icon || nextGoal.name.slice(0, 1)} tone="accent" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="truncate text-[15px] font-semibold text-[var(--foreground)]">
+                      {nextGoal.name}
+                    </p>
+                    <p className="text-[13px] font-semibold tabular-nums text-[var(--text-secondary)]">
+                      {nextGoal.percentComplete}%
+                    </p>
+                  </div>
+                  <p className="mt-0.5 text-[12px] text-[var(--text-muted)]">
+                    {nextGoal.percentComplete >= 100
+                      ? "Complete"
+                      : `${formatCurrency(
+                          Math.max(
+                            nextGoal.remaining / (1 - nextGoal.percentComplete / 100) -
+                              nextGoal.remaining,
+                            0,
+                          ),
+                        )} of ${formatCurrency(
+                          nextGoal.remaining / (1 - nextGoal.percentComplete / 100),
+                        )}`}
+                    {nextGoal.estimatedCompletionDate
+                      ? ` · ${nextGoal.estimatedCompletionDate}`
+                      : ""}
+                  </p>
+                </div>
               </div>
-              <p className="text-[15px] font-semibold tabular-nums text-[var(--foreground)]">
-                {nextGoal.percentComplete}%
-              </p>
-            </div>
-            <IosProgressBar value={nextGoal.percentComplete} className="mt-3" />
-          </IosCard>
+              <IosProgressBar value={nextGoal.percentComplete} className="mt-3" />
+            </IosCard>
+          </Link>
         </IosSection>
       ) : null}
 

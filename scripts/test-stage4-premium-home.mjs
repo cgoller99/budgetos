@@ -20,6 +20,7 @@ const css = read("app/globals.css");
 const nav = read("components/MobileBottomNav.tsx");
 
 assert.match(home, /data-home-hero="safe-to-spend"/);
+assert.match(home, /from-\[var\(--accent-light\)\] to-\[var\(--accent-hover\)\]/);
 assert.match(home, /Safe to Spend/);
 assert.match(home, /variant="home"/);
 assert.ok(
