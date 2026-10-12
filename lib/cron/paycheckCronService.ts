@@ -31,7 +31,8 @@ export async function runDuePaychecks(
     errors: [],
   };
 
-  // A due date is a forecast. Applying allocations stays on the user's confirmation.
+  // income_plans has no automatic-payday opt-in. is_active only means the plan
+  // exists. A due date stays a forecast; Apply paycheck is the confirmation.
   result.skipped = duePlans?.length ?? 0;
 
   return result;
