@@ -1,3 +1,8 @@
+import {
+  classifyRecurringKind,
+  recurringEquivalents,
+  recurringKindLabel,
+} from "@/lib/automation/recurringReview";
 import type { AutomationSuggestion } from "@/lib/automation/types";
 import { findSubscriptionPriceIncreases } from "@/lib/automation/financialInsights";
 import { formatCurrency } from "@/lib/finance/format";
@@ -33,13 +38,23 @@ export function detectRecurringBillSuggestions(
     }
 
     const nextDate = formatEstimatedDate(candidate.nextEstimatedPaymentDate);
+    const equivalents = recurringEquivalents(
+      candidate.averageAmount,
+      candidate.frequency,
+    );
+    const kindLabel = recurringKindLabel(
+      classifyRecurringKind({
+        merchantKey: candidate.merchantKey,
+        category: candidate.category,
+      }),
+    );
     suggestions.push({
       id: `automation-recurring-bill-${candidate.merchantKey.replace(/[^a-z0-9]+/g, "-")}`,
       kind: "recurring_bill",
       title: `Confirm ${candidate.displayName} as a recurring bill?`,
       description: nextDate
-        ? `About ${formatCurrency(candidate.averageAmount)} ${candidate.frequency}. The next charge looks like ${nextDate}. Buxme will not add it until you confirm.`
-        : `About ${formatCurrency(candidate.averageAmount)} ${candidate.frequency}. Buxme will not add it until you confirm.`,
+        ? `${kindLabel}. About ${formatCurrency(candidate.averageAmount)} ${candidate.frequency}, ${formatCurrency(equivalents.monthly)} per month (${formatCurrency(equivalents.annual)} per year). The next charge looks like ${nextDate}. Buxme will not add it until you confirm.`
+        : `${kindLabel}. About ${formatCurrency(candidate.averageAmount)} ${candidate.frequency}, ${formatCurrency(equivalents.monthly)} per month (${formatCurrency(equivalents.annual)} per year). Buxme will not add it until you confirm.`,
       icon: "📅",
       tone: "accent",
       priority: candidate.transactionIds.length >= 3 ? 80 : 55,

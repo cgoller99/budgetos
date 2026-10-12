@@ -1,11 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { AddBillModal } from "@/components/bills/AddBillModal";
+import type { BillFormState } from "@/components/bills/BillFormFields";
 import { Button, Modal } from "@/components/ui";
-import { cn } from "@/components/ui/cn";
+import { useFinance } from "@/context/FinanceContext";
+import { findSubscriptionPriceIncreases } from "@/lib/automation/financialInsights";
+import { buildRecurringReview } from "@/lib/automation/recurringReview";
 import { formatCurrency } from "@/lib/finance/format";
-import { getBillFrequencyLabel } from "@/lib/recurring/frequencies";
 import type { RecurringBillCandidate } from "@/lib/plaid/types";
+import { getBillFrequencyLabel } from "@/lib/recurring/frequencies";
 
 type RecurringBillsFoundModalProps = {
   isOpen: boolean;
@@ -13,20 +17,45 @@ type RecurringBillsFoundModalProps = {
   isSubmitting?: boolean;
   onAddSelected: (selected: RecurringBillCandidate[]) => void | Promise<void>;
   onIgnore: (selected: RecurringBillCandidate[]) => void | Promise<void>;
+  onDismiss: (candidate: RecurringBillCandidate) => void;
   onRemindLater: () => void | Promise<void>;
   onClose: () => void;
 };
 
-function candidateKey(candidate: RecurringBillCandidate): string {
-  return candidate.merchantKey;
-}
-
-function formatCandidateAmount(candidate: RecurringBillCandidate): string {
-  if (candidate.action === "update") {
-    return `~${formatCurrency(candidate.averageAmount)}`;
+function formatNextCharge(value: string | null): string | null {
+  if (!value) {
+    return null;
   }
 
-  return formatCurrency(candidate.averageAmount);
+  const date = new Date(`${value.slice(0, 10)}T12:00:00`);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function draftFromCandidate(candidate: RecurringBillCandidate): BillFormState {
+  return {
+    name: candidate.displayName,
+    category: candidate.category,
+    frequency: candidate.frequency,
+    startDate:
+      candidate.nextEstimatedPaymentDate ??
+      candidate.lastPaymentDate ??
+      new Date().toISOString().slice(0, 10),
+    autopay: false,
+    recurring: true,
+    splits: [
+      {
+        amount: String(candidate.averageAmount),
+        dueDay: String(candidate.dueDay),
+        paycheckAssignment: "first_paycheck",
+        customPayDay: "15",
+        paymentAccountId: candidate.paymentAccountId ?? "",
+      },
+    ],
+  };
 }
 
 export function RecurringBillsFoundModal({
@@ -35,141 +64,165 @@ export function RecurringBillsFoundModal({
   isSubmitting = false,
   onAddSelected,
   onIgnore,
+  onDismiss,
   onRemindLater,
   onClose,
 }: RecurringBillsFoundModalProps) {
-  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(
-    () => new Set(candidates.map(candidateKey)),
+  const finance = useFinance();
+  const [draft, setDraft] = useState<BillFormState | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const items = useMemo(
+    () =>
+      buildRecurringReview(candidates, {
+        transactions: finance.transactions,
+      }),
+    [candidates, finance.transactions],
   );
-
-  useEffect(() => {
-    setSelectedKeys(new Set(candidates.map(candidateKey)));
-  }, [candidates]);
-
-  const selectedCandidates = useMemo(
-    () => candidates.filter((candidate) => selectedKeys.has(candidateKey(candidate))),
-    [candidates, selectedKeys],
+  const priceAlerts = useMemo(
+    () => findSubscriptionPriceIncreases(finance),
+    [finance],
   );
-
-  function toggleCandidate(key: string) {
-    setSelectedKeys((current) => {
-      const next = new Set(current);
-
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-      }
-
-      return next;
-    });
-  }
-
-  function selectAll() {
-    setSelectedKeys(new Set(candidates.map(candidateKey)));
-  }
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={`We found ${candidates.length} recurring bill${candidates.length === 1 ? "" : "s"}`}
-    >
-      <p className="text-sm leading-relaxed text-[var(--text-muted)]">
-        Review detected recurring charges from your synced transactions. Buxme will never add bills
-        without your approval.
-      </p>
+    <>
+      <Modal isOpen={isOpen} onClose={onClose} title="Review recurring payments">
+        <p className="text-sm leading-relaxed text-[var(--text-muted)]">
+          These suggestions come from your transactions. Buxme will not add a bill until you
+          confirm it.
+        </p>
 
-      <div className="mt-5 max-h-[min(50vh,420px)] space-y-2 overflow-y-auto pr-1">
-        {candidates.map((candidate) => {
-          const key = candidateKey(candidate);
-          const checked = selectedKeys.has(key);
+        {items.length === 0 && priceAlerts.length === 0 ? (
+          <p className="mt-4 text-sm text-[var(--text-muted)]">
+            Nothing new to review.
+          </p>
+        ) : null}
 
-          return (
-            <label
-              key={key}
-              className={cn(
-                "flex cursor-pointer items-start gap-3 rounded-2xl border px-4 py-3 transition-colors",
-                checked
-                  ? "border-[var(--accent)]/30 bg-[var(--accent)]/10"
-                  : "border-[var(--surface-border)] bg-[var(--surface-subtle)]",
-              )}
-            >
-              <input
-                type="checkbox"
-                checked={checked}
-                onChange={() => toggleCandidate(key)}
-                className="mt-1 h-4 w-4 rounded border-[var(--surface-border)] accent-[var(--accent)]"
-              />
-              <span className="min-w-0 flex-1">
-                <span className="flex flex-wrap items-center gap-2">
-                  <span className="font-medium text-[var(--foreground)]">
-                    {candidate.displayName}
+        <div className="mt-4 max-h-[min(58vh,520px)] space-y-3 overflow-y-auto pr-1">
+          {items.map((item) => {
+            const nextCharge = formatNextCharge(item.nextCharge);
+
+            return (
+              <article
+                key={item.merchantKey}
+                className="rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-subtle)] px-4 py-3"
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-[16px] font-semibold text-[var(--foreground)]">
+                    {item.merchant}
+                  </p>
+                  <span className="rounded-full bg-[var(--accent)]/15 px-2 py-0.5 text-[11px] font-semibold text-[var(--accent-light)]">
+                    {item.kindLabel}
                   </span>
-                  <span className="text-sm tabular-nums text-[var(--text-secondary)]">
-                    {formatCandidateAmount(candidate)} ·{" "}
-                    {getBillFrequencyLabel(candidate.frequency)}
-                  </span>
-                </span>
-                <span className="mt-1 block text-xs text-[var(--text-muted)]">
-                  {candidate.action === "update"
-                    ? "Matches an existing bill — we'll suggest updating it."
-                    : "New recurring bill"}
-                  {candidate.lastPaymentDate
-                    ? ` · Last payment ${candidate.lastPaymentDate}`
-                    : ""}
-                  {candidate.nextEstimatedPaymentDate
-                    ? ` · Next ~${candidate.nextEstimatedPaymentDate}`
-                    : ""}
-                </span>
-              </span>
-            </label>
-          );
-        })}
-      </div>
+                </div>
+                <p className="mt-1 text-[14px] text-[var(--text-secondary)]">
+                  {formatCurrency(item.typicalAmount)} · {getBillFrequencyLabel(item.frequency)}
+                  {nextCharge ? ` · Next ${nextCharge}` : ""}
+                </p>
+                <p className="mt-1 text-[13px] text-[var(--text-muted)]">
+                  {formatCurrency(item.monthlyEquivalent)} per month ·{" "}
+                  {formatCurrency(item.annualEquivalent)} per year
+                </p>
+                <p className="mt-1 text-[12px] text-[var(--text-muted)]">
+                  {item.confidenceLabel} · Not added yet
+                </p>
+                {item.priceChange ? (
+                  <p className="mt-2 text-[13px] text-[var(--danger)]">
+                    Latest charge {formatCurrency(item.priceChange.latestAmount)} is above the
+                    earlier average of {formatCurrency(item.priceChange.previousAverage)}.
+                  </p>
+                ) : null}
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <Button
+                    size="md"
+                    disabled={isSubmitting}
+                    onClick={() => void onAddSelected([item.candidate])}
+                  >
+                    Confirm
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="md"
+                    disabled={isSubmitting}
+                    onClick={() => {
+                      setDraft(draftFromCandidate(item.candidate));
+                      setEditOpen(true);
+                    }}
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="md"
+                    disabled={isSubmitting}
+                    onClick={() => onDismiss(item.candidate)}
+                  >
+                    Dismiss
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="md"
+                    disabled={isSubmitting}
+                    onClick={() => void onIgnore([item.candidate])}
+                  >
+                    Not recurring
+                  </Button>
+                </div>
+              </article>
+            );
+          })}
 
-      <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
-        <Button
-          variant="ghost"
-          size="md"
-          disabled={isSubmitting}
-          onClick={() => void onRemindLater()}
-        >
-          Remind Me Later
-        </Button>
-        <Button
-          variant="secondary"
-          size="md"
-          disabled={isSubmitting || selectedCandidates.length === 0}
-          onClick={() => void onIgnore(selectedCandidates)}
-        >
-          Ignore
-        </Button>
-        <Button variant="secondary" size="md" disabled={isSubmitting} onClick={selectAll}>
-          Select All
-        </Button>
-        <Button
-          size="md"
-          disabled={isSubmitting || selectedCandidates.length === 0}
-          onClick={() => void onAddSelected(selectedCandidates)}
-        >
-          {isSubmitting
-            ? "Adding..."
-            : `Add Selected (${selectedCandidates.length})`}
-        </Button>
-      </div>
-    </Modal>
+          {priceAlerts.length > 0 ? (
+            <div className="rounded-2xl border border-[var(--danger)]/30 bg-[var(--danger)]/10 px-4 py-3">
+              <p className="text-[14px] font-semibold text-[var(--foreground)]">
+                Price changes
+              </p>
+              <ul className="mt-2 space-y-2">
+                {priceAlerts.map((alert) => (
+                  <li key={alert.billId} className="text-[13px] text-[var(--text-secondary)]">
+                    {alert.name} latest charge is {formatCurrency(alert.latestAmount)}, above the
+                    earlier average of {formatCurrency(alert.previousAverage)}. The bill stays the
+                    same until you edit it.
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="mt-4">
+          <Button
+            variant="ghost"
+            size="md"
+            fullWidth
+            disabled={isSubmitting}
+            onClick={() => void onRemindLater()}
+          >
+            Remind me later
+          </Button>
+        </div>
+      </Modal>
+      <AddBillModal
+        isOpen={editOpen}
+        draft={draft}
+        onClose={() => {
+          setEditOpen(false);
+        }}
+      />
+    </>
   );
 }
 
 export function RecurringBillsFoundCard({
   candidates,
+  priceAlertCount = 0,
   onReview,
 }: {
   candidates: RecurringBillCandidate[];
+  priceAlertCount?: number;
   onReview: () => void;
 }) {
-  if (candidates.length === 0) {
+  const count = candidates.length + priceAlertCount;
+  if (count === 0) {
     return null;
   }
 
@@ -177,14 +230,14 @@ export function RecurringBillsFoundCard({
     <div className="rounded-2xl border border-[var(--accent)]/25 bg-[var(--accent)]/10 px-4 py-4 sm:px-5 sm:py-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm font-medium text-[var(--foreground)]">Recurring bills found</p>
+          <p className="text-sm font-medium text-[var(--foreground)]">Recurring payments to review</p>
           <p className="mt-1 text-sm text-[var(--text-muted)]">
-            We detected {candidates.length} recurring charge
-            {candidates.length === 1 ? "" : "s"} from your synced transactions.
+            {count} suggestion{count === 1 ? "" : "s"} from your transactions. Nothing is added
+            until you confirm.
           </p>
         </div>
         <Button size="md" onClick={onReview}>
-          Review bills
+          Review
         </Button>
       </div>
     </div>

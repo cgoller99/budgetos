@@ -7,6 +7,8 @@ export const BILL_CATEGORY_OPTIONS = [
   "Healthcare",
   "Lifestyle",
   "Subscriptions",
+  "Memberships",
+  "Loans",
   "Education",
   "Other",
 ] as const;
