@@ -9,7 +9,14 @@ import fs from "node:fs";
 import path from "node:path";
 import { emptyFinanceData } from "../lib/finance/emptyFinanceData.ts";
 import { getSafeToSpend } from "../lib/finance/safeToSpend.ts";
+import { isFounderEmail } from "../lib/founder/emails.ts";
+import {
+  moneyPlanApiResult,
+  resolveMoneyPlanAccess,
+  sanitizeMoneyPlanBudgets,
+} from "../lib/plan/moneyPlanAccess.ts";
 import { buildMoneyPlan } from "../lib/plan/moneyPlan.ts";
+import { FREE_SUBSCRIPTION, hasProPlusAccess } from "../lib/subscription/types.ts";
 
 const reference = new Date(2026, 9, 12, 12, 0, 0);
 const root = path.resolve(import.meta.dirname, "..");
@@ -205,12 +212,136 @@ assert.equal(hidden.incomePlan, null);
 
 const plans = fs.readFileSync(path.join(root, "lib/subscription/plans.ts"), "utf8");
 const screen = fs.readFileSync(path.join(root, "components/plan/MoneyPlanContent.tsx"), "utf8");
+const preview = fs.readFileSync(path.join(root, "components/plan/MoneyPlanPreview.tsx"), "utf8");
+const client = fs.readFileSync(path.join(root, "components/plan/MoneyPlanScreen.tsx"), "utf8");
+const page = fs.readFileSync(path.join(root, "app/(authenticated)/money-plan/page.tsx"), "utf8");
+const route = fs.readFileSync(path.join(root, "app/api/money-plan/route.ts"), "utf8");
+const gate = fs.readFileSync(path.join(root, "lib/plan/moneyPlanGate.server.ts"), "utf8");
 const engine = fs.readFileSync(path.join(root, "lib/plan/moneyPlan.ts"), "utf8");
+const reports = fs.readFileSync(path.join(root, "components/reports/ReportsContent.tsx"), "utf8");
+const iosReports = fs.readFileSync(path.join(root, "components/native/ios/IosReportsScreen.tsx"), "utf8");
 assert.match(plans, /PRO_PLUS_ROUTE_PREFIXES = \[\]/);
+assert.match(plans, /\$7\.99/);
+assert.match(plans, /\$14\.99/);
+assert.doesNotMatch(plans, /\/money-plan/);
 assert.match(screen, /does not move money/);
-assert.match(screen, /ProUpgradeBanner/);
+assert.doesNotMatch(screen, /useFinance|buildMoneyPlan|ProUpgradeBanner/);
 assert.doesNotMatch(screen, /executePaycheck|markIncomePlan/);
+assert.match(preview, /Upgrade to Pro\+/);
+assert.match(preview, /\/settings\?upgrade=pro_plus#billing/);
+assert.match(preview, /Included with Pro\+/);
+assert.doesNotMatch(preview, /useFinance|buildMoneyPlan|formatCurrency|safeToSpend/);
+assert.match(client, /\/api\/money-plan/);
+assert.doesNotMatch(client, /buildMoneyPlan|useFinance/);
+assert.match(page, /readMoneyPlanAccess/);
+assert.match(page, /force-dynamic/);
+assert.match(route, /export async function GET/);
+assert.match(route, /export async function POST/);
+assert.match(route, /moneyPlanHttpResponse/);
+assert.match(gate, /getEffectiveEntitlements/);
+assert.match(gate, /adminFounderGranted/);
+assert.match(gate, /resolveMoneyPlanAccess/);
+assert.match(gate, /moneyPlanApiResult/);
+assert.ok(gate.indexOf('access !== "full"') < gate.indexOf("loadFinanceData"));
+assert.doesNotMatch(gate, /STRIPE_PRO_PLUS_PRICE|service_role|serviceRole/);
+assert.match(reports, /featureLabel="Advanced reports"/);
+assert.match(iosReports, /featureLabel="Advanced reports"/);
 assert.doesNotMatch(engine, /remaining \/ 12|GOAL_ALLOCATION/);
 assert.doesNotMatch(engine, /executePaycheck|markIncomePlan/);
+
+const future = "2099-01-01T00:00:00.000Z";
+const past = "2000-01-01T00:00:00.000Z";
+
+function subscription(partial) {
+  return { ...FREE_SUBSCRIPTION, ...partial };
+}
+
+function accessFor(partial, isFounder = false) {
+  const current = subscription(partial);
+  return resolveMoneyPlanAccess({
+    isFounder,
+    hasProPlusAccess: hasProPlusAccess(current),
+  });
+}
+
+assert.equal(accessFor({ plan: "free", status: "none" }), "preview");
+assert.equal(
+  accessFor({ plan: "pro", status: "active", provider: "stripe", currentPeriodEnd: future }),
+  "preview",
+);
+assert.equal(
+  accessFor({ plan: "pro_plus", status: "active", provider: "stripe", currentPeriodEnd: future }),
+  "full",
+);
+assert.equal(
+  accessFor({ plan: "pro_plus", status: "trialing", provider: "stripe", currentPeriodEnd: future }),
+  "full",
+);
+assert.equal(
+  accessFor({ plan: "pro_plus", status: "past_due", provider: "stripe", currentPeriodEnd: future }),
+  "full",
+);
+assert.equal(
+  accessFor({ plan: "pro_plus", status: "canceled", provider: "stripe", currentPeriodEnd: future }),
+  "preview",
+);
+assert.equal(
+  accessFor({ plan: "pro_plus", status: "active", provider: "stripe", currentPeriodEnd: past }),
+  "preview",
+);
+assert.equal(
+  accessFor({
+    plan: "pro_plus",
+    status: "active",
+    provider: "apple",
+    currentPeriodEnd: null,
+  }),
+  "preview",
+);
+assert.equal(accessFor({ plan: "free", status: "none" }, true), "full");
+assert.equal(
+  accessFor({ plan: "pro", status: "active", provider: "stripe", currentPeriodEnd: future }, true),
+  "full",
+);
+
+process.env.FOUNDER_EMAILS = "founder@buxme.co";
+assert.equal(isFounderEmail("founder@buxme.co"), true);
+assert.equal(isFounderEmail("person@buxme.co"), false);
+assert.equal(
+  resolveMoneyPlanAccess({
+    isFounder: isFounderEmail("founder@buxme.co"),
+    hasProPlusAccess: false,
+  }),
+  "full",
+);
+assert.equal(
+  resolveMoneyPlanAccess({
+    isFounder: isFounderEmail("person@buxme.co"),
+    hasProPlusAccess: hasProPlusAccess(
+      subscription({ plan: "pro", status: "active", provider: "stripe", currentPeriodEnd: future }),
+    ),
+  }),
+  "preview",
+);
+
+const blocked = moneyPlanApiResult({ access: "preview", plan });
+assert.equal(blocked.status, 403);
+assert.equal(blocked.body.access, "preview");
+assert.equal(blocked.body.upgradePlan, "pro_plus");
+assert.equal(Object.hasOwn(blocked.body, "plan"), false);
+assert.doesNotMatch(JSON.stringify(blocked.body), /safeToSpend|2000/);
+const opened = moneyPlanApiResult({ access: "full", plan });
+assert.equal(opened.status, 200);
+assert.equal(opened.body.plan.safeToSpend, plan.safeToSpend);
+assert.equal(moneyPlanApiResult({ access: "full", plan: null }).status, 403);
+assert.deepEqual(sanitizeMoneyPlanBudgets("nope"), []);
+assert.deepEqual(
+  sanitizeMoneyPlanBudgets([
+    { category: "Groceries", amount: 50 },
+    { category: "Rent", amount: -1 },
+    { category: "", amount: 10 },
+  ]),
+  [{ category: "Groceries", amount: 50 }],
+);
 
 console.log("Money Plan checks passed.");

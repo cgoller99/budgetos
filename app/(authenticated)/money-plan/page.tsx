@@ -1,5 +1,9 @@
-import { MoneyPlanContent } from "@/components/plan/MoneyPlanContent";
+import { MoneyPlanScreen } from "@/components/plan/MoneyPlanScreen";
+import { readMoneyPlanAccess } from "@/lib/plan/moneyPlanGate.server";
 
-export default function MoneyPlanPage() {
-  return <MoneyPlanContent />;
+export const dynamic = "force-dynamic";
+
+export default async function MoneyPlanPage() {
+  const access = await readMoneyPlanAccess();
+  return <MoneyPlanScreen access={access} />;
 }

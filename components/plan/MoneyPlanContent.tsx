@@ -1,17 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { IosCard, IosScreen, IosSection } from "@/components/native/ios/IosPrimitives";
-import { ProUpgradeBanner } from "@/components/subscription/ProUpgradeBanner";
 import { Card, CardContent, CardHeader } from "@/components/ui";
 import { pageContainerWideClassName } from "@/components/ui/tokens";
-import { useAuth } from "@/context/AuthContext";
-import { useFinance } from "@/context/FinanceContext";
-import { readSavedCategoryBudgets } from "@/lib/automation/savedBudgets";
 import { formatCurrency } from "@/lib/finance/format";
 import { useNativeIos } from "@/lib/native/useNativeIos";
-import { buildMoneyPlan, type MoneyPlan } from "@/lib/plan/moneyPlan";
+import type { MoneyPlan } from "@/lib/plan/moneyPlan";
+
+const NOTE =
+  "This screen does not move money or change your Income Plan, bills, debts, goals, or budgets.";
 
 function PlanSections({ plan }: { plan: MoneyPlan }) {
   return (
@@ -113,7 +111,7 @@ function PlanSections({ plan }: { plan: MoneyPlan }) {
         <h2 className="text-[15px] font-semibold text-[var(--foreground)]">Saved budgets</h2>
         {plan.budgets.length === 0 ? (
           <p className="mt-1 text-[13px] text-[var(--text-muted)]">
-            No saved category limits on this device.
+            No saved category limits yet.
           </p>
         ) : (
           <ul className="mt-2 flex flex-col gap-2 text-[13px] text-[var(--text-muted)]">
@@ -133,30 +131,15 @@ function PlanSections({ plan }: { plan: MoneyPlan }) {
   );
 }
 
-export function MoneyPlanContent() {
-  const finance = useFinance();
-  const { user } = useAuth();
+export function MoneyPlanContent({ plan }: { plan: MoneyPlan }) {
   const nativeIos = useNativeIos();
-  const [budgets, setBudgets] = useState<Array<{ category: string; amount: number }>>([]);
-
-  useEffect(() => {
-    setBudgets(readSavedCategoryBudgets(user?.id));
-  }, [user?.id]);
-
-  const plan = useMemo(
-    () => buildMoneyPlan(finance, new Date(), budgets),
-    [budgets, finance],
-  );
-
-  const note = "This screen does not move money or change your Income Plan, bills, debts, goals, or budgets.";
 
   if (nativeIos) {
     return (
       <IosScreen>
-        <ProUpgradeBanner requiredPlan="pro_plus" featureLabel="Money Plan" />
         <IosSection title="Money Plan">
           <IosCard padding="md">
-            <p className="text-[13px] leading-snug text-[var(--text-muted)]">{note}</p>
+            <p className="text-[13px] leading-snug text-[var(--text-muted)]">{NOTE}</p>
             <div className="mt-4">
               <PlanSections plan={plan} />
             </div>
@@ -168,14 +151,13 @@ export function MoneyPlanContent() {
 
   return (
     <div className={pageContainerWideClassName}>
-      <ProUpgradeBanner requiredPlan="pro_plus" featureLabel="Money Plan" />
       <Card>
         <CardHeader
           title="Money Plan"
           description="Income, bills, debt, goals, saved budgets, and the monthly cash-flow plan in one place."
         />
         <CardContent>
-          <p className="mb-4 text-sm text-[var(--text-muted)]">{note}</p>
+          <p className="mb-4 text-sm text-[var(--text-muted)]">{NOTE}</p>
           <PlanSections plan={plan} />
         </CardContent>
       </Card>
