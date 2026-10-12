@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import {
   BillFormFields,
   initialBillFormState,
@@ -21,19 +21,14 @@ export function AddBillModal({ isOpen, onClose, draft = null }: AddBillModalProp
   const { addBill } = useFinance();
   const { showToast } = useToast();
   const [form, setForm] = useState(initialBillFormState);
-  const draftRef = useRef(draft);
-  draftRef.current = draft;
-  const draftSignature = draft
-    ? `${draft.name}|${draft.category}|${draft.frequency}|${draft.splits[0]?.amount ?? ""}`
-    : "";
 
   useEffect(() => {
     if (!isOpen) {
       return;
     }
 
-    setForm(draftRef.current ?? initialBillFormState);
-  }, [isOpen, draftSignature]);
+    setForm(draft ?? initialBillFormState);
+  }, [isOpen, draft]);
 
   function handleClose() {
     setForm(initialBillFormState);
