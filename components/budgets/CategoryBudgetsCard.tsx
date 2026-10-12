@@ -1,5 +1,6 @@
 "use client";
 
+import { CategoryBudgetStatus } from "@/components/budgets/CategoryBudgetStatus";
 import { useCategoryBudgets } from "@/components/budgets/useCategoryBudgets";
 import { Button, Card, CardContent, CardHeader, Input, ProgressBar } from "@/components/ui";
 import { formatCurrency } from "@/lib/finance/format";
@@ -16,6 +17,9 @@ export function CategoryBudgetsCard() {
     updateAmount,
     removeBudget,
     addBudget,
+    status,
+    syncMessage,
+    retry,
   } = useCategoryBudgets();
 
   return (
@@ -25,6 +29,7 @@ export function CategoryBudgetsCard() {
         description="Monthly limits by category. Suggestions stay off until you confirm."
       />
       <CardContent className="space-y-5">
+        <CategoryBudgetStatus status={status} message={syncMessage} onRetry={retry} />
         {suggestions.length > 0 ? (
           <div>
             <p className="text-sm font-semibold text-[var(--foreground)]">Suggested limits</p>

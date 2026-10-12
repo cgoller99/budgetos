@@ -3,31 +3,63 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useFinance } from "@/context/FinanceContext";
+import { createBrowserCategoryBudgetSession } from "@/lib/budgets/categoryBudgetClient";
 import {
   buildCategoryBudgetViews,
   suggestCategoryBudgetLimits,
 } from "@/lib/budgets/categoryBudgets";
-import { getDisplayCategory } from "@/lib/transactions/categoryPresentation";
 import {
-  readSavedCategoryBudgets,
-  writeSavedCategoryBudgets,
+  type CategoryBudgetSyncState,
   type SavedCategoryBudget,
-} from "@/lib/automation/savedBudgets";
+} from "@/lib/budgets/categoryBudgetSync";
+import { getDisplayCategory } from "@/lib/transactions/categoryPresentation";
+
+const INITIAL_SYNC: CategoryBudgetSyncState = {
+  budgets: [],
+  status: "loading",
+  message: "Loading budgets...",
+};
 
 export function useCategoryBudgets() {
   const finance = useFinance();
   const { user } = useAuth();
-  const [saved, setSaved] = useState<SavedCategoryBudget[]>([]);
+  const userId = user?.id ?? null;
+  const [syncState, setSyncState] = useState<CategoryBudgetSyncState>(INITIAL_SYNC);
+  const [seenUserId, setSeenUserId] = useState<string | null>(userId);
   const [category, setCategory] = useState("");
   const [amount, setAmount] = useState("");
 
+  if (userId !== seenUserId) {
+    setSeenUserId(userId);
+    setSyncState(INITIAL_SYNC);
+  }
+
   useEffect(() => {
-    setSaved(readSavedCategoryBudgets(user?.id));
-  }, [user?.id]);
+    let cancelled = false;
+    const session = createBrowserCategoryBudgetSession(userId);
+    setSyncState(session.readLocalState());
+    const unsubscribe = session.subscribe((state) => {
+      if (!cancelled) {
+        setSyncState(state);
+      }
+    });
+    void session.load();
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [userId]);
+
+  const saved = syncState.budgets;
 
   function persist(next: SavedCategoryBudget[]) {
-    setSaved(next);
-    writeSavedCategoryBudgets(user?.id, next);
+    const session = createBrowserCategoryBudgetSession(userId);
+    setSyncState(session.commit(next));
+  }
+
+  function retry() {
+    const session = createBrowserCategoryBudgetSession(userId);
+    void session.load();
   }
 
   const suggestions = useMemo(
@@ -94,5 +126,8 @@ export function useCategoryBudgets() {
     updateAmount,
     removeBudget,
     addBudget,
+    status: syncState.status,
+    syncMessage: syncState.message,
+    retry,
   };
 }

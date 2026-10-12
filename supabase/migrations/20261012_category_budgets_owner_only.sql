@@ -1,6 +1,6 @@
--- Category budgets are personal.
--- Not applied to production in this change. The app still stores budgets on
--- the device until this migration is reviewed and applied.
+-- Category budgets are personal and owned by one user.
+-- Apply this migration before shipping budget sync. The app reads and writes
+-- public.category_budgets for the signed-in user and keeps a device cache.
 -- Household peers must not read or write another member's limits.
 -- FOR ALL includes SELECT, so owner updates are not silently dropped.
 

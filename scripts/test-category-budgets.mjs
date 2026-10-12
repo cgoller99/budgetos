@@ -17,6 +17,8 @@ import {
   readSavedCategoryBudgets,
   writeSavedCategoryBudgets,
 } from "../lib/automation/savedBudgets.ts";
+import { createSupabaseCategoryBudgetRemote } from "../lib/budgets/categoryBudgetRemote.ts";
+import { CategoryBudgetSession } from "../lib/budgets/categoryBudgetSync.ts";
 
 const root = path.resolve(import.meta.dirname, "..");
 const reference = new Date("2026-10-15T12:00:00");
@@ -370,17 +372,30 @@ const tableReaders = sourceFiles(root).filter((filePath) => {
   const source = fs.readFileSync(filePath, "utf8");
   return source.includes('from("category_budgets")') || source.includes("from('category_budgets')");
 });
-assert.deepEqual(tableReaders, []);
+assert.deepEqual(
+  tableReaders.map((filePath) => path.relative(root, filePath)),
+  ["lib/budgets/categoryBudgetRemote.ts"],
+);
+
+const remoteSource = read("lib/budgets/categoryBudgetRemote.ts");
+assert.match(remoteSource, /from\("category_budgets"\)/);
+assert.match(remoteSource, /\.eq\("user_id", userId\)/);
+assert.match(remoteSource, /onConflict: "user_id,category"/);
+assert.doesNotMatch(remoteSource, /service_role|serviceRole|createAdmin/);
 
 const hook = read("components/budgets/useCategoryBudgets.ts");
-const effect = hook.match(/useEffect\(\(\) => \{[\s\S]*?\}, \[user\?\.id\]\);/);
+const effect = hook.match(/useEffect\(\(\) => \{[\s\S]*?\}, \[userId\]\);/);
 assert.ok(effect);
-assert.match(effect[0], /readSavedCategoryBudgets/);
+assert.match(effect[0], /session\.load\(\)/);
 assert.doesNotMatch(effect[0], /writeSavedCategoryBudgets|suggestCategoryBudgetLimits/);
 assert.match(hook, /!saved\.some/);
 assert.match(hook, /getDisplayCategory/);
 assert.match(hook, /buildCategoryBudgetViews\(saved, finance\)/);
+assert.match(hook, /Loading budgets/);
 assert.doesNotMatch(read("lib/automation/savedBudgets.ts"), /spent/);
+assert.match(read("components/budgets/CategoryBudgetStatus.tsx"), /Try again/);
+assert.match(read("components/budgets/CategoryBudgetStatus.tsx"), /role="status"/);
+assert.match(read("app/(authenticated)/layout.tsx"), /CategoryBudgetSync/);
 
 for (const relativePath of [
   "components/native/ios/IosBudgetsSection.tsx",
@@ -402,5 +417,379 @@ assert.match(home, /<IosBudgetsSection \/>/);
 assert.match(reports, /<IosBudgetsSection \/>/);
 assert.match(webReports, /<CategoryBudgetsCard \/>/);
 assert.match(dashboard, /<CategoryBudgetsCard \/>/);
+
+function memoryStorage(initial = new Map()) {
+  return {
+    getItem: (key) => (initial.has(key) ? initial.get(key) : null),
+    setItem: (key, value) => initial.set(key, String(value)),
+  };
+}
+
+function memoryServer() {
+  const rows = [];
+  return {
+    rows,
+    remote(userId) {
+      return {
+        async list() {
+          return rows
+            .filter((row) => row.user_id === userId)
+            .map((row) => ({
+              category: row.category,
+              amount: row.amount,
+              updatedAt: row.updated_at,
+            }));
+        },
+        async save(record) {
+          const index = rows.findIndex(
+            (row) => row.user_id === userId && row.category === record.category,
+          );
+          const next = {
+            user_id: userId,
+            category: record.category,
+            amount: record.amount,
+            updated_at: record.updatedAt,
+          };
+          if (index === -1) {
+            rows.push(next);
+          } else {
+            rows[index] = next;
+          }
+        },
+        async remove(category) {
+          const index = rows.findIndex(
+            (row) => row.user_id === userId && row.category === category,
+          );
+          if (index !== -1) {
+            rows.splice(index, 1);
+          }
+        },
+      };
+    },
+  };
+}
+
+function createStubClient(tableRows, actor) {
+  return {
+    from(table) {
+      if (table !== "category_budgets") {
+        throw new Error(`Unexpected table ${table}`);
+      }
+      const filters = [];
+      let mode = "select";
+      const query = {
+        select() {
+          mode = "select";
+          return query;
+        },
+        eq(column, value) {
+          filters.push([column, value]);
+          return query;
+        },
+        delete() {
+          mode = "delete";
+          return query;
+        },
+        upsert(body) {
+          if (body.user_id !== actor) {
+            return Promise.resolve({
+              error: { message: "new row violates row-level security" },
+            });
+          }
+          const index = tableRows.findIndex(
+            (row) => row.user_id === body.user_id && row.category === body.category,
+          );
+          if (index === -1) {
+            tableRows.push({ ...body });
+          } else {
+            tableRows[index] = { ...tableRows[index], ...body };
+          }
+          return Promise.resolve({ error: null });
+        },
+        then(onFulfilled, onRejected) {
+          try {
+            if (mode === "delete") {
+              for (let index = tableRows.length - 1; index >= 0; index -= 1) {
+                const row = tableRows[index];
+                const matches =
+                  row.user_id === actor &&
+                  filters.every(([column, value]) => row[column] === value);
+                if (matches) {
+                  tableRows.splice(index, 1);
+                }
+              }
+              onFulfilled({ error: null });
+              return;
+            }
+            const data = tableRows.filter(
+              (row) =>
+                row.user_id === actor &&
+                filters.every(([column, value]) => row[column] === value),
+            );
+            onFulfilled({ data, error: null });
+          } catch (error) {
+            onRejected?.(error);
+          }
+        },
+      };
+      return query;
+    },
+  };
+}
+
+const account = memoryServer();
+const phoneStorage = new Map();
+let clock = "2026-10-12T01:00:00.000Z";
+const phone = new CategoryBudgetSession(
+  "user-a",
+  memoryStorage(phoneStorage),
+  account.remote("user-a"),
+  () => clock,
+);
+phone.commit([
+  { category: "Groceries", amount: 80 },
+  { category: "Gas", amount: 40 },
+]);
+await phone.whenIdle();
+assert.equal(account.rows.filter((row) => row.user_id === "user-a").length, 2);
+
+const afterLogin = new CategoryBudgetSession(
+  "user-a",
+  memoryStorage(phoneStorage),
+  account.remote("user-a"),
+  () => clock,
+);
+const relogin = await afterLogin.load();
+assert.deepEqual(relogin.budgets, [
+  { category: "Gas", amount: 40 },
+  { category: "Groceries", amount: 80 },
+]);
+
+const reinstall = new CategoryBudgetSession(
+  "user-a",
+  memoryStorage(new Map()),
+  account.remote("user-a"),
+  () => clock,
+);
+const restored = await reinstall.load();
+assert.deepEqual(restored.budgets, relogin.budgets);
+assert.equal(restored.message, null);
+
+clock = "2026-10-12T02:00:00.000Z";
+const tablet = new CategoryBudgetSession(
+  "user-a",
+  memoryStorage(new Map()),
+  account.remote("user-a"),
+  () => clock,
+);
+const tabletLoaded = await tablet.load();
+assert.equal(tabletLoaded.budgets.find((item) => item.category === "Groceries").amount, 80);
+tablet.commit([
+  { category: "Gas", amount: 40 },
+  { category: "Groceries", amount: 95 },
+]);
+await tablet.whenIdle();
+const phoneRefresh = await phone.load();
+assert.equal(
+  phoneRefresh.budgets.find((item) => item.category === "Groceries").amount,
+  95,
+);
+
+const otherUser = new CategoryBudgetSession(
+  "user-b",
+  memoryStorage(new Map()),
+  account.remote("user-b"),
+  () => clock,
+);
+assert.deepEqual((await otherUser.load()).budgets, []);
+
+let online = false;
+const offlineServer = memoryServer();
+const offlineStorage = new Map();
+const offlineRemote = {
+  async list() {
+    if (!online) {
+      throw new Error("offline");
+    }
+    return offlineServer.remote("user-a").list();
+  },
+  async save(record) {
+    if (!online) {
+      throw new Error("offline");
+    }
+    return offlineServer.remote("user-a").save(record);
+  },
+  async remove(category) {
+    if (!online) {
+      throw new Error("offline");
+    }
+    return offlineServer.remote("user-a").remove(category);
+  },
+};
+const offlineSession = new CategoryBudgetSession(
+  "user-a",
+  memoryStorage(offlineStorage),
+  offlineRemote,
+  () => "2026-10-12T03:00:00.000Z",
+);
+let offlineState = null;
+offlineSession.subscribe((state) => {
+  offlineState = state;
+});
+const offlineCommit = offlineSession.commit([{ category: "Groceries", amount: 55 }]);
+assert.equal(offlineCommit.budgets[0].amount, 55);
+await offlineSession.whenIdle();
+assert.equal(offlineState.status, "offline");
+assert.match(offlineState.message, /Saved on this device/);
+assert.equal(offlineServer.rows.length, 0);
+const offlineReload = new CategoryBudgetSession(
+  "user-a",
+  memoryStorage(offlineStorage),
+  offlineRemote,
+  () => "2026-10-12T03:00:00.000Z",
+);
+const offlineCached = await offlineReload.load();
+assert.equal(offlineCached.status, "offline");
+assert.equal(offlineCached.budgets[0].amount, 55);
+online = true;
+const onlineAgain = await offlineReload.load();
+assert.equal(onlineAgain.status, "ready");
+assert.equal(onlineAgain.message, null);
+assert.equal(offlineServer.rows[0].amount, 55);
+
+const staleServer = memoryServer();
+let resolveList = null;
+const staleRemote = {
+  list() {
+    return new Promise((resolve) => {
+      resolveList = resolve;
+    });
+  },
+  save: (record) => staleServer.remote("user-a").save(record),
+  remove: (category) => staleServer.remote("user-a").remove(category),
+};
+const staleSession = new CategoryBudgetSession(
+  "user-a",
+  memoryStorage(new Map()),
+  staleRemote,
+  () => "2026-10-12T04:00:00.000Z",
+);
+const staleLoad = staleSession.load();
+staleSession.commit([{ category: "Groceries", amount: 70 }]);
+resolveList([
+  { category: "Groceries", amount: 10, updatedAt: "2026-10-01T00:00:00.000Z" },
+  { category: "Rent", amount: 400, updatedAt: "2026-10-11T00:00:00.000Z" },
+]);
+const staleResult = await staleLoad;
+assert.equal(staleResult.budgets.find((item) => item.category === "Groceries").amount, 70);
+assert.equal(staleResult.budgets.find((item) => item.category === "Rent").amount, 400);
+await staleSession.whenIdle();
+assert.equal(staleServer.rows.find((row) => row.category === "Groceries").amount, 70);
+
+const legacyStorage = new Map();
+legacyStorage.set(
+  "buxme-category-budgets:user-a",
+  JSON.stringify([{ category: "Groceries", amount: 33 }]),
+);
+const legacyServer = memoryServer();
+legacyServer.rows.push({
+  user_id: "user-a",
+  category: "Restaurants",
+  amount: 20,
+  updated_at: "2026-10-01T00:00:00.000Z",
+});
+const legacySession = new CategoryBudgetSession(
+  "user-a",
+  memoryStorage(legacyStorage),
+  legacyServer.remote("user-a"),
+  () => "2026-10-12T05:00:00.000Z",
+);
+const legacyLoaded = await legacySession.load();
+assert.equal(legacyLoaded.budgets.find((item) => item.category === "Groceries").amount, 33);
+assert.equal(legacyLoaded.budgets.find((item) => item.category === "Restaurants").amount, 20);
+assert.equal(legacyServer.rows.find((row) => row.category === "Groceries").amount, 33);
+
+const legacyConflictStorage = new Map();
+legacyConflictStorage.set(
+  "buxme-category-budgets:user-c",
+  JSON.stringify([{ category: "Groceries", amount: 33 }]),
+);
+const legacyConflictServer = memoryServer();
+legacyConflictServer.rows.push({
+  user_id: "user-c",
+  category: "Groceries",
+  amount: 50,
+  updated_at: "2026-10-02T00:00:00.000Z",
+});
+const legacyConflict = await new CategoryBudgetSession(
+  "user-c",
+  memoryStorage(legacyConflictStorage),
+  legacyConflictServer.remote("user-c"),
+  () => "2026-10-12T05:00:00.000Z",
+).load();
+assert.equal(legacyConflict.budgets[0].amount, 50);
+assert.equal(legacyConflictServer.rows[0].amount, 50);
+
+const ownedRows = [
+  {
+    user_id: "user-a",
+    category: "Groceries",
+    amount: 80,
+    updated_at: "2026-10-01T00:00:00.000Z",
+  },
+  {
+    user_id: "user-b",
+    category: "Rent",
+    amount: 900,
+    updated_at: "2026-10-01T00:00:00.000Z",
+  },
+];
+const ownerRemote = createSupabaseCategoryBudgetRemote(
+  createStubClient(ownedRows, "user-a"),
+  "user-a",
+);
+assert.deepEqual(await ownerRemote.list(), [
+  {
+    category: "Groceries",
+    amount: 80,
+    updatedAt: "2026-10-01T00:00:00.000Z",
+  },
+]);
+await ownerRemote.save({
+  category: "Groceries",
+  amount: 120,
+  updatedAt: "2026-10-02T00:00:00.000Z",
+});
+assert.equal(ownedRows.find((row) => row.user_id === "user-a").amount, 120);
+assert.equal(ownedRows.find((row) => row.user_id === "user-b").amount, 900);
+const hostile = createSupabaseCategoryBudgetRemote(
+  createStubClient(ownedRows, "user-b"),
+  "user-a",
+);
+await assert.rejects(() =>
+  hostile.save({
+    category: "Groceries",
+    amount: 1,
+    updatedAt: "2026-10-03T00:00:00.000Z",
+  }),
+);
+
+const emptyLoad = await new CategoryBudgetSession(
+  "user-z",
+  memoryStorage(new Map()),
+  {
+    async list() {
+      throw new Error("offline");
+    },
+    async save() {
+      throw new Error("offline");
+    },
+    async remove() {
+      throw new Error("offline");
+    },
+  },
+).load();
+assert.equal(emptyLoad.status, "error");
+assert.match(emptyLoad.message, /couldn't be loaded/);
 
 console.log("Category budget, refund, transfer, and privacy checks passed.");

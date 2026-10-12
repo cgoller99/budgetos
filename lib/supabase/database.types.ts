@@ -547,6 +547,26 @@ export type PlaidRecurringDismissalInsert = {
   created_at?: string;
 };
 
+export type CategoryBudgetRow = {
+  id: string;
+  user_id: string;
+  category: string;
+  amount: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CategoryBudgetInsert = {
+  id?: string;
+  user_id: string;
+  category: string;
+  amount: number;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type CategoryBudgetUpdate = Partial<CategoryBudgetInsert>;
+
 export type IncomePlanRow = {
   id: string;
   user_id: string;
@@ -1196,6 +1216,12 @@ export type Database = {
         Row: PlaidRecurringDismissalRow;
         Insert: PlaidRecurringDismissalInsert;
         Update: Partial<PlaidRecurringDismissalInsert>;
+        Relationships: [];
+      };
+      category_budgets: {
+        Row: CategoryBudgetRow;
+        Insert: CategoryBudgetInsert;
+        Update: CategoryBudgetUpdate;
         Relationships: [];
       };
       income_plans: {
