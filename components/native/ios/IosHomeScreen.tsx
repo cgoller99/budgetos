@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
+import { CashOutlookCard } from "@/components/dashboard/CashOutlookCard";
 import { IosInsightsSection } from "@/components/native/ios/IosInsightsSection";
 import {
   buildFinancialInsights,
@@ -268,6 +269,8 @@ export function IosHomeScreen() {
           }
         />
       ) : null}
+
+      <CashOutlookCard />
 
       <IosInsightsSection insights={insights} budgetSuggestions={budgetSuggestions} />
 

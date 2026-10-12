@@ -323,6 +323,8 @@ const short = forecastCashOutlook(
 assert.equal(short.shortfalls.length, 1);
 assert.equal(short.shortfalls[0].date, "2026-10-20");
 assert.equal(short.shortfalls[0].amount, -150);
+assert.equal(short.events[0].balanceAfter, -150);
+assert.equal(short.events[0].confidence, "estimated");
 assert.match(short.shortfalls[0].detail, /confirmed/);
 assert.match(short.shortfalls[0].detail, /estimates/);
 assert.equal(short.lowBalance.amount, -150);

@@ -37,6 +37,7 @@ export type CashOutlookEvent = {
   kind: CashOutlookKind;
   confidence: "estimated";
   detail: string;
+  balanceAfter: number;
 };
 
 export type CashOutlookShortfall = {
@@ -191,7 +192,7 @@ export function forecastCashOutlook(
 ): CashOutlook {
   const today = startOfDay(referenceDate);
   const horizon = addDays(today, HORIZON_DAYS);
-  const events: CashOutlookEvent[] = [];
+  const events: Array<Omit<CashOutlookEvent, "balanceAfter">> = [];
   const plan = filterPersonalIncomePlan(data.incomePlan, data.viewerUserId ?? null);
 
   for (const source of getEffectiveIncomeSources(data)) {
@@ -492,7 +493,8 @@ export function forecastCashOutlook(
   const availableCash = balance;
   let lowBalance = { date: toDateString(today), amount: balance };
   const shortfalls: CashOutlookShortfall[] = [];
-  const byDate = new Map<string, CashOutlookEvent[]>();
+  const projected: CashOutlookEvent[] = [];
+  const byDate = new Map<string, Array<Omit<CashOutlookEvent, "balanceAfter">>>();
   for (const event of events) {
     const group = byDate.get(event.date) ?? [];
     group.push(event);
@@ -505,6 +507,7 @@ export function forecastCashOutlook(
     const ordered = [...group].sort((left, right) => right.amount - left.amount);
     for (const event of ordered) {
       balance = roundCurrency(balance + event.amount);
+      projected.push({ ...event, balanceAfter: balance });
       if (balance < lowBalance.amount) {
         lowBalance = { date, amount: balance };
       }
@@ -528,7 +531,7 @@ export function forecastCashOutlook(
     endDate: toDateString(horizon),
     availableCash,
     availableCashConfidence: "confirmed",
-    events,
+    events: projected,
     endingCash: balance,
     lowBalance,
     shortfalls,

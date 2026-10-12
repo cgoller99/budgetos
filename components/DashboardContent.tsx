@@ -9,6 +9,7 @@ import { SpendingBreakdownCard } from "@/components/dashboard/SpendingBreakdownC
 import { ThisWeeksPlanCard } from "@/components/dashboard/ThisWeeksPlanCard";
 import { TopGoalsCard } from "@/components/dashboard/TopGoalsCard";
 import { UpcomingBillsCard } from "@/components/dashboard/UpcomingBillsCard";
+import { CashOutlookCard } from "@/components/dashboard/CashOutlookCard";
 import { WeeklyCashFlowCard } from "@/components/dashboard/WeeklyCashFlowCard";
 import { WelcomeChecklist } from "@/components/guidance/WelcomeChecklist";
 import { IosHomeScreen } from "@/components/native/ios/IosHomeScreen";
@@ -44,6 +45,8 @@ export function DashboardContent() {
         <RecentTransactionsCard />
         <TopGoalsCard />
       </div>
+
+      <CashOutlookCard />
 
       <div className={dashboardCompactSectionClassName}>
         <WeeklyCashFlowCard />
