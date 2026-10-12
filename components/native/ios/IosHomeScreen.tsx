@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { IosInsightsSection } from "@/components/native/ios/IosInsightsSection";
 import {
@@ -19,7 +19,9 @@ import {
   IosSection,
   IosSkeletonScreen,
 } from "@/components/native/ios/IosPrimitives";
+import { useAuth } from "@/context/AuthContext";
 import { useFinance } from "@/context/FinanceContext";
+import { readSavedCategoryBudgets } from "@/lib/automation/savedBudgets";
 import { getBillsDueThisWeek } from "@/lib/finance/bills";
 import {
   formatCurrency,
@@ -53,6 +55,12 @@ function metricDelta(value: number, monthlyChange: number, favorableWhenDown = f
 
 export function IosHomeScreen() {
   const finance = useFinance();
+  const { user } = useAuth();
+  const [budgets, setBudgets] = useState<Array<{ category: string; amount: number }>>([]);
+
+  useEffect(() => {
+    setBudgets(readSavedCategoryBudgets(user?.id));
+  }, [user?.id]);
   const {
     isLoading,
     dashboard,
@@ -79,7 +87,10 @@ export function IosHomeScreen() {
     () => getBillsDueThisWeek(finance).slice(0, 3),
     [finance],
   );
-  const insights = useMemo(() => buildFinancialInsights(finance), [finance]);
+  const insights = useMemo(
+    () => buildFinancialInsights(finance, new Date(), budgets).slice(0, 3),
+    [budgets, finance],
+  );
   const budgetSuggestions = useMemo(
     () => suggestCategoryBudgets(finance),
     [finance],
