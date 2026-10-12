@@ -1,34 +1,11 @@
 import type { AutomationProvider, AutomationSuggestion } from "@/lib/automation/types";
-import type { FinanceData } from "@/lib/finance/types";
 import { candidateToAddBillInput } from "@/lib/plaid/recurringBillDetection";
 import { detectRecurringBillCandidatesFromFinanceData } from "@/lib/plaid/recurringBillDetection";
-import { detectPayrollCandidates } from "@/lib/plaid/incomeDetectionService";
-import type { PlaidMappedTransaction } from "@/lib/plaid/types";
 import { getBillFrequencyLabel } from "@/lib/recurring/frequencies";
-
-function toPlaidMappedTransactions(data: FinanceData): PlaidMappedTransaction[] {
-  return data.transactions
-    .filter((transaction) => Boolean(transaction.externalTransactionId))
-    .map((transaction) => {
-      const account = data.accounts.find((item) => item.id === transaction.accountId);
-
-      return {
-        externalTransactionId: transaction.externalTransactionId!,
-        externalAccountId: account?.externalAccountId ?? transaction.accountId,
-        amount: transaction.amount,
-        type: transaction.type === "transfer" ? "expense" : transaction.type,
-        category: transaction.category,
-        date: transaction.date,
-        notes: transaction.notes,
-        name: transaction.notes,
-      };
-    });
-}
 
 export const plaidAutomationProvider: AutomationProvider = {
   id: "plaid",
   getSuggestions(data, referenceDate = new Date()) {
-    const plaidTransactions = toPlaidMappedTransactions(data);
     const suggestions: AutomationSuggestion[] = [];
 
     const recurringCandidates = detectRecurringBillCandidatesFromFinanceData(
@@ -69,48 +46,6 @@ export const plaidAutomationProvider: AutomationProvider = {
           },
         },
       });
-    }
-
-    const plan = data.incomePlan;
-
-    if (plan) {
-      const depositAccount = data.accounts.find(
-        (account) => account.id === plan.depositAccountId,
-      );
-      const payrollCandidates = detectPayrollCandidates({
-        transactions: plaidTransactions,
-        paycheckAmount: plan.paycheckAmount,
-        depositAccountExternalId: depositAccount?.externalAccountId ?? null,
-        referenceDate,
-      });
-
-      for (const candidate of payrollCandidates) {
-        suggestions.push({
-          id: `plaid-paycheck-${candidate.transactionId}`,
-          kind: "paycheck_detected" as const,
-          title: "Paycheck detected.",
-          description: "Apply your Income Plan?",
-          icon: "💵",
-          tone: "accent" as const,
-          priority: 105,
-          timestamp: candidate.postedDate,
-          provider: "plaid",
-          entityId: candidate.transactionId,
-          entityType: "transaction",
-          detailHref: "/income?tab=plan",
-          primaryAction: {
-            label: "Apply",
-            type: "apply_paycheck",
-            payload: {
-              transactionId: candidate.transactionId,
-            },
-          },
-          secondaryAction: {
-            label: "Skip",
-            type: "skip",
-          },
-        });
-      }
     }
 
     return suggestions;
