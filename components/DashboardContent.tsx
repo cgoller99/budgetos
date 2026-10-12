@@ -5,6 +5,7 @@ import { DashboardHero } from "@/components/dashboard/DashboardHero";
 import { DashboardMoreSection } from "@/components/dashboard/DashboardMoreSection";
 import { FinancialTrendsCard } from "@/components/dashboard/FinancialTrendsCard";
 import { RecentTransactionsCard } from "@/components/dashboard/RecentTransactionsCard";
+import { CategoryBudgetsCard } from "@/components/budgets/CategoryBudgetsCard";
 import { SpendingBreakdownCard } from "@/components/dashboard/SpendingBreakdownCard";
 import { ThisWeeksPlanCard } from "@/components/dashboard/ThisWeeksPlanCard";
 import { TopGoalsCard } from "@/components/dashboard/TopGoalsCard";
@@ -51,6 +52,8 @@ export function DashboardContent() {
         <FinancialTrendsCard />
         <AchievementsCard />
       </div>
+
+      <CategoryBudgetsCard />
 
       {dashboard.weeklyPlan.length > 0 ? (
         <div id="weekly-plan" className="scroll-mt-24">

@@ -2,11 +2,9 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
+import { IosBudgetsSection } from "@/components/native/ios/IosBudgetsSection";
 import { IosInsightsSection } from "@/components/native/ios/IosInsightsSection";
-import {
-  buildFinancialInsights,
-  suggestCategoryBudgets,
-} from "@/lib/automation/financialInsights";
+import { buildFinancialInsights } from "@/lib/automation/financialInsights";
 import {
   IosAvatar,
   IosBanner,
@@ -80,10 +78,6 @@ export function IosHomeScreen() {
     [finance],
   );
   const insights = useMemo(() => buildFinancialInsights(finance), [finance]);
-  const budgetSuggestions = useMemo(
-    () => suggestCategoryBudgets(finance),
-    [finance],
-  );
 
   const recentTxns = useMemo(
     () =>
@@ -257,7 +251,8 @@ export function IosHomeScreen() {
         />
       ) : null}
 
-      <IosInsightsSection insights={insights} budgetSuggestions={budgetSuggestions} />
+      <IosInsightsSection insights={insights} />
+      <IosBudgetsSection />
 
       <IosSection title="Upcoming" action={<IosLink href="/bills">See All</IosLink>}>
         <IosList>
