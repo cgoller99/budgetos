@@ -7,8 +7,11 @@ import {
 import type { FinanceData, IncomeSource, Transaction } from "@/lib/finance/types";
 import { formatCurrency } from "@/lib/finance/format";
 import { formatPayDate } from "@/lib/incomePlan/payDates";
-import { INCOME_PLAN_SCHEDULE_LABELS } from "@/lib/incomePlan/types";
-import type { IncomePlan } from "@/lib/incomePlan/types";
+import {
+  INCOME_PLAN_SCHEDULE_LABELS,
+  type IncomePlan,
+  type MarkPaycheckReceivedInput,
+} from "@/lib/incomePlan/types";
 import { cleanMerchantName } from "@/lib/plaid/transactionIntelligence";
 import { getIncomeFrequencyLabel } from "@/lib/recurring/frequencies";
 import { filterRealIncomeTransactions } from "@/lib/transactions/transferDetection";
@@ -250,7 +253,82 @@ export function paycheckReviewDescription(item: PaycheckReviewItem): string {
   return describeReview(item);
 }
 
-/** A detected deposit should be reviewed before the scheduled plan run applies it. */
+export type UpcomingPaycheckState = {
+  /** Forecast on the schedule. No matching deposit, and this payday is not applied. */
+  lifecycle: "expected" | "received" | "applied";
+  payDate: string | null;
+  lastAppliedDate: string | null;
+};
+
+export function classifyUpcomingPaycheck(
+  data: FinanceData,
+  referenceDate = new Date(),
+): UpcomingPaycheckState {
+  const plan = filterPersonalIncomePlan(data.incomePlan, data.viewerUserId);
+  const events = data.incomePlanPaychecks ?? [];
+  const lastAppliedDate =
+    [...events].sort((left, right) => right.payDate.localeCompare(left.payDate))[0]?.payDate ??
+    plan?.lastProcessedDate ??
+    null;
+
+  if (!plan?.isActive) {
+    return { lifecycle: "expected", payDate: plan?.nextPayDate ?? null, lastAppliedDate };
+  }
+
+  if (events.some((event) => event.payDate === plan.nextPayDate)) {
+    return { lifecycle: "applied", payDate: plan.nextPayDate, lastAppliedDate };
+  }
+
+  const received = buildPaycheckReviews(data, referenceDate).some((item) => item.canApply);
+
+  return {
+    lifecycle: received ? "received" : "expected",
+    payDate: plan.nextPayDate,
+    lastAppliedDate,
+  };
+}
+
+/**
+ * User-confirmed apply only.
+ * Reuses one matching deposit so a second income row is not created.
+ * Refuses a second apply for the same payday or the same deposit.
+ */
+export function resolveAuthorizedPaycheckInput(
+  data: FinanceData,
+  input: MarkPaycheckReceivedInput = {},
+  referenceDate = new Date(),
+): MarkPaycheckReceivedInput {
+  const plan = filterPersonalIncomePlan(data.incomePlan, data.viewerUserId);
+  const events = data.incomePlanPaychecks ?? [];
+
+  if (plan && events.some((event) => event.payDate === plan.nextPayDate)) {
+    throw new Error("This paycheck was already applied.");
+  }
+
+  const requested = input.sourceTransactionId?.trim() || "";
+
+  if (requested && events.some((event) => event.incomeTransactionId === requested)) {
+    throw new Error("This deposit was already applied.");
+  }
+
+  if (requested) {
+    return { ...input, sourceTransactionId: requested };
+  }
+
+  const matches = buildPaycheckReviews(data, referenceDate).filter((item) => item.canApply);
+
+  if (matches.length > 1) {
+    throw new Error("Confirm which deposit to apply.");
+  }
+
+  if (matches.length === 1) {
+    return { ...input, sourceTransactionId: matches[0].transactionId };
+  }
+
+  return input;
+}
+
+/** A detected deposit should be reviewed before any scheduled plan run applies it. */
 export function shouldDeferScheduledPaycheck(
   data: FinanceData,
   referenceDate = new Date(),
