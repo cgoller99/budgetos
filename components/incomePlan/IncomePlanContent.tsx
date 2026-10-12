@@ -483,6 +483,8 @@ export function IncomePlanContent({ embedded = false }: { embedded?: boolean }) 
         }
       />
 
+      <PaycheckDetectedPromptList />
+
       <div>
         <h2 className="text-xl font-semibold tracking-tight text-[var(--foreground)]">
           {existing ? "Edit Income Plan" : "Set up your Income Plan"}

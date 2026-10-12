@@ -23,6 +23,7 @@ import { DeleteIncomeModal } from "@/components/income/DeleteIncomeModal";
 import { EditIncomeModal } from "@/components/income/EditIncomeModal";
 import { IosBottomSheet } from "@/components/native/ios/IosBottomSheet";
 import { IncomePlanContent } from "@/components/incomePlan/IncomePlanContent";
+import { PaycheckDetectedPromptList } from "@/components/incomePlan/PaycheckDetectedPrompt";
 import { IncomeLedgerPanel } from "@/components/income/IncomeLedgerPanel";
 import { IncomeForecastPanel } from "@/components/income/IncomeForecastPanel";
 import { useFinance } from "@/context/FinanceContext";
@@ -79,6 +80,7 @@ function PaycheckPlan({
 
   return (
     <div className="flex flex-col gap-3">
+      {!showEditor ? <PaycheckDetectedPromptList /> : null}
       <IosCard padding="md">
         <p className="text-[12px] font-medium text-[var(--text-muted)]">Upcoming payday</p>
         <p className="mt-1 text-[20px] font-semibold text-[var(--foreground)]">

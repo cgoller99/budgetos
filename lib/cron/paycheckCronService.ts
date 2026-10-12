@@ -1,5 +1,6 @@
 import "server-only";
 
+import { shouldDeferScheduledPaycheck } from "@/lib/automation/paycheckReview";
 import type { BuxmeSupabaseClient } from "@/lib/supabase/client";
 import { getErrorMessage } from "@/lib/supabase/errors";
 import { FinanceService } from "@/lib/supabase/services/financeService";
@@ -72,6 +73,13 @@ export async function runDuePaychecks(
     }
 
     try {
+      const current = await service.loadFinanceData(plan.user_id);
+
+      if (shouldDeferScheduledPaycheck(current, referenceDate)) {
+        result.skipped += 1;
+        continue;
+      }
+
       await service.markIncomePlanPaycheckReceived(plan.user_id);
       result.processed += 1;
     } catch (cronError) {

@@ -83,6 +83,7 @@ import {
   getDismissedAutomationIds,
 } from "@/lib/automation";
 import { mergeAutomationNotifications } from "@/lib/automation/notifications";
+import { shouldDeferScheduledPaycheck } from "@/lib/automation/paycheckReview";
 import { buildRecurringReview, recurringEvidenceKey } from "@/lib/automation/recurringReview";
 import {
   readRecurringReviewDismissals,
@@ -2011,6 +2012,12 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
     // suggestion must NOT auto-apply: it does not advance/clear itself, so it
     // would re-fire every render and march the pay date into the future.
     if (!isIncomePlanPaycheckDue(data)) {
+      return;
+    }
+
+    // A bank deposit is waiting for review. Applying now would move allocations
+    // and can create a second income row on top of that deposit.
+    if (shouldDeferScheduledPaycheck(data)) {
       return;
     }
 
