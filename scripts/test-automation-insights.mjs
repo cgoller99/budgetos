@@ -46,7 +46,7 @@ const memory = buildMerchantCategoryMemory([
   { notes: "NETFLIX.COM", category: "ENTERTAINMENT", date: "2026-08-05" },
   { notes: "Netflix", category: "Subscriptions", date: "2026-09-05" },
 ]);
-assert.equal(memory.get("netflix"), "Subscriptions");
+assert.equal(memory.latest.get("netflix"), "Subscriptions");
 assert.equal(
   categoryForSyncedTransaction({
     isNew: false,

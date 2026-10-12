@@ -16,6 +16,8 @@ import type { BuxmeSupabaseClient } from "@/lib/supabase/client";
 import {
   buildMerchantCategoryMemory,
   categoryForSyncedTransaction,
+  emptyMerchantCategoryMemory,
+  rememberMerchantCategory,
 } from "@/lib/automation/categoryMemory";
 import { merchantGroupKey } from "@/lib/bills/merchantMatch";
 import { mapPlaidAccount } from "@/lib/plaid/mappers";
@@ -552,7 +554,7 @@ export class BankConnectionsRepository {
       .order("transaction_date", { ascending: false })
       .limit(2000);
     const categoryMemory = memoryError
-      ? new Map<string, string>()
+      ? emptyMerchantCategoryMemory()
       : buildMerchantCategoryMemory(
           (rememberedRows ?? []).map((row) => ({
             notes: row.notes,
@@ -594,9 +596,7 @@ export class BankConnectionsRepository {
         merchantKey,
         memory: categoryMemory,
       });
-      if (merchantKey.length >= 3 && category.trim() && !categoryMemory.has(merchantKey)) {
-        categoryMemory.set(merchantKey, category);
-      }
+      rememberMerchantCategory(categoryMemory, merchantKey, category);
 
       const payload = {
         user_id: input.userId,
