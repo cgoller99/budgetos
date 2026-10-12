@@ -1,5 +1,6 @@
 "use client";
 
+import { CategoryBudgetStatus } from "@/components/budgets/CategoryBudgetStatus";
 import { IosCard, IosProgressBar, IosSection } from "@/components/native/ios/IosPrimitives";
 import { useCategoryBudgets } from "@/components/budgets/useCategoryBudgets";
 import { formatCurrency } from "@/lib/finance/format";
@@ -16,10 +17,14 @@ export function IosBudgetsSection() {
     updateAmount,
     removeBudget,
     addBudget,
+    status,
+    syncMessage,
+    retry,
   } = useCategoryBudgets();
 
   return (
     <IosSection title="Budgets">
+      <CategoryBudgetStatus status={status} message={syncMessage} onRetry={retry} />
       {suggestions.length > 0 ? (
         <IosCard padding="md">
           <p className="text-[15px] font-semibold text-[var(--foreground)]">
