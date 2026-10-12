@@ -7,6 +7,7 @@ import {
   buildCategoryBudgetViews,
   suggestCategoryBudgetLimits,
 } from "@/lib/budgets/categoryBudgets";
+import { getDisplayCategory } from "@/lib/transactions/categoryPresentation";
 import {
   readSavedCategoryBudgets,
   writeSavedCategoryBudgets,
@@ -42,9 +43,10 @@ export function useCategoryBudgets() {
   );
 
   function acceptSuggestion(nextCategory: string, limit: number) {
+    const categoryName = getDisplayCategory(nextCategory);
     persist([
-      ...saved.filter((item) => item.category !== nextCategory),
-      { category: nextCategory, amount: limit },
+      ...saved.filter((item) => getDisplayCategory(item.category) !== categoryName),
+      { category: categoryName, amount: limit },
     ]);
   }
 
@@ -53,17 +55,19 @@ export function useCategoryBudgets() {
       return;
     }
 
+    const categoryName = getDisplayCategory(nextCategory);
     persist(
       saved.map((item) =>
-        item.category === nextCategory
-          ? { ...item, amount: Math.round(nextAmount * 100) / 100 }
+        getDisplayCategory(item.category) === categoryName
+          ? { ...item, category: categoryName, amount: Math.round(nextAmount * 100) / 100 }
           : item,
       ),
     );
   }
 
   function removeBudget(nextCategory: string) {
-    persist(saved.filter((item) => item.category !== nextCategory));
+    const categoryName = getDisplayCategory(nextCategory);
+    persist(saved.filter((item) => getDisplayCategory(item.category) !== categoryName));
   }
 
   function addBudget(event: FormEvent<HTMLFormElement>) {

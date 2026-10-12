@@ -243,6 +243,58 @@ assert.equal(diningView.progress, 0);
 assert.equal(diningView.alert, null);
 assert.equal(active[0].category, "Groceries");
 
+const synced = finance({
+  transactions: [
+    transaction({
+      id: "sync-1",
+      amount: 42,
+      date: "2026-10-03",
+      category: "FOOD AND DRINK GROCERIES",
+      notes: "Kroger",
+    }),
+  ],
+});
+const beforeSync = buildCategoryBudgetViews(
+  [{ category: "Groceries", amount: 200 }],
+  synced,
+  reference,
+);
+const afterSync = buildCategoryBudgetViews(
+  [{ category: "Groceries", amount: 200 }],
+  finance({
+    transactions: [
+      ...synced.transactions,
+      transaction({
+        id: "sync-2",
+        amount: 18,
+        date: "2026-10-09",
+        category: "FOOD AND DRINK GROCERIES",
+        notes: "Kroger",
+      }),
+    ],
+  }),
+  reference,
+);
+assert.equal(beforeSync[0].spent, 42);
+assert.equal(beforeSync[0].remaining, 158);
+assert.equal(beforeSync[0].limit, 200);
+assert.equal(afterSync[0].spent, 60);
+assert.equal(afterSync[0].remaining, 140);
+assert.equal(afterSync[0].limit, 200);
+
+const collapsed = buildCategoryBudgetViews(
+  [
+    { category: "FOOD AND DRINK GROCERIES", amount: 80 },
+    { category: "Groceries", amount: 125 },
+  ],
+  synced,
+  reference,
+);
+assert.equal(collapsed.length, 1);
+assert.equal(collapsed[0].category, "Groceries");
+assert.equal(collapsed[0].limit, 125);
+assert.equal(collapsed[0].spent, 42);
+
 const confirmed = suggestions.map((item) => ({
   category: item.category,
   amount: item.suggestedLimit,
@@ -326,6 +378,9 @@ assert.ok(effect);
 assert.match(effect[0], /readSavedCategoryBudgets/);
 assert.doesNotMatch(effect[0], /writeSavedCategoryBudgets|suggestCategoryBudgetLimits/);
 assert.match(hook, /!saved\.some/);
+assert.match(hook, /getDisplayCategory/);
+assert.match(hook, /buildCategoryBudgetViews\(saved, finance\)/);
+assert.doesNotMatch(read("lib/automation/savedBudgets.ts"), /spent/);
 
 for (const relativePath of [
   "components/native/ios/IosBudgetsSection.tsx",

@@ -162,18 +162,32 @@ export function buildCategoryBudgetViews(
   referenceDate = new Date(),
 ): CategoryBudgetView[] {
   const spentByCategory = netCategorySpending(data, monthKey(referenceDate));
+  const limitsByCategory = new Map<string, number>();
 
-  return limits
-    .filter((item) => item.category.trim() && item.amount >= 0)
-    .map((item) => {
-      const spent = roundCurrency(spentByCategory.get(item.category) ?? 0);
-      const remaining = roundCurrency(item.amount - spent);
+  for (const item of limits) {
+    const category = getDisplayCategory(item.category);
+    if (
+      !category ||
+      EXCLUDED_CATEGORIES.has(category) ||
+      !Number.isFinite(item.amount) ||
+      item.amount < 0
+    ) {
+      continue;
+    }
+    // Keep one limit per display category. A later edit replaces the earlier one.
+    limitsByCategory.set(category, roundCurrency(item.amount));
+  }
+
+  return [...limitsByCategory.entries()]
+    .map(([category, limit]) => {
+      const spent = roundCurrency(spentByCategory.get(category) ?? 0);
+      const remaining = roundCurrency(limit - spent);
       const progress =
-        item.amount > 0 ? Math.max(0, Math.round((spent / item.amount) * 100)) : 0;
-      const overspent = spent > item.amount;
+        limit > 0 ? Math.max(0, Math.round((spent / limit) * 100)) : 0;
+      const overspent = spent > limit;
       return {
-        category: item.category,
-        limit: roundCurrency(item.amount),
+        category,
+        limit,
         spent,
         remaining,
         progress,
