@@ -32,6 +32,7 @@ import { buildUpdatedDebt } from "@/lib/finance/debts";
 import { disconnectPlaidAccount as disconnectPlaidAccountRequest } from "@/lib/accounts/clientApi";
 import { buildUpdatedBill } from "@/lib/finance/bills";
 import { buildUpdatedIncomeSource } from "@/lib/finance/income";
+import { applyGoalEdit } from "@/lib/finance/goalForecast";
 import { getGoalTypeMeta } from "@/lib/finance/goalTypes";
 import type {
   AddAccountInput,
@@ -1561,15 +1562,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
         {
           ...data,
           savingsGoals: data.savingsGoals.map((goal) =>
-            goal.id === goalId
-              ? {
-                  ...goal,
-                  name: input.name.trim(),
-                  type: input.type,
-                  icon: meta.icon,
-                  target: input.target,
-                }
-              : goal,
+            goal.id === goalId ? applyGoalEdit(goal, input, meta.icon) : goal,
           ),
         },
         (repository, userId) => repository.updateGoal(userId, goalId, input),
