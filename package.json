@@ -102,7 +102,8 @@
     "test:automation-insights": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-automation-insights.mjs",
     "test:transaction-intelligence": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-transaction-intelligence.mjs",
     "test:recurring-review": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-recurring-review.mjs",
-    "test:paycheck-review": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-paycheck-review.mjs"
+    "test:paycheck-review": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-paycheck-review.mjs",
+    "test:cash-flow-forecast": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-cash-flow-forecast.mjs"
   },
   "dependencies": {
     "@apple/app-store-server-library": "^3.1.0",

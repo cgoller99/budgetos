@@ -20,6 +20,7 @@ import {
   IosSkeletonScreen,
 } from "@/components/native/ios/IosPrimitives";
 import { useFinance } from "@/context/FinanceContext";
+import { forecastCashUntilPayday } from "@/lib/finance/cashFlowForecast";
 import { getBillsDueThisWeek } from "@/lib/finance/bills";
 import {
   formatCurrency,
@@ -102,6 +103,7 @@ export function IosHomeScreen() {
   const debt = dashboard.kpiMetrics.find((metric) => metric.label === "Debt");
   const moneyFlow = dashboard.moneyFlow;
   const safeToSpend = moneyFlow.safeToSpend;
+  const paydayForecast = forecastCashUntilPayday(finance);
   const health = dashboard.financialHealthScore;
   const nextPaycheck = dashboard.nextPaycheck;
   const nextGoal = dashboard.nextGoal;
@@ -162,6 +164,11 @@ export function IosHomeScreen() {
             ? `of ${formatCurrency(moneyFlow.income)} this month`
             : spendHint}
         </p>
+        {paydayForecast.nextPayDate ? (
+          <p className="mt-1 text-[12px] leading-snug text-white/75">
+            {formatCurrency(paydayForecast.safeUntilPayday)} until payday after bills due
+          </p>
+        ) : null}
         <p className="mt-3 text-[12px] font-medium text-white/70">Health {health.score}</p>
       </section>
 

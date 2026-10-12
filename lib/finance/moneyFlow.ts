@@ -199,9 +199,12 @@ function buildBreakdown(
   ];
 }
 
-export function calculateMoneyFlow(data: FinanceData): MoneyFlowResult {
-  const income = calculateMonthlyIncome(data);
-  const bills = calculateMonthlySpending(data);
+export function calculateMoneyFlow(
+  data: FinanceData,
+  referenceDate = new Date(),
+): MoneyFlowResult {
+  const income = calculateMonthlyIncome(data, referenceDate);
+  const bills = calculateMonthlySpending(data, referenceDate);
   const afterBills = Math.max(income - bills, 0);
 
   const rawDebts = getTotalMinimumPayments(data);
