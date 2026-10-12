@@ -83,6 +83,11 @@ import {
   getDismissedAutomationIds,
 } from "@/lib/automation";
 import { mergeAutomationNotifications } from "@/lib/automation/notifications";
+import { buildRecurringReview, recurringEvidenceKey } from "@/lib/automation/recurringReview";
+import {
+  readRecurringReviewDismissals,
+  writeRecurringReviewDismissal,
+} from "@/lib/automation/recurringReviewDismissals";
 import type { AutomationSuggestion } from "@/lib/automation/types";
 import { registerAutomationProvider } from "@/lib/automation/registry";
 import { plaidAutomationProvider } from "@/lib/automation/providers/plaidAutomationProvider";
@@ -97,7 +102,6 @@ import {
 import type { PlaidSyncResult, RecurringBillCandidate } from "@/lib/plaid/types";
 import {
   candidateToAddBillInput,
-  candidateToEditBillInput,
   detectRecurringBillCandidatesFromFinanceData,
 } from "@/lib/plaid/recurringBillDetection";
 import {
@@ -254,6 +258,7 @@ export type FinanceContextValue = FinanceData & {
   closeRecurringBillsModal: () => void;
   addSelectedRecurringBills: (selected: RecurringBillCandidate[]) => Promise<void>;
   ignoreSelectedRecurringBills: (selected: RecurringBillCandidate[]) => Promise<void>;
+  dismissRecurringCandidate: (candidate: RecurringBillCandidate) => void;
   snoozeRecurringBillsPrompt: () => Promise<void>;
   markNotificationRead: (notificationId: string) => void;
   acknowledgeWeeklySummary: () => void;
@@ -389,12 +394,16 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
         financeData,
         financeData.plaidRecurringDismissals ?? [],
       );
+      const visible = buildRecurringReview(candidates, {
+        transactions: financeData.transactions,
+        dismissals: readRecurringReviewDismissals(userIdRef.current),
+      }).map((item) => item.candidate);
 
-      setRecurringBillCandidates(candidates);
+      setRecurringBillCandidates(visible);
 
       if (
         options?.openModal &&
-        candidates.length > 0 &&
+        visible.length > 0 &&
         !isRecurringBillsPromptSnoozed()
       ) {
         setShowRecurringBillsModal(true);
@@ -1856,26 +1865,21 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
 
       try {
         let createdCount = 0;
-        let updatedCount = 0;
 
         for (const candidate of selected) {
-          if (candidate.action === "update" && candidate.existingBillId) {
-            const existing = dataRef.current.bills.find(
-              (bill) => bill.id === candidate.existingBillId,
-            );
-
-            if (existing) {
-              await editBill(
-                candidate.existingBillId,
-                candidateToEditBillInput(existing, candidate),
-              );
-              updatedCount += 1;
-              continue;
-            }
+          if (candidate.action !== "create") {
+            continue;
           }
 
-          await addBill(candidateToAddBillInput(candidate));
+          await addBill({
+            ...candidateToAddBillInput(candidate),
+            autopay: false,
+          });
           createdCount += 1;
+        }
+
+        if (createdCount === 0) {
+          return;
         }
 
         await reconcileBillPayments();
@@ -1886,20 +1890,27 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
 
         setShowRecurringBillsModal(false);
         showToast({
-          title: "Recurring bills updated",
-          subtitle:
-            createdCount > 0 && updatedCount > 0
-              ? `Added ${createdCount} and updated ${updatedCount} bill${createdCount + updatedCount === 1 ? "" : "s"}.`
-              : createdCount > 0
-                ? `Added ${createdCount} bill${createdCount === 1 ? "" : "s"}.`
-                : `Updated ${updatedCount} bill${updatedCount === 1 ? "" : "s"}.`,
+          title: "Recurring bill added",
+          subtitle: `Added ${createdCount} bill${createdCount === 1 ? "" : "s"} after your confirmation.`,
           type: "success",
         });
       } finally {
         setIsApplyingRecurringBills(false);
       }
     },
-    [addBill, editBill, refreshFinance, refreshRecurringBillCandidates, showToast],
+    [addBill, refreshFinance, refreshRecurringBillCandidates, showToast],
+  );
+
+  const dismissRecurringCandidate = useCallback(
+    (candidate: RecurringBillCandidate) => {
+      writeRecurringReviewDismissal(
+        userIdRef.current,
+        candidate.merchantKey,
+        recurringEvidenceKey(candidate),
+      );
+      refreshRecurringBillCandidates(dataRef.current);
+    },
+    [refreshRecurringBillCandidates],
   );
 
   const disconnectBank = useCallback(
@@ -2114,6 +2125,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
       closeRecurringBillsModal,
       addSelectedRecurringBills,
       ignoreSelectedRecurringBills,
+      dismissRecurringCandidate,
       snoozeRecurringBillsPrompt: snoozeRecurringBillsPromptHandler,
       markNotificationRead,
       acknowledgeWeeklySummary,
@@ -2151,6 +2163,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
       closeRecurringBillsModal,
       addSelectedRecurringBills,
       ignoreSelectedRecurringBills,
+      dismissRecurringCandidate,
       snoozeRecurringBillsPromptHandler,
       data,
       deleteBill,

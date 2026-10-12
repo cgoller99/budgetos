@@ -1,7 +1,12 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
-import { BillFormFields, initialBillFormState, parseBillForm } from "@/components/bills/BillFormFields";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import {
+  BillFormFields,
+  initialBillFormState,
+  parseBillForm,
+  type BillFormState,
+} from "@/components/bills/BillFormFields";
 import { Button, Modal } from "@/components/ui";
 import { useFinance } from "@/context/FinanceContext";
 import { useToast } from "@/context/ToastContext";
@@ -9,12 +14,26 @@ import { useToast } from "@/context/ToastContext";
 type AddBillModalProps = {
   isOpen: boolean;
   onClose: () => void;
+  draft?: BillFormState | null;
 };
 
-export function AddBillModal({ isOpen, onClose }: AddBillModalProps) {
+export function AddBillModal({ isOpen, onClose, draft = null }: AddBillModalProps) {
   const { addBill } = useFinance();
   const { showToast } = useToast();
   const [form, setForm] = useState(initialBillFormState);
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+  const draftSignature = draft
+    ? `${draft.name}|${draft.category}|${draft.frequency}|${draft.splits[0]?.amount ?? ""}`
+    : "";
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    setForm(draftRef.current ?? initialBillFormState);
+  }, [isOpen, draftSignature]);
 
   function handleClose() {
     setForm(initialBillFormState);

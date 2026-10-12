@@ -1,3 +1,4 @@
+import { categoryForRecurringCandidate } from "@/lib/automation/recurringReview";
 import { merchantGroupKey } from "@/lib/bills/merchantMatch";
 import type { Bill, BillFrequency, FinanceData, Transaction } from "@/lib/finance/types";
 import type { PlaidMappedTransaction, RecurringBillCandidate } from "@/lib/plaid/types";
@@ -5,34 +6,6 @@ import type { PlaidMappedTransaction, RecurringBillCandidate } from "@/lib/plaid
 const AMOUNT_VARIANCE = 0.15;
 const DAY_OF_MONTH_TOLERANCE = 3;
 const MIN_OCCURRENCES = 2;
-
-const KNOWN_SUBSCRIPTION_MERCHANTS = [
-  "netflix",
-  "spotify",
-  "hulu",
-  "disney",
-  "apple",
-  "amazon prime",
-  "youtube",
-  "gym",
-  "planet fitness",
-  "peloton",
-];
-
-const KNOWN_UTILITY_MERCHANTS = [
-  "georgia power",
-  "electric",
-  "water",
-  "gas",
-  "internet",
-  "comcast",
-  "xfinity",
-  "att",
-  "at&t",
-  "verizon",
-  "tmobile",
-  "t-mobile",
-];
 
 function normalizeMerchantKey(value: string): string {
   return merchantGroupKey(value);
@@ -122,39 +95,7 @@ function inferFrequency(sortedDates: string[]): BillFrequency | null {
 }
 
 function inferCategory(merchantKey: string, fallback: string): string {
-  if (KNOWN_SUBSCRIPTION_MERCHANTS.some((merchant) => merchantKey.includes(merchant))) {
-    return "Subscriptions";
-  }
-
-  if (KNOWN_UTILITY_MERCHANTS.some((merchant) => merchantKey.includes(merchant))) {
-    return "Utilities";
-  }
-
-  if (
-    merchantKey.includes("rent") ||
-    merchantKey.includes("mortgage") ||
-    merchantKey.includes("landlord")
-  ) {
-    return "Housing";
-  }
-
-  if (
-    merchantKey.includes("insurance") ||
-    merchantKey.includes("geico") ||
-    merchantKey.includes("progressive")
-  ) {
-    return "Insurance";
-  }
-
-  if (
-    merchantKey.includes("loan") ||
-    merchantKey.includes("car payment") ||
-    merchantKey.includes("auto finance")
-  ) {
-    return "Loans";
-  }
-
-  return fallback || "Bills";
+  return categoryForRecurringCandidate(merchantKey, fallback);
 }
 
 function estimateDueDay(sortedDates: string[], frequency: BillFrequency): number {

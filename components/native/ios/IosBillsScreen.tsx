@@ -15,6 +15,7 @@ import { IosBottomSheet } from "@/components/native/ios/IosBottomSheet";
 import { AddBillModal } from "@/components/bills/AddBillModal";
 import { EditBillModal } from "@/components/bills/EditBillModal";
 import { useFinance } from "@/context/FinanceContext";
+import { findSubscriptionPriceIncreases } from "@/lib/automation/financialInsights";
 import { useToast } from "@/context/ToastContext";
 import { getBillPaymentHistory } from "@/lib/finance/billPayments";
 import {
@@ -212,6 +213,10 @@ export function IosBillsScreen() {
     () => allBills.filter((bill) => bill.recurring),
     [allBills],
   );
+  const reviewCount = useMemo(
+    () => recurringBillCandidates.length + findSubscriptionPriceIncreases(finance).length,
+    [finance, recurringBillCandidates.length],
+  );
   const paid = useMemo(() => getPaidBills(finance), [finance]);
   const paidTotal = useMemo(
     () => paid.reduce((sum, bill) => sum + bill.amount, 0),
@@ -334,12 +339,10 @@ export function IosBillsScreen() {
         })}
       </div>
 
-      {recurringBillCandidates.length > 0 ? (
+      {reviewCount > 0 ? (
         <IosBanner
-          title={`We found ${recurringBillCandidates.length} possible bill${
-            recurringBillCandidates.length === 1 ? "" : "s"
-          }`}
-          subtitle="Review before adding"
+          title={`${reviewCount} recurring payment${reviewCount === 1 ? "" : "s"} to review`}
+          subtitle="Nothing is added until you confirm"
           action={
             <button
               type="button"
