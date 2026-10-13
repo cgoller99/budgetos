@@ -228,7 +228,7 @@ export function computeFinancialSnapshot(
   referenceDate = new Date(),
 ): FinancialSnapshot {
   const normalized = normalizeRecurringFinanceData(data, referenceDate);
-  const moneyFlow = calculateMoneyFlow(normalized);
+  const moneyFlow = calculateMoneyFlow(normalized, referenceDate);
   const safeToSpend = moneyFlow.safeToSpend;
   const safeToSpendWeekly = getSafeToSpendWeekly(normalized, referenceDate);
   const netWorthBreakdown = calculateNetWorthBreakdown(normalized);

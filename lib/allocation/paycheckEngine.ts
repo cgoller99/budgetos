@@ -1,3 +1,4 @@
+import { resolveAuthorizedPaycheckInput } from "@/lib/automation/paycheckReview";
 import { resolvePaymentAccountId } from "@/lib/finance/balanceEffects";
 import type { FinanceData, Transaction } from "@/lib/finance/types";
 import { advancePayDate } from "@/lib/incomePlan/payDates";
@@ -163,7 +164,12 @@ export function executePaycheckAllocations(
     throw new Error("Income plan is not active.");
   }
 
-  const sourceTransactionId = input.sourceTransactionId?.trim() || null;
+  const authorized = resolveAuthorizedPaycheckInput(
+    { ...data, incomePlan: plan },
+    input,
+    referenceDate,
+  );
+  const sourceTransactionId = authorized.sourceTransactionId?.trim() || null;
   const existingSource =
     sourceTransactionId == null
       ? null

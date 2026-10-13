@@ -11,7 +11,7 @@ export const WEEKS_PER_MONTH = 4.33;
  */
 export function getSafeToSpend(data: FinanceData, referenceDate = new Date()): number {
   const normalized = normalizeRecurringFinanceData(data, referenceDate);
-  return calculateMoneyFlow(normalized).safeToSpend;
+  return calculateMoneyFlow(normalized, referenceDate).safeToSpend;
 }
 
 /** Weekly Safe To Spend derived from the canonical monthly value. */

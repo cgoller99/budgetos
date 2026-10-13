@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { IosCard, IosSection } from "@/components/native/ios/IosPrimitives";
+import { IosCard, IosLink, IosSection } from "@/components/native/ios/IosPrimitives";
 import { type FinancialInsight } from "@/lib/automation/financialInsights";
 import { cn } from "@/components/ui/cn";
 
@@ -15,7 +15,10 @@ export function IosInsightsSection({ insights }: IosInsightsSectionProps) {
   }
 
   return (
-    <IosSection title="Insights">
+    <IosSection
+      title="Insights"
+      action={insights.length > 0 ? <IosLink href="/insights">See all</IosLink> : undefined}
+    >
       {insights.length > 0 ? (
         <div className="flex flex-col gap-2">
           {insights.map((insight) => (
