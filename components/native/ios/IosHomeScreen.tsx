@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { CashOutlookCard } from "@/components/dashboard/CashOutlookCard";
 import { IosBudgetsSection } from "@/components/native/ios/IosBudgetsSection";
 import { IosInsightsSection } from "@/components/native/ios/IosInsightsSection";
 import { buildFinancialInsights } from "@/lib/automation/financialInsights";
@@ -21,6 +22,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useFinance } from "@/context/FinanceContext";
 import { readSavedCategoryBudgets } from "@/lib/automation/savedBudgets";
 import { forecastCashUntilPayday } from "@/lib/finance/cashFlowForecast";
+import { describeCashOutlook, forecastCashOutlook } from "@/lib/finance/cashOutlook";
 import { getBillsDueThisWeek } from "@/lib/finance/bills";
 import {
   formatCurrency,
@@ -109,6 +111,7 @@ export function IosHomeScreen() {
   const moneyFlow = dashboard.moneyFlow;
   const safeToSpend = moneyFlow.safeToSpend;
   const paydayForecast = forecastCashUntilPayday(finance);
+  const cashOutlook = describeCashOutlook(forecastCashOutlook(finance));
   const health = dashboard.financialHealthScore;
   const nextPaycheck = dashboard.nextPaycheck;
   const nextGoal = dashboard.nextGoal;
@@ -173,6 +176,9 @@ export function IosHomeScreen() {
           <p className="mt-1 text-[12px] leading-snug text-white/75">
             {formatCurrency(paydayForecast.safeUntilPayday)} until payday after bills due
           </p>
+        ) : null}
+        {cashOutlook ? (
+          <p className="mt-1 text-[12px] leading-snug text-white/75">{cashOutlook}</p>
         ) : null}
         <p className="mt-3 text-[12px] font-medium text-white/70">Health {health.score}</p>
       </section>
@@ -269,6 +275,7 @@ export function IosHomeScreen() {
         />
       ) : null}
 
+      <CashOutlookCard />
       <IosInsightsSection insights={insights} />
       <IosBudgetsSection />
 
