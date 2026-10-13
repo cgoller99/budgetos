@@ -1,4 +1,5 @@
 import { AuthGate } from "@/components/auth/AuthGate";
+import { CategoryBudgetSync } from "@/components/budgets/CategoryBudgetSync";
 import { OnboardingGate } from "@/components/onboarding/OnboardingGate";
 import { AppLayout } from "@/components/AppLayout";
 import { SubscriptionProvider } from "@/context/SubscriptionContext";
@@ -14,6 +15,7 @@ export default function AuthenticatedLayout({
       <SubscriptionProvider>
         <WhatsNewProvider>
           <OnboardingGate>
+            <CategoryBudgetSync />
             <AppLayout>{children}</AppLayout>
           </OnboardingGate>
         </WhatsNewProvider>

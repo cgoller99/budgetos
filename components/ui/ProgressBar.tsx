@@ -1,6 +1,6 @@
 import { cn } from "./cn";
 
-type ProgressBarVariant = "primary" | "muted";
+type ProgressBarVariant = "primary" | "muted" | "danger";
 
 type ProgressBarProps = {
   value: number;
@@ -11,6 +11,7 @@ type ProgressBarProps = {
 const fillClasses: Record<ProgressBarVariant, string> = {
   primary: "bg-[var(--accent)]",
   muted: "bg-[var(--text-muted)]",
+  danger: "bg-[var(--danger)]",
 };
 
 export function ProgressBar({

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { CategoryBudgetsCard } from "@/components/budgets/CategoryBudgetsCard";
 import { BarTrendChart } from "@/components/charts/BarTrendChart";
 import { CategoryBars } from "@/components/charts/CategoryBars";
 import { CHART_COLORS } from "@/components/charts/constants";
@@ -210,6 +211,7 @@ export function ReportsContent() {
           monthlyTrends={monthlyTrends}
           totalGoalSavings={totalGoalSavings}
         />
+        <CategoryBudgetsCard />
 
         <MobileCollapsibleSection
           title="Categories & export"
@@ -245,6 +247,7 @@ export function ReportsContent() {
           onExportCsv={handleExportCsv}
         />
 
+        <CategoryBudgetsCard />
         <ReportsSecondarySection reportEvents={reportEvents} />
       </div>
     </div>
