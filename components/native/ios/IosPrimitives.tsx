@@ -275,7 +275,13 @@ export function IosSkeletonScreen({
           variant === "home" ? "h-[168px]" : "h-[120px]",
         )}
       />
-      {variant === "home" ? null : (
+      {variant === "home" ? (
+        <div className="grid grid-cols-3 gap-2">
+          <div className="h-[72px] animate-pulse rounded-[16px] bg-white/[0.05]" />
+          <div className="h-[72px] animate-pulse rounded-[16px] bg-white/[0.05]" />
+          <div className="h-[72px] animate-pulse rounded-[16px] bg-white/[0.05]" />
+        </div>
+      ) : (
       <div className="grid grid-cols-2 gap-3">
         <div className="h-[88px] animate-pulse rounded-[16px] bg-white/[0.05]" />
         <div className="h-[88px] animate-pulse rounded-[16px] bg-white/[0.05]" />
@@ -395,7 +401,7 @@ export function IosProgressBar({
     <div className={cn("h-2 overflow-hidden rounded-full bg-white/[0.08]", className)}>
       <div
         className={cn(
-          "h-full rounded-full transition-[width] duration-300",
+          "ios-progress-fill h-full rounded-full transition-[width] duration-300",
           tone === "accent" && "bg-[var(--accent)]",
           tone === "success" && "bg-[var(--success)]",
           tone === "warning" && "bg-[var(--warning)]",

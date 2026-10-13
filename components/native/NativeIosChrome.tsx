@@ -29,13 +29,16 @@ function revealFocusedField(target: HTMLElement) {
 
 export function NativeIosChrome() {
   const nativeIos = useNativeIos();
-  const [offline, setOffline] = useState(false);
+  const [phase, setPhase] = useState<"online" | "offline" | "restored">("online");
 
   useEffect(() => {
     if (!nativeIos) return;
 
     const syncConnection = () => {
-      setOffline(navigator.onLine === false);
+      setPhase((current) => {
+        if (navigator.onLine === false) return "offline";
+        return current === "offline" ? "restored" : "online";
+      });
     };
     syncConnection();
     window.addEventListener("online", syncConnection);
@@ -79,14 +82,22 @@ export function NativeIosChrome() {
     };
   }, [nativeIos]);
 
-  if (!nativeIos || !offline) return null;
+  useEffect(() => {
+    if (phase !== "restored") return;
+    const timeout = window.setTimeout(() => setPhase("online"), 1600);
+    return () => window.clearTimeout(timeout);
+  }, [phase]);
+
+  if (!nativeIos || phase === "online") return null;
 
   return (
     <p
       role="status"
       className="mb-3 rounded-[10px] bg-white/[0.06] px-3.5 py-2.5 text-[13px] text-[var(--text-secondary)]"
     >
-      You are offline. Buxme will refresh when the connection returns.
+      {phase === "offline"
+        ? "You are offline. Buxme will refresh when the connection returns."
+        : "Back online."}
     </p>
   );
 }
