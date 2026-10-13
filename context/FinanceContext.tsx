@@ -17,10 +17,6 @@ import { ANALYTICS_EVENTS, trackEvent } from "@/lib/analytics/client";
 import { getDemoFinanceData } from "@/lib/demo/data";
 import { computeFinanceHub } from "@/lib/finance/computeFinanceHub";
 import type { FinancialSnapshot } from "@/lib/finance/financialEngine";
-import {
-  isIncomePlanPaycheckDue,
-  markIncomePlanAutoRun,
-} from "@/lib/finance/autoScheduler";
 import { coerceFinanceData, emptyFinanceData } from "@/lib/finance/emptyFinanceData";
 import {
   applyBillSplitPaymentByIdToData,
@@ -32,6 +28,7 @@ import { buildUpdatedDebt } from "@/lib/finance/debts";
 import { disconnectPlaidAccount as disconnectPlaidAccountRequest } from "@/lib/accounts/clientApi";
 import { buildUpdatedBill } from "@/lib/finance/bills";
 import { buildUpdatedIncomeSource } from "@/lib/finance/income";
+import { applyGoalEdit } from "@/lib/finance/goalForecast";
 import { getGoalTypeMeta } from "@/lib/finance/goalTypes";
 import type {
   AddAccountInput,
@@ -83,7 +80,6 @@ import {
   getDismissedAutomationIds,
 } from "@/lib/automation";
 import { mergeAutomationNotifications } from "@/lib/automation/notifications";
-import { shouldDeferScheduledPaycheck } from "@/lib/automation/paycheckReview";
 import { buildRecurringReview, recurringEvidenceKey } from "@/lib/automation/recurringReview";
 import {
   readRecurringReviewDismissals,
@@ -354,6 +350,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
   const userIdRef = useRef<string | null>(null);
   const dataRef = useRef<FinanceData>(emptyFinanceData);
   const realtimeRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const paycheckApplyInFlightRef = useRef(false);
 
   const applyFinanceData = useCallback(
     (next: FinanceData, options?: { cache?: boolean; updatedAt?: string | null }) => {
@@ -1561,15 +1558,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
         {
           ...data,
           savingsGoals: data.savingsGoals.map((goal) =>
-            goal.id === goalId
-              ? {
-                  ...goal,
-                  name: input.name.trim(),
-                  type: input.type,
-                  icon: meta.icon,
-                  target: input.target,
-                }
-              : goal,
+            goal.id === goalId ? applyGoalEdit(goal, input, meta.icon) : goal,
           ),
         },
         (repository, userId) => repository.updateGoal(userId, goalId, input),
@@ -1750,24 +1739,39 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
     async (input: MarkPaycheckReceivedInput = {}) => {
       const plan = data.incomePlan;
 
-      if (!plan) {
+      if (!plan || paycheckApplyInFlightRef.current) {
         return;
       }
 
-      const { data: next } = applyIncomePlanPaycheckToData(data, plan, input);
+      paycheckApplyInFlightRef.current = true;
+      let startedMutation = false;
 
-      await runMutation(
-        next,
-        (repository, userId) =>
-          repository.markIncomePlanPaycheckReceived(userId, input),
-        {
-          events: [
-            buildPaycheckProcessedEvent("Income Plan", plan.paycheckAmount),
-          ],
-        },
-      );
+      try {
+        const { data: next } = applyIncomePlanPaycheckToData(data, plan, input);
+        startedMutation = true;
+
+        await runMutation(
+          next,
+          (repository, userId) =>
+            repository.markIncomePlanPaycheckReceived(userId, input),
+          {
+            events: [
+              buildPaycheckProcessedEvent("Income Plan", plan.paycheckAmount),
+            ],
+          },
+        );
+      } catch (applyError) {
+        if (!startedMutation) {
+          const message =
+            applyError instanceof Error ? applyError.message : "Could not apply this paycheck.";
+          showToast({ title: message, type: "error" });
+        }
+        throw applyError;
+      } finally {
+        paycheckApplyInFlightRef.current = false;
+      }
     },
-    [data, runMutation],
+    [data, runMutation, showToast],
   );
 
   const dismissAutomationSuggestionHandler = useCallback((suggestionId: string) => {
@@ -1993,60 +1997,6 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
     },
     [addBill, markIncomePlanPaycheckReceived, showToast],
   );
-
-  // Tracks the `${planId}:${payDate}` keys we've already attempted this session so a
-  // failed auto-run never retries in a tight loop (which would repeatedly advance and
-  // roll back the pay date and spam sync errors).
-  const autoRunAttemptsRef = useRef<Set<string>>(new Set());
-  const autoRunInFlightRef = useRef(false);
-
-  useEffect(() => {
-    if (isLoading || !data.incomePlan || autoRunInFlightRef.current) {
-      return;
-    }
-
-    const plan = data.incomePlan;
-
-    // Only auto-run when the plan's scheduled pay date has actually arrived
-    // (isIncomePlanPaycheckDue is bounded by today). A "paycheck detected"
-    // suggestion must NOT auto-apply: it does not advance/clear itself, so it
-    // would re-fire every render and march the pay date into the future.
-    if (!isIncomePlanPaycheckDue(data)) {
-      return;
-    }
-
-    // A bank deposit is waiting for review. Applying now would move allocations
-    // and can create a second income row on top of that deposit.
-    if (shouldDeferScheduledPaycheck(data)) {
-      return;
-    }
-
-    const attemptKey = `${plan.id}:${plan.nextPayDate}`;
-
-    if (autoRunAttemptsRef.current.has(attemptKey)) {
-      return;
-    }
-
-    autoRunAttemptsRef.current.add(attemptKey);
-    autoRunInFlightRef.current = true;
-
-    void (async () => {
-      try {
-        await markIncomePlanPaycheckReceived();
-        markIncomePlanAutoRun(plan.id, plan.nextPayDate);
-        showToast({
-          title: "Paycheck plan applied",
-          subtitle: "Your allocations updated automatically.",
-          type: "success",
-        });
-      } catch {
-        // Leave the attempt recorded so we don't retry this pay date automatically;
-        // the user can retry manually from the Income hub.
-      } finally {
-        autoRunInFlightRef.current = false;
-      }
-    })();
-  }, [data, isLoading, markIncomePlanPaycheckReceived, showToast]);
 
   const hub = useMemo(() => computeFinanceHub(data), [data]);
   const mergedNotifications = useMemo(

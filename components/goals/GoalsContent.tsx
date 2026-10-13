@@ -30,6 +30,20 @@ export function GoalsContent() {
     return finance.savingsGoals.find((goal) => goal.id === id) ?? null;
   }
 
+  async function savePlan(goalId: string, weeklySavings: number) {
+    const goal = findGoal(goalId);
+    if (!goal) {
+      return;
+    }
+
+    await finance.editGoal(goalId, {
+      name: goal.name,
+      type: goal.type,
+      target: goal.target,
+      weeklySavings,
+    });
+  }
+
   if (nativeIos) {
     return <IosGoalsScreen />;
   }
@@ -56,14 +70,23 @@ export function GoalsContent() {
         />
       ) : (
         <div className="grid grid-cols-1 gap-5">
-          {goals.map((goal) => (
-            <GoalCard
-              key={goal.id}
-              goal={goal}
-              onAddMoney={() => setMoneyGoal(findGoal(goal.id))}
-              onEdit={() => setEditGoal(findGoal(goal.id))}
-            />
-          ))}
+          {goals.map((goal) => {
+            const savingsGoal = findGoal(goal.id);
+            if (!savingsGoal) {
+              return null;
+            }
+
+            return (
+              <GoalCard
+                key={goal.id}
+                goal={goal}
+                savingsGoal={savingsGoal}
+                onAddMoney={() => setMoneyGoal(savingsGoal)}
+                onEdit={() => setEditGoal(savingsGoal)}
+                onSavePlan={(weeklySavings) => savePlan(goal.id, weeklySavings)}
+              />
+            );
+          })}
         </div>
       )}
 

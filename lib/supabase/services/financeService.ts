@@ -12,6 +12,12 @@ import {
 import { buildUpdatedBill, findBillSplit, getCurrentYearMonth } from "@/lib/finance/bills";
 import { isUserInDemoMode } from "@/lib/finance/demoData";
 import { emptyFinanceData } from "@/lib/finance/emptyFinanceData";
+import {
+  buildGoalSavingsPlan,
+  contributionFromStoredGoal,
+  goalSavingsPlanColumns,
+  mergeGoalUpdate,
+} from "@/lib/finance/goalForecast";
 import { getGoalTypeMeta } from "@/lib/finance/goalTypes";
 import { buildUpdatedIncomeSource } from "@/lib/finance/income";
 import {
@@ -1072,16 +1078,38 @@ export class FinanceService {
     input: EditGoalInput,
   ): Promise<FinanceData | null> {
     const meta = getGoalTypeMeta(input.type);
+    const base = {
+      name: input.name.trim(),
+      goal_type: input.type,
+      icon: meta.icon,
+      target_amount: input.target,
+      updated_at: new Date().toISOString(),
+    };
+    let planColumns = null;
+
+    if (typeof input.weeklySavings === "number") {
+      const { data: existingRow, error: readError } = await this.supabase
+        .from("goals")
+        .select(
+          "contribution_amount, contribution_frequency, start_date, next_occurrence, last_processed_date, recurring_status",
+        )
+        .eq("id", goalId)
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (readError) throw readError;
+
+      planColumns = goalSavingsPlanColumns(
+        buildGoalSavingsPlan(
+          contributionFromStoredGoal(existingRow),
+          input.weeklySavings,
+        ),
+      );
+    }
 
     const { error } = await this.supabase
       .from("goals")
-      .update({
-        name: input.name.trim(),
-        goal_type: input.type,
-        icon: meta.icon,
-        target_amount: input.target,
-        updated_at: new Date().toISOString(),
-      })
+      .update(mergeGoalUpdate(base, input.weeklySavings, planColumns))
       .eq("id", goalId)
       .eq("user_id", userId);
 

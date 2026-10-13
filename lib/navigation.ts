@@ -89,6 +89,13 @@ export const NAV_SECONDARY_ROUTES = [
     subtitle: "What changed in your money, and why.",
   },
   {
+    label: "Money Plan",
+    icon: "income",
+    href: "/money-plan",
+    eyebrow: "Plan",
+    subtitle: "See income, bills, debt, goals, and cash flow together.",
+  },
+  {
     label: "What's New",
     icon: "reports",
     href: "/whats-new",
