@@ -201,6 +201,8 @@ export type EditGoalInput = {
   name: string;
   type: GoalType;
   target: number;
+  /** Weekly forecast rate. Omit this field to leave a saved contribution unchanged. */
+  weeklySavings?: number;
 };
 
 export type AddSavingsGoalInput = CreateGoalInput;
