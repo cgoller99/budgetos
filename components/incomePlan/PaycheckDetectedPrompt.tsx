@@ -45,8 +45,8 @@ export function PaycheckDetectedPrompt({ item }: { item: PaycheckReviewItem }) {
   return (
     <Card padding="lg" className="border-[var(--accent)]/30 bg-[var(--accent)]/5">
       <CardHeader
-        title="Review this deposit"
-        description="Nothing is applied until you confirm."
+        title="Received paycheck"
+        description="A matching deposit is in. Allocations stay unapplied until you confirm."
         action={
           <Badge variant={item.confidence === "likely" ? "accent" : "warning"}>
             {confidenceLabel(item)}

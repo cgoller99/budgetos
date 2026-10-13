@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { Badge, Button, Card, CardContent, CardHeader } from "@/components/ui";
 import { useFinance } from "@/context/FinanceContext";
 import { useToast } from "@/context/ToastContext";
+import { classifyUpcomingPaycheck } from "@/lib/automation/paycheckReview";
 import { getAllocationProgress, resolveAllocationAmounts } from "@/lib/incomePlan/allocations";
 import {
   daysUntilPayDate,
@@ -76,11 +77,25 @@ export function NextPaycheckCard() {
   }
 
   const daysUntil = daysUntilPayDate(plan.nextPayDate);
+  const paycheckState = classifyUpcomingPaycheck(finance);
+  const statusLabel =
+    paycheckState.lifecycle === "applied"
+      ? "Applied"
+      : paycheckState.lifecycle === "received"
+        ? "Received"
+        : "Expected";
 
   return (
     <Card hover>
       <CardHeader
-        title="Next paycheck"
+        title={paycheckState.lifecycle === "expected" ? "Expected paycheck" : "Paycheck"}
+        description={
+          paycheckState.lifecycle === "applied"
+            ? "This payday is already applied."
+            : paycheckState.lifecycle === "received"
+              ? "A matching deposit is waiting. Allocations apply when you confirm."
+              : "Forecast only. Nothing is allocated until you confirm."
+        }
         action={
           <Link
             href="/income?tab=plan"
@@ -101,13 +116,18 @@ export function NextPaycheckCard() {
               +{formatCurrency(plan.paycheckAmount)}
             </p>
           </div>
-          <Badge variant="accent">
-            {daysUntil === 0
-              ? "Today"
-              : daysUntil === 1
-                ? "Tomorrow"
-                : `${daysUntil} days`}
-          </Badge>
+          <div className="flex flex-col items-end gap-2">
+            <Badge variant={paycheckState.lifecycle === "applied" ? "success" : "accent"}>
+              {statusLabel}
+            </Badge>
+            <Badge variant="default">
+              {daysUntil === 0
+                ? "Today"
+                : daysUntil === 1
+                  ? "Tomorrow"
+                  : `${daysUntil} days`}
+            </Badge>
+          </div>
         </div>
 
         {extraMonth && paycheckIndex >= 3 && (
@@ -148,12 +168,22 @@ export function NextPaycheckCard() {
           ))}
         </ul>
 
+        {paycheckState.lastAppliedDate && paycheckState.lifecycle !== "applied" ? (
+          <p className="text-sm text-[var(--text-muted)]">
+            Applied {formatPayDate(paycheckState.lastAppliedDate)}
+          </p>
+        ) : null}
+
         <Button
           fullWidth
-          disabled={isSubmitting || finance.isSyncing}
+          disabled={isSubmitting || finance.isSyncing || paycheckState.lifecycle === "applied"}
           onClick={() => void handleMarkReceived()}
         >
-          {isSubmitting ? "Applying…" : "Mark Paycheck Received"}
+          {isSubmitting
+            ? "Applying…"
+            : paycheckState.lifecycle === "applied"
+              ? "Already applied"
+              : "Apply paycheck"}
         </Button>
       </CardContent>
     </Card>

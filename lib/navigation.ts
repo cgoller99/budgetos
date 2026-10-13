@@ -82,6 +82,13 @@ export const NAV_ROUTES = [
 /** Secondary routes (not in main sidebar). */
 export const NAV_SECONDARY_ROUTES = [
   {
+    label: "Money Plan",
+    icon: "income",
+    href: "/money-plan",
+    eyebrow: "Plan",
+    subtitle: "See income, bills, debt, goals, and cash flow together.",
+  },
+  {
     label: "What's New",
     icon: "reports",
     href: "/whats-new",

@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { executePaycheckAllocations } from "../lib/allocation/paycheckEngine.ts";
 import { detectPaycheckSuggestions } from "../lib/automation/detectPaycheck.ts";
 import {
   buildPaycheckReviews,
+  classifyUpcomingPaycheck,
   paycheckReviewSuggestionId,
+  resolveAuthorizedPaycheckInput,
   shouldDeferScheduledPaycheck,
 } from "../lib/automation/paycheckReview.ts";
 import { plaidAutomationProvider } from "../lib/automation/providers/plaidAutomationProvider.ts";
@@ -306,6 +309,106 @@ assert.equal(unmatchedPlan[0].allocations.length, 0);
 assert.equal(detectPaycheckSuggestions(noPlan, reference).length, 0);
 assert.equal(shouldDeferScheduledPaycheck(noPlan, reference), false);
 
+assert.equal(
+  classifyUpcomingPaycheck(finance({ transactions: [] }), reference).lifecycle,
+  "expected",
+);
+assert.equal(classifyUpcomingPaycheck(matched, reference).lifecycle, "received");
+
+const appliedData = finance({
+  incomePlan: plan({ nextPayDate: "2026-10-10", lastProcessedDate: "2026-10-10" }),
+  incomePlanPaychecks: [
+    {
+      id: "event-applied",
+      incomePlanId: "plan",
+      payDate: "2026-10-10",
+      grossAmount: 2000,
+      isExtraPaycheck: false,
+      incomeTransactionId: "internal-1",
+      allocationEvents: [],
+    },
+  ],
+  transactions: [
+    income({
+      id: "internal-1",
+      amount: 2000,
+      date: "2026-10-10",
+      notes: "ACH PAYROLL ACME CORP",
+    }),
+  ],
+});
+assert.equal(classifyUpcomingPaycheck(appliedData, reference).lifecycle, "applied");
+
+const depositData = finance({
+  transactions: [
+    income({
+      id: "dep-1",
+      amount: 2000,
+      date: "2026-10-10",
+      notes: "ACH PAYROLL ACME CORP",
+    }),
+  ],
+});
+const linkedApply = executePaycheckAllocations(
+  depositData,
+  depositData.incomePlan,
+  {},
+  reference,
+);
+assert.equal(linkedApply.paycheckEvent.incomeTransactionId, "dep-1");
+assert.equal(
+  linkedApply.data.transactions.filter((transaction) => transaction.type === "income").length,
+  1,
+);
+
+assert.throws(
+  () =>
+    executePaycheckAllocations(
+      {
+        ...depositData,
+        incomePlanPaychecks: linkedApply.data.incomePlanPaychecks,
+      },
+      depositData.incomePlan,
+      {},
+      reference,
+    ),
+  /already applied/,
+);
+
+const manualApply = executePaycheckAllocations(
+  finance({ transactions: [] }),
+  finance().incomePlan,
+  {},
+  reference,
+);
+assert.equal(
+  manualApply.data.transactions.filter((transaction) =>
+    transaction.notes?.includes("Income Plan paycheck received"),
+  ).length,
+  1,
+);
+
+const twoDeposits = finance({
+  transactions: [
+    income({
+      id: "dep-a",
+      amount: 2000,
+      date: "2026-10-10",
+      notes: "ACH PAYROLL ACME",
+    }),
+    income({
+      id: "dep-b",
+      amount: 2000,
+      date: "2026-10-09",
+      notes: "ACH PAYROLL ACME",
+    }),
+  ],
+});
+assert.throws(
+  () => resolveAuthorizedPaycheckInput(twoDeposits, {}, reference),
+  /Confirm which deposit/,
+);
+
 const prompt = fs.readFileSync(
   new URL("../components/incomePlan/PaycheckDetectedPrompt.tsx", import.meta.url),
   "utf8",
@@ -317,6 +420,13 @@ const context = fs.readFileSync(
   new URL("../context/FinanceContext.tsx", import.meta.url),
   "utf8",
 );
-assert.match(context, /shouldDeferScheduledPaycheck\(data\)/);
+assert.doesNotMatch(context, /Paycheck plan applied/);
+assert.doesNotMatch(context, /markIncomePlanPaycheckReceived\(\)/);
+
+const cron = fs.readFileSync(
+  new URL("../lib/cron/paycheckCronService.ts", import.meta.url),
+  "utf8",
+);
+assert.doesNotMatch(cron, /markIncomePlanPaycheckReceived/);
 
 console.log("paycheck review ok");
