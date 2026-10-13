@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { IosCard, IosSection } from "@/components/native/ios/IosPrimitives";
+import { IosCard, IosLink, IosSection } from "@/components/native/ios/IosPrimitives";
 import { useAuth } from "@/context/AuthContext";
 import {
   budgetSuggestionDetail,
@@ -56,7 +56,10 @@ export function IosInsightsSection({
   }
 
   return (
-    <IosSection title="Insights">
+    <IosSection
+      title="Insights"
+      action={insights.length > 0 ? <IosLink href="/insights">See all</IosLink> : undefined}
+    >
       {insights.length > 0 ? (
         <div className="flex flex-col gap-2">
           {insights.map((insight) => (
