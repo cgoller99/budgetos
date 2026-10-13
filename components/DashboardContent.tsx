@@ -10,6 +10,7 @@ import { ThisWeeksPlanCard } from "@/components/dashboard/ThisWeeksPlanCard";
 import { TopGoalsCard } from "@/components/dashboard/TopGoalsCard";
 import { UpcomingBillsCard } from "@/components/dashboard/UpcomingBillsCard";
 import { WeeklyCashFlowCard } from "@/components/dashboard/WeeklyCashFlowCard";
+import { DashboardInsightsCard } from "@/components/insights/InsightsContent";
 import { WelcomeChecklist } from "@/components/guidance/WelcomeChecklist";
 import { IosHomeScreen } from "@/components/native/ios/IosHomeScreen";
 import { DashboardSkeleton } from "@/components/ui";
@@ -38,6 +39,7 @@ export function DashboardContent() {
     <div className={cn(pageContainerWideClassName)}>
       <DashboardHero />
       <WelcomeChecklist />
+      <DashboardInsightsCard />
 
       <div className={dashboardMediumSectionClassName}>
         <UpcomingBillsCard />

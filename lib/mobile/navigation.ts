@@ -21,6 +21,7 @@ export const MOBILE_MORE_NAV = [
   { href: "/transactions", label: "Transactions", icon: "transactions" as const },
   { href: "/debt", label: "Debt", icon: "debt" as const },
   { href: "/investments", label: "Investments", icon: "reports" as const },
+  { href: "/insights", label: "Insights", icon: "reports" as const },
   { href: "/money-plan", label: "Money Plan", icon: "income" as const },
   { href: "/reports", label: "Reports", icon: "reports" as const },
   { href: "/roadmap", label: "Roadmap", icon: "roadmap" as const },
@@ -37,6 +38,7 @@ export const IOS_MORE_NAV = [
   { href: "/debt", label: "Debt", icon: "debt" as const, group: "money" as const },
   { href: "/investments", label: "Investments", icon: "reports" as const, group: "money" as const },
   { href: "/money-plan", label: "Money Plan", icon: "income" as const, group: "money" as const },
+  { href: "/insights", label: "Insights", icon: "reports" as const, group: "insights" as const },
   { href: "/reports", label: "Reports", icon: "reports" as const, group: "insights" as const },
   { href: "/calendar", label: "Calendar", icon: "calendar" as const, group: "insights" as const },
   // Household lives under App — not Insights — so Insights taps never imply Settings.
