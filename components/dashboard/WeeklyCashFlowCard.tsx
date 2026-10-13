@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { AnimatedNumber, ExpandableCard, PanelLink } from "@/components/ui";
 import { useFinance } from "@/context/FinanceContext";
+import { forecastCashUntilPayday } from "@/lib/finance/cashFlowForecast";
 import { formatCurrency } from "@/lib/finance/format";
 import { WEEKS_PER_MONTH } from "@/lib/finance/safeToSpend";
 
@@ -80,8 +81,10 @@ function CashFlowGauge({
 }
 
 export function WeeklyCashFlowCard() {
-  const { dashboard, snapshot } = useFinance();
+  const finance = useFinance();
+  const { dashboard, snapshot } = finance;
   const { moneyFlow } = dashboard;
+  const paydayForecast = forecastCashUntilPayday(finance);
 
   const weekly = useMemo(
     () => ({
@@ -154,6 +157,13 @@ export function WeeklyCashFlowCard() {
           </div>
         </div>
       </div>
+      {paydayForecast.nextPayDate ? (
+        <p className="mt-4 text-sm text-[var(--text-muted)]">
+          {formatCurrency(paydayForecast.safeUntilPayday)} until payday on{" "}
+          {paydayForecast.nextPayDate}, after{" "}
+          {formatCurrency(paydayForecast.billsDueBeforePayday)} in bills due.
+        </p>
+      ) : null}
     </ExpandableCard>
   );
 }
