@@ -37,6 +37,7 @@ import {
   getIncomeTableRows,
 } from "@/lib/finance/income";
 import type { IncomeSource, IncomeTableRow } from "@/lib/finance/types";
+import { classifyUpcomingPaycheck } from "@/lib/automation/paycheckReview";
 import { triggerHaptic } from "@/lib/native/haptics";
 
 type IncomeTab = "upcoming" | "plan" | "sources" | "history";
@@ -58,6 +59,13 @@ function PaycheckPlan({
   onToggleEditor: () => void;
 }) {
   const plan = finance.incomePlan;
+  const paycheckState = classifyUpcomingPaycheck(finance);
+  const paydayLabel =
+    paycheckState.lifecycle === "received"
+      ? "Received paycheck"
+      : paycheckState.lifecycle === "applied"
+        ? "Applied paycheck"
+        : "Expected paycheck";
   const resolved = plan ? resolveAllocationAmounts(plan) : [];
   const allocated = resolved.reduce((sum, item) => sum + item.amount, 0);
   const remaining = plan ? Math.round((plan.paycheckAmount - allocated) * 100) / 100 : 0;
@@ -82,7 +90,7 @@ function PaycheckPlan({
     <div className="flex flex-col gap-3">
       {!showEditor ? <PaycheckDetectedPromptList /> : null}
       <IosCard padding="md">
-        <p className="text-[12px] font-medium text-[var(--text-muted)]">Upcoming payday</p>
+        <p className="text-[12px] font-medium text-[var(--text-muted)]">{paydayLabel}</p>
         <p className="mt-1 text-[20px] font-semibold text-[var(--foreground)]">
           {nextPaycheck?.formattedDate ?? formatPayDate(plan.nextPayDate)}
         </p>
@@ -95,6 +103,11 @@ function PaycheckPlan({
                 ? " · Tomorrow"
                 : ` · In ${nextPaycheck.daysUntil} days`
             : ""}
+          {paycheckState.lifecycle === "expected"
+            ? " · Forecast only"
+            : paycheckState.lifecycle === "received"
+              ? " · Confirm before allocations apply"
+              : " · Allocations already applied"}
         </p>
         <div className="mt-3 flex items-end justify-between">
           <div>

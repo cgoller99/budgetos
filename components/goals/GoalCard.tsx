@@ -4,18 +4,28 @@ import { Badge, Button, Card, CardContent, ProgressRing } from "@/components/ui"
 import { GoalInsightList } from "@/components/goals/GoalInsightList";
 import { GoalMilestoneConfetti } from "@/components/goals/GoalMilestoneConfetti";
 import { GoalTimelineChart } from "@/components/goals/GoalTimelineChart";
+import { GoalForecastPanel } from "@/components/goals/GoalForecastPanel";
 import { formatCurrency } from "@/lib/finance/format";
 import { formatGoalDate, type GoalProgress } from "@/lib/finance/goals";
 import { getGoalTypeMeta } from "@/lib/finance/goalTypes";
+import type { SavingsGoal } from "@/lib/finance/types";
 import { cn } from "@/components/ui/cn";
 
 type GoalCardProps = {
   goal: GoalProgress;
+  savingsGoal: SavingsGoal;
   onAddMoney: () => void;
   onEdit: () => void;
+  onSavePlan: (weeklySavings: number) => Promise<void>;
 };
 
-export function GoalCard({ goal, onAddMoney, onEdit }: GoalCardProps) {
+export function GoalCard({
+  goal,
+  savingsGoal,
+  onAddMoney,
+  onEdit,
+  onSavePlan,
+}: GoalCardProps) {
   const typeMeta = getGoalTypeMeta(goal.type);
 
   return (
@@ -112,6 +122,8 @@ export function GoalCard({ goal, onAddMoney, onEdit }: GoalCardProps) {
           </p>
           <GoalTimelineChart timeline={goal.timeline} />
         </div>
+
+        <GoalForecastPanel goal={savingsGoal} onSave={onSavePlan} />
 
         <div className="mt-8 flex gap-3 border-t border-[var(--surface-border)] pt-6">
           <Button

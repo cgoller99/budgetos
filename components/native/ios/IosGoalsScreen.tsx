@@ -16,6 +16,7 @@ import {
   IosSkeletonScreen,
 } from "@/components/native/ios/IosPrimitives";
 import { IosBottomSheet } from "@/components/native/ios/IosBottomSheet";
+import { GoalForecastPanel } from "@/components/goals/GoalForecastPanel";
 import { AddMoneyModal } from "@/components/goals/AddMoneyModal";
 import { CreateGoalModal } from "@/components/goals/CreateGoalModal";
 import { EditGoalModal } from "@/components/goals/EditGoalModal";
@@ -65,6 +66,20 @@ export function IosGoalsScreen() {
 
   function findGoal(id: string) {
     return finance.savingsGoals.find((goal) => goal.id === id) ?? null;
+  }
+
+  async function savePlan(goalId: string, weeklySavings: number) {
+    const goal = findGoal(goalId);
+    if (!goal) {
+      return;
+    }
+
+    await finance.editGoal(goalId, {
+      name: goal.name,
+      type: goal.type,
+      target: goal.target,
+      weeklySavings,
+    });
   }
 
   return (
@@ -220,6 +235,18 @@ export function IosGoalsScreen() {
                 />
                 <IosDetailLine label="Source" value={goal.contributionSourceLabel} />
               </div>
+              {(() => {
+                const savingsGoal = findGoal(goal.id);
+                if (!savingsGoal) {
+                  return null;
+                }
+                return (
+                  <GoalForecastPanel
+                    goal={savingsGoal}
+                    onSave={(weeklySavings) => savePlan(goal.id, weeklySavings)}
+                  />
+                );
+              })()}
               <div className="mt-4 flex gap-2">
                 {!goal.isComplete ? (
                   <button
