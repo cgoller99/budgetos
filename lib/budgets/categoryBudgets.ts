@@ -1,3 +1,11 @@
+import {
+  budgetMonthlyEquivalent,
+  BUDGET_FREQUENCY_LABELS,
+  currentBudgetPeriod,
+  formatBudgetPeriodLabel,
+  normalizeBudgetSchedule,
+  type BudgetFrequency,
+} from "@/lib/budgets/budgetPeriod";
 import { isPersonalOwnerRow } from "@/lib/finance/personalIncomeScope";
 import type { FinanceData, Transaction } from "@/lib/finance/types";
 import { getDisplayCategory } from "@/lib/transactions/categoryPresentation";
@@ -19,6 +27,16 @@ export type CategoryBudgetSuggestion = {
   months: number;
 };
 
+export type CategoryBudgetLimitInput = {
+  category: string;
+  amount: number;
+  frequency?: BudgetFrequency;
+  anchorDate?: string | null;
+  weekday?: number | null;
+  monthDays?: number[] | [number, number] | null;
+  intervalDays?: number | null;
+};
+
 export type CategoryBudgetView = {
   category: string;
   limit: number;
@@ -27,6 +45,16 @@ export type CategoryBudgetView = {
   progress: number;
   overspent: boolean;
   alert: string | null;
+  frequency: BudgetFrequency;
+  frequencyLabel: string;
+  periodStart: string;
+  periodEnd: string;
+  periodLabel: string;
+  anchorDate: string | null;
+  weekday: number | null;
+  monthDays: [number, number] | null;
+  intervalDays: number | null;
+  monthlyEquivalent: number;
 };
 
 function roundCurrency(value: number): number {
@@ -69,14 +97,19 @@ function refundBucket(transaction: Transaction): string | null {
   return display;
 }
 
+function matchesPostedDate(date: string, matches: (posted: string) => boolean): boolean {
+  return matches(date.slice(0, 10));
+}
+
 /**
- * Net category spending for one month.
+ * Net category spending for transactions whose posted date matches.
  * Transfers and another household member's rows are excluded.
  * Merchant refunds reduce the matching spending category.
+ * A date is counted once: the caller supplies one window.
  */
-export function netCategorySpending(
+function netCategorySpendingWhere(
   data: FinanceData,
-  month: string,
+  matches: (posted: string) => boolean,
 ): Map<string, number> {
   const totals = new Map<string, number>();
   const expenses = filterRealExpenseTransactions(
@@ -85,7 +118,7 @@ export function netCategorySpending(
       (transaction) =>
         transaction.type === "expense" &&
         !transaction.goalId &&
-        transaction.date.slice(0, 7) === month &&
+        matchesPostedDate(transaction.date, matches) &&
         ownedTransaction(data, transaction),
     ),
   );
@@ -102,7 +135,7 @@ export function netCategorySpending(
     if (
       transaction.type !== "income" ||
       !isRefundActivity(transaction) ||
-      transaction.date.slice(0, 7) !== month ||
+      !matchesPostedDate(transaction.date, matches) ||
       !ownedTransaction(data, transaction)
     ) {
       continue;
@@ -119,6 +152,28 @@ export function netCategorySpending(
   }
 
   return totals;
+}
+
+/**
+ * Net category spending for one calendar month.
+ * Transfers and another household member's rows are excluded.
+ * Merchant refunds reduce the matching spending category.
+ */
+export function netCategorySpending(
+  data: FinanceData,
+  month: string,
+): Map<string, number> {
+  return netCategorySpendingWhere(data, (posted) => posted.slice(0, 7) === month);
+}
+
+export function netCategorySpendingInPeriod(
+  data: FinanceData,
+  period: { start: string; end: string },
+): Map<string, number> {
+  return netCategorySpendingWhere(
+    data,
+    (posted) => posted >= period.start && posted <= period.end,
+  );
 }
 
 export function suggestCategoryBudgetLimits(
@@ -157,12 +212,14 @@ export function suggestCategoryBudgetLimits(
 }
 
 export function buildCategoryBudgetViews(
-  limits: Array<{ category: string; amount: number }>,
+  limits: CategoryBudgetLimitInput[],
   data: FinanceData,
   referenceDate = new Date(),
 ): CategoryBudgetView[] {
-  const spentByCategory = netCategorySpending(data, monthKey(referenceDate));
-  const limitsByCategory = new Map<string, number>();
+  const limitsByCategory = new Map<
+    string,
+    { limit: number; schedule: ReturnType<typeof normalizeBudgetSchedule> }
+  >();
 
   for (const item of limits) {
     const category = getDisplayCategory(item.category);
@@ -175,24 +232,44 @@ export function buildCategoryBudgetViews(
       continue;
     }
     // Keep one limit per display category. A later edit replaces the earlier one.
-    limitsByCategory.set(category, roundCurrency(item.amount));
+    limitsByCategory.set(category, {
+      limit: roundCurrency(item.amount),
+      schedule: normalizeBudgetSchedule(item),
+    });
   }
 
+  const month = monthKey(referenceDate);
+
   return [...limitsByCategory.entries()]
-    .map(([category, limit]) => {
+    .map(([category, entry]) => {
+      const period = currentBudgetPeriod(entry.schedule, referenceDate);
+      const spentByCategory =
+        entry.schedule.frequency === "monthly"
+          ? netCategorySpending(data, month)
+          : netCategorySpendingInPeriod(data, period);
       const spent = roundCurrency(spentByCategory.get(category) ?? 0);
-      const remaining = roundCurrency(limit - spent);
+      const remaining = roundCurrency(entry.limit - spent);
       const progress =
-        limit > 0 ? Math.max(0, Math.round((spent / limit) * 100)) : 0;
-      const overspent = spent > limit;
+        entry.limit > 0 ? Math.max(0, Math.round((spent / entry.limit) * 100)) : 0;
+      const overspent = spent > entry.limit;
       return {
         category,
-        limit,
+        limit: entry.limit,
         spent,
         remaining,
         progress,
         overspent,
         alert: overspent ? "Over budget" : null,
+        frequency: entry.schedule.frequency,
+        frequencyLabel: BUDGET_FREQUENCY_LABELS[entry.schedule.frequency],
+        periodStart: period.start,
+        periodEnd: period.end,
+        periodLabel: formatBudgetPeriodLabel(period),
+        anchorDate: entry.schedule.anchorDate,
+        weekday: entry.schedule.weekday,
+        monthDays: entry.schedule.monthDays,
+        intervalDays: entry.schedule.intervalDays,
+        monthlyEquivalent: budgetMonthlyEquivalent(entry.limit, entry.schedule),
       };
     })
     .sort((left, right) => right.spent - left.spent);

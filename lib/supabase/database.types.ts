@@ -554,6 +554,12 @@ export type CategoryBudgetRow = {
   amount: number;
   created_at: string;
   updated_at: string;
+  /** Omitted on databases that have not applied the frequency migration. */
+  frequency?: string | null;
+  anchor_date?: string | null;
+  weekday?: number | null;
+  month_days?: number[] | null;
+  interval_days?: number | null;
 };
 
 export type CategoryBudgetInsert = {
@@ -563,6 +569,11 @@ export type CategoryBudgetInsert = {
   amount: number;
   created_at?: string;
   updated_at?: string;
+  frequency?: string | null;
+  anchor_date?: string | null;
+  weekday?: number | null;
+  month_days?: number[] | null;
+  interval_days?: number | null;
 };
 
 export type CategoryBudgetUpdate = Partial<CategoryBudgetInsert>;

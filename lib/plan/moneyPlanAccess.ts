@@ -1,3 +1,5 @@
+import { storedScheduleFields } from "@/lib/budgets/budgetPeriod";
+
 export type MoneyPlanAccess = "full" | "preview";
 
 export function resolveMoneyPlanAccess(input: {
@@ -48,7 +50,15 @@ export function moneyPlanApiResult<T>(input: {
 
 export function sanitizeMoneyPlanBudgets(
   value: unknown,
-): Array<{ category: string; amount: number }> {
+): Array<{
+  category: string;
+  amount: number;
+  frequency?: "weekly" | "biweekly" | "twice_monthly" | "monthly" | "custom";
+  anchorDate?: string | null;
+  weekday?: number | null;
+  monthDays?: [number, number] | null;
+  intervalDays?: number | null;
+}> {
   if (!Array.isArray(value)) {
     return [];
   }
@@ -77,6 +87,7 @@ export function sanitizeMoneyPlanBudgets(
     budgets.push({
       category,
       amount: Math.round(amount * 100) / 100,
+      ...storedScheduleFields(item),
     });
     if (budgets.length >= 40) {
       break;
