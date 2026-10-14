@@ -553,7 +553,7 @@ export function IosSegmentedControl<T extends string>({
               type="button"
               onClick={() => onChange(option.value)}
               className={cn(
-                "min-h-9 shrink-0 rounded-full px-3.5 text-[13px] font-semibold transition-colors active:opacity-80",
+                "min-h-11 shrink-0 rounded-full px-3.5 text-[15px] font-semibold transition-colors active:opacity-80",
                 active
                   ? "bg-[var(--accent)] text-white shadow-[0_0_16px_rgba(59,130,246,0.35)]"
                   : "bg-white/[0.06] text-[var(--text-secondary)]",
@@ -577,7 +577,7 @@ export function IosSegmentedControl<T extends string>({
             type="button"
             onClick={() => onChange(option.value)}
             className={cn(
-              "min-h-9 flex-1 rounded-[10px] px-2 text-[13px] font-semibold transition-colors",
+              "min-h-11 flex-1 rounded-[10px] px-2 text-[15px] font-semibold transition-colors",
               active
                 ? "bg-[var(--accent)] text-white shadow-[0_0_12px_rgba(59,130,246,0.35)]"
                 : "text-[var(--text-muted)]",

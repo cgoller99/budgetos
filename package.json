@@ -99,6 +99,7 @@
     "test:ios-keyboard-offline": "node scripts/test-ios-keyboard-offline.mjs",
     "test:ios-remaining-screens": "node scripts/test-ios-remaining-screens.mjs",
     "test:ios-sheet-editing": "node --experimental-strip-types scripts/test-ios-sheet-editing.mjs",
+    "test:ios-ui-21": "node --experimental-strip-types scripts/test-ios-ui-21.mjs",
     "test:automation-insights": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-automation-insights.mjs",
     "test:money-plan": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-money-plan.mjs",
     "test:transaction-intelligence": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-transaction-intelligence.mjs",

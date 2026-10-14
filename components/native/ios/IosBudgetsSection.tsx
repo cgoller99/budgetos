@@ -1,9 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { CategoryBudgetStatus } from "@/components/budgets/CategoryBudgetStatus";
+import { IosBottomSheet } from "@/components/native/ios/IosBottomSheet";
 import { IosCard, IosProgressBar, IosSection } from "@/components/native/ios/IosPrimitives";
 import { useCategoryBudgets } from "@/components/budgets/useCategoryBudgets";
 import { formatCurrency } from "@/lib/finance/format";
+import { triggerHaptic } from "@/lib/native/haptics";
 
 export function IosBudgetsSection() {
   const {
@@ -21,10 +24,46 @@ export function IosBudgetsSection() {
     syncMessage,
     retry,
   } = useCategoryBudgets();
+  const [editingCategory, setEditingCategory] = useState<string | null>(null);
+  const [draftLimit, setDraftLimit] = useState("");
+  const editing = views.find((view) => view.category === editingCategory) ?? null;
+  const totalLimit = views.reduce((sum, view) => sum + view.limit, 0);
+  const totalSpent = views.reduce((sum, view) => sum + view.spent, 0);
+  const totalRemaining = totalLimit - totalSpent;
+  const overCount = views.filter((view) => view.overspent).length;
+
+  function openEditor(categoryName: string, limit: number) {
+    void triggerHaptic("selection");
+    setEditingCategory(categoryName);
+    setDraftLimit(String(limit));
+  }
+
+  function saveLimit() {
+    if (!editing) return;
+    const nextAmount = Number.parseFloat(draftLimit);
+    if (!Number.isFinite(nextAmount) || nextAmount < 0) return;
+    updateAmount(editing.category, nextAmount);
+    void triggerHaptic("success");
+    setEditingCategory(null);
+  }
 
   return (
     <IosSection title="Budgets">
       <CategoryBudgetStatus status={status} message={syncMessage} onRetry={retry} />
+      {views.length > 0 ? (
+        <IosCard padding="md">
+          <p className="text-[13px] font-medium text-[var(--text-muted)]">This month</p>
+          <p className="mt-1 text-[22px] font-semibold tabular-nums text-[var(--foreground)]">
+            {formatCurrency(Math.max(totalRemaining, 0))} left
+          </p>
+          <p className="mt-1 text-[13px] text-[var(--text-muted)]">
+            {formatCurrency(totalSpent)} spent of {formatCurrency(totalLimit)}
+            {overCount > 0
+              ? ` · ${overCount} over budget`
+              : " · nothing over budget"}
+          </p>
+        </IosCard>
+      ) : null}
       {suggestions.length > 0 ? (
         <IosCard padding="md">
           <p className="text-[15px] font-semibold text-[var(--foreground)]">
@@ -76,10 +115,10 @@ export function IosBudgetsSection() {
             </div>
             <button
               type="button"
-              className="min-h-11 text-[13px] font-semibold text-[var(--danger)]"
-              onClick={() => removeBudget(view.category)}
+              className="min-h-11 text-[15px] font-semibold text-[var(--accent-light)]"
+              onClick={() => openEditor(view.category, view.limit)}
             >
-              Remove
+              Edit
             </button>
           </div>
           <IosProgressBar
@@ -88,26 +127,18 @@ export function IosBudgetsSection() {
             className="mt-3"
           />
           {view.alert ? (
-            <p className="mt-2 text-[12px] font-medium text-[var(--danger)]">{view.alert}</p>
+            <p className="mt-2 text-[13px] font-medium text-[var(--danger)]">{view.alert}</p>
           ) : null}
-          <label className="mt-3 block text-[12px] text-[var(--text-muted)]">
-            Monthly limit
-            <input
-              type="number"
-              inputMode="decimal"
-              min={0}
-              step="0.01"
-              value={view.limit}
-              aria-label={`${view.category} budget`}
-              className="mt-1 min-h-11 w-full rounded-[12px] bg-white/[0.06] px-3 text-[16px] text-[var(--foreground)]"
-              onChange={(event) => {
-                const nextAmount = Number.parseFloat(event.target.value);
-                if (Number.isFinite(nextAmount) && nextAmount >= 0) {
-                  updateAmount(view.category, nextAmount);
-                }
-              }}
-            />
-          </label>
+          <button
+            type="button"
+            className="mt-2 min-h-11 text-[13px] font-semibold text-[var(--danger)]"
+            onClick={() => {
+              void triggerHaptic("light");
+              removeBudget(view.category);
+            }}
+          >
+            Remove
+          </button>
         </IosCard>
       ))}
 
@@ -137,6 +168,32 @@ export function IosBudgetsSection() {
           </button>
         </form>
       </IosCard>
+      <IosBottomSheet
+        open={editing !== null}
+        title={editing ? editing.category : "Budget"}
+        onClose={() => setEditingCategory(null)}
+        footer={
+          <button
+            type="button"
+            className="min-h-12 w-full rounded-[14px] bg-[var(--accent)] text-[16px] font-semibold text-white"
+            onClick={saveLimit}
+          >
+            Save limit
+          </button>
+        }
+      >
+        <label className="block text-[13px] text-[var(--text-muted)]">
+          Monthly limit
+          <input
+            type="text"
+            inputMode="decimal"
+            value={draftLimit}
+            aria-label={editing ? `${editing.category} budget` : "Monthly limit"}
+            className="mt-2 min-h-12 w-full rounded-[12px] bg-white/[0.06] px-3 text-[16px] text-[var(--foreground)]"
+            onChange={(event) => setDraftLimit(event.target.value)}
+          />
+        </label>
+      </IosBottomSheet>
     </IosSection>
   );
 }

@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { formatCurrency } from "@/lib/finance/format";
 import type { FinanceData, Transaction } from "@/lib/finance/types";
 import { getLinkedAccountName } from "@/lib/transactions/accountLookup";
-import { isDisplayedInflow } from "@/lib/transactions/refunds";
+import { isDisplayedInflow, isRefundActivity } from "@/lib/transactions/refunds";
 import { isConfidentInternalTransfer } from "@/lib/transactions/transferDetection";
 import { formatTransactionDate, getTransactionTypeLabel } from "@/lib/transactions";
 import {
@@ -103,6 +103,7 @@ export function IosTransactionDetailSheet({
   }
 
   const isTransfer = isConfidentInternalTransfer(finance, shown);
+  const isRefund = !isTransfer && isRefundActivity(shown);
   const isInflow = !isTransfer && isDisplayedInflow(shown);
   const label = getDisplayMerchant({
     notes: shown.notes,
@@ -166,7 +167,9 @@ export function IosTransactionDetailSheet({
         <p
           className={cn(
             "text-center text-[34px] font-semibold leading-none tracking-tight tabular-nums",
-            isInflow ? "text-[var(--success)]" : isTransfer ? "text-[var(--foreground)]" : "text-[var(--danger)]",
+            isRefund || isInflow
+              ? "text-[var(--success)]"
+              : "text-[var(--foreground)]",
           )}
         >
           {isInflow ? "+" : isTransfer ? "" : "−"}
@@ -186,7 +189,7 @@ export function IosTransactionDetailSheet({
             value={
               isTransfer
                 ? "Transfer"
-                : shown.type === "expense" && shown.amount < 0
+                : isRefund
                   ? "Refund"
                   : getTransactionTypeLabel(shown.type)
             }

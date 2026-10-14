@@ -28,6 +28,7 @@ import { IncomeLedgerPanel } from "@/components/income/IncomeLedgerPanel";
 import { IncomeForecastPanel } from "@/components/income/IncomeForecastPanel";
 import { useFinance } from "@/context/FinanceContext";
 import { useToast } from "@/context/ToastContext";
+import { describeCashOutlook, forecastCashOutlook } from "@/lib/finance/cashOutlook";
 import { formatCurrency } from "@/lib/finance/format";
 import { resolveAllocationAmounts } from "@/lib/incomePlan/allocations";
 import { advancePayDate, describePaySchedule, formatPayDate } from "@/lib/incomePlan/payDates";
@@ -66,6 +67,7 @@ function PaycheckPlan({
       : paycheckState.lifecycle === "applied"
         ? "Applied paycheck"
         : "Expected paycheck";
+  const cashOutlook = describeCashOutlook(forecastCashOutlook(finance));
   const resolved = plan ? resolveAllocationAmounts(plan) : [];
   const allocated = resolved.reduce((sum, item) => sum + item.amount, 0);
   const remaining = plan ? Math.round((plan.paycheckAmount - allocated) * 100) / 100 : 0;
@@ -187,6 +189,12 @@ function PaycheckPlan({
           </IosSection>
         );
       })()}
+      {cashOutlook ? (
+        <IosCard padding="md">
+          <p className="text-[13px] font-medium text-[var(--text-muted)]">Cash-flow outlook</p>
+          <p className="mt-1 text-[15px] leading-snug text-[var(--foreground)]">{cashOutlook}</p>
+        </IosCard>
+      ) : null}
       <IosSection title="Allocations">
         {resolved.length === 0 ? (
           <IosCard padding="md">
