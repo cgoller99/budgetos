@@ -1,4 +1,5 @@
 import { calculateCash, calculateDebt } from "@/lib/calculations/netWorth";
+import { projectDebtPayoff } from "@/lib/finance/debtPayoff";
 import {
   getCurrentYearMonth,
   getDueDateForMonth,
@@ -265,48 +266,19 @@ export function simulateDebtPayoff(
     };
   }
 
-  let months = 0;
-  let totalInterest = 0;
-
-  while (state.some((debt) => debt.balance > 0.01) && months < MAX_SIMULATION_MONTHS) {
-    months += 1;
-
-    for (const debt of state) {
-      if (debt.balance <= 0.01) {
-        continue;
-      }
-
-      const interest = debt.balance * (debt.interestRate / 100 / 12);
-      totalInterest += interest;
-      debt.balance += interest;
-    }
-
-    for (const debt of state) {
-      if (debt.balance <= 0.01) {
-        continue;
-      }
-
-      const payment = Math.min(debt.minimumPayment, debt.balance);
-      debt.balance -= payment;
-    }
-
-    let remainingExtra = extraMonthly;
-    const target = pickStrategyTarget(state, strategy);
-
-    if (target && remainingExtra > 0) {
-      const applied = Math.min(remainingExtra, target.balance);
-      target.balance -= applied;
-      remainingExtra -= applied;
-    }
-  }
-
-  const paidOff = !state.some((debt) => debt.balance > 0.01);
+  const projected = projectDebtPayoff({
+    debts,
+    strategy,
+    extraMonthly,
+    referenceDate,
+  });
 
   return {
-    months,
-    totalInterest,
-    debtFreeDate: addMonths(referenceDate, months),
-    isReliable: paidOff && months < MAX_SIMULATION_MONTHS,
+    months: projected.months ?? MAX_SIMULATION_MONTHS,
+    totalInterest: projected.totalInterest ?? 0,
+    debtFreeDate:
+      projected.debtFreeDate ?? addMonths(referenceDate, MAX_SIMULATION_MONTHS),
+    isReliable: projected.isReliable,
   };
 }
 
