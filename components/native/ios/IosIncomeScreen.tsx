@@ -67,7 +67,9 @@ function PaycheckPlan({
       : paycheckState.lifecycle === "applied"
         ? "Applied paycheck"
         : "Expected paycheck";
-  const cashOutlook = describeCashOutlook(forecastCashOutlook(finance));
+  const outlook = forecastCashOutlook(finance);
+  const cashOutlook = describeCashOutlook(outlook);
+  const showOutlook = outlook.availableCash !== 0 || outlook.events.length > 0;
   const resolved = plan ? resolveAllocationAmounts(plan) : [];
   const allocated = resolved.reduce((sum, item) => sum + item.amount, 0);
   const remaining = plan ? Math.round((plan.paycheckAmount - allocated) * 100) / 100 : 0;
@@ -189,10 +191,32 @@ function PaycheckPlan({
           </IosSection>
         );
       })()}
-      {cashOutlook ? (
+      {showOutlook ? (
         <IosCard padding="md">
           <p className="text-[13px] font-medium text-[var(--text-muted)]">Cash-flow outlook</p>
-          <p className="mt-1 text-[15px] leading-snug text-[var(--foreground)]">{cashOutlook}</p>
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <div>
+              <p className="text-[12px] text-[var(--text-muted)]">Confirmed cash</p>
+              <p className="mt-0.5 text-[17px] font-semibold tabular-nums text-[var(--foreground)]">
+                {formatCurrency(outlook.availableCash)}
+              </p>
+            </div>
+            <div>
+              <p className="text-[12px] text-[var(--text-muted)]">30-day low</p>
+              <p
+                className={`mt-0.5 text-[17px] font-semibold tabular-nums ${
+                  outlook.lowBalance.amount < 0
+                    ? "text-[var(--danger)]"
+                    : "text-[var(--foreground)]"
+                }`}
+              >
+                {formatCurrency(outlook.lowBalance.amount)}
+              </p>
+            </div>
+          </div>
+          <p className="mt-3 text-[13px] leading-snug text-[var(--text-secondary)]">
+            {cashOutlook ?? "No dip below today’s confirmed cash in this window."}
+          </p>
         </IosCard>
       ) : null}
       <IosSection title="Allocations">
@@ -413,26 +437,9 @@ export function IosIncomeScreen() {
         open={selectedSource !== null}
         title={selectedSource?.name}
         onClose={() => setSelectedSource(null)}
-      >
-        {selectedSource ? (
-          <div>
-            <p className="text-center text-[34px] font-semibold leading-none tracking-tight tabular-nums text-[var(--success)]">
-              {formatCurrency(selectedSource.amount)}
-            </p>
-            <p className="mt-2 text-center text-[13px] text-[var(--text-muted)]">
-              {selectedSource.frequencyLabel} · {selectedSource.statusLabel}
-            </p>
-            <div className="mt-5 rounded-[16px] bg-white/[0.04] px-3.5">
-              <IosDetailLine
-                label="Next pay"
-                value={selectedSource.nextPayDate || "not scheduled"}
-              />
-              <IosDetailLine
-                label="Deposits to"
-                value={selectedSource.depositAccountName || "unassigned"}
-              />
-            </div>
-            <div className="mt-4 flex gap-2">
+        footer={
+          selectedSource ? (
+            <div className="flex gap-2">
               {selectedSource.canMarkReceived ? (
                 <button
                   type="button"
@@ -463,6 +470,27 @@ export function IosIncomeScreen() {
               >
                 Edit
               </button>
+            </div>
+          ) : null
+        }
+      >
+        {selectedSource ? (
+          <div>
+            <p className="text-center text-[34px] font-semibold leading-none tracking-tight tabular-nums text-[var(--success)]">
+              {formatCurrency(selectedSource.amount)}
+            </p>
+            <p className="mt-2 text-center text-[13px] text-[var(--text-muted)]">
+              {selectedSource.frequencyLabel} · {selectedSource.statusLabel}
+            </p>
+            <div className="mt-5 rounded-[16px] bg-white/[0.04] px-3.5">
+              <IosDetailLine
+                label="Next pay"
+                value={selectedSource.nextPayDate || "not scheduled"}
+              />
+              <IosDetailLine
+                label="Deposits to"
+                value={selectedSource.depositAccountName || "unassigned"}
+              />
             </div>
             {findIncome(selectedSource.id) ? (
               <button

@@ -12,6 +12,8 @@ import {
   getDisplayCategory,
   getDisplayMerchant,
 } from "@/lib/transactions/categoryPresentation";
+import { IosAvatar } from "@/components/native/ios/IosPrimitives";
+import { IosMerchantMark } from "@/components/native/ios/IosMerchantMark";
 import { triggerHaptic } from "@/lib/native/haptics";
 import { cn } from "@/components/ui/cn";
 import { lockBodyScroll, unlockBodyScroll } from "@/lib/ui/bodyScrollLock";
@@ -48,6 +50,8 @@ export function IosTransactionDetailSheet({
   const [dragOffset, setDragOffset] = useState(0);
   const dragOrigin = useRef<number | null>(null);
   const dragOffsetRef = useRef(0);
+  const lastPointer = useRef<{ y: number; time: number } | null>(null);
+  const velocityRef = useRef(0);
   const onCloseRef = useRef(onClose);
 
   useEffect(() => {
@@ -89,11 +93,28 @@ export function IosTransactionDetailSheet({
     setDragOffset(next);
   }
 
+  function moveDrag(clientY: number) {
+    if (dragOrigin.current == null) return;
+    const now = performance.now();
+    const previous = lastPointer.current;
+    if (previous) {
+      const elapsed = Math.max(now - previous.time, 1);
+      velocityRef.current = (clientY - previous.y) / elapsed;
+    }
+    lastPointer.current = { y: clientY, time: now };
+    setDrag(Math.max(0, clientY - dragOrigin.current));
+  }
+
   function endDrag() {
-    const shouldClose = dragOffsetRef.current > 96;
+    const shouldClose = dragOffsetRef.current > 96 || velocityRef.current > 0.65;
     dragOrigin.current = null;
+    lastPointer.current = null;
+    velocityRef.current = 0;
     setDrag(0);
-    if (shouldClose) onCloseRef.current();
+    if (shouldClose) {
+      void triggerHaptic("light");
+      onCloseRef.current();
+    }
   }
 
   const shown = transaction ?? presented;
@@ -152,11 +173,12 @@ export function IosTransactionDetailSheet({
           data-sheet-handle="true"
           onPointerDown={(event) => {
             dragOrigin.current = event.clientY;
+            lastPointer.current = { y: event.clientY, time: performance.now() };
+            velocityRef.current = 0;
             event.currentTarget.setPointerCapture(event.pointerId);
           }}
           onPointerMove={(event) => {
-            if (dragOrigin.current == null) return;
-            setDrag(Math.max(0, event.clientY - dragOrigin.current));
+            moveDrag(event.clientY);
           }}
           onPointerUp={endDrag}
           onPointerCancel={endDrag}
@@ -164,6 +186,19 @@ export function IosTransactionDetailSheet({
           <div className="h-1 w-10 rounded-full bg-white/25" />
         </div>
 
+        <div className="mb-3 flex justify-center">
+          <IosAvatar
+            fallback={
+              <IosMerchantMark
+                category={category}
+                kind={
+                  isTransfer ? "transfer" : isRefund ? "refund" : isInflow ? "income" : "spending"
+                }
+              />
+            }
+            tone={isRefund || isInflow ? "success" : isTransfer ? "muted" : "accent"}
+          />
+        </div>
         <p
           className={cn(
             "text-center text-[34px] font-semibold leading-none tracking-tight tabular-nums",
@@ -201,7 +236,7 @@ export function IosTransactionDetailSheet({
           {shown.notes.trim() ? <DetailRow label="Notes" value={shown.notes} /> : null}
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-2">
+        <div className="native-sheet-footer sticky bottom-0 -mx-4 mt-4 grid grid-cols-2 gap-2 border-t border-white/[0.06] bg-[#0b0f14] px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
           <button
             type="button"
             className="min-h-12 rounded-[14px] bg-[var(--accent)] text-[16px] font-semibold text-white active:opacity-90"

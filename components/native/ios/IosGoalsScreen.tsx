@@ -10,6 +10,7 @@ import {
   IosListRow,
   IosPrimaryButton,
   IosProgressBar,
+  IosRing,
   IosScreen,
   IosSection,
   IosSegmentedControl,
@@ -176,9 +177,12 @@ export function IosGoalsScreen() {
                       <p className="truncate text-[15px] font-semibold text-[var(--foreground)]">
                         {goal.name}
                       </p>
-                      <p className="text-[13px] font-semibold tabular-nums text-[var(--text-secondary)]">
-                        {goal.percentComplete}%
-                      </p>
+                      <IosRing
+                        value={goal.percentComplete}
+                        size={44}
+                        stroke={4}
+                        label={`${goal.percentComplete}%`}
+                      />
                     </div>
                     <p className="mt-0.5 text-[12px] text-[var(--text-muted)]">
                       {formatCurrency(goal.current)} of {formatCurrency(goal.target)}
@@ -250,9 +254,14 @@ export function IosGoalsScreen() {
           if (!goal) return null;
           return (
             <div>
-              <p className="text-center text-[34px] font-semibold leading-none tabular-nums text-[var(--foreground)]">
-                {goal.percentComplete}%
-              </p>
+              <div className="flex justify-center">
+                <IosRing
+                  value={goal.percentComplete}
+                  size={88}
+                  stroke={7}
+                  label={`${goal.percentComplete}%`}
+                />
+              </div>
               <p className="mt-2 text-center text-[13px] text-[var(--text-muted)]">
                 {formatCurrency(goal.current)} of {formatCurrency(goal.target)}
               </p>

@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 import { CategoryBudgetStatus } from "@/components/budgets/CategoryBudgetStatus";
 import { IosBottomSheet } from "@/components/native/ios/IosBottomSheet";
-import { IosCard, IosProgressBar, IosSection } from "@/components/native/ios/IosPrimitives";
+import { IosCard, IosLink, IosProgressBar, IosSection } from "@/components/native/ios/IosPrimitives";
 import { useCategoryBudgets } from "@/components/budgets/useCategoryBudgets";
 import { formatCurrency } from "@/lib/finance/format";
 import { triggerHaptic } from "@/lib/native/haptics";
@@ -26,7 +27,10 @@ export function IosBudgetsSection() {
   } = useCategoryBudgets();
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [draftLimit, setDraftLimit] = useState("");
+  const pathname = usePathname();
+  const glance = pathname === "/dashboard";
   const editing = views.find((view) => view.category === editingCategory) ?? null;
+  const visibleViews = glance ? views.slice(0, 3) : views;
   const totalLimit = views.reduce((sum, view) => sum + view.limit, 0);
   const totalSpent = views.reduce((sum, view) => sum + view.spent, 0);
   const totalRemaining = totalLimit - totalSpent;
@@ -48,7 +52,10 @@ export function IosBudgetsSection() {
   }
 
   return (
-    <IosSection title="Budgets">
+    <IosSection
+      title="Budgets"
+      action={glance ? <IosLink href="/reports">Edit limits</IosLink> : undefined}
+    >
       <CategoryBudgetStatus status={status} message={syncMessage} onRetry={retry} />
       {views.length > 0 ? (
         <IosCard padding="md">
@@ -64,7 +71,7 @@ export function IosBudgetsSection() {
           </p>
         </IosCard>
       ) : null}
-      {suggestions.length > 0 ? (
+      {!glance && suggestions.length > 0 ? (
         <IosCard padding="md">
           <p className="text-[15px] font-semibold text-[var(--foreground)]">
             Suggested limits
@@ -99,7 +106,7 @@ export function IosBudgetsSection() {
         </IosCard>
       ) : null}
 
-      {views.map((view) => (
+      {visibleViews.map((view) => (
         <IosCard key={view.category} padding="md">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -129,19 +136,27 @@ export function IosBudgetsSection() {
           {view.alert ? (
             <p className="mt-2 text-[13px] font-medium text-[var(--danger)]">{view.alert}</p>
           ) : null}
-          <button
-            type="button"
-            className="mt-2 min-h-11 text-[13px] font-semibold text-[var(--danger)]"
-            onClick={() => {
-              void triggerHaptic("light");
-              removeBudget(view.category);
-            }}
-          >
-            Remove
-          </button>
+          {glance ? null : (
+            <button
+              type="button"
+              className="mt-2 min-h-11 text-[13px] font-semibold text-[var(--danger)]"
+              onClick={() => {
+                void triggerHaptic("light");
+                removeBudget(view.category);
+              }}
+            >
+              Remove
+            </button>
+          )}
         </IosCard>
       ))}
+      {glance && views.length > visibleViews.length ? (
+        <p className="px-1 text-[13px] text-[var(--text-muted)]">
+          {views.length - visibleViews.length} more on Budgets
+        </p>
+      ) : null}
 
+      {glance ? null : (
       <IosCard padding="md">
         <form onSubmit={addBudget} className="flex flex-col gap-3">
           <p className="text-[15px] font-semibold text-[var(--foreground)]">Add a budget</p>
@@ -168,6 +183,7 @@ export function IosBudgetsSection() {
           </button>
         </form>
       </IosCard>
+      )}
       <IosBottomSheet
         open={editing !== null}
         title={editing ? editing.category : "Budget"}

@@ -29,26 +29,40 @@ assert.match(home, /<IosBudgetsSection \/>/);
 assert.match(home, /describeTimeRemaining/);
 assert.match(home, /href="\/income"/);
 assert.match(home, /href="\/reports"/);
+assert.match(home, /detail="summary"/);
+assert.match(home, /IosMerchantMark/);
 
 const transactions = read("components/native/ios/IosTransactionsScreen.tsx");
 assert.match(transactions, /isRefundActivity/);
 assert.match(transactions, /value: "refunds"/);
 assert.match(transactions, /type="search"/);
+assert.match(transactions, /aria-label="Categories"/);
+assert.match(transactions, /IosMerchantMark/);
 
 const budgets = read("components/native/ios/IosBudgetsSection.tsx");
 assert.match(budgets, /This month/);
 assert.match(budgets, /over budget/);
 assert.match(budgets, /Save limit/);
 assert.match(budgets, /native-sheet-footer|footer=/);
+assert.match(budgets, /pathname === "\/dashboard"/);
+assert.match(budgets, /Edit limits/);
 
 const goals = read("components/native/ios/IosGoalsScreen.tsx");
 assert.match(goals, /Time remaining/);
 assert.match(goals, /GoalForecastPanel/);
 assert.match(goals, /Add money/);
+assert.match(goals, /IosRing/);
 
 const plan = read("components/native/ios/IosIncomeScreen.tsx");
 assert.match(plan, /Cash-flow outlook/);
 assert.match(plan, /Confirm before allocations apply/);
+assert.match(plan, /30-day low/);
+assert.match(plan, /footer=/);
+
+const marks = read("components/native/ios/IosMerchantMark.tsx");
+assert.match(marks, /refund/);
+assert.match(marks, /income/);
+assert.match(marks, /spending|other/);
 
 const css = read("app/globals.css");
 assert.match(css, /html\[data-native-platform="ios"\] \.ios-home-hero/);

@@ -220,7 +220,7 @@ export function IosLink({
     <Link
       href={href}
       className={cn(
-        "text-[13px] font-semibold text-[var(--accent-light)] active:opacity-70",
+        "inline-flex min-h-11 items-center text-[15px] font-semibold text-[var(--accent-light)] active:opacity-70",
         className,
       )}
     >
@@ -453,7 +453,12 @@ export function IosRing({
         />
       </svg>
       {label ? (
-        <span className="absolute inset-0 flex items-center justify-center text-[11px] font-semibold tabular-nums text-[var(--foreground)]">
+        <span
+          className={cn(
+            "absolute inset-0 flex items-center justify-center font-semibold tabular-nums text-[var(--foreground)]",
+            size < 64 ? "text-[10px]" : "text-[15px]",
+          )}
+        >
           {label}
         </span>
       ) : null}
@@ -597,7 +602,7 @@ export function IosAvatar({
   tone = "accent",
 }: {
   src?: string | null;
-  fallback: string;
+  fallback: ReactNode;
   tone?: "accent" | "success" | "warning" | "danger" | "purple" | "muted";
 }) {
   if (src) {

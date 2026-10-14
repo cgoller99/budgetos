@@ -36,7 +36,8 @@ import {
   getDisplayCategory,
   getDisplayMerchant,
 } from "@/lib/transactions/categoryPresentation";
-import { isDisplayedInflow } from "@/lib/transactions/refunds";
+import { isDisplayedInflow, isRefundActivity } from "@/lib/transactions/refunds";
+import { IosMerchantMark } from "@/components/native/ios/IosMerchantMark";
 import { isConfidentInternalTransfer } from "@/lib/transactions/transferDetection";
 import { getPlaidConnectionUiState } from "@/lib/native/plaidConnectionUi";
 import { isPlaidClientEnabled } from "@/lib/plaid/clientConfig";
@@ -386,7 +387,7 @@ export function IosHomeScreen() {
 
       <IosInsightsSection insights={insights} />
       <IosBudgetsSection />
-      <CashOutlookCard />
+      <CashOutlookCard detail="summary" />
 
       <IosSection
         title="Recent"
@@ -402,6 +403,7 @@ export function IosHomeScreen() {
           <IosList>
             {recentTxns.map((transaction) => {
               const isTransfer = isConfidentInternalTransfer(finance, transaction);
+              const isRefund = !isTransfer && isRefundActivity(transaction);
               const isInflow = !isTransfer && isDisplayedInflow(transaction);
               const label = getDisplayMerchant({
                 notes: transaction.notes,
@@ -411,15 +413,30 @@ export function IosHomeScreen() {
               const category = isTransfer
                 ? "Transfer"
                 : getDisplayCategory(transaction.category);
+              const kind = isTransfer
+                ? "transfer"
+                : isRefund
+                  ? "refund"
+                  : isInflow
+                    ? "income"
+                    : "spending";
+              const kindLabel =
+                kind === "transfer"
+                  ? "Transfer"
+                  : kind === "refund"
+                    ? "Refund"
+                    : kind === "income"
+                      ? "Income"
+                      : "Spending";
               return (
                 <IosListRow
                   key={transaction.id}
                   title={label}
-                  subtitle={`${formatTransactionDate(transaction.date)} · ${category}`}
+                  subtitle={`${kindLabel} · ${formatTransactionDate(transaction.date)}`}
                   leading={
                     <IosAvatar
-                      fallback={label.slice(0, 1).toUpperCase()}
-                      tone={isInflow ? "success" : "muted"}
+                      fallback={<IosMerchantMark category={category} kind={kind} />}
+                      tone={isRefund || isInflow ? "success" : isTransfer ? "muted" : "accent"}
                     />
                   }
                   trailing={
