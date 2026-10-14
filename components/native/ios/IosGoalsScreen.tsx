@@ -10,6 +10,7 @@ import {
   IosListRow,
   IosPrimaryButton,
   IosProgressBar,
+  IosRing,
   IosScreen,
   IosSection,
   IosSegmentedControl,
@@ -23,6 +24,7 @@ import { EditGoalModal } from "@/components/goals/EditGoalModal";
 import { useFinance } from "@/context/FinanceContext";
 import { formatCurrency } from "@/lib/finance/format";
 import { formatGoalDate, getGoalProgressList } from "@/lib/finance/goals";
+import { describeTimeRemaining } from "@/lib/native/timeRemaining";
 import type { SavingsGoal } from "@/lib/finance/types";
 import { triggerHaptic } from "@/lib/native/haptics";
 
@@ -63,6 +65,8 @@ export function IosGoalsScreen() {
   if (finance.isLoading) {
     return <IosSkeletonScreen rows={4} />;
   }
+
+  const selectedGoal = goals.find((goal) => goal.id === selectedGoalId) ?? null;
 
   function findGoal(id: string) {
     return finance.savingsGoals.find((goal) => goal.id === id) ?? null;
@@ -173,9 +177,12 @@ export function IosGoalsScreen() {
                       <p className="truncate text-[15px] font-semibold text-[var(--foreground)]">
                         {goal.name}
                       </p>
-                      <p className="text-[13px] font-semibold tabular-nums text-[var(--text-secondary)]">
-                        {goal.percentComplete}%
-                      </p>
+                      <IosRing
+                        value={goal.percentComplete}
+                        size={44}
+                        stroke={4}
+                        label={`${goal.percentComplete}%`}
+                      />
                     </div>
                     <p className="mt-0.5 text-[12px] text-[var(--text-muted)]">
                       {formatCurrency(goal.current)} of {formatCurrency(goal.target)}
@@ -183,10 +190,11 @@ export function IosGoalsScreen() {
                   </div>
                 </div>
                 <IosProgressBar value={goal.percentComplete} className="mt-3" />
-                <p className="mt-2 text-[12px] text-[var(--text-muted)]">
+                <p className="mt-2 text-[13px] text-[var(--text-muted)]">
+                  {describeTimeRemaining(goal.estimatedCompletionDate)}
                   {goal.estimatedCompletionDate
-                    ? formatGoalDate(goal.estimatedCompletionDate)
-                    : "TBD"}
+                    ? ` · ${formatGoalDate(goal.estimatedCompletionDate)}`
+                    : ""}
                 </p>
               </button>
             ))}
@@ -208,23 +216,62 @@ export function IosGoalsScreen() {
 
       <IosBottomSheet
         open={selectedGoalId !== null}
-        title={goals.find((goal) => goal.id === selectedGoalId)?.name}
+        title={selectedGoal?.name}
         onClose={() => setSelectedGoalId(null)}
+        footer={
+          selectedGoal ? (
+            <div className="flex gap-2">
+              {!selectedGoal.isComplete ? (
+                <button
+                  type="button"
+                  className="min-h-12 flex-1 rounded-[14px] bg-[var(--accent)] text-[16px] font-semibold text-white"
+                  onClick={() => {
+                    void triggerHaptic("light");
+                    setMoneyGoal(findGoal(selectedGoal.id));
+                    setSelectedGoalId(null);
+                  }}
+                >
+                  Add money
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="min-h-12 flex-1 rounded-[14px] bg-white/[0.06] text-[16px] font-semibold text-[var(--foreground)]"
+                onClick={() => {
+                  void triggerHaptic("light");
+                  setEditGoal(findGoal(selectedGoal.id));
+                  setSelectedGoalId(null);
+                }}
+              >
+                Edit
+              </button>
+            </div>
+          ) : null
+        }
       >
         {(() => {
           const goal = goals.find((item) => item.id === selectedGoalId);
           if (!goal) return null;
           return (
             <div>
-              <p className="text-center text-[34px] font-semibold leading-none tabular-nums text-[var(--foreground)]">
-                {goal.percentComplete}%
-              </p>
+              <div className="flex justify-center">
+                <IosRing
+                  value={goal.percentComplete}
+                  size={88}
+                  stroke={7}
+                  label={`${goal.percentComplete}%`}
+                />
+              </div>
               <p className="mt-2 text-center text-[13px] text-[var(--text-muted)]">
                 {formatCurrency(goal.current)} of {formatCurrency(goal.target)}
               </p>
               <IosProgressBar value={goal.percentComplete} tone="warning" className="mt-4" />
               <div className="mt-5 rounded-[16px] bg-white/[0.04] px-3.5">
                 <IosDetailLine label="Remaining" value={formatCurrency(goal.remaining)} />
+                <IosDetailLine
+                  label="Time remaining"
+                  value={describeTimeRemaining(goal.estimatedCompletionDate)}
+                />
                 <IosDetailLine
                   label="Projected"
                   value={formatGoalDate(goal.estimatedCompletionDate)}
@@ -247,32 +294,6 @@ export function IosGoalsScreen() {
                   />
                 );
               })()}
-              <div className="mt-4 flex gap-2">
-                {!goal.isComplete ? (
-                  <button
-                    type="button"
-                    className="min-h-12 flex-1 rounded-[14px] bg-[var(--accent)] text-[16px] font-semibold text-white"
-                    onClick={() => {
-                      void triggerHaptic("light");
-                      setMoneyGoal(findGoal(goal.id));
-                      setSelectedGoalId(null);
-                    }}
-                  >
-                    Add money
-                  </button>
-                ) : null}
-                <button
-                  type="button"
-                  className="min-h-12 flex-1 rounded-[14px] bg-white/[0.06] text-[16px] font-semibold text-[var(--foreground)]"
-                  onClick={() => {
-                    void triggerHaptic("light");
-                    setEditGoal(findGoal(goal.id));
-                    setSelectedGoalId(null);
-                  }}
-                >
-                  Edit
-                </button>
-              </div>
             </div>
           );
         })()}

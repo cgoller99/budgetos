@@ -34,6 +34,7 @@ jobs:
           npm run test:paycheck-goal-allocations
           npm run test:alias-hook
           npm run test:subscription-lifecycle
+          npm run test:ios-ui-21
           npm run test:onboarding-progress
           npm run test:plaid-credit-mapping
           npm run test:recurring-bill-detection

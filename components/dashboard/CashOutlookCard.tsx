@@ -23,7 +23,7 @@ const KIND_LABEL: Record<CashOutlookKind, string> = {
   debt: "Debt minimum",
 };
 
-export function CashOutlookCard() {
+export function CashOutlookCard({ detail = "full" }: { detail?: "full" | "summary" }) {
   const finance = useFinance();
   const nativeIos = useNativeIos();
   const outlook = useMemo(() => forecastCashOutlook(finance), [finance]);
@@ -35,7 +35,10 @@ export function CashOutlookCard() {
   const summary = describeCashOutlook(outlook);
   const visible = outlook.events.slice(0, VISIBLE_EVENTS);
   const hiddenCount = outlook.events.length - visible.length;
-  const intro = `Confirmed cash ${formatCurrency(outlook.availableCash)}. Later rows are estimates through ${formatPayDate(outlook.endDate)}.`;
+  const intro =
+    detail === "summary"
+      ? `Confirmed cash ${formatCurrency(outlook.availableCash)}. Estimates run through ${formatPayDate(outlook.endDate)}.`
+      : `Confirmed cash ${formatCurrency(outlook.availableCash)}. Later rows are estimates through ${formatPayDate(outlook.endDate)}.`;
 
   if (nativeIos) {
     return (
@@ -52,7 +55,7 @@ export function CashOutlookCard() {
             </p>
           )}
         </IosCard>
-        {visible.length > 0 ? (
+        {detail === "full" && visible.length > 0 ? (
           <IosList>
             {visible.map((event) => (
               <IosListRow
@@ -65,7 +68,7 @@ export function CashOutlookCard() {
             ))}
           </IosList>
         ) : null}
-        {hiddenCount > 0 ? (
+        {detail === "full" && hiddenCount > 0 ? (
           <p className="px-1 text-[12px] text-[var(--text-muted)]">
             {hiddenCount} more estimated {hiddenCount === 1 ? "item" : "items"} in this window.
           </p>

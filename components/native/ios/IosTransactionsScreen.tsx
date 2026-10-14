@@ -13,6 +13,7 @@ import {
   IosSkeletonScreen,
   IosTextButton,
 } from "@/components/native/ios/IosPrimitives";
+import { IosMerchantMark } from "@/components/native/ios/IosMerchantMark";
 import { IosTransactionDetailSheet } from "@/components/native/ios/IosTransactionDetailSheet";
 import { AddTransactionModal } from "@/components/transactions/AddTransactionModal";
 import { DeleteTransactionModal } from "@/components/transactions/DeleteTransactionModal";
@@ -36,14 +37,14 @@ import {
   getDisplayCategory,
   getDisplayMerchant,
 } from "@/lib/transactions/categoryPresentation";
-import { isDisplayedInflow } from "@/lib/transactions/refunds";
+import { isDisplayedInflow, isRefundActivity } from "@/lib/transactions/refunds";
 import { isConfidentInternalTransfer } from "@/lib/transactions/transferDetection";
 import { hasLinkedFinancialAccounts } from "@/lib/transactions/accountLookup";
 import { isPlaidClientEnabled } from "@/lib/plaid/clientConfig";
 import { triggerHaptic } from "@/lib/native/haptics";
 import { cn } from "@/components/ui/cn";
 
-type TxTab = "all" | "income" | "expense";
+type TxTab = "all" | "income" | "expense" | "refunds";
 
 function IosTransactionsScreenInner() {
   const { syncBank, isSyncing, ...finance } = useFinance();
@@ -60,6 +61,7 @@ function IosTransactionsScreenInner() {
   const [highlightedTransactionId, setHighlightedTransactionId] = useState<string | null>(
     null,
   );
+  const [refundsOnly, setRefundsOnly] = useState(false);
   const searchTimer = useRef<number | null>(null);
   const hasScrolledRef = useRef(false);
 
@@ -67,9 +69,13 @@ function IosTransactionsScreenInner() {
     setFilters(parseTransactionFilters(searchParams));
     hasScrolledRef.current = false;
   }, [searchParams]);
-
-  const tab: TxTab =
-    filters.type === "income" ? "income" : filters.type === "expense" ? "expense" : "all";
+  const tab: TxTab = refundsOnly
+    ? "refunds"
+    : filters.type === "income"
+      ? "income"
+      : filters.type === "expense"
+        ? "expense"
+        : "all";
 
   const syncFiltersToUrl = useCallback(
     (nextFilters: TransactionFilterState) => {
@@ -82,6 +88,14 @@ function IosTransactionsScreenInner() {
 
   const setTab = (next: TxTab) => {
     void triggerHaptic("selection");
+    if (next === "refunds") {
+      setRefundsOnly(true);
+      const nextFilters = { ...filters, type: "all" as const };
+      setFilters(nextFilters);
+      syncFiltersToUrl(nextFilters);
+      return;
+    }
+    setRefundsOnly(false);
     const nextFilters = {
       ...filters,
       type: next === "all" ? ("all" as const) : next,
@@ -90,19 +104,35 @@ function IosTransactionsScreenInner() {
     syncFiltersToUrl(nextFilters);
   };
 
+  const setCategory = (category: string) => {
+    void triggerHaptic("selection");
+    const nextFilters = { ...filters, category };
+    setFilters(nextFilters);
+    syncFiltersToUrl(nextFilters);
+  };
+
   const clearFilters = useCallback(() => {
+    setRefundsOnly(false);
     setFilters(DEFAULT_TRANSACTION_FILTERS);
     router.replace("/transactions");
   }, [router, setFilters]);
 
   const plaidEnabled = isPlaidClientEnabled();
   const canSyncPlaid = plaidEnabled && hasLinkedFinancialAccounts(finance);
-  const transactions = useMemo(
-    () => filterAndSortTransactions(finance, filters),
-    [finance, filters],
-  );
+  const transactions = useMemo(() => {
+    const filtered = filterAndSortTransactions(finance, filters);
+    return refundsOnly ? filtered.filter((transaction) => isRefundActivity(transaction)) : filtered;
+  }, [finance, filters, refundsOnly]);
   const dayGroups = useMemo(() => groupByDay(transactions), [transactions]);
   const summary = useMemo(() => getTransactionSummary(finance), [finance]);
+  const categories = useMemo(() => {
+    const names = new Set<string>();
+    for (const transaction of finance.transactions) {
+      const name = getDisplayCategory(transaction.category);
+      if (name.trim()) names.add(name);
+    }
+    return [...names].sort((left, right) => left.localeCompare(right));
+  }, [finance.transactions]);
   const filterDescription = describeTransactionFilters(filters);
   const hasActiveFilters =
     filters.search.trim().length > 0 ||
@@ -219,7 +249,8 @@ function IosTransactionsScreenInner() {
         options={[
           { value: "all", label: "All" },
           { value: "income", label: "Income" },
-          { value: "expense", label: "Expenses" },
+          { value: "expense", label: "Spending" },
+          { value: "refunds", label: "Refunds" },
         ]}
       />
 
@@ -233,6 +264,45 @@ function IosTransactionsScreenInner() {
             </IosTextButton>
           }
         />
+      ) : null}
+
+      {categories.length > 1 ? (
+        <div
+          className="flex gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          role="group"
+          aria-label="Categories"
+        >
+          <button
+            type="button"
+            onClick={() => setCategory("all")}
+            className={cn(
+              "min-h-11 shrink-0 rounded-full px-3.5 text-[15px] font-semibold",
+              filters.category === "all"
+                ? "bg-white/[0.14] text-[var(--foreground)]"
+                : "bg-white/[0.06] text-[var(--text-secondary)]",
+            )}
+          >
+            All categories
+          </button>
+          {categories.map((category) => {
+            const active = filters.category.toLowerCase() === category.toLowerCase();
+            return (
+              <button
+                key={category}
+                type="button"
+                onClick={() => setCategory(category)}
+                className={cn(
+                  "min-h-11 shrink-0 rounded-full px-3.5 text-[15px] font-semibold",
+                  active
+                    ? "bg-[var(--accent)] text-white"
+                    : "bg-white/[0.06] text-[var(--text-secondary)]",
+                )}
+              >
+                {category}
+              </button>
+            );
+          })}
+        </div>
       ) : null}
 
       <label className="block">
@@ -255,9 +325,11 @@ function IosTransactionsScreenInner() {
             {hasActiveFilters ? "No matching transactions" : "No transactions yet"}
           </p>
           <p className="mt-1 text-[13px] text-[var(--text-muted)]">
-            {hasActiveFilters
-              ? "Try clearing filters or searching a different merchant."
-              : "Add a transaction or sync linked accounts."}
+            {refundsOnly
+              ? "Refunds show up when a charge is reversed or categorized as a refund."
+              : hasActiveFilters
+                ? "Try clearing filters or searching a different merchant."
+                : "Add a transaction or sync linked accounts."}
           </p>
         </IosCard>
       ) : (
@@ -270,6 +342,7 @@ function IosTransactionsScreenInner() {
               <IosList>
                 {group.items.map((transaction) => {
                   const isTransfer = isConfidentInternalTransfer(finance, transaction);
+                  const isRefund = !isTransfer && isRefundActivity(transaction);
                   const displayCategory = isTransfer
                     ? "Transfer"
                     : getDisplayCategory(transaction.category);
@@ -279,6 +352,13 @@ function IosTransactionsScreenInner() {
                     type: isTransfer ? "transfer" : transaction.type,
                   });
                   const isInflow = !isTransfer && isDisplayedInflow(transaction);
+                  const kind = isTransfer
+                    ? "Transfer"
+                    : isRefund
+                      ? "Refund"
+                      : transaction.type === "income"
+                        ? "Income"
+                        : "Spending";
                   const highlighted = highlightedTransactionId === transaction.id;
 
                   return (
@@ -299,21 +379,38 @@ function IosTransactionsScreenInner() {
                         )}
                       >
                         <IosAvatar
-                          fallback={label.slice(0, 1).toUpperCase()}
-                          tone={isInflow ? "success" : "muted"}
+                          fallback={
+                            <IosMerchantMark
+                              category={displayCategory}
+                              kind={
+                                isTransfer
+                                  ? "transfer"
+                                  : isRefund
+                                    ? "refund"
+                                    : isInflow
+                                      ? "income"
+                                      : "spending"
+                              }
+                            />
+                          }
+                          tone={isRefund || isInflow ? "success" : isTransfer ? "muted" : "accent"}
                         />
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-[15px] font-medium text-[var(--foreground)]">
                             {label}
                           </p>
-                          <p className="mt-0.5 truncate text-[12px] text-[var(--text-muted)]">
-                            {displayCategory}
+                          <p className="mt-0.5 truncate text-[13px] text-[var(--text-muted)]">
+                            {kind} · {displayCategory}
                           </p>
                         </div>
                         <span
                           className={cn(
                             "shrink-0 text-[15px] font-medium tabular-nums",
-                            isInflow ? "text-[var(--success)]" : "text-[var(--danger)]",
+                            isRefund || isInflow
+                              ? "text-[var(--success)]"
+                              : isTransfer
+                                ? "text-[var(--text-secondary)]"
+                                : "text-[var(--foreground)]",
                           )}
                         >
                           {isInflow ? "+" : "−"}

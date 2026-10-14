@@ -24,6 +24,8 @@ import { readSavedCategoryBudgets } from "@/lib/automation/savedBudgets";
 import { forecastCashUntilPayday } from "@/lib/finance/cashFlowForecast";
 import { describeCashOutlook, forecastCashOutlook } from "@/lib/finance/cashOutlook";
 import { getBillsDueThisWeek } from "@/lib/finance/bills";
+import { enrichGoal } from "@/lib/finance/goals";
+import { describeTimeRemaining } from "@/lib/native/timeRemaining";
 import {
   formatCurrency,
   formatMonthlyChange,
@@ -34,7 +36,8 @@ import {
   getDisplayCategory,
   getDisplayMerchant,
 } from "@/lib/transactions/categoryPresentation";
-import { isDisplayedInflow } from "@/lib/transactions/refunds";
+import { isDisplayedInflow, isRefundActivity } from "@/lib/transactions/refunds";
+import { IosMerchantMark } from "@/components/native/ios/IosMerchantMark";
 import { isConfidentInternalTransfer } from "@/lib/transactions/transferDetection";
 import { getPlaidConnectionUiState } from "@/lib/native/plaidConnectionUi";
 import { isPlaidClientEnabled } from "@/lib/plaid/clientConfig";
@@ -89,9 +92,15 @@ export function IosHomeScreen() {
     [finance],
   );
   const insights = useMemo(
-    () => buildFinancialInsights(finance, new Date(), budgets).slice(0, 3),
+    () => buildFinancialInsights(finance, new Date(), budgets).slice(0, 2),
     [budgets, finance],
   );
+  const featuredGoal = useMemo(() => {
+    const summary = finance.dashboard.nextGoal;
+    if (!summary) return null;
+    const match = finance.savingsGoals.find((goal) => goal.id === summary.id);
+    return match ? enrichGoal(finance, match) : null;
+  }, [finance]);
 
   const recentTxns = useMemo(
     () =>
@@ -112,7 +121,6 @@ export function IosHomeScreen() {
   const safeToSpend = moneyFlow.safeToSpend;
   const paydayForecast = forecastCashUntilPayday(finance);
   const cashOutlook = describeCashOutlook(forecastCashOutlook(finance));
-  const health = dashboard.financialHealthScore;
   const nextPaycheck = dashboard.nextPaycheck;
   const nextGoal = dashboard.nextGoal;
   const spendHint = nextPaycheck
@@ -131,22 +139,6 @@ export function IosHomeScreen() {
     connection.phase === "empty" &&
     accounts.length === 0 &&
     debts.length === 0;
-
-  const flowSegments = [
-    { label: "Income", value: Math.max(moneyFlow.income, 0), color: "bg-[var(--success)]" },
-    { label: "Bills", value: Math.max(moneyFlow.bills, 0), color: "bg-[var(--accent)]" },
-    {
-      label: "Expenses",
-      value: Math.max(moneyFlow.debts + moneyFlow.goals + moneyFlow.investments, 0),
-      color: "bg-[var(--warning)]",
-    },
-    {
-      label: "Left",
-      value: Math.max(safeToSpend, 0),
-      color: "bg-white/25",
-    },
-  ];
-  const flowTotal = Math.max(moneyFlow.income, 1);
 
   const cashDelta = metricDelta(cash?.value ?? 0, cash?.monthlyChange ?? 0);
   const debtDelta = metricDelta(debt?.value ?? 0, debt?.monthlyChange ?? 0, true);
@@ -172,6 +164,10 @@ export function IosHomeScreen() {
             ? `of ${formatCurrency(moneyFlow.income)} this month`
             : spendHint}
         </p>
+        <p className="mt-3 text-[15px] font-medium text-white">
+          Available cash{" "}
+          <span className="tabular-nums">{formatCurrency(checking)}</span>
+        </p>
         {paydayForecast.nextPayDate ? (
           <p className="mt-1 text-[12px] leading-snug text-white/75">
             {formatCurrency(paydayForecast.safeUntilPayday)} until payday after bills due
@@ -180,8 +176,34 @@ export function IosHomeScreen() {
         {cashOutlook ? (
           <p className="mt-1 text-[12px] leading-snug text-white/75">{cashOutlook}</p>
         ) : null}
-        <p className="mt-3 text-[12px] font-medium text-white/70">Health {health.score}</p>
       </section>
+
+      <div className="flex gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <Link
+          href="/income"
+          className="inline-flex min-h-11 shrink-0 items-center rounded-full bg-[var(--accent)] px-3.5 text-[15px] font-semibold text-white"
+        >
+          {nextPaycheck ? "Paycheck" : "Add paycheck"}
+        </Link>
+        <Link
+          href="/bills"
+          className="inline-flex min-h-11 shrink-0 items-center rounded-full bg-white/[0.06] px-3.5 text-[15px] font-semibold text-[var(--foreground)]"
+        >
+          {upcomingBills.some((bill) => bill.status === "overdue") ? "Review bills" : "Bills"}
+        </Link>
+        <Link
+          href="/reports"
+          className="inline-flex min-h-11 shrink-0 items-center rounded-full bg-white/[0.06] px-3.5 text-[15px] font-semibold text-[var(--foreground)]"
+        >
+          Budgets
+        </Link>
+        <Link
+          href="/savings"
+          className="inline-flex min-h-11 shrink-0 items-center rounded-full bg-white/[0.06] px-3.5 text-[15px] font-semibold text-[var(--foreground)]"
+        >
+          Goals
+        </Link>
+      </div>
 
       <div className="grid grid-cols-3 gap-2">
         <Link
@@ -275,10 +297,6 @@ export function IosHomeScreen() {
         />
       ) : null}
 
-      <CashOutlookCard />
-      <IosInsightsSection insights={insights} />
-      <IosBudgetsSection />
-
       <IosSection title="Upcoming" action={<IosLink href="/bills">See All</IosLink>}>
         <IosList>
           {nextPaycheck ? (
@@ -355,20 +373,9 @@ export function IosHomeScreen() {
                     </p>
                   </div>
                   <p className="mt-0.5 text-[12px] text-[var(--text-muted)]">
-                    {nextGoal.percentComplete >= 100
-                      ? "Complete"
-                      : `${formatCurrency(
-                          Math.max(
-                            nextGoal.remaining / (1 - nextGoal.percentComplete / 100) -
-                              nextGoal.remaining,
-                            0,
-                          ),
-                        )} of ${formatCurrency(
-                          nextGoal.remaining / (1 - nextGoal.percentComplete / 100),
-                        )}`}
-                    {nextGoal.estimatedCompletionDate
-                      ? ` · ${nextGoal.estimatedCompletionDate}`
-                      : ""}
+                    {featuredGoal
+                      ? `${describeTimeRemaining(featuredGoal.estimatedCompletionDate)} · ${formatCurrency(featuredGoal.current)} of ${formatCurrency(featuredGoal.target)}`
+                      : nextGoal.estimatedCompletionDate || "Progress"}
                   </p>
                 </div>
               </div>
@@ -377,6 +384,10 @@ export function IosHomeScreen() {
           </Link>
         </IosSection>
       ) : null}
+
+      <IosInsightsSection insights={insights} />
+      <IosBudgetsSection />
+      <CashOutlookCard detail="summary" />
 
       <IosSection
         title="Recent"
@@ -392,6 +403,7 @@ export function IosHomeScreen() {
           <IosList>
             {recentTxns.map((transaction) => {
               const isTransfer = isConfidentInternalTransfer(finance, transaction);
+              const isRefund = !isTransfer && isRefundActivity(transaction);
               const isInflow = !isTransfer && isDisplayedInflow(transaction);
               const label = getDisplayMerchant({
                 notes: transaction.notes,
@@ -401,15 +413,30 @@ export function IosHomeScreen() {
               const category = isTransfer
                 ? "Transfer"
                 : getDisplayCategory(transaction.category);
+              const kind = isTransfer
+                ? "transfer"
+                : isRefund
+                  ? "refund"
+                  : isInflow
+                    ? "income"
+                    : "spending";
+              const kindLabel =
+                kind === "transfer"
+                  ? "Transfer"
+                  : kind === "refund"
+                    ? "Refund"
+                    : kind === "income"
+                      ? "Income"
+                      : "Spending";
               return (
                 <IosListRow
                   key={transaction.id}
                   title={label}
-                  subtitle={`${formatTransactionDate(transaction.date)} · ${category}`}
+                  subtitle={`${kindLabel} · ${formatTransactionDate(transaction.date)}`}
                   leading={
                     <IosAvatar
-                      fallback={label.slice(0, 1).toUpperCase()}
-                      tone={isInflow ? "success" : "muted"}
+                      fallback={<IosMerchantMark category={category} kind={kind} />}
+                      tone={isRefund || isInflow ? "success" : isTransfer ? "muted" : "accent"}
                     />
                   }
                   trailing={
@@ -428,34 +455,6 @@ export function IosHomeScreen() {
             })}
           </IosList>
         )}
-      </IosSection>
-
-      <IosSection title="Cash Flow">
-        <IosCard padding="md">
-          <div className="flex h-3 overflow-hidden rounded-full bg-white/[0.06]">
-            {flowSegments.map((segment) => (
-              <div
-                key={segment.label}
-                className={cn(segment.color)}
-                style={{ width: `${(segment.value / flowTotal) * 100}%` }}
-                title={segment.label}
-              />
-            ))}
-          </div>
-          <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5">
-            {flowSegments.map((segment) => (
-              <div key={segment.label} className="flex items-center justify-between gap-2">
-                <span className="flex items-center gap-1.5 text-[12px] text-[var(--text-muted)]">
-                  <span className={cn("size-2 rounded-full", segment.color)} />
-                  {segment.label}
-                </span>
-                <span className="text-[12px] font-medium tabular-nums text-[var(--text-secondary)]">
-                  {formatCurrency(segment.value)}
-                </span>
-              </div>
-            ))}
-          </div>
-        </IosCard>
       </IosSection>
     </IosScreen>
   );
