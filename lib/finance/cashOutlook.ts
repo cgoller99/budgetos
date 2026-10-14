@@ -1,6 +1,6 @@
 import { resolveAllocationAmounts } from "@/lib/incomePlan/allocations";
 import { EXTRA_DEBT_ALLOCATION_NAME } from "@/lib/finance/debtPayoff";
-import { advancePayDate, formatPayDate } from "@/lib/incomePlan/payDates";
+import { advancePayDate, formatPayDate, resolveUpcomingPayDate } from "@/lib/incomePlan/payDates";
 import { calculateAvailableCash } from "@/lib/calculations/availableCash";
 import { getBillProgressList, getCurrentYearMonth } from "@/lib/finance/bills";
 import {
@@ -17,6 +17,7 @@ import type { FinanceData, Transaction } from "@/lib/finance/types";
 import { detectRecurringBillCandidatesFromFinanceData } from "@/lib/plaid/recurringBillDetection";
 import {
   advanceOccurrence,
+  computeInitialNextOccurrence,
   parseDateString,
   startOfDay,
   toDateString,
@@ -200,10 +201,18 @@ export function forecastCashOutlook(
     if (!isIncomeSourceActive(source) || source.amount <= 0 || !source.schedule) {
       continue;
     }
-    const usePlanDates = Boolean(isIncomePlanSourceId(source.id) && plan);
-    const first = parseDateString(
+    const usePlanDates = Boolean(isIncomePlanSourceId(source.id) && plan?.isActive);
+    const storedFirst = parseDateString(
       (usePlanDates && plan ? plan.nextPayDate : source.schedule.nextOccurrence).slice(0, 10),
     );
+    const first =
+      usePlanDates && plan
+        ? parseDateString(resolveUpcomingPayDate(plan, referenceDate))
+        : computeInitialNextOccurrence(
+            storedFirst,
+            source.schedule.frequency ?? source.frequency,
+            referenceDate,
+          );
     const dates = upcomingDates(
       first,
       (current) => {
@@ -367,7 +376,7 @@ export function forecastCashOutlook(
 
   if (plan?.isActive) {
     const payDates = upcomingDates(
-      parseDateString(plan.nextPayDate.slice(0, 10)),
+      parseDateString(resolveUpcomingPayDate(plan, referenceDate)),
       (current) =>
         parseDateString(advancePayDate({ ...plan, nextPayDate: toDateString(current) })),
       today,
