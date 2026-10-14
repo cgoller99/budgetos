@@ -11,9 +11,60 @@ import {
   ANALYTICS_EVENTS,
   captureServerEvent,
 } from "@/lib/analytics/server";
+import { subscriptionLifecycleCaptures } from "@/lib/analytics/subscriptionLifecycle";
+import { resolvePlanFromStripePrice } from "@/lib/stripe/priceResolver";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
+
+async function profileIdForStripeCustomer(
+  customerId: string | null | undefined,
+): Promise<string | undefined> {
+  if (!customerId) {
+    return undefined;
+  }
+
+  const supabase = createSupabaseAdminClient();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("stripe_customer_id", customerId)
+    .maybeSingle();
+
+  return profile?.id;
+}
+
+async function captureSubscriptionLifecycle(
+  subscription: Stripe.Subscription,
+  input: {
+    eventType: string;
+    previousStatus?: string | null;
+    previousCancelAtPeriodEnd?: boolean | null;
+  },
+): Promise<void> {
+  const price = subscription.items.data[0]?.price ?? null;
+  const plan = resolvePlanFromStripePrice(price);
+  const customerId =
+    typeof subscription.customer === "string"
+      ? subscription.customer
+      : subscription.customer?.id;
+  const userId = await profileIdForStripeCustomer(customerId);
+  const captures = subscriptionLifecycleCaptures({
+    provider: "stripe",
+    eventType: input.eventType,
+    status: subscription.status,
+    previousStatus: input.previousStatus,
+    cancelAtPeriodEnd: subscription.cancel_at_period_end ?? false,
+    previousCancelAtPeriodEnd: input.previousCancelAtPeriodEnd,
+    plan,
+  });
+
+  for (const capture of captures) {
+    await captureServerEvent(capture.event, capture.properties, {
+      distinctId: userId,
+    });
+  }
+}
 
 export async function GET() {
   const config = getStripeConfig();
@@ -77,11 +128,23 @@ export async function POST(request: Request) {
       case "customer.subscription.deleted": {
         const stripe = getStripeWebhookClient();
         const subscriptionPayload = event.data.object as Stripe.Subscription;
+        const previous = event.data.previous_attributes as
+          | Partial<Stripe.Subscription>
+          | undefined;
         const subscription = await stripe.subscriptions.retrieve(
           subscriptionPayload.id,
           { expand: ["items.data.price.product"] },
         );
         await syncSubscriptionToProfile(subscription);
+        await captureSubscriptionLifecycle(subscription, {
+          eventType: event.type,
+          previousStatus:
+            typeof previous?.status === "string" ? previous.status : null,
+          previousCancelAtPeriodEnd:
+            typeof previous?.cancel_at_period_end === "boolean"
+              ? previous.cancel_at_period_end
+              : null,
+        });
         await tryLogAdminEvent({
           eventType: "stripe",
           message: `${event.type} (${subscription.id})`,

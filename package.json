@@ -23,6 +23,8 @@
     "test:income-annualization": "node scripts/test-income-annualization.mjs",
     "test:income-pay-dates": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-income-pay-dates.mjs",
     "test:paycheck-goal-allocations": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-paycheck-goal-allocations.mjs",
+    "test:subscription-lifecycle": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-subscription-lifecycle.mjs",
+    "test:alias-hook": "node scripts/test-alias-hook.mjs",
     "test:plaid-credit-mapping": "node scripts/test-plaid-credit-mapping.mjs",
     "test:onboarding-progress": "node scripts/test-onboarding-progress.mjs",
     "test:recurring-bill-detection": "node scripts/test-recurring-bill-detection.mjs",

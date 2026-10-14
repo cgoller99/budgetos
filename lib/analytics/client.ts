@@ -103,6 +103,102 @@ export function trackEvent(
   });
 }
 
+const FIRST_OPEN_KEY = "buxme.first_open";
+
+export function trackFirstOpen(platform: "ios" | "android" | "web"): void {
+  if (typeof window === "undefined" || !isAnalyticsEnabled()) {
+    return;
+  }
+
+  try {
+    if (window.localStorage.getItem(FIRST_OPEN_KEY)) {
+      return;
+    }
+  } catch {
+    // Session dedupe still limits this browser tab.
+  }
+
+  trackEvent(
+    ANALYTICS_EVENTS.APP_OPENED,
+    { platform },
+    { once: true, dedupeKey: "app_opened" },
+  );
+
+  try {
+    window.localStorage.setItem(FIRST_OPEN_KEY, "1");
+  } catch {
+    // Ignore storage failures. The in-memory dedupe still applies.
+  }
+}
+
+export function trackAccountCreated(
+  userId: string,
+  needsVerification: boolean,
+): void {
+  if (!isAnalyticsEnabled()) {
+    return;
+  }
+
+  const storageKey = `buxme.account_created.${userId}`;
+  if (typeof window !== "undefined") {
+    try {
+      if (window.localStorage.getItem(storageKey)) {
+        return;
+      }
+    } catch {
+      // Continue with session dedupe.
+    }
+  }
+
+  trackEvent(
+    ANALYTICS_EVENTS.ACCOUNT_CREATED,
+    { method: "email", needs_verification: needsVerification },
+    { dedupeKey: `account-${userId}` },
+  );
+
+  if (typeof window !== "undefined") {
+    try {
+      window.localStorage.setItem(storageKey, "1");
+    } catch {
+      // Ignore storage failures.
+    }
+  }
+}
+
+export function trackFirstBudget(
+  source: "paycheck" | "category",
+  userId?: string | null,
+): void {
+  if (!isAnalyticsEnabled()) {
+    return;
+  }
+
+  const storageKey = userId ? `buxme.first_budget.${userId}` : null;
+  if (typeof window !== "undefined" && storageKey) {
+    try {
+      if (window.localStorage.getItem(storageKey)) {
+        return;
+      }
+    } catch {
+      // Continue with session dedupe.
+    }
+  }
+
+  trackEvent(
+    ANALYTICS_EVENTS.CREATED_BUDGET,
+    { source },
+    { once: true, dedupeKey: storageKey ?? "created-budget" },
+  );
+
+  if (typeof window !== "undefined" && storageKey) {
+    try {
+      window.localStorage.setItem(storageKey, "1");
+    } catch {
+      // Ignore storage failures.
+    }
+  }
+}
+
 export function trackPageView(path: string): void {
   if (!isAnalyticsEnabled()) {
     return;

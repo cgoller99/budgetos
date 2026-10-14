@@ -13,7 +13,11 @@ import {
 import { useToast } from "@/context/ToastContext";
 import { useAuth } from "@/context/AuthContext";
 import { useHousehold } from "@/context/HouseholdContext";
-import { ANALYTICS_EVENTS, trackEvent } from "@/lib/analytics/client";
+import {
+  ANALYTICS_EVENTS,
+  trackEvent,
+  trackFirstBudget,
+} from "@/lib/analytics/client";
 import { getDemoFinanceData } from "@/lib/demo/data";
 import { computeFinanceHub } from "@/lib/finance/computeFinanceHub";
 import type { FinancialSnapshot } from "@/lib/finance/financialEngine";
@@ -1724,12 +1728,9 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
         });
       }
 
-      if (input.allocations.length > 0) {
-        trackEvent(
-          ANALYTICS_EVENTS.CREATED_BUDGET,
-          { allocation_count: input.allocations.length },
-          { once: true, dedupeKey: "created-budget" },
-        );
+      const hadAllocations = (data.incomePlan?.allocations.length ?? 0) > 0;
+      if (!hadAllocations && input.allocations.length > 0) {
+        trackFirstBudget("paycheck", userIdRef.current);
       }
     },
     [data, runMutation],

@@ -23,6 +23,7 @@ import {
   ANALYTICS_EVENTS,
   identifyAnalyticsUser,
   resetAnalyticsUser,
+  trackAccountCreated,
   trackEvent,
 } from "@/lib/analytics/client";
 import { ensureBetaRegistration } from "@/lib/beta/register.client";
@@ -192,19 +193,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
         );
       }
 
+      identifyAnalyticsUser({
+        id: data.user.id,
+        email: data.user.email,
+        name: fullName?.trim() || null,
+      });
+      trackAccountCreated(data.user.id, !data.session);
+
       if (data.session) {
         setSession(data.session);
         setUser(data.session.user);
-        identifyAnalyticsUser({
-          id: data.session.user.id,
-          email: data.session.user.email,
-          name: fullName?.trim() || null,
-        });
-        trackEvent(
-          ANALYTICS_EVENTS.ACCOUNT_CREATED,
-          { method: "email" },
-          { once: true, dedupeKey: `account-${data.session.user.id}` },
-        );
         void ensureProfile(
           supabase,
           data.session.user.id,

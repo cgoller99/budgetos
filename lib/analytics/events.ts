@@ -1,4 +1,5 @@
 export const ANALYTICS_EVENTS = {
+  APP_OPENED: "app_opened",
   ACCOUNT_CREATED: "account_created",
   LOGIN: "login",
   COMPLETED_ONBOARDING: "completed_onboarding",

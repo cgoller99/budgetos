@@ -10,15 +10,20 @@ import type { AiTeamProductAnalytics, AiTeamProductSignal } from "@/lib/ai-team/
 import type { BuxmeSupabaseClient } from "@/lib/supabase/client";
 
 const POSTHOG_EVENTS = [
+  ANALYTICS_EVENTS.APP_OPENED,
   ANALYTICS_EVENTS.ACCOUNT_CREATED,
   ANALYTICS_EVENTS.COMPLETED_ONBOARDING,
   ANALYTICS_EVENTS.CONNECTED_PLAID,
   ANALYTICS_EVENTS.PLAID_CONNECTION_FAILED,
+  ANALYTICS_EVENTS.CREATED_BUDGET,
+  ANALYTICS_EVENTS.CREATED_INCOME_PLAN,
+  ANALYTICS_EVENTS.CREATED_GOAL,
   ANALYTICS_EVENTS.OPENED_DASHBOARD,
   ANALYTICS_EVENTS.VIEWED_REPORTS,
   ANALYTICS_EVENTS.STRIPE_CHECKOUT_STARTED,
   ANALYTICS_EVENTS.SUBSCRIPTION_PURCHASED,
   ANALYTICS_EVENTS.SUBSCRIPTION_STARTED,
+  ANALYTICS_EVENTS.SUBSCRIPTION_CANCELLED,
   ANALYTICS_EVENTS.COMPLETED_FEEDBACK,
 ] as const;
 
@@ -187,10 +192,17 @@ export async function getAiTeamProductAnalytics(
       detail: `${plaid.connectedAccounts} connected accounts are currently reported.`,
       source: "Buxme bank connections",
     },
+    eventSignal(posthog, "app-opened", "App first opens", ANALYTICS_EVENTS.APP_OPENED),
+    eventSignal(posthog, "accounts", "Account registrations", ANALYTICS_EVENTS.ACCOUNT_CREATED),
+    eventSignal(posthog, "budgets", "First budgets", ANALYTICS_EVENTS.CREATED_BUDGET),
+    eventSignal(posthog, "income-plans", "Paycheck plans", ANALYTICS_EVENTS.CREATED_INCOME_PLAN),
+    eventSignal(posthog, "goals", "Savings goals", ANALYTICS_EVENTS.CREATED_GOAL),
     eventSignal(posthog, "dashboard", "Dashboard opens", ANALYTICS_EVENTS.OPENED_DASHBOARD),
     eventSignal(posthog, "reports", "Reports viewed", ANALYTICS_EVENTS.VIEWED_REPORTS),
     eventSignal(posthog, "checkout", "Checkout starts", ANALYTICS_EVENTS.STRIPE_CHECKOUT_STARTED),
     eventSignal(posthog, "purchases", "Subscription purchases", ANALYTICS_EVENTS.SUBSCRIPTION_PURCHASED),
+    eventSignal(posthog, "trials", "Trial starts", ANALYTICS_EVENTS.SUBSCRIPTION_STARTED),
+    eventSignal(posthog, "cancellations", "Cancellations", ANALYTICS_EVENTS.SUBSCRIPTION_CANCELLED),
     {
       id: "feedback",
       label: "Feedback signals",
