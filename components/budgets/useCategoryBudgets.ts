@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { trackFirstBudget } from "@/lib/analytics/client";
 import { useFinance } from "@/context/FinanceContext";
 import { createBrowserCategoryBudgetSession } from "@/lib/budgets/categoryBudgetClient";
 import {
@@ -53,8 +54,13 @@ export function useCategoryBudgets() {
   const saved = syncState.budgets;
 
   function persist(next: SavedCategoryBudget[]) {
+    const isFirstBudget =
+      syncState.status !== "loading" && saved.length === 0 && next.length > 0;
     const session = createBrowserCategoryBudgetSession(userId);
     setSyncState(session.commit(next));
+    if (isFirstBudget) {
+      trackFirstBudget("category", userId);
+    }
   }
 
   function retry() {

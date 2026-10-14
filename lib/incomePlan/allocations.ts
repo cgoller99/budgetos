@@ -5,9 +5,12 @@ import type {
   IncomePlanPaycheckEvent,
   ResolvedAllocation,
 } from "@/lib/incomePlan/types";
+import type { AllocationType } from "@/lib/allocation/types";
 import {
+  getAllocationType,
   resolveAllocations,
   validateAllocationPlan,
+  getAllocationSummaryFromPlan,
 } from "@/lib/allocation/allocationEngine";
 import { getCurrentYearMonth } from "@/lib/finance/bills";
 
@@ -34,42 +37,175 @@ export function formatAllocationAmountInput(amount: number | null | undefined): 
   return amount === 0 ? "" : String(amount);
 }
 
+export type AllocationDraftFields = Omit<IncomePlanAllocation, "id"> & {
+  id?: string;
+};
+
+export function allocationAmountInputValue(
+  allocation: Pick<
+    IncomePlanAllocation,
+    "amount" | "percentage" | "allocationType" | "isRemainingBalance"
+  >,
+): string {
+  if (getAllocationType(allocation) !== "fixed") {
+    return "";
+  }
+
+  return formatAllocationAmountInput(allocation.amount);
+}
+
+export function allocationPercentInputValue(
+  allocation: Pick<
+    IncomePlanAllocation,
+    "amount" | "percentage" | "allocationType" | "isRemainingBalance"
+  >,
+): string {
+  if (getAllocationType(allocation) !== "percentage") {
+    return "";
+  }
+
+  if (
+    allocation.percentage === null ||
+    allocation.percentage === undefined ||
+    allocation.percentage === 0
+  ) {
+    return "";
+  }
+
+  return String(allocation.percentage);
+}
+
+/**
+ * Applies the visible amount fields using allocation type, not a stale dollar
+ * value hidden behind a percentage or remaining row.
+ */
+export function applyAllocationInputs<T extends AllocationDraftFields>(
+  allocation: T,
+  amountText: string,
+  percentText: string,
+): T {
+  const type = getAllocationType(allocation);
+
+  if (type === "remaining") {
+    return {
+      ...allocation,
+      amount: null,
+      percentage: null,
+      allocationType: "remaining",
+      isRemainingBalance: true,
+    };
+  }
+
+  if (type === "percentage") {
+    return {
+      ...allocation,
+      amount: null,
+      percentage: parseAllocationAmountInput(percentText),
+      allocationType: "percentage",
+      isRemainingBalance: false,
+    };
+  }
+
+  return {
+    ...allocation,
+    amount: parseAllocationAmountInput(amountText),
+    percentage: null,
+    allocationType: "fixed",
+    isRemainingBalance: false,
+  };
+}
+
+export function setAllocationModeOnDraft<T extends AllocationDraftFields>(
+  allocations: T[],
+  index: number,
+  mode: AllocationType,
+): T[] {
+  return allocations.map((item, itemIndex) => {
+    if (mode === "remaining") {
+      if (itemIndex === index) {
+        return {
+          ...item,
+          allocationType: "remaining",
+          isRemainingBalance: true,
+          amount: null,
+          percentage: null,
+        };
+      }
+
+      if (getAllocationType(item) === "remaining") {
+        return {
+          ...item,
+          allocationType: "fixed",
+          isRemainingBalance: false,
+        };
+      }
+
+      return { ...item, isRemainingBalance: false };
+    }
+
+    if (itemIndex !== index) {
+      return item;
+    }
+
+    if (mode === "percentage") {
+      return {
+        ...item,
+        allocationType: "percentage",
+        isRemainingBalance: false,
+        amount: null,
+      };
+    }
+
+    return {
+      ...item,
+      allocationType: "fixed",
+      isRemainingBalance: false,
+      percentage: null,
+    };
+  });
+}
+
 export function getAllocationSummary(
   paycheckAmount: number,
-  allocations: Pick<
-    IncomePlanAllocation,
-    "amount" | "isRemainingBalance"
-  >[],
+  allocations: Array<
+    Pick<
+      IncomePlanAllocation,
+      "amount" | "isRemainingBalance" | "percentage" | "allocationType"
+    >
+  >,
 ): {
   paycheckAmount: number;
   fixedAllocated: number;
+  percentageAllocated: number;
   allocated: number;
   remaining: number;
   isOverAllocated: boolean;
   overBy: number;
   remainingBalanceCount: number;
+  percentageTotal: number;
 } {
-  const remainingBalanceCount = allocations.filter(
-    (item) => item.isRemainingBalance,
-  ).length;
-
-  const allocated = roundCurrency(
-    allocations
-      .filter((item) => !item.isRemainingBalance)
-      .reduce((total, item) => total + (item.amount ?? 0), 0),
+  const summary = getAllocationSummaryFromPlan(
+    paycheckAmount,
+    allocations.map((item, index) => ({
+      id: `summary-${index}`,
+      name: "",
+      icon: "",
+      amount: item.amount,
+      percentage: item.percentage ?? null,
+      allocationType: item.allocationType ?? null,
+      isRemainingBalance: item.isRemainingBalance,
+      accountId: null,
+      goalId: null,
+      monthlyTarget: null,
+      sortOrder: index,
+    })),
   );
-
-  const remaining = roundCurrency(paycheckAmount - allocated);
-  const isOverAllocated = remaining < 0;
+  const isOverAllocated = summary.remaining < 0;
 
   return {
-    paycheckAmount: roundCurrency(paycheckAmount),
-    fixedAllocated: allocated,
-    allocated,
-    remaining,
+    ...summary,
     isOverAllocated,
-    overBy: isOverAllocated ? roundCurrency(Math.abs(remaining)) : 0,
-    remainingBalanceCount,
+    overBy: isOverAllocated ? roundCurrency(Math.abs(summary.remaining)) : 0,
   };
 }
 

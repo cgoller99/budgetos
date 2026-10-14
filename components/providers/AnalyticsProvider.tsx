@@ -6,7 +6,9 @@ import {
   identifyAnalyticsUser,
   initAnalytics,
   resetAnalyticsUser,
+  trackFirstOpen,
 } from "@/lib/analytics/client";
+import { getNativePlatform } from "@/lib/native/platform";
 
 export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -26,10 +28,11 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
         email: user.email,
         name: (user.user_metadata?.full_name as string | undefined) ?? null,
       });
-      return;
+    } else {
+      resetAnalyticsUser();
     }
 
-    resetAnalyticsUser();
+    trackFirstOpen(getNativePlatform());
   }, [isAuthenticated, isLoading, user]);
 
   return children;

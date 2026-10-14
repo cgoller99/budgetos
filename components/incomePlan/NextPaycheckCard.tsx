@@ -12,6 +12,7 @@ import {
   formatPayDate,
   getPaycheckIndexInMonth,
   isExtraPaycheckMonth,
+  resolveUpcomingPayDate,
 } from "@/lib/incomePlan/payDates";
 import { formatCurrency } from "@/lib/finance/format";
 import type { MarkPaycheckReceivedInput } from "@/lib/incomePlan/types";
@@ -32,10 +33,11 @@ export function NextPaycheckCard() {
     [plan],
   );
 
+  const upcomingPayDate = plan ? resolveUpcomingPayDate(plan) : null;
   const paycheckIndex = useMemo(() => {
-    if (!plan) return 0;
-    return getPaycheckIndexInMonth(plan, plan.nextPayDate);
-  }, [plan]);
+    if (!plan || !upcomingPayDate) return 0;
+    return getPaycheckIndexInMonth(plan, upcomingPayDate);
+  }, [plan, upcomingPayDate]);
 
   if (!plan) {
     return (
@@ -76,21 +78,27 @@ export function NextPaycheckCard() {
     }
   }
 
-  const daysUntil = daysUntilPayDate(plan.nextPayDate);
+  const daysUntil = daysUntilPayDate(upcomingPayDate ?? plan.nextPayDate);
+  const showingProjectedDate = upcomingPayDate !== plan.nextPayDate;
   const paycheckState = classifyUpcomingPaycheck(finance);
-  const statusLabel =
-    paycheckState.lifecycle === "applied"
-      ? "Applied"
-      : paycheckState.lifecycle === "received"
-        ? "Received"
-        : "Expected";
+  const caughtUp = paycheckState.lifecycle === "applied" && !showingProjectedDate;
+  const statusLabel = caughtUp
+    ? "Applied"
+    : paycheckState.lifecycle === "received"
+      ? "Received"
+      : "Expected";
 
   return (
     <Card hover>
       <CardHeader
-        title={paycheckState.lifecycle === "expected" ? "Expected paycheck" : "Paycheck"}
+        title={
+          paycheckState.lifecycle === "expected" ||
+          (paycheckState.lifecycle === "applied" && showingProjectedDate)
+            ? "Expected paycheck"
+            : "Paycheck"
+        }
         description={
-          paycheckState.lifecycle === "applied"
+          caughtUp
             ? "This payday is already applied."
             : paycheckState.lifecycle === "received"
               ? "A matching deposit is waiting. Allocations apply when you confirm."
@@ -109,15 +117,15 @@ export function NextPaycheckCard() {
       <CardContent className="space-y-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-sm text-[var(--text-muted)]">
-              {formatPayDate(plan.nextPayDate)}
+            <p className="text-sm text-[var(--text-secondary)]">
+              {formatPayDate(upcomingPayDate ?? plan.nextPayDate)}
             </p>
             <p className="mt-1 text-2xl font-semibold tabular-nums text-[var(--foreground)]">
               +{formatCurrency(plan.paycheckAmount)}
             </p>
           </div>
           <div className="flex flex-col items-end gap-2">
-            <Badge variant={paycheckState.lifecycle === "applied" ? "success" : "accent"}>
+            <Badge variant={caughtUp ? "success" : "accent"}>
               {statusLabel}
             </Badge>
             <Badge variant="default">
@@ -176,14 +184,10 @@ export function NextPaycheckCard() {
 
         <Button
           fullWidth
-          disabled={isSubmitting || finance.isSyncing || paycheckState.lifecycle === "applied"}
+          disabled={isSubmitting || finance.isSyncing || caughtUp}
           onClick={() => void handleMarkReceived()}
         >
-          {isSubmitting
-            ? "Applying…"
-            : paycheckState.lifecycle === "applied"
-              ? "Already applied"
-              : "Apply paycheck"}
+          {isSubmitting ? "Applying…" : caughtUp ? "Already applied" : "Apply paycheck"}
         </Button>
       </CardContent>
     </Card>

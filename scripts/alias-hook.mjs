@@ -1,5 +1,21 @@
 import { statSync } from "node:fs";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
+
+const libRoot =
+  path.resolve(fileURLToPath(new URL("../lib/", import.meta.url))) + path.sep;
+
+function isInsideRepoLib(parentURL) {
+  if (!parentURL.startsWith("file:")) {
+    return false;
+  }
+
+  try {
+    return fileURLToPath(parentURL).startsWith(libRoot);
+  } catch {
+    return false;
+  }
+}
 
 function resolveAlias(specifier) {
   const relative = specifier.slice(2);
@@ -25,7 +41,7 @@ export async function resolve(specifier, context, nextResolve) {
   if (
     (specifier.startsWith("./") || specifier.startsWith("../")) &&
     !pathHasExtension(specifier) &&
-    parent.includes("/workspace/lib/")
+    isInsideRepoLib(parent)
   ) {
     const asFile = new URL(`${specifier}.ts`, parent);
     try {

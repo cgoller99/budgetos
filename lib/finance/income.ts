@@ -19,7 +19,9 @@ import {
   normalizeIncomeFrequency,
 } from "@/lib/recurring/frequencies";
 import { normalizeRecurringFinanceData } from "@/lib/recurring/normalize";
+import { resolveUpcomingPayDate } from "@/lib/incomePlan/payDates";
 import {
+  computeInitialNextOccurrence,
   createSchedule,
   daysUntil,
   parseDateString,
@@ -115,6 +117,31 @@ export function buildUpdatedIncomeSource(
   };
 }
 
+function projectedPayDate(
+  source: IncomeSource,
+  data: FinanceData,
+  referenceDate: Date,
+): Date | null {
+  const schedule = source.schedule;
+  if (!schedule?.nextOccurrence) {
+    return null;
+  }
+
+  if (!isIncomeSourceActive(source)) {
+    return parseDateString(schedule.nextOccurrence);
+  }
+
+  if (isIncomePlanSourceId(source.id) && data.incomePlan?.nextPayDate) {
+    return parseDateString(resolveUpcomingPayDate(data.incomePlan, referenceDate));
+  }
+
+  return computeInitialNextOccurrence(
+    parseDateString(schedule.nextOccurrence),
+    schedule.frequency || source.frequency,
+    referenceDate,
+  );
+}
+
 export function enrichIncomeSource(
   source: IncomeSource,
   data: FinanceData,
@@ -122,9 +149,7 @@ export function enrichIncomeSource(
 ): IncomeTableRow {
   const schedule = source.schedule;
   const isActive = isIncomeSourceActive(source);
-  const nextPayDateRaw = schedule
-    ? parseDateString(schedule.nextOccurrence)
-    : null;
+  const nextPayDateRaw = projectedPayDate(source, data, referenceDate);
 
   return {
     id: source.id,
@@ -134,9 +159,7 @@ export function enrichIncomeSource(
     category: source.category?.trim() || "—",
     depositAccountName: resolveDepositAccountName(data, source.depositAccountId),
     startDate: schedule ? formatPayDate(schedule.startDate) : "—",
-    nextPayDate: nextPayDateRaw
-      ? formatPayDate(schedule?.nextOccurrence)
-      : "—",
+    nextPayDate: nextPayDateRaw ? formatPayDate(toDateString(nextPayDateRaw)) : "—",
     lastPaid: formatPayDate(schedule?.lastProcessedDate),
     isActive,
     statusLabel: isActive ? "Active" : "Paused",
@@ -180,7 +203,10 @@ export function getNextPaycheck(
       return [];
     }
 
-    const nextDate = parseDateString(source.schedule.nextOccurrence);
+    const nextDate = projectedPayDate(source, normalized, referenceDate);
+    if (!nextDate) {
+      return [];
+    }
 
     return [
       {
@@ -234,7 +260,10 @@ export function getUpcomingIncome(
         return [];
       }
 
-      const nextDate = parseDateString(source.schedule.nextOccurrence);
+      const nextDate = projectedPayDate(source, normalized, referenceDate);
+      if (!nextDate) {
+        return [];
+      }
 
       return [
         {

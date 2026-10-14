@@ -8,7 +8,6 @@ import { IncomeRow } from "@/components/income/IncomeRow";
 import {
   Button,
   EmptyState,
-  PageHeader,
   SkeletonGrid,
   StatCard,
 } from "@/components/ui";
@@ -114,29 +113,17 @@ export function IncomeContent({ embedded = false }: { embedded?: boolean }) {
 
   const editIncome = editIncomeId ? findIncome(editIncomeId) : null;
   const deleteIncome = deleteIncomeId ? findIncome(deleteIncomeId) : null;
-  const nextPaycheckChange = summary.nextPaycheck
+  const nextPaycheckLabel = summary.nextPaycheck
     ? summary.nextPaycheck.daysUntil === 0
-      ? "Due today"
-      : summary.nextPaycheck.daysUntil < 0
-        ? "Overdue"
-        : `${summary.nextPaycheck.daysUntil} days`
+      ? `${summary.nextPaycheck.name} · ${summary.nextPaycheck.formattedDate} · Today`
+      : summary.nextPaycheck.daysUntil === 1
+        ? `${summary.nextPaycheck.name} · ${summary.nextPaycheck.formattedDate} · Tomorrow`
+        : `${summary.nextPaycheck.name} · ${summary.nextPaycheck.formattedDate} · ${Math.max(summary.nextPaycheck.daysUntil, 0)} days`
     : "No active income";
 
   return (
-    <div className={cn(!embedded && pageContainerWideClassName)}>
-      {!embedded ? (
-        <PageHeader
-          action={
-            <Button onClick={() => setIsCreateOpen(true)}>Add income source</Button>
-          }
-        />
-      ) : (
-        <div className="flex justify-end">
-          <Button onClick={() => setIsCreateOpen(true)}>Add income source</Button>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+    <div className={cn("flex min-w-0 flex-col gap-4", !embedded && pageContainerWideClassName)}>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Monthly income"
           value={formatCurrency(summary.monthlyIncome)}
@@ -156,11 +143,7 @@ export function IncomeContent({ embedded = false }: { embedded?: boolean }) {
               ? formatCurrency(summary.nextPaycheck.amount)
               : "—"
           }
-          change={
-            summary.nextPaycheck
-              ? `${summary.nextPaycheck.name} · ${summary.nextPaycheck.formattedDate}`
-              : nextPaycheckChange
-          }
+          change={nextPaycheckLabel}
           positive={Boolean(summary.nextPaycheck)}
         />
         <StatCard
@@ -183,22 +166,20 @@ export function IncomeContent({ embedded = false }: { embedded?: boolean }) {
           }
         />
       ) : (
-        <section className="space-y-4">
-          <div className="hidden rounded-3xl border border-white/[0.04] bg-white/[0.015] px-6 py-4 lg:block">
-            <div className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,0.7fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.7fr)_auto] gap-3 text-xs font-medium uppercase tracking-[0.14em] text-white/35">
-              <span>Source name</span>
-              <span>Amount</span>
-              <span>Frequency</span>
-              <span>Category</span>
-              <span>Deposit account</span>
-              <span>Next pay date</span>
-              <span>Last paid</span>
-              <span>Status</span>
-              <span className="text-right">Actions</span>
+        <section className="flex min-w-0 flex-col gap-3">
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="text-base font-semibold text-[var(--foreground)]">Income sources</h2>
+              <p className="mt-0.5 text-sm text-[var(--text-secondary)]">
+                Amount, schedule, and the next payday for each source.
+              </p>
             </div>
+            <Button className="shrink-0" onClick={() => setIsCreateOpen(true)}>
+              Add income source
+            </Button>
           </div>
 
-          <div className="space-y-3">
+          <div className="grid min-w-0 grid-cols-1 gap-3 xl:grid-cols-2">
             {rows.map((row) => (
               <IncomeRow
                 key={row.id}
