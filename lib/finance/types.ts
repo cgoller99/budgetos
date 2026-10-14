@@ -605,6 +605,10 @@ export type MoneyFlowData = {
   goals: number;
   investments: number;
   safeToSpend: number;
+  projectedSafeToSpend?: number;
+  availableCash?: number;
+  cashAvailabilityStatus?: "known" | "qualified" | "unavailable";
+  cashAvailabilityReason?: string | null;
   stages: MoneyFlowStageData[];
   breakdown: MoneyFlowBreakdownItem[];
   /** @deprecated use stages/breakdown */

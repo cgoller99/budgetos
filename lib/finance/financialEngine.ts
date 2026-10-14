@@ -17,7 +17,10 @@ import {
   type CategoryBreakdownItem,
   type MonthlyTrendPoint,
 } from "@/lib/reports/reportMetrics";
-import { calculateAvailableCash, hasPlaidLinkedCashAccounts } from "@/lib/calculations/availableCash";
+import {
+  calculateAvailableCash,
+  hasSpendableCashAccounts,
+} from "@/lib/calculations/availableCash";
 import { getSafeToSpendWeekly } from "@/lib/finance/safeToSpend";
 import { generateWeeklyPlan } from "@/lib/intelligence";
 import { generateRoadmap, toNextMilestoneSummary } from "@/lib/roadmap";
@@ -175,6 +178,10 @@ function toMoneyFlowData(moneyFlow: MoneyFlowResult): MoneyFlowData {
     goals: moneyFlow.goals,
     investments: moneyFlow.investments,
     safeToSpend: moneyFlow.safeToSpend,
+    projectedSafeToSpend: moneyFlow.projectedSafeToSpend,
+    availableCash: moneyFlow.availableCash,
+    cashAvailabilityStatus: moneyFlow.cashAvailabilityStatus,
+    cashAvailabilityReason: moneyFlow.cashAvailabilityReason,
     stages: moneyFlow.stages,
     breakdown: moneyFlow.breakdown,
     spending: {
@@ -285,7 +292,7 @@ export function buildDashboardFromSnapshot(
     },
     {
       label: "Cash",
-      value: hasPlaidLinkedCashAccounts(normalized)
+      value: hasSpendableCashAccounts(normalized)
         ? calculateAvailableCash(normalized)
         : netWorthBreakdown.cash.value,
       monthlyChange: netWorthBreakdown.cash.monthlyChange,

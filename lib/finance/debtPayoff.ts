@@ -189,28 +189,109 @@ export function monthlyAmountFromSchedule(
   }
 }
 
+/**
+ * True when an allocation is linked to a debt via structured `debtId`.
+ * Display names are not required for recognition.
+ */
+export function isDebtLinkedAllocation(
+  allocation: Pick<
+    IncomePlanAllocation,
+    "debtId" | "goalId" | "billId" | "isRemainingBalance"
+  >,
+): boolean {
+  return Boolean(
+    allocation.debtId &&
+      !allocation.isRemainingBalance &&
+      !allocation.goalId &&
+      !allocation.billId,
+  );
+}
+
+/** @deprecated Prefer isDebtLinkedAllocation + plannedExtraDebtMonthly(plan, debts). */
+export function isExtraDebtAllocation(
+  allocation: Pick<
+    IncomePlanAllocation,
+    "debtId" | "name" | "goalId" | "billId" | "isRemainingBalance"
+  >,
+): boolean {
+  return (
+    isDebtLinkedAllocation(allocation) &&
+    allocation.name === EXTRA_DEBT_ALLOCATION_NAME
+  );
+}
+
+/**
+ * Monthly paycheck amounts allocated to each debtId.
+ * `taggedExtra` rows are planner extras that sit *on top of* the minimum.
+ * Other debt-linked rows are treated as funding the minimum (only the
+ * portion above that minimum is extra).
+ */
+export function plannedDebtLinkedMonthlyByDebtId(
+  plan: IncomePlan | null | undefined,
+): Map<string, { total: number; taggedExtra: number }> {
+  const byDebt = new Map<string, { total: number; taggedExtra: number }>();
+  if (!plan?.isActive) {
+    return byDebt;
+  }
+  const resolved = resolveAllocationAmounts(plan);
+  for (const item of resolved) {
+    if (!isDebtLinkedAllocation(item.allocation) || item.amount <= 0) {
+      continue;
+    }
+    const debtId = item.allocation.debtId!;
+    const monthly = monthlyAmountFromSchedule(
+      item.amount,
+      plan.paySchedule,
+      plan.customIntervalDays,
+    );
+    const current = byDebt.get(debtId) ?? { total: 0, taggedExtra: 0 };
+    current.total = roundCurrency(current.total + monthly);
+    if (item.allocation.name === EXTRA_DEBT_ALLOCATION_NAME) {
+      current.taggedExtra = roundCurrency(current.taggedExtra + monthly);
+    }
+    byDebt.set(debtId, current);
+  }
+  return byDebt;
+}
+
+/**
+ * Genuine *extra* debt payments beyond each debt's minimum.
+ * Uses structured `debtId`. Tagged extras (debt planner) always count in full.
+ * Other debt-linked allocations only contribute the portion above the minimum.
+ */
 export function plannedExtraDebtMonthly(
   plan: IncomePlan | null | undefined,
+  debts?: Array<Pick<Debt, "id" | "minimumPayment" | "balance">> | null,
 ): number {
   if (!plan?.isActive) {
     return 0;
   }
-  const resolved = resolveAllocationAmounts(plan);
-  return roundCurrency(
-    resolved.reduce((total, item) => {
-      if (item.allocation.name !== EXTRA_DEBT_ALLOCATION_NAME || item.amount <= 0) {
-        return total;
-      }
-      return (
-        total +
-        monthlyAmountFromSchedule(
-          item.amount,
-          plan.paySchedule,
-          plan.customIntervalDays,
-        )
-      );
-    }, 0),
-  );
+
+  const byDebt = plannedDebtLinkedMonthlyByDebtId(plan);
+  if (byDebt.size === 0) {
+    return 0;
+  }
+
+  const debtById = new Map((debts ?? []).map((debt) => [debt.id, debt]));
+  let extra = 0;
+  for (const [debtId, planned] of byDebt) {
+    const debt = debtById.get(debtId);
+    // Tagged planner extras always stack on top of the reserved minimum.
+    extra += planned.taggedExtra;
+
+    const towardMinimum = roundCurrency(planned.total - planned.taggedExtra);
+    if (towardMinimum <= 0) {
+      continue;
+    }
+    if (!debt || debt.balance <= 0.009) {
+      // Unknown / paid-off debt: remaining linked amount is treated as extra.
+      extra += towardMinimum;
+      continue;
+    }
+    const minimum = Math.max(debt.minimumPayment, 0);
+    extra += Math.max(towardMinimum - minimum, 0);
+  }
+  return roundCurrency(extra);
 }
 
 export function incomePlanAllocationsWithExtraDebt<

@@ -406,8 +406,11 @@ export function forecastCashOutlook(
         }
         if (allocation.debtId) {
           const countedMinimum = debtIds.has(allocation.debtId);
-          const isExplicitExtra = allocation.name === EXTRA_DEBT_ALLOCATION_NAME;
-          if (countedMinimum && !isExplicitExtra) {
+          // debtId is the source of truth for which debt is linked. When the
+          // calendar already includes that debt's minimum, only planner extras
+          // (tagged by EXTRA_DEBT_ALLOCATION_NAME) add an additional outflow.
+          const taggedExtra = allocation.name === EXTRA_DEBT_ALLOCATION_NAME;
+          if (countedMinimum && !taggedExtra) {
             continue;
           }
           events.push({
@@ -417,9 +420,9 @@ export function forecastCashOutlook(
             amount: roundCurrency(-item.amount),
             kind: "debt",
             confidence: "estimated",
-            detail: isExplicitExtra
-              ? `${allocation.name} adds ${formatCurrency(item.amount)} from the ${key} paycheck. The scheduled minimum is counted separately, so this line is only the extra.`
-              : `${allocation.name} takes ${formatCurrency(item.amount)} from the ${key} paycheck. No separate debt due date was counted for it.`,
+            detail: taggedExtra
+              ? `${allocation.name} adds ${formatCurrency(item.amount)} from the ${key} paycheck for debt ${allocation.debtId}. The scheduled minimum is counted separately.`
+              : `${allocation.name} takes ${formatCurrency(item.amount)} from the ${key} paycheck via debt link ${allocation.debtId}.`,
           });
         }
       }

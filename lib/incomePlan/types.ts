@@ -38,6 +38,11 @@ export type IncomePlan = {
   monthlyDays: number[];
   customIntervalDays: number | null;
   depositAccountId: string | null;
+  /**
+   * Explicit link to the income source this plan represents.
+   * When set, effective income projections use the source once (not plan + source).
+   */
+  linkedIncomeSourceId?: string | null;
   nextPayDate: string;
   lastProcessedDate: string | null;
   isActive: boolean;
@@ -91,6 +96,7 @@ export type SaveIncomePlanInput = {
   monthlyDays: number[];
   customIntervalDays: number | null;
   depositAccountId: string | null;
+  linkedIncomeSourceId?: string | null;
   allocations: Omit<IncomePlanAllocation, "id">[];
 };
 

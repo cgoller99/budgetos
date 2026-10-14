@@ -1,5 +1,8 @@
 import { calculateMonthlyIncome, calculateMonthlySpending } from "@/lib/calculations/cashFlow";
-import { calculateAvailableCash, hasPlaidLinkedCashAccounts } from "@/lib/calculations/availableCash";
+import {
+  resolveCashAvailability,
+  type CashAvailabilityStatus,
+} from "@/lib/calculations/availableCash";
 import { plannedExtraDebtMonthly } from "@/lib/finance/debtPayoff";
 import { isPersonalOwnerRow } from "@/lib/finance/personalIncomeScope";
 import type { FinanceData } from "@/lib/finance/types";
@@ -40,6 +43,11 @@ export type MoneyFlowResult = {
   goals: number;
   investments: number;
   safeToSpend: number;
+  /** Income-based STS before any cash ceiling. */
+  projectedSafeToSpend: number;
+  availableCash: number;
+  cashAvailabilityStatus: CashAvailabilityStatus;
+  cashAvailabilityReason: string | null;
   stages: MoneyFlowStage[];
   breakdown: MoneyFlowBreakdownLine[];
 };
@@ -100,8 +108,9 @@ function reservedDebtPayments(data: FinanceData, referenceDate: Date): number {
     }
   }
 
+  const plannedExtra = plannedExtraDebtMonthly(data.incomePlan, data.debts ?? []);
   return roundCurrency(
-    reserved + Math.max(plannedExtraDebtMonthly(data.incomePlan), paidBeyondMinimum) + orphanPayments,
+    reserved + Math.max(plannedExtra, paidBeyondMinimum) + orphanPayments,
   );
 }
 
@@ -279,11 +288,14 @@ export function calculateMoneyFlow(
     income - bills - debts - goals - investments,
     0,
   );
-  const availableCash = calculateAvailableCash(data);
+  const cash = resolveCashAvailability(data);
+  // Always respect known/qualified spendable cash — including manual checking.
+  // When no spendable cash can be determined, do not invent a large income-based
+  // "safe" number; callers can still read projectedSafeToSpend for context.
   const safeToSpend =
-    hasPlaidLinkedCashAccounts(data) && availableCash >= 0
-      ? Math.min(projectedSafeToSpend, availableCash)
-      : projectedSafeToSpend;
+    cash.status === "unavailable"
+      ? 0
+      : Math.min(projectedSafeToSpend, Math.max(cash.amount, 0));
 
   return {
     income,
@@ -292,6 +304,10 @@ export function calculateMoneyFlow(
     goals,
     investments,
     safeToSpend,
+    projectedSafeToSpend,
+    availableCash: cash.amount,
+    cashAvailabilityStatus: cash.status,
+    cashAvailabilityReason: cash.reason,
     stages: buildStages(income, bills, debts, goals, investments, safeToSpend),
     breakdown: buildBreakdown(
       income,

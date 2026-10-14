@@ -168,6 +168,13 @@ export function IosHomeScreen() {
           Available cash{" "}
           <span className="tabular-nums">{formatCurrency(checking)}</span>
         </p>
+        {moneyFlow.cashAvailabilityReason ? (
+          <p className="mt-1 text-[12px] leading-snug text-amber-100/90">
+            {moneyFlow.cashAvailabilityStatus === "unavailable"
+              ? "Safe to Spend unavailable — add a spendable cash account."
+              : moneyFlow.cashAvailabilityReason}
+          </p>
+        ) : null}
         {paydayForecast.nextPayDate ? (
           <p className="mt-1 text-[12px] leading-snug text-white/75">
             {formatCurrency(paydayForecast.safeUntilPayday)} until payday after bills due
