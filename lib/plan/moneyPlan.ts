@@ -8,7 +8,7 @@ import {
   isPersonalOwnerRow,
 } from "@/lib/finance/personalIncomeScope";
 import type { FinanceData } from "@/lib/finance/types";
-import { describePaySchedule } from "@/lib/incomePlan/payDates";
+import { describePaySchedule, resolveUpcomingPayDate } from "@/lib/incomePlan/payDates";
 import { getDisplayCategory } from "@/lib/transactions/categoryPresentation";
 import { isConfidentInternalTransfer } from "@/lib/transactions/transferDetection";
 
@@ -113,7 +113,7 @@ export function buildMoneyPlan(
       plan && plan.isActive
         ? {
             paycheckAmount: plan.paycheckAmount,
-            nextPayDate: plan.nextPayDate,
+            nextPayDate: resolveUpcomingPayDate(plan, referenceDate),
             scheduleLabel: describePaySchedule(plan),
             allocations: plan.allocations.map((allocation) => ({
               id: allocation.id,

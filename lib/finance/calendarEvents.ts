@@ -1,11 +1,13 @@
 import { getBillProgressList, getBillStatusVariant, startOfDay } from "@/lib/finance/bills";
 import {
   getEffectiveIncomeSources,
+  isIncomePlanSourceId,
   isIncomeSourceActive,
 } from "@/lib/finance/effectiveIncome";
-import type { BillProgress, BillStatus, FinanceData } from "@/lib/finance/types";
+import type { BillProgress, BillStatus, FinanceData, IncomeSource } from "@/lib/finance/types";
+import { resolveUpcomingPayDate } from "@/lib/incomePlan/payDates";
 import { normalizeRecurringFinanceData } from "@/lib/recurring";
-import { parseDateString, toDateString } from "@/lib/recurring/schedule";
+import { computeInitialNextOccurrence, parseDateString, toDateString } from "@/lib/recurring/schedule";
 
 export type CalendarEventType =
   | "bill"
@@ -74,17 +76,44 @@ function billsForDate(
   });
 }
 
+function projectedScheduleDate(
+  nextOccurrence: string,
+  frequency: string,
+  referenceDate: Date,
+): Date {
+  return computeInitialNextOccurrence(
+    parseDateString(nextOccurrence),
+    frequency,
+    referenceDate,
+  );
+}
+
+function projectedIncomeDate(source: IncomeSource, data: FinanceData, referenceDate: Date): Date | null {
+  if (!source.schedule?.nextOccurrence) {
+    return null;
+  }
+  if (isIncomePlanSourceId(source.id) && data.incomePlan?.isActive && data.incomePlan.nextPayDate) {
+    return parseDateString(resolveUpcomingPayDate(data.incomePlan, referenceDate));
+  }
+  return projectedScheduleDate(
+    source.schedule.nextOccurrence,
+    source.schedule.frequency || source.frequency,
+    referenceDate,
+  );
+}
+
 function incomeEventsForDate(
   data: FinanceData,
   date: Date,
+  referenceDate: Date,
 ): CalendarEvent[] {
   return getEffectiveIncomeSources(data).flatMap((source) => {
     if (!isIncomeSourceActive(source) || !source.schedule) {
       return [];
     }
 
-    const nextDate = parseDateString(source.schedule.nextOccurrence);
-    if (toDateKey(nextDate) !== toDateKey(date)) {
+    const nextDate = projectedIncomeDate(source, data, referenceDate);
+    if (!nextDate || toDateKey(nextDate) !== toDateKey(date)) {
       return [];
     }
 
@@ -100,13 +129,21 @@ function incomeEventsForDate(
   });
 }
 
-function goalEventsForDate(data: FinanceData, date: Date): CalendarEvent[] {
+function goalEventsForDate(
+  data: FinanceData,
+  date: Date,
+  referenceDate: Date,
+): CalendarEvent[] {
   return (data.savingsGoals ?? []).flatMap((goal) => {
     if (!goal.autoContribution?.schedule || goal.autoContribution.schedule.status !== "active") {
       return [];
     }
 
-    const nextDate = parseDateString(goal.autoContribution.schedule.nextOccurrence);
+    const nextDate = projectedScheduleDate(
+      goal.autoContribution.schedule.nextOccurrence,
+      goal.autoContribution.schedule.frequency,
+      referenceDate,
+    );
     if (toDateKey(nextDate) !== toDateKey(date)) {
       return [];
     }
@@ -142,14 +179,22 @@ function debtEventsForDate(data: FinanceData, date: Date): CalendarEvent[] {
   });
 }
 
-function investmentEventsForDate(data: FinanceData, date: Date): CalendarEvent[] {
+function investmentEventsForDate(
+  data: FinanceData,
+  date: Date,
+  referenceDate: Date,
+): CalendarEvent[] {
   return (data.investments ?? []).flatMap((investment) => {
     const schedule = investment.autoContribution?.schedule;
     if (!schedule || schedule.status !== "active") {
       return [];
     }
 
-    const nextDate = parseDateString(schedule.nextOccurrence);
+    const nextDate = projectedScheduleDate(
+      schedule.nextOccurrence,
+      schedule.frequency,
+      referenceDate,
+    );
     if (toDateKey(nextDate) !== toDateKey(date)) {
       return [];
     }
@@ -166,13 +211,17 @@ function investmentEventsForDate(data: FinanceData, date: Date): CalendarEvent[]
   });
 }
 
-function allocationEventsForDate(data: FinanceData, date: Date): CalendarEvent[] {
+function allocationEventsForDate(
+  data: FinanceData,
+  date: Date,
+  referenceDate: Date,
+): CalendarEvent[] {
   const plan = data.incomePlan;
-  if (!plan?.nextPayDate) {
+  if (!plan?.isActive || !plan.nextPayDate) {
     return [];
   }
 
-  const payDate = parseDateString(plan.nextPayDate);
+  const payDate = parseDateString(resolveUpcomingPayDate(plan, referenceDate));
   if (toDateKey(payDate) !== toDateKey(date)) {
     return [];
   }
@@ -212,11 +261,11 @@ export function buildCalendarMonth(
 
     const events = [
       ...billEvents,
-      ...incomeEventsForDate(normalized, date),
-      ...goalEventsForDate(normalized, date),
+      ...incomeEventsForDate(normalized, date, referenceDate),
+      ...goalEventsForDate(normalized, date, referenceDate),
       ...debtEventsForDate(normalized, date),
-      ...investmentEventsForDate(normalized, date),
-      ...allocationEventsForDate(normalized, date),
+      ...investmentEventsForDate(normalized, date, referenceDate),
+      ...allocationEventsForDate(normalized, date, referenceDate),
     ];
 
     const dominantStatus =
