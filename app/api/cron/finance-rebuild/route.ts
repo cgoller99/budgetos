@@ -16,22 +16,11 @@ import { FinanceService } from "@/lib/supabase/services/financeService";
 function isAuthorized(request: Request): boolean {
   const cronSecret = process.env.CRON_SECRET?.trim();
 
-  if (cronSecret) {
-    const auth = request.headers.get("authorization");
-    if (auth === `Bearer ${cronSecret}`) {
-      return true;
-    }
+  if (!cronSecret) {
+    return process.env.NODE_ENV === "development" && !process.env.VERCEL;
   }
 
-  // Vercel scheduled cron invocations (header alone is not sufficient off-platform).
-  if (
-    process.env.VERCEL === "1" &&
-    request.headers.get("x-vercel-cron") === "1"
-  ) {
-    return true;
-  }
-
-  return process.env.NODE_ENV === "development" && !process.env.VERCEL;
+  return request.headers.get("authorization") === `Bearer ${cronSecret}`;
 }
 
 export async function POST(request: Request) {

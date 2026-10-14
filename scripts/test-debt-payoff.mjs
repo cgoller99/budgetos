@@ -353,4 +353,62 @@ assert.match(screen, /Add payment plan/);
 assert.match(screen, /DebtPayoffPlanner/);
 assert.match(readFileSync("lib/finance/debts.ts", "utf8"), /Add payment plan/);
 
+function paycheckFlow(payment) {
+  return calculateMoneyFlow(
+    {
+      ...emptyFinanceData,
+      income: [
+        {
+          id: "job",
+          name: "Job",
+          amount: 3000,
+          frequency: "monthly",
+          category: "Employment",
+          schedule: {
+            frequency: "monthly",
+            startDate: "2026-01-01",
+            nextOccurrence: "2026-10-30",
+            status: "active",
+          },
+        },
+      ],
+      debts: [
+        debt({
+          id: "med",
+          name: "Medical",
+          balance: 500,
+          minimumPayment: 100,
+          accountType: "medical",
+        }),
+      ],
+      transactions: payment
+        ? [
+            {
+              id: "pay",
+              amount: payment,
+              type: "expense",
+              category: "Healthcare",
+              accountId: "checking",
+              date: "2026-10-04",
+              notes: "Medical payment",
+              debtId: "med",
+            },
+          ]
+        : [],
+    },
+    reference,
+  );
+}
+
+const unpaidDebt = paycheckFlow(0);
+assert.equal(unpaidDebt.debts, 100);
+assert.equal(unpaidDebt.safeToSpend, 2900);
+const paidDebt = paycheckFlow(100);
+assert.equal(paidDebt.bills, 0);
+assert.equal(paidDebt.debts, 100);
+assert.equal(paidDebt.safeToSpend, 2900);
+const extraDebtPayment = paycheckFlow(150);
+assert.equal(extraDebtPayment.debts, 150);
+assert.equal(extraDebtPayment.safeToSpend, 2850);
+
 console.log("debt payoff ok");

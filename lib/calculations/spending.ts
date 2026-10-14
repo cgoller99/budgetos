@@ -62,12 +62,14 @@ function incomeRefundOffset(data: FinanceData, referenceDate: Date): number {
 function getCurrentMonthExpenseTransactions(
   data: FinanceData,
   referenceDate = new Date(),
+  options?: { excludeDebtLinked?: boolean },
 ) {
   return getTransactionsForMonth(data, referenceDate).filter(
     (transaction) =>
       transaction.type === "expense" &&
       !transaction.goalId &&
-      !isInternalTransferExpense(data, transaction),
+      !isInternalTransferExpense(data, transaction) &&
+      !(options?.excludeDebtLinked && transaction.debtId),
   );
 }
 
@@ -76,7 +78,7 @@ function sumBillLinkedExpenses(
   referenceDate = new Date(),
 ): number {
   return sum(
-    getCurrentMonthExpenseTransactions(data, referenceDate)
+    getCurrentMonthExpenseTransactions(data, referenceDate, { excludeDebtLinked: true })
       .filter((transaction) => Boolean(transaction.billId))
       .map((transaction) => transaction.amount),
   );
@@ -87,9 +89,9 @@ function sumBillMatchedExpenses(
   referenceDate = new Date(),
 ): number {
   const recurringBills = (data.bills ?? []).filter((bill) => bill.recurring);
-  const expenses = getCurrentMonthExpenseTransactions(data, referenceDate).filter(
-    (transaction) => !transaction.billId,
-  );
+  const expenses = getCurrentMonthExpenseTransactions(data, referenceDate, {
+    excludeDebtLinked: true,
+  }).filter((transaction) => !transaction.billId);
 
   let matchedTotal = 0;
   const matchedExpenseIds = new Set<string>();
@@ -121,7 +123,9 @@ function sumDiscretionaryExpenses(
   data: FinanceData,
   referenceDate = new Date(),
 ): number {
-  const expenses = getCurrentMonthExpenseTransactions(data, referenceDate);
+  const expenses = getCurrentMonthExpenseTransactions(data, referenceDate, {
+    excludeDebtLinked: true,
+  });
   const matchedIds = new Set<string>();
 
   for (const transaction of expenses) {
@@ -167,9 +171,9 @@ export function calculateMonthlySpendingForMoneyFlow(
   const recurringBills = recurringBillMonthlyTotal(data);
   const refundOffset = incomeRefundOffset(data, referenceDate);
   const ledgerExpenses = sum(
-    getCurrentMonthExpenseTransactions(data, referenceDate).map(
-      (transaction) => transaction.amount,
-    ),
+    getCurrentMonthExpenseTransactions(data, referenceDate, {
+      excludeDebtLinked: true,
+    }).map((transaction) => transaction.amount),
   );
 
   if (recurringBills <= 0) {
