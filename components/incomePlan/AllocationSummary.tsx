@@ -5,7 +5,12 @@ import { cn } from "@/components/ui/cn";
 
 type AllocationSummaryProps = {
   paycheckAmount: number;
-  allocations: Pick<IncomePlanAllocation, "amount" | "isRemainingBalance">[];
+  allocations: Array<
+    Pick<
+      IncomePlanAllocation,
+      "amount" | "isRemainingBalance" | "percentage" | "allocationType"
+    >
+  >;
   className?: string;
 };
 
@@ -25,7 +30,7 @@ export function AllocationSummary({
     >
       <dl className="grid gap-4 sm:grid-cols-3">
         <div>
-          <dt className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
+          <dt className="text-xs font-medium uppercase tracking-wide text-[var(--text-secondary)]">
             Paycheck amount
           </dt>
           <dd className="mt-1 text-lg font-semibold tabular-nums text-[var(--foreground)]">
@@ -33,16 +38,16 @@ export function AllocationSummary({
           </dd>
         </div>
         <div>
-          <dt className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
-            Fixed allocated amount
+          <dt className="text-xs font-medium uppercase tracking-wide text-[var(--text-secondary)]">
+            Allocated
           </dt>
           <dd className="mt-1 text-lg font-semibold tabular-nums text-[var(--foreground)]">
-            {formatCurrency(summary.fixedAllocated)}
+            {formatCurrency(summary.allocated)}
           </dd>
         </div>
         <div>
-          <dt className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
-            Remaining amount
+          <dt className="text-xs font-medium uppercase tracking-wide text-[var(--text-secondary)]">
+            Left unallocated
           </dt>
           <dd
             className={cn(
