@@ -614,6 +614,7 @@ html[data-native-platform="ios"] .native-tab-bar {
   background: color-mix(in srgb, #060b14 88%, transparent);
   box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.35);
   backdrop-filter: blur(20px);
+  min-height: calc(49px + env(safe-area-inset-bottom, 0px));
 }
 
 html[data-native-platform="ios"] .native-top-bar,
@@ -728,18 +729,32 @@ html[data-native-platform="ios"] .native-page-enter {
 }
 
 html[data-native-platform="ios"] .native-tab-enter {
-  animation: native-tab-enter 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: native-tab-enter 0.16s ease-out both;
+}
+
+html[data-native-platform="ios"] .native-page-back {
+  animation: native-page-back 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @keyframes native-tab-enter {
   from {
-    opacity: 0;
-    transform: translateY(8px);
+    opacity: 0.9;
   }
 
   to {
     opacity: 1;
-    transform: translateY(0);
+  }
+}
+
+@keyframes native-page-back {
+  from {
+    opacity: 0.96;
+    transform: translateX(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
   }
 }
 
@@ -778,7 +793,7 @@ html[data-native-platform="ios"] .ios-metric-chip:active {
 
 @keyframes native-page-enter {
   from {
-    opacity: 0;
+    opacity: 0.96;
     transform: translateX(10px);
   }
 
@@ -849,6 +864,18 @@ html[data-native-platform="ios"] .ios-card {
 
 html[data-native-platform="ios"] .ios-hero-metric {
   padding-top: 0.1rem;
+}
+
+html[data-native-platform="ios"] .ios-home-hero {
+  background:
+    radial-gradient(120% 90% at 100% 0%, rgba(255, 255, 255, 0.18), transparent 42%),
+    linear-gradient(145deg, #3b82f6 0%, #1d4ed8 58%, #0b1b3a 100%);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.45);
+}
+
+html[data-native-platform="ios"] .ios-progress-fill {
+  background-image: linear-gradient(90deg, rgba(255, 255, 255, 0.18), transparent 42%);
 }
 
 html[data-native-platform="ios"] .ios-list {
@@ -993,6 +1020,7 @@ html[data-native-platform="ios"] .native-main .mb-6.space-y-3 > p {
 
 @media (prefers-reduced-motion: reduce) {
   html[data-native-platform="ios"] .native-page-enter,
+  html[data-native-platform="ios"] .native-page-back,
   html[data-native-platform="ios"] .native-tab-enter,
   .page-enter,
   .native-modal-panel-enter {

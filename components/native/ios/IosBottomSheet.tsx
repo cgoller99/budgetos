@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/components/ui/cn";
+import { triggerHaptic } from "@/lib/native/haptics";
 import { lockBodyScroll, unlockBodyScroll } from "@/lib/ui/bodyScrollLock";
 
 type IosBottomSheetProps = {
@@ -11,6 +12,7 @@ type IosBottomSheetProps = {
   labelledBy?: string;
   onClose: () => void;
   children: ReactNode;
+  footer?: ReactNode;
 };
 
 export function IosBottomSheet({
@@ -19,12 +21,15 @@ export function IosBottomSheet({
   labelledBy = "ios-sheet-title",
   onClose,
   children,
+  footer,
 }: IosBottomSheetProps) {
   const [visible, setVisible] = useState(false);
   const [animating, setAnimating] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
   const dragOrigin = useRef<number | null>(null);
   const dragOffsetRef = useRef(0);
+  const lastPointer = useRef<{ y: number; time: number } | null>(null);
+  const velocityRef = useRef(0);
   const onCloseRef = useRef(onClose);
   const [retained, setRetained] = useState<ReactNode>(children);
 
@@ -67,11 +72,34 @@ export function IosBottomSheet({
     setDragOffset(next);
   }
 
+  function beginDrag(clientY: number) {
+    dragOrigin.current = clientY;
+    lastPointer.current = { y: clientY, time: performance.now() };
+    velocityRef.current = 0;
+  }
+
+  function moveDrag(clientY: number) {
+    if (dragOrigin.current == null) return;
+    const now = performance.now();
+    const previous = lastPointer.current;
+    if (previous) {
+      const elapsed = Math.max(now - previous.time, 1);
+      velocityRef.current = (clientY - previous.y) / elapsed;
+    }
+    lastPointer.current = { y: clientY, time: now };
+    setDrag(Math.max(0, clientY - dragOrigin.current));
+  }
+
   function endDrag() {
-    const shouldClose = dragOffsetRef.current > 96;
+    const shouldClose = dragOffsetRef.current > 96 || velocityRef.current > 0.65;
     dragOrigin.current = null;
+    lastPointer.current = null;
+    velocityRef.current = 0;
     setDrag(0);
-    if (shouldClose) onCloseRef.current();
+    if (shouldClose) {
+      void triggerHaptic("light");
+      onCloseRef.current();
+    }
   }
 
   if (!visible || typeof document === "undefined") return null;
@@ -106,12 +134,11 @@ export function IosBottomSheet({
           className="mx-auto mb-2 flex h-7 w-full touch-none items-center justify-center"
           data-sheet-handle="true"
           onPointerDown={(event) => {
-            dragOrigin.current = event.clientY;
+            beginDrag(event.clientY);
             event.currentTarget.setPointerCapture(event.pointerId);
           }}
           onPointerMove={(event) => {
-            if (dragOrigin.current == null) return;
-            setDrag(Math.max(0, event.clientY - dragOrigin.current));
+            moveDrag(event.clientY);
           }}
           onPointerUp={endDrag}
           onPointerCancel={endDrag}
@@ -121,12 +148,26 @@ export function IosBottomSheet({
         {title ? (
           <h2
             id={labelledBy}
-            className="mb-3 text-center text-[17px] font-semibold text-[var(--foreground)]"
+            className="mb-3 touch-none text-center text-[17px] font-semibold text-[var(--foreground)]"
+            onPointerDown={(event) => {
+              beginDrag(event.clientY);
+              event.currentTarget.setPointerCapture(event.pointerId);
+            }}
+            onPointerMove={(event) => {
+              moveDrag(event.clientY);
+            }}
+            onPointerUp={endDrag}
+            onPointerCancel={endDrag}
           >
             {title}
           </h2>
         ) : null}
         {open ? children : retained}
+        {footer ? (
+          <div className="native-sheet-footer sticky bottom-0 -mx-4 mt-4 border-t border-white/[0.06] bg-[#0b0f14] px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
+            {footer}
+          </div>
+        ) : null}
       </div>
     </div>,
     document.body,

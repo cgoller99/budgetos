@@ -16,6 +16,7 @@ import {
   isMobileMoreRoute,
 } from "@/lib/mobile/navigation";
 import { triggerHaptic } from "@/lib/native/haptics";
+import { markIosNavigation } from "@/lib/native/iosNavigation";
 import { useNativeIos } from "@/lib/native/useNativeIos";
 
 export function MobileBottomNav({ activeHref }: { activeHref: string }) {
@@ -31,9 +32,14 @@ export function MobileBottomNav({ activeHref }: { activeHref: string }) {
     <>
       <nav
         className={cn(
-          "fixed inset-x-0 bottom-0 z-30 border-t border-[var(--surface-border)] bg-[var(--background)]/98 px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-1.5 backdrop-blur-xl lg:hidden",
-          nativeIos && "native-tab-bar",
+          "fixed inset-x-0 bottom-0 z-30 border-t border-[var(--surface-border)] bg-[var(--background)]/98 px-2 pt-1.5 backdrop-blur-xl lg:hidden",
+          nativeIos ? "native-tab-bar" : "pb-[calc(0.5rem+env(safe-area-inset-bottom))]",
         )}
+        style={
+          nativeIos
+            ? { paddingBottom: "env(safe-area-inset-bottom, 0px)" }
+            : undefined
+        }
         aria-label="Primary navigation"
         data-native-tab-bar={nativeIos ? "ios" : "web"}
       >
@@ -52,6 +58,7 @@ export function MobileBottomNav({ activeHref }: { activeHref: string }) {
                 href={route.href}
                 aria-current={isActive ? "page" : undefined}
                 onClick={() => {
+                  markIosNavigation("tab");
                   void triggerHaptic("selection");
                 }}
                 className={cn(
