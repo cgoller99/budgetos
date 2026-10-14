@@ -17,20 +17,19 @@ import { AddDebtModal } from "@/components/debt/AddDebtModal";
 import { DeleteDebtModal } from "@/components/debt/DeleteDebtModal";
 import { EditDebtModal } from "@/components/debt/EditDebtModal";
 import { MakePaymentModal } from "@/components/debt/MakePaymentModal";
-import { DebtStrategyPanel } from "@/components/debt/DebtStrategyPanel";
+import { DebtPayoffPlanner } from "@/components/debt/DebtPayoffPlanner";
 import { useFinance } from "@/context/FinanceContext";
 import { formatCurrency } from "@/lib/finance/format";
 import {
   getDebtsDashboardSummary,
   getDebtTableRows,
 } from "@/lib/finance/debts";
-import type { Debt, DebtStrategy } from "@/lib/finance/types";
+import type { Debt } from "@/lib/finance/types";
 import { triggerHaptic } from "@/lib/native/haptics";
 
 export function IosDebtScreen() {
   const finance = useFinance();
   const { isLoading } = finance;
-  const [strategy, setStrategy] = useState<DebtStrategy>("avalanche");
   const [showDetails, setShowDetails] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [editDebtId, setEditDebtId] = useState<string | null>(null);
@@ -161,11 +160,7 @@ export function IosDebtScreen() {
           </button>
           {showDetails ? (
             <IosSection title="Payoff strategy">
-              <DebtStrategyPanel
-                data={finance}
-                strategy={strategy}
-                onStrategyChange={setStrategy}
-              />
+              <DebtPayoffPlanner variant="ios" />
             </IosSection>
           ) : null}
         </>

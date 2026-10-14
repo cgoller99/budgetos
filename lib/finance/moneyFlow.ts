@@ -1,6 +1,7 @@
 import { calculateMonthlyIncome, calculateMonthlySpending } from "@/lib/calculations/cashFlow";
 import { calculateAvailableCash, hasPlaidLinkedCashAccounts } from "@/lib/calculations/availableCash";
 import { getTotalMinimumPayments } from "@/lib/finance/debts";
+import { plannedExtraDebtMonthly } from "@/lib/finance/debtPayoff";
 import type { FinanceData } from "@/lib/finance/types";
 
 export type MoneyFlowStageId =
@@ -207,7 +208,10 @@ export function calculateMoneyFlow(
   const bills = calculateMonthlySpending(data, referenceDate);
   const afterBills = Math.max(income - bills, 0);
 
-  const rawDebts = getTotalMinimumPayments(data);
+  const rawDebts =
+    Math.round(
+      (getTotalMinimumPayments(data) + plannedExtraDebtMonthly(data.incomePlan)) * 100,
+    ) / 100;
   const debts = Math.min(rawDebts, afterBills);
   const afterDebts = Math.max(afterBills - debts, 0);
 

@@ -5,7 +5,7 @@ import { AddDebtModal } from "@/components/debt/AddDebtModal";
 import { DeleteDebtModal } from "@/components/debt/DeleteDebtModal";
 import { EditDebtModal } from "@/components/debt/EditDebtModal";
 import { DebtRow } from "@/components/debt/DebtRow";
-import { DebtStrategyPanel } from "@/components/debt/DebtStrategyPanel";
+import { DebtPayoffPlanner } from "@/components/debt/DebtPayoffPlanner";
 import { MakePaymentModal } from "@/components/debt/MakePaymentModal";
 import { IosDebtScreen } from "@/components/native/ios/IosDebtScreen";
 import {
@@ -13,16 +13,11 @@ import {
   EmptyState,
   PageHeader,
   SkeletonGrid,
-  StatCard,
 } from "@/components/ui";
 import { pageContainerWideClassName } from "@/components/ui/tokens";
 import { useFinance } from "@/context/FinanceContext";
-import { formatCurrency } from "@/lib/finance/format";
-import {
-  getDebtsDashboardSummary,
-  getDebtTableRows,
-} from "@/lib/finance/debts";
-import type { Debt, DebtStrategy } from "@/lib/finance/types";
+import { getDebtTableRows } from "@/lib/finance/debts";
+import type { Debt } from "@/lib/finance/types";
 import { useNativeIos } from "@/lib/native/useNativeIos";
 import { cn } from "@/components/ui/cn";
 
@@ -30,16 +25,11 @@ export function DebtContent() {
   const finance = useFinance();
   const { isLoading } = finance;
   const nativeIos = useNativeIos();
-  const [strategy, setStrategy] = useState<DebtStrategy>("avalanche");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editDebtId, setEditDebtId] = useState<string | null>(null);
   const [deleteDebtId, setDeleteDebtId] = useState<string | null>(null);
   const [paymentDebtId, setPaymentDebtId] = useState<string | null>(null);
 
-  const summary = useMemo(
-    () => getDebtsDashboardSummary(finance),
-    [finance],
-  );
   const rows = useMemo(() => getDebtTableRows(finance), [finance]);
 
   if (nativeIos) {
@@ -66,42 +56,7 @@ export function DebtContent() {
         }
       />
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          label="Total debt"
-          value={formatCurrency(summary.totalDebt)}
-          change={`${summary.activeDebtCount} active balances`}
-          positive={summary.totalDebt === 0}
-        />
-        <StatCard
-          label="Monthly minimum payments"
-          value={formatCurrency(summary.totalMinimumPayments)}
-          change="Required each month"
-          positive={summary.totalMinimumPayments === 0}
-        />
-        <StatCard
-          label="Estimated debt free date"
-          value={summary.estimatedDebtFreeDate}
-          change={
-            summary.activeDebtCount > 0
-              ? "At current minimums"
-              : "You're debt free"
-          }
-          positive={summary.activeDebtCount === 0}
-        />
-        <StatCard
-          label="Interest paid this year"
-          value={formatCurrency(summary.interestPaidThisYear)}
-          change="Estimated year to date"
-          positive={false}
-        />
-      </div>
-
-      <DebtStrategyPanel
-        data={finance}
-        strategy={strategy}
-        onStrategyChange={setStrategy}
-      />
+      <DebtPayoffPlanner />
 
       {rows.length === 0 ? (
         <EmptyState

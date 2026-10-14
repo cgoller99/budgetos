@@ -1,4 +1,5 @@
 import { resolveAllocationAmounts } from "@/lib/incomePlan/allocations";
+import { EXTRA_DEBT_ALLOCATION_NAME } from "@/lib/finance/debtPayoff";
 import { advancePayDate, formatPayDate } from "@/lib/incomePlan/payDates";
 import { calculateAvailableCash } from "@/lib/calculations/availableCash";
 import { getBillProgressList, getCurrentYearMonth } from "@/lib/finance/bills";
@@ -394,7 +395,12 @@ export function forecastCashOutlook(
             detail: `${allocation.name} takes ${formatCurrency(item.amount)} from the ${key} paycheck. The goal has no separate active schedule, so it is counted here once.`,
           });
         }
-        if (allocation.debtId && !debtIds.has(allocation.debtId)) {
+        if (allocation.debtId) {
+          const countedMinimum = debtIds.has(allocation.debtId);
+          const isExplicitExtra = allocation.name === EXTRA_DEBT_ALLOCATION_NAME;
+          if (countedMinimum && !isExplicitExtra) {
+            continue;
+          }
           events.push({
             id: `debt-plan-${allocation.id}-${key}`,
             date: key,
@@ -402,7 +408,9 @@ export function forecastCashOutlook(
             amount: roundCurrency(-item.amount),
             kind: "debt",
             confidence: "estimated",
-            detail: `${allocation.name} takes ${formatCurrency(item.amount)} from the ${key} paycheck. No separate debt due date was counted for it.`,
+            detail: isExplicitExtra
+              ? `${allocation.name} adds ${formatCurrency(item.amount)} from the ${key} paycheck. The scheduled minimum is counted separately, so this line is only the extra.`
+              : `${allocation.name} takes ${formatCurrency(item.amount)} from the ${key} paycheck. No separate debt due date was counted for it.`,
           });
         }
       }
