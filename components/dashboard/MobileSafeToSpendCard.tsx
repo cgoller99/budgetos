@@ -3,12 +3,16 @@
 import Link from "next/link";
 import { InfoTooltip } from "@/components/guidance/InfoTooltip";
 import { useFinance } from "@/context/FinanceContext";
+import { forecastCashUntilPayday } from "@/lib/finance/cashFlowForecast";
+import { describeCashOutlook, forecastCashOutlook } from "@/lib/finance/cashOutlook";
 import { formatCurrency } from "@/lib/finance/format";
 import { buildTransactionsHref, getCurrentMonthDateRange } from "@/lib/transactions/filterParams";
 
 export function MobileSafeToSpendCard() {
-  const { dashboard } = useFinance();
-  const safeToSpend = dashboard.moneyFlow.safeToSpend;
+  const finance = useFinance();
+  const safeToSpend = finance.dashboard.moneyFlow.safeToSpend;
+  const paydayForecast = forecastCashUntilPayday(finance);
+  const cashOutlook = describeCashOutlook(forecastCashOutlook(finance));
   const { dateFrom, dateTo } = getCurrentMonthDateRange();
 
   return (
@@ -33,6 +37,14 @@ export function MobileSafeToSpendCard() {
           <p className="mt-2 text-sm text-white/45">
             After bills, goals, and planned savings this month
           </p>
+          {paydayForecast.nextPayDate ? (
+            <p className="mt-1 text-sm text-white/55">
+              {formatCurrency(paydayForecast.safeUntilPayday)} until payday after bills due
+            </p>
+          ) : null}
+          {cashOutlook ? (
+            <p className="mt-1 text-sm text-white/55">{cashOutlook}</p>
+          ) : null}
         </div>
         <InfoTooltip label="Monthly amount left after planned bills, debt payments, goals, and investments." />
       </div>

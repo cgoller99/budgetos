@@ -1,12 +1,11 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { CashOutlookCard } from "@/components/dashboard/CashOutlookCard";
+import { IosBudgetsSection } from "@/components/native/ios/IosBudgetsSection";
 import { IosInsightsSection } from "@/components/native/ios/IosInsightsSection";
-import {
-  buildFinancialInsights,
-  suggestCategoryBudgets,
-} from "@/lib/automation/financialInsights";
+import { buildFinancialInsights } from "@/lib/automation/financialInsights";
 import {
   IosAvatar,
   IosBanner,
@@ -19,7 +18,11 @@ import {
   IosSection,
   IosSkeletonScreen,
 } from "@/components/native/ios/IosPrimitives";
+import { useAuth } from "@/context/AuthContext";
 import { useFinance } from "@/context/FinanceContext";
+import { readSavedCategoryBudgets } from "@/lib/automation/savedBudgets";
+import { forecastCashUntilPayday } from "@/lib/finance/cashFlowForecast";
+import { describeCashOutlook, forecastCashOutlook } from "@/lib/finance/cashOutlook";
 import { getBillsDueThisWeek } from "@/lib/finance/bills";
 import {
   formatCurrency,
@@ -53,6 +56,12 @@ function metricDelta(value: number, monthlyChange: number, favorableWhenDown = f
 
 export function IosHomeScreen() {
   const finance = useFinance();
+  const { user } = useAuth();
+  const [budgets, setBudgets] = useState<Array<{ category: string; amount: number }>>([]);
+
+  useEffect(() => {
+    setBudgets(readSavedCategoryBudgets(user?.id));
+  }, [user?.id]);
   const {
     isLoading,
     dashboard,
@@ -79,10 +88,9 @@ export function IosHomeScreen() {
     () => getBillsDueThisWeek(finance).slice(0, 3),
     [finance],
   );
-  const insights = useMemo(() => buildFinancialInsights(finance), [finance]);
-  const budgetSuggestions = useMemo(
-    () => suggestCategoryBudgets(finance),
-    [finance],
+  const insights = useMemo(
+    () => buildFinancialInsights(finance, new Date(), budgets).slice(0, 3),
+    [budgets, finance],
   );
 
   const recentTxns = useMemo(
@@ -102,6 +110,8 @@ export function IosHomeScreen() {
   const debt = dashboard.kpiMetrics.find((metric) => metric.label === "Debt");
   const moneyFlow = dashboard.moneyFlow;
   const safeToSpend = moneyFlow.safeToSpend;
+  const paydayForecast = forecastCashUntilPayday(finance);
+  const cashOutlook = describeCashOutlook(forecastCashOutlook(finance));
   const health = dashboard.financialHealthScore;
   const nextPaycheck = dashboard.nextPaycheck;
   const nextGoal = dashboard.nextGoal;
@@ -162,6 +172,14 @@ export function IosHomeScreen() {
             ? `of ${formatCurrency(moneyFlow.income)} this month`
             : spendHint}
         </p>
+        {paydayForecast.nextPayDate ? (
+          <p className="mt-1 text-[12px] leading-snug text-white/75">
+            {formatCurrency(paydayForecast.safeUntilPayday)} until payday after bills due
+          </p>
+        ) : null}
+        {cashOutlook ? (
+          <p className="mt-1 text-[12px] leading-snug text-white/75">{cashOutlook}</p>
+        ) : null}
         <p className="mt-3 text-[12px] font-medium text-white/70">Health {health.score}</p>
       </section>
 
@@ -257,7 +275,9 @@ export function IosHomeScreen() {
         />
       ) : null}
 
-      <IosInsightsSection insights={insights} budgetSuggestions={budgetSuggestions} />
+      <CashOutlookCard />
+      <IosInsightsSection insights={insights} />
+      <IosBudgetsSection />
 
       <IosSection title="Upcoming" action={<IosLink href="/bills">See All</IosLink>}>
         <IosList>

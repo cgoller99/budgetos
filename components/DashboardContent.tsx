@@ -5,11 +5,14 @@ import { DashboardHero } from "@/components/dashboard/DashboardHero";
 import { DashboardMoreSection } from "@/components/dashboard/DashboardMoreSection";
 import { FinancialTrendsCard } from "@/components/dashboard/FinancialTrendsCard";
 import { RecentTransactionsCard } from "@/components/dashboard/RecentTransactionsCard";
+import { CategoryBudgetsCard } from "@/components/budgets/CategoryBudgetsCard";
 import { SpendingBreakdownCard } from "@/components/dashboard/SpendingBreakdownCard";
 import { ThisWeeksPlanCard } from "@/components/dashboard/ThisWeeksPlanCard";
 import { TopGoalsCard } from "@/components/dashboard/TopGoalsCard";
 import { UpcomingBillsCard } from "@/components/dashboard/UpcomingBillsCard";
+import { CashOutlookCard } from "@/components/dashboard/CashOutlookCard";
 import { WeeklyCashFlowCard } from "@/components/dashboard/WeeklyCashFlowCard";
+import { DashboardInsightsCard } from "@/components/insights/InsightsContent";
 import { WelcomeChecklist } from "@/components/guidance/WelcomeChecklist";
 import { IosHomeScreen } from "@/components/native/ios/IosHomeScreen";
 import { DashboardSkeleton } from "@/components/ui";
@@ -38,6 +41,7 @@ export function DashboardContent() {
     <div className={cn(pageContainerWideClassName)}>
       <DashboardHero />
       <WelcomeChecklist />
+      <DashboardInsightsCard />
 
       <div className={dashboardMediumSectionClassName}>
         <UpcomingBillsCard />
@@ -45,12 +49,16 @@ export function DashboardContent() {
         <TopGoalsCard />
       </div>
 
+      <CashOutlookCard />
+
       <div className={dashboardCompactSectionClassName}>
         <WeeklyCashFlowCard />
         <SpendingBreakdownCard />
         <FinancialTrendsCard />
         <AchievementsCard />
       </div>
+
+      <CategoryBudgetsCard />
 
       {dashboard.weeklyPlan.length > 0 ? (
         <div id="weekly-plan" className="scroll-mt-24">

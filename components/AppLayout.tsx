@@ -34,6 +34,8 @@ const REFRESHABLE_PATHS = new Set([
   "/debt",
   "/investments",
   "/reports",
+  "/insights",
+  "/money-plan",
   "/calendar",
   "/settings",
 ]);

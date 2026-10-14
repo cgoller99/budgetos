@@ -1,7 +1,10 @@
-export type SavedCategoryBudget = {
-  category: string;
-  amount: number;
-};
+import {
+  parseCategoryBudgetCache,
+  visibleCategoryBudgets,
+  type SavedCategoryBudget,
+} from "@/lib/budgets/categoryBudgetSync";
+
+export type { SavedCategoryBudget } from "@/lib/budgets/categoryBudgetSync";
 
 const STORAGE_KEY = "buxme-category-budgets";
 
@@ -16,28 +19,9 @@ export function readSavedCategoryBudgets(
     return [];
   }
 
-  try {
-    const stored = window.localStorage.getItem(storageKey(userId));
-    if (!stored) {
-      return [];
-    }
-
-    const parsed = JSON.parse(stored) as SavedCategoryBudget[];
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed.filter(
-      (item) =>
-        typeof item?.category === "string" &&
-        item.category.trim().length > 0 &&
-        typeof item.amount === "number" &&
-        Number.isFinite(item.amount) &&
-        item.amount >= 0,
-    );
-  } catch {
-    return [];
-  }
+  return visibleCategoryBudgets(
+    parseCategoryBudgetCache(window.localStorage.getItem(storageKey(userId))),
+  );
 }
 
 export function writeSavedCategoryBudgets(
