@@ -1,4 +1,6 @@
+import { resolveAllocations } from "@/lib/allocation/allocationEngine";
 import type { FinanceData, SavingsGoal, Transaction } from "@/lib/finance/types";
+import { weeklySavingsFromPaycheckAmount } from "@/lib/finance/goalForecast";
 import { getGoalTypeMeta } from "@/lib/finance/goalTypes";
 
 export type GoalContributionSource =
@@ -46,22 +48,40 @@ function isIncomePlanContribution(transaction: Transaction): boolean {
   return transaction.notes?.includes("Income Plan") ?? false;
 }
 
-function getIncomePlanAllocationAmount(
-  data: FinanceData,
-  goalId: string,
-): number {
-  const allocation = data.incomePlan?.allocations.find(
-    (item) => item.goalId === goalId && !item.isRemainingBalance,
-  );
+function plannedPaycheckDollars(data: FinanceData, goalId: string): number {
+  const plan = data.incomePlan;
+  if (!plan) {
+    return 0;
+  }
 
-  return allocation?.amount ?? 0;
+  return roundCurrency(
+    resolveAllocations(plan)
+      .filter((item) => item.allocation.goalId === goalId)
+      .reduce((total, item) => total + item.amount, 0),
+  );
+}
+
+/** Weekly savings implied by paycheck allocations for this goal. Does not change the saved balance. */
+export function paycheckWeeklyForGoal(data: FinanceData, goalId: string): number {
+  const plan = data.incomePlan;
+  if (!plan) {
+    return 0;
+  }
+
+  return (
+    weeklySavingsFromPaycheckAmount(
+      plannedPaycheckDollars(data, goalId),
+      plan.paySchedule,
+      plan.customIntervalDays,
+    ) ?? 0
+  );
 }
 
 export function getGoalContributionBreakdown(
   data: FinanceData,
   goal: SavingsGoal,
 ): GoalContributionBreakdown {
-  const incomePlanAmount = getIncomePlanAllocationAmount(data, goal.id);
+  const incomeWeekly = paycheckWeeklyForGoal(data, goal.id);
   const autoAmount = goal.autoContribution?.amount ?? 0;
   const autoWeekly =
     goal.autoContribution?.frequency === "weekly"
@@ -72,19 +92,19 @@ export function getGoalContributionBreakdown(
           ? autoAmount / 4.33
           : 0;
 
-  if (incomePlanAmount > 0 && autoWeekly > 0) {
+  if (incomeWeekly > 0 && autoWeekly > 0) {
     return {
-      weeklyContribution: roundCurrency(incomePlanAmount / 4.33 + autoWeekly),
-      monthlyContribution: roundCurrency(incomePlanAmount + autoWeekly * 4.33),
+      weeklyContribution: roundCurrency(incomeWeekly + autoWeekly),
+      monthlyContribution: roundCurrency((incomeWeekly + autoWeekly) * 4.33),
       source: "mixed",
       sourceLabel: "Income Plan + Automatic",
     };
   }
 
-  if (incomePlanAmount > 0) {
+  if (incomeWeekly > 0) {
     return {
-      weeklyContribution: roundCurrency(incomePlanAmount / 4.33),
-      monthlyContribution: roundCurrency(incomePlanAmount),
+      weeklyContribution: roundCurrency(incomeWeekly),
+      monthlyContribution: roundCurrency(incomeWeekly * 4.33),
       source: "income_plan",
       sourceLabel: "Income Plan",
     };

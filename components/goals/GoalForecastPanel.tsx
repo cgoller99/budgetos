@@ -4,12 +4,15 @@ import { useEffect, useState } from "react";
 import { useFinance } from "@/context/FinanceContext";
 import { formatCurrency } from "@/lib/finance/format";
 import {
+  getGoalContributionBreakdown,
+  paycheckWeeklyForGoal,
+} from "@/lib/finance/goalAnalytics";
+import {
   forecastGoalSavings,
   sumGoalContributions,
   weeklySavingsFromContribution,
 } from "@/lib/finance/goalForecast";
 import { formatGoalDate } from "@/lib/finance/goals";
-import { getGoalContributionBreakdown } from "@/lib/finance/goalAnalytics";
 import type { SavingsGoal } from "@/lib/finance/types";
 import { cn } from "@/components/ui/cn";
 
@@ -35,8 +38,12 @@ export function GoalForecastPanel({ goal, onSave }: GoalForecastPanelProps) {
   const [saving, setSaving] = useState(false);
 
   const savedWeekly = weeklySavingsFromContribution(goal.autoContribution);
+  const paycheckWeekly = paycheckWeeklyForGoal(finance, goal.id);
+  const breakdown = getGoalContributionBreakdown(finance, goal);
   const assumedWeekly =
-    savedWeekly ?? getGoalContributionBreakdown(finance, goal).weeklyContribution;
+    savedWeekly ??
+    Math.round(Math.max(0, breakdown.weeklyContribution - paycheckWeekly) * 100) /
+      100;
 
   useEffect(() => {
     setDraft(assumedWeekly);
@@ -49,7 +56,7 @@ export function GoalForecastPanel({ goal, onSave }: GoalForecastPanelProps) {
     current: goal.current,
     target: goal.target,
     createdAt: goal.createdAt,
-    weeklySavings: draft,
+    weeklySavings: draft + paycheckWeekly,
     contributed,
     paySchedule,
     customIntervalDays,
@@ -131,8 +138,11 @@ export function GoalForecastPanel({ goal, onSave }: GoalForecastPanelProps) {
       <p className="mt-1 text-[14px] font-semibold tabular-nums text-[var(--foreground)]">
         {formatCurrency(draft)} / week
       </p>
-      <p className="mt-2 text-[12px] leading-snug text-[var(--text-muted)]">
+      <p className="mt-2 text-[12px] leading-snug text-[var(--text-secondary)]">
         This preview stays here until you save the plan. Saving does not move money.
+        {paycheckWeekly > 0
+          ? ` The finish date includes ${formatCurrency(paycheckWeekly)} / week from your paycheck plan.`
+          : ""}
       </p>
       <button
         type="button"

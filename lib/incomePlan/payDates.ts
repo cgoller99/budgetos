@@ -142,6 +142,38 @@ export function computeNextPayDate(
   return toDateString(next);
 }
 
+/**
+ * Next payday to show or forecast.
+ * A stored next date that is still today or later is kept as entered.
+ * A stored date in the past is projected forward from the saved schedule.
+ * This does not write the customer's payday settings.
+ */
+export function resolveUpcomingPayDate(
+  plan: Pick<
+    IncomePlan,
+    | "paySchedule"
+    | "anchorDate"
+    | "weeklyDayOfWeek"
+    | "monthlyDays"
+    | "customIntervalDays"
+    | "nextPayDate"
+  >,
+  referenceDate = new Date(),
+): string {
+  const today = startOfDay(referenceDate);
+  const stored = startOfDay(parseDateString(plan.nextPayDate.slice(0, 10)));
+
+  if (Number.isNaN(stored.getTime()) || stored.getTime() >= today.getTime()) {
+    return toDateString(stored);
+  }
+
+  return computeNextPayDate(plan.paySchedule, plan.anchorDate, referenceDate, {
+    weeklyDayOfWeek: plan.weeklyDayOfWeek,
+    monthlyDays: plan.monthlyDays,
+    customIntervalDays: plan.customIntervalDays,
+  });
+}
+
 export function advancePayDate(
   plan: Pick<
     IncomePlan,

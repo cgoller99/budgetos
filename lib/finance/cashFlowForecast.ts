@@ -5,7 +5,13 @@ import {
   isIncomeSourceActive,
 } from "@/lib/finance/effectiveIncome";
 import type { FinanceData } from "@/lib/finance/types";
-import { parseDateString, startOfDay, toDateString } from "@/lib/recurring/schedule";
+import { resolveUpcomingPayDate } from "@/lib/incomePlan/payDates";
+import {
+  computeInitialNextOccurrence,
+  parseDateString,
+  startOfDay,
+  toDateString,
+} from "@/lib/recurring/schedule";
 
 const DEFAULT_HORIZON_DAYS = 14;
 
@@ -34,25 +40,27 @@ function daysBetween(start: Date, end: Date): number {
 }
 
 function nextPayday(data: FinanceData, referenceDate: Date): Date | null {
-  const today = startOfDay(referenceDate);
   const dates: Date[] = [];
   const plan = data.incomePlan;
 
   if (plan?.isActive && plan.nextPayDate) {
-    const payDate = parseDateString(plan.nextPayDate.slice(0, 10));
-    if (payDate.getTime() >= today.getTime()) {
-      dates.push(payDate);
-    }
+    dates.push(parseDateString(resolveUpcomingPayDate(plan, referenceDate)));
   }
 
   for (const source of getEffectiveIncomeSources(data)) {
     if (!isIncomeSourceActive(source) || !source.schedule?.nextOccurrence) {
       continue;
     }
-    const payDate = parseDateString(source.schedule.nextOccurrence);
-    if (payDate.getTime() >= today.getTime()) {
-      dates.push(payDate);
+    if (plan?.isActive && source.id === "__buxme_income_plan__") {
+      continue;
     }
+    dates.push(
+      computeInitialNextOccurrence(
+        parseDateString(source.schedule.nextOccurrence),
+        source.schedule.frequency || source.frequency,
+        referenceDate,
+      ),
+    );
   }
 
   if (dates.length === 0) {

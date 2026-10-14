@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
-  Badge,
   Button,
   Card,
   CardContent,
@@ -13,26 +12,29 @@ import {
   SkeletonGrid,
 } from "@/components/ui";
 import { pageContainerWideClassName } from "@/components/ui/tokens";
-import { AllocationSummary } from "@/components/incomePlan/AllocationSummary";
+import { PaycheckAllocationEditor } from "@/components/incomePlan/PaycheckAllocationEditor";
 import { EnvelopeBalancesCard } from "@/components/incomePlan/EnvelopeBalancesCard";
 import { MonthlyAllocationProgress, NextPaycheckCard } from "@/components/incomePlan/NextPaycheckCard";
 import { PaycheckDetectedPromptList } from "@/components/incomePlan/PaycheckDetectedPrompt";
 import { useFinance } from "@/context/FinanceContext";
 import { useToast } from "@/context/ToastContext";
+import { getAllocationType } from "@/lib/allocation/allocationEngine";
+import type { AllocationType } from "@/lib/allocation/types";
 import {
-  formatAllocationAmountInput,
+  allocationAmountInputValue,
+  allocationPercentInputValue,
+  applyAllocationInputs,
   getAllocationSummary,
-  parseAllocationAmountInput,
+  setAllocationModeOnDraft,
   suggestAllocationIcons,
   validateAllocations,
-  resolveAllocationAmounts,
+  type AllocationDraftFields,
 } from "@/lib/incomePlan/allocations";
 import { describePaySchedule } from "@/lib/incomePlan/payDates";
 import {
   EXTRA_PAYCHECK_SUGGESTIONS,
   INCOME_PLAN_SCHEDULE_LABELS,
   WEEKDAY_LABELS,
-  type IncomePlanAllocation,
   type IncomePlanSchedule,
   type SaveIncomePlanInput,
 } from "@/lib/incomePlan/types";
@@ -50,7 +52,7 @@ const SCHEDULE_OPTIONS: IncomePlanSchedule[] = [
   "custom",
 ];
 
-type AllocationDraft = Omit<IncomePlanAllocation, "id"> & { id?: string };
+type AllocationDraft = AllocationDraftFields;
 
 function defaultAllocations(): AllocationDraft[] {
   return [
@@ -59,7 +61,7 @@ function defaultAllocations(): AllocationDraft[] {
       icon: "🏠",
       amount: null,
       percentage: null,
-      allocationType: null,
+      allocationType: "fixed",
       isRemainingBalance: false,
       accountId: null,
       goalId: null,
@@ -75,7 +77,7 @@ function defaultAllocations(): AllocationDraft[] {
       icon: "✈️",
       amount: null,
       percentage: null,
-      allocationType: null,
+      allocationType: "fixed",
       isRemainingBalance: false,
       accountId: null,
       goalId: null,
@@ -91,7 +93,7 @@ function defaultAllocations(): AllocationDraft[] {
       icon: "💳",
       amount: null,
       percentage: null,
-      allocationType: null,
+      allocationType: "fixed",
       isRemainingBalance: false,
       accountId: null,
       goalId: null,
@@ -107,7 +109,7 @@ function defaultAllocations(): AllocationDraft[] {
       icon: "🛍️",
       amount: null,
       percentage: null,
-      allocationType: null,
+      allocationType: "remaining",
       isRemainingBalance: true,
       accountId: null,
       goalId: null,
@@ -158,56 +160,49 @@ export function IncomePlanContent({ embedded = false }: { embedded?: boolean }) 
     existing?.allocations ?? defaultAllocations(),
   );
   const [amountInputs, setAmountInputs] = useState<string[]>(() =>
-    (existing?.allocations ?? defaultAllocations()).map((item) =>
-      item.isRemainingBalance
-        ? ""
-        : formatAllocationAmountInput(item.amount),
-    ),
+    (existing?.allocations ?? defaultAllocations()).map(allocationAmountInputValue),
   );
+  const [percentInputs, setPercentInputs] = useState<string[]>(() =>
+    (existing?.allocations ?? defaultAllocations()).map(allocationPercentInputValue),
+  );
+  const [allocationsDirty, setAllocationsDirty] = useState(false);
 
   const paycheckAmountValue = Number.parseFloat(paycheckAmount) || 0;
+  const usingSavedAllocations = Boolean(existing && !showSettings && !allocationsDirty);
+  const editorAllocations = usingSavedAllocations
+    ? existing!.allocations
+    : allocations;
+  const editorAmountInputs = usingSavedAllocations
+    ? existing!.allocations.map(allocationAmountInputValue)
+    : amountInputs;
+  const editorPercentInputs = usingSavedAllocations
+    ? existing!.allocations.map(allocationPercentInputValue)
+    : percentInputs;
+  const activePaycheckAmount =
+    existing && !showSettings ? existing.paycheckAmount : paycheckAmountValue;
+  const activePaySchedule =
+    existing && !showSettings ? existing.paySchedule : paySchedule;
+  const activeCustomIntervalDays =
+    existing && !showSettings
+      ? existing.customIntervalDays
+      : Number.parseInt(customIntervalDays, 10) || null;
 
   const parsedAllocations = useMemo(
     () =>
-      allocations.map((item, index) => ({
-        ...item,
-        amount: item.isRemainingBalance
-          ? null
-          : parseAllocationAmountInput(amountInputs[index] ?? ""),
-      })),
-    [allocations, amountInputs],
+      editorAllocations.map((item, index) =>
+        applyAllocationInputs(
+          item,
+          editorAmountInputs[index] ?? "",
+          editorPercentInputs[index] ?? "",
+        ),
+      ),
+    [editorAllocations, editorAmountInputs, editorPercentInputs],
   );
 
   const allocationSummary = useMemo(
-    () => getAllocationSummary(paycheckAmountValue, parsedAllocations),
-    [parsedAllocations, paycheckAmountValue],
+    () => getAllocationSummary(activePaycheckAmount, parsedAllocations),
+    [parsedAllocations, activePaycheckAmount],
   );
-
-  const resolvedExisting = useMemo(
-    () => (existing ? resolveAllocationAmounts(existing) : []),
-    [existing],
-  );
-
-  useEffect(() => {
-    if (!showSettings || !existing) {
-      return;
-    }
-
-    setPaySchedule(existing.paySchedule);
-    setPaycheckAmount(String(existing.paycheckAmount));
-    setAnchorDate(existing.anchorDate);
-    setWeeklyDayOfWeek(existing.weeklyDayOfWeek ?? new Date().getDay());
-    setMonthlyDays(existing.monthlyDays);
-    setCustomIntervalDays(String(existing.customIntervalDays ?? 14));
-    setDepositAccountId(existing.depositAccountId);
-    setAllocations(existing.allocations);
-    setAmountInputs(
-      existing.allocations.map((item) =>
-        item.isRemainingBalance ? "" : formatAllocationAmountInput(item.amount),
-      ),
-    );
-    setStep(1);
-  }, [existing, showSettings]);
 
   const previewPlan = useMemo(
     () =>
@@ -245,8 +240,59 @@ export function IncomePlanContent({ embedded = false }: { embedded?: boolean }) 
     return <SkeletonGrid count={4} />;
   }
 
+  function currentDraft() {
+    if (usingSavedAllocations && existing) {
+      return {
+        allocations: existing.allocations,
+        amountInputs: existing.allocations.map(allocationAmountInputValue),
+        percentInputs: existing.allocations.map(allocationPercentInputValue),
+      };
+    }
+
+    return { allocations, amountInputs, percentInputs };
+  }
+
+  function commitDraft(
+    nextAllocations: AllocationDraft[],
+    nextAmounts: string[],
+    nextPercents: string[],
+  ) {
+    setAllocations(nextAllocations);
+    setAmountInputs(nextAmounts);
+    setPercentInputs(nextPercents);
+    setAllocationsDirty(true);
+  }
+
+  function hydrateSchedule(plan: NonNullable<typeof existing>) {
+    setPaySchedule(plan.paySchedule);
+    setPaycheckAmount(String(plan.paycheckAmount));
+    setAnchorDate(plan.anchorDate);
+    setWeeklyDayOfWeek(plan.weeklyDayOfWeek ?? new Date().getDay());
+    setMonthlyDays(plan.monthlyDays);
+    setCustomIntervalDays(String(plan.customIntervalDays ?? 14));
+    setDepositAccountId(plan.depositAccountId);
+  }
+
+  function openSettings() {
+    if (!existing) {
+      return;
+    }
+
+    hydrateSchedule(existing);
+    if (!allocationsDirty) {
+      setAllocations(existing.allocations);
+      setAmountInputs(existing.allocations.map(allocationAmountInputValue));
+      setPercentInputs(existing.allocations.map(allocationPercentInputValue));
+    }
+    setShowSettings(true);
+    setStep(1);
+  }
+
   async function handleSave() {
-    const amount = Number.parseFloat(paycheckAmount);
+    const keepSavedSchedule = Boolean(existing && !showSettings);
+    const amount = keepSavedSchedule
+      ? existing!.paycheckAmount
+      : Number.parseFloat(paycheckAmount);
 
     if (!Number.isFinite(amount) || amount <= 0) {
       showToast({
@@ -270,27 +316,38 @@ export function IncomePlanContent({ embedded = false }: { embedded?: boolean }) 
       return;
     }
 
-    const input: SaveIncomePlanInput = {
-      paySchedule,
-      paycheckAmount: amount,
-      anchorDate,
-      weeklyDayOfWeek:
-        paySchedule === "weekly" || paySchedule === "biweekly"
-          ? weeklyDayOfWeek
-          : null,
-      monthlyDays:
-        paySchedule === "twice_monthly"
-          ? monthlyDays
-          : paySchedule === "monthly"
-            ? [monthlyDays[0] ?? 1]
-            : [1, 15],
-      customIntervalDays:
-        paySchedule === "custom"
-          ? Number.parseInt(customIntervalDays, 10) || 14
-          : null,
-      depositAccountId,
-      allocations: normalizedAllocations,
-    };
+    const input: SaveIncomePlanInput = keepSavedSchedule
+      ? {
+          paySchedule: existing!.paySchedule,
+          paycheckAmount: existing!.paycheckAmount,
+          anchorDate: existing!.anchorDate,
+          weeklyDayOfWeek: existing!.weeklyDayOfWeek,
+          monthlyDays: existing!.monthlyDays,
+          customIntervalDays: existing!.customIntervalDays,
+          depositAccountId: existing!.depositAccountId,
+          allocations: normalizedAllocations,
+        }
+      : {
+          paySchedule,
+          paycheckAmount: amount,
+          anchorDate,
+          weeklyDayOfWeek:
+            paySchedule === "weekly" || paySchedule === "biweekly"
+              ? weeklyDayOfWeek
+              : null,
+          monthlyDays:
+            paySchedule === "twice_monthly"
+              ? monthlyDays
+              : paySchedule === "monthly"
+                ? [monthlyDays[0] ?? 1]
+                : [1, 15],
+          customIntervalDays:
+            paySchedule === "custom"
+              ? Number.parseInt(customIntervalDays, 10) || 14
+              : null,
+          depositAccountId,
+          allocations: normalizedAllocations,
+        };
 
     setIsSaving(true);
 
@@ -301,6 +358,7 @@ export function IncomePlanContent({ embedded = false }: { embedded?: boolean }) 
         subtitle: "Your next paycheck is on the dashboard.",
         type: "success",
       });
+      setAllocationsDirty(false);
       setShowSettings(false);
       setStep(1);
     } catch {
@@ -311,87 +369,229 @@ export function IncomePlanContent({ embedded = false }: { embedded?: boolean }) 
   }
 
   function updateAmountInput(index: number, value: string) {
-    setAmountInputs((previous) =>
-      previous.map((item, itemIndex) => (itemIndex === index ? value : item)),
+    const draft = currentDraft();
+    commitDraft(
+      draft.allocations,
+      draft.amountInputs.map((item, itemIndex) =>
+        itemIndex === index ? value : item,
+      ),
+      draft.percentInputs,
+    );
+  }
+
+  function updatePercentInput(index: number, value: string) {
+    const draft = currentDraft();
+    commitDraft(
+      draft.allocations,
+      draft.amountInputs,
+      draft.percentInputs.map((item, itemIndex) =>
+        itemIndex === index ? value : item,
+      ),
     );
   }
 
   function updateAllocation(index: number, patch: Partial<AllocationDraft>) {
-    setAllocations((previous) =>
-      previous.map((item, itemIndex) =>
+    const draft = currentDraft();
+    commitDraft(
+      draft.allocations.map((item, itemIndex) =>
         itemIndex === index ? { ...item, ...patch } : item,
       ),
+      draft.amountInputs,
+      draft.percentInputs,
+    );
+  }
+
+  function assignGoal(index: number, goalId: string | null) {
+    const draft = currentDraft();
+    if (
+      goalId &&
+      draft.allocations.some(
+        (item, itemIndex) => itemIndex !== index && item.goalId === goalId,
+      )
+    ) {
+      const goal = finance.savingsGoals.find((item) => item.id === goalId);
+      showToast({
+        title: "Goal already added",
+        subtitle: goal
+          ? `Edit the ${goal.name} row to change that amount.`
+          : "Edit the existing row to change that amount.",
+      });
+      return;
+    }
+
+    const goal = goalId
+      ? finance.savingsGoals.find((item) => item.id === goalId)
+      : null;
+    const current = draft.allocations[index];
+    const previousGoal = finance.savingsGoals.find(
+      (item) => item.id === current?.goalId,
+    );
+    const shouldRename =
+      !current?.name.trim() ||
+      current.name === "New category" ||
+      current.name === previousGoal?.name;
+
+    updateAllocation(index, {
+      goalId,
+      ...(goal && shouldRename ? { name: goal.name, icon: goal.icon } : {}),
+    });
+  }
+
+  function insertAllocation(next: AllocationDraft) {
+    const draft = currentDraft();
+    const remainingIndex = draft.allocations.findIndex(
+      (item) => getAllocationType(item) === "remaining",
+    );
+    const index =
+      remainingIndex === -1 ? draft.allocations.length : remainingIndex;
+    commitDraft(
+      [
+        ...draft.allocations.slice(0, index),
+        next,
+        ...draft.allocations.slice(index),
+      ],
+      [
+        ...draft.amountInputs.slice(0, index),
+        "",
+        ...draft.amountInputs.slice(index),
+      ],
+      [
+        ...draft.percentInputs.slice(0, index),
+        "",
+        ...draft.percentInputs.slice(index),
+      ],
     );
   }
 
   function addAllocation() {
-    setAllocations((previous) => [
-      ...previous,
-      {
-        name: "New category",
-        icon: "💵",
-        amount: null,
-        percentage: null,
-        allocationType: null,
-        isRemainingBalance: false,
-        accountId: null,
-        goalId: null,
-        billId: null,
-        debtId: null,
-        investmentId: null,
-        monthlyTarget: null,
-        contributionFrequency: null,
-        sortOrder: previous.length,
-      },
-    ]);
-    setAmountInputs((previous) => [...previous, ""]);
+    insertAllocation({
+      name: "New category",
+      icon: "💵",
+      amount: null,
+      percentage: null,
+      allocationType: "fixed",
+      isRemainingBalance: false,
+      accountId: null,
+      goalId: null,
+      billId: null,
+      debtId: null,
+      investmentId: null,
+      monthlyTarget: null,
+      contributionFrequency: null,
+      sortOrder: 0,
+    });
   }
 
-  function removeAllocation(index: number) {
-    if (allocations.length <= 1) {
+  function addGoalAllocation(goalId: string) {
+    const goal = finance.savingsGoals.find((item) => item.id === goalId);
+    if (!goal) {
       return;
     }
 
-    setAllocations((previous) =>
-      previous.filter((_, itemIndex) => itemIndex !== index),
-    );
-    setAmountInputs((previous) =>
-      previous.filter((_, itemIndex) => itemIndex !== index),
+    const draft = currentDraft();
+    if (draft.allocations.some((item) => item.goalId === goalId)) {
+      showToast({
+        title: "Goal already added",
+        subtitle: `Edit the ${goal.name} row to change that amount.`,
+      });
+      return;
+    }
+
+    insertAllocation({
+      name: goal.name,
+      icon: goal.icon,
+      amount: null,
+      percentage: null,
+      allocationType: "fixed",
+      isRemainingBalance: false,
+      accountId: null,
+      goalId: goal.id,
+      billId: null,
+      debtId: null,
+      investmentId: null,
+      monthlyTarget: null,
+      contributionFrequency: null,
+      sortOrder: 0,
+    });
+  }
+
+  function removeAllocation(index: number) {
+    const draft = currentDraft();
+    if (draft.allocations.length <= 1) {
+      return;
+    }
+
+    commitDraft(
+      draft.allocations.filter((_, itemIndex) => itemIndex !== index),
+      draft.amountInputs.filter((_, itemIndex) => itemIndex !== index),
+      draft.percentInputs.filter((_, itemIndex) => itemIndex !== index),
     );
   }
 
-  function setRemainingBalance(index: number) {
-    setAllocations((previous) =>
-      previous.map((item, itemIndex) => ({
-        ...item,
-        isRemainingBalance: itemIndex === index,
-        amount:
-          itemIndex === index
-            ? null
-            : parseAllocationAmountInput(amountInputs[itemIndex] ?? ""),
-      })),
+  function setAllocationMode(index: number, mode: AllocationType) {
+    const draft = currentDraft();
+    const nextAllocations = setAllocationModeOnDraft(
+      draft.allocations,
+      index,
+      mode,
     );
-    setAmountInputs((previous) =>
-      previous.map((value, itemIndex) =>
-        itemIndex === index ? "" : value,
+    commitDraft(
+      nextAllocations,
+      draft.amountInputs.map((value, itemIndex) =>
+        mode === "remaining" && itemIndex === index ? "" : value,
+      ),
+      draft.percentInputs.map((value, itemIndex) =>
+        mode === "remaining" && itemIndex === index ? "" : value,
       ),
     );
   }
 
+  const saveAllocationsDisabled =
+    isSaving ||
+    finance.isSyncing ||
+    allocationSummary.isOverAllocated ||
+    allocationSummary.remainingBalanceCount !== 1 ||
+    allocationSummary.percentageTotal > 100 ||
+    activePaycheckAmount <= 0;
+
+  const allocationEditor = (
+    <PaycheckAllocationEditor
+      paycheckAmount={activePaycheckAmount}
+      allocations={parsedAllocations}
+      amountInputs={editorAmountInputs}
+      percentInputs={editorPercentInputs}
+      goals={finance.savingsGoals}
+      accounts={finance.accounts.map((account) => ({
+        id: account.id,
+        name: account.name,
+      }))}
+      paySchedule={activePaySchedule}
+      customIntervalDays={activeCustomIntervalDays}
+      onAmountInput={updateAmountInput}
+      onPercentInput={updatePercentInput}
+      onUpdate={updateAllocation}
+      onAssignGoal={assignGoal}
+      onAddGoal={addGoalAllocation}
+      onAddCategory={addAllocation}
+      onRemove={removeAllocation}
+      onSetMode={setAllocationMode}
+    />
+  );
+
   if (existing && !showSettings) {
     return (
-      <div className={cn(!embedded && pageContainerWideClassName, "space-y-6")}>
+      <div className={cn(!embedded && pageContainerWideClassName, "min-w-0 space-y-4")}>
         {!embedded ? (
           <PageHeader
             action={
-              <Button variant="secondary" onClick={() => setShowSettings(true)}>
+              <Button variant="secondary" onClick={openSettings}>
                 Edit plan
               </Button>
             }
           />
         ) : (
           <div className="flex justify-end">
-            <Button variant="secondary" onClick={() => setShowSettings(true)}>
+            <Button variant="secondary" onClick={openSettings}>
               Edit plan
             </Button>
           </div>
@@ -399,7 +599,7 @@ export function IncomePlanContent({ embedded = false }: { embedded?: boolean }) 
 
         <PaycheckDetectedPromptList />
 
-        <p className="text-sm text-[var(--text-muted)]">
+        <p className="text-sm text-[var(--text-secondary)]">
           {describePaySchedule(existing)} · {formatCurrency(existing.paycheckAmount)} per paycheck
         </p>
 
@@ -411,36 +611,20 @@ export function IncomePlanContent({ embedded = false }: { embedded?: boolean }) 
         <EnvelopeBalancesCard />
 
         <Card padding="lg">
-          <CardHeader title="Allocation rules" />
-          <CardContent className="space-y-3">
-            {resolvedExisting.map(({ allocation, amount }) => (
-              <div
-                key={allocation.id}
-                className="flex items-center justify-between gap-3 rounded-xl border border-[var(--surface-border)] bg-[var(--surface-subtle)] px-4 py-3"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-xl">{allocation.icon}</span>
-                  <div>
-                    <p className="font-medium text-[var(--foreground)]">
-                      {allocation.name}
-                    </p>
-                    <p className="text-sm text-[var(--text-muted)]">
-                      {allocation.isRemainingBalance
-                        ? "Remaining balance"
-                        : "Fixed amount"}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold tabular-nums text-[var(--foreground)]">
-                    {formatCurrency(amount)}
-                  </span>
-                  {allocation.isRemainingBalance && (
-                    <Badge variant="accent">Remaining</Badge>
-                  )}
-                </div>
-              </div>
-            ))}
+          <CardHeader
+            title="Paycheck allocations"
+            description="Set what each paycheck contributes. Saved balances change only when you confirm the paycheck."
+          />
+          <CardContent className="space-y-4">
+            {allocationEditor}
+            <Button
+              type="button"
+              size="lg"
+              disabled={saveAllocationsDisabled || !allocationsDirty}
+              onClick={() => void handleSave()}
+            >
+              {isSaving ? "Saving…" : "Save allocations"}
+            </Button>
           </CardContent>
         </Card>
 
@@ -472,11 +656,17 @@ export function IncomePlanContent({ embedded = false }: { embedded?: boolean }) 
   }
 
   return (
-    <div className={cn(pageContainerWideClassName, "space-y-6")}>
+    <div className={cn(!embedded && pageContainerWideClassName, "min-w-0 space-y-4")}>
       <PageHeader
         action={
           existing ? (
-            <Button variant="ghost" onClick={() => setShowSettings(false)}>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setShowSettings(false);
+                setAllocationsDirty(false);
+              }}
+            >
               Cancel
             </Button>
           ) : undefined
@@ -675,158 +865,9 @@ export function IncomePlanContent({ embedded = false }: { embedded?: boolean }) 
         <Card padding="lg">
           <CardHeader
             title="Where should each paycheck go?"
-            description="Enter a fixed dollar amount for each category, then mark one as Remaining Balance for what's left."
+            description="Add savings goals, set a dollar amount or percent, and leave one row for whatever is left."
           />
-          <CardContent className="space-y-3">
-            <div className="rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-subtle)] px-4 py-3">
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-sm font-medium text-[var(--text-muted)]">
-                  Paycheck
-                </span>
-                <span className="text-lg font-semibold tabular-nums text-[var(--foreground)]">
-                  {formatCurrency(paycheckAmountValue)}
-                </span>
-              </div>
-            </div>
-
-            {allocations.map((allocation, index) => (
-              <div
-                key={index}
-                className="rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-subtle)] p-4"
-              >
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                  <div className="flex min-w-0 flex-1 items-center gap-3">
-                    <input
-                      value={allocation.icon}
-                      onChange={(event) =>
-                        updateAllocation(index, { icon: event.target.value })
-                      }
-                      aria-label={`Icon for ${allocation.name}`}
-                      className="w-12 shrink-0 rounded-xl border border-[var(--surface-border)] bg-[var(--background)] px-2 py-2 text-center text-lg"
-                      maxLength={2}
-                    />
-                    <input
-                      value={allocation.name}
-                      onChange={(event) =>
-                        updateAllocation(index, { name: event.target.value })
-                      }
-                      placeholder="Category name"
-                      className="min-w-0 flex-1 rounded-xl border border-[var(--surface-border)] bg-[var(--background)] px-4 py-3 text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
-                    />
-                  </div>
-
-                  {allocation.isRemainingBalance ? (
-                    <div className="flex shrink-0 flex-col items-start gap-1 sm:min-w-[9rem] sm:items-end">
-                      <Badge variant="accent">Remaining Balance</Badge>
-                      <span
-                        className={cn(
-                          "text-lg font-semibold tabular-nums",
-                          allocationSummary.isOverAllocated
-                            ? "text-red-500"
-                            : "text-[var(--foreground)]",
-                        )}
-                      >
-                        {formatCurrency(allocationSummary.remaining)}
-                      </span>
-                    </div>
-                  ) : (
-                    <div className="flex shrink-0 flex-col gap-1 sm:min-w-[9rem] sm:items-end">
-                      <span className="text-xs font-medium text-[var(--text-muted)]">
-                        Fixed amount
-                      </span>
-                      <div className="relative w-full sm:w-36">
-                        <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">
-                          $
-                        </span>
-                        <input
-                          inputMode="decimal"
-                          value={amountInputs[index] ?? ""}
-                          onChange={(event) =>
-                            updateAmountInput(index, event.target.value)
-                          }
-                          placeholder="0"
-                          aria-label={`Fixed amount for ${allocation.name}`}
-                          className="w-full rounded-xl border border-[var(--surface-border)] bg-[var(--background)] py-3 pl-8 pr-4 text-right tabular-nums text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <FormField label="Account">
-                    <select
-                      value={allocation.accountId ?? ""}
-                      onChange={(event) =>
-                        updateAllocation(index, {
-                          accountId: event.target.value || null,
-                        })
-                      }
-                      className="w-full rounded-xl border border-[var(--surface-border)] bg-[var(--background)] px-4 py-3"
-                    >
-                      <option value="">None</option>
-                      {finance.accounts.map((account) => (
-                        <option key={account.id} value={account.id}>
-                          {account.name}
-                        </option>
-                      ))}
-                    </select>
-                  </FormField>
-                  <FormField label="Goal">
-                    <select
-                      value={allocation.goalId ?? ""}
-                      onChange={(event) =>
-                        updateAllocation(index, {
-                          goalId: event.target.value || null,
-                        })
-                      }
-                      className="w-full rounded-xl border border-[var(--surface-border)] bg-[var(--background)] px-4 py-3"
-                    >
-                      <option value="">None</option>
-                      {finance.savingsGoals.map((goal) => (
-                        <option key={goal.id} value={goal.id}>
-                          {goal.icon} {goal.name}
-                        </option>
-                      ))}
-                    </select>
-                  </FormField>
-                </div>
-
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Button
-                    size="sm"
-                    variant={
-                      allocation.isRemainingBalance ? "primary" : "secondary"
-                    }
-                    onClick={() => setRemainingBalance(index)}
-                  >
-                    {allocation.isRemainingBalance
-                      ? "Remaining Balance"
-                      : "Use as Remaining Balance"}
-                  </Button>
-                  {allocations.length > 1 && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => removeAllocation(index)}
-                    >
-                      Remove
-                    </Button>
-                  )}
-                </div>
-              </div>
-            ))}
-
-            <Button variant="secondary" onClick={addAllocation}>
-              Add category
-            </Button>
-
-            <AllocationSummary
-              paycheckAmount={paycheckAmountValue}
-              allocations={parsedAllocations}
-              className="mt-2"
-            />
-          </CardContent>
+          <CardContent>{allocationEditor}</CardContent>
         </Card>
       )}
 
@@ -842,13 +883,7 @@ export function IncomePlanContent({ embedded = false }: { embedded?: boolean }) 
           </Button>
         ) : (
           <Button
-            disabled={
-              isSaving ||
-              finance.isSyncing ||
-              allocationSummary.isOverAllocated ||
-              allocationSummary.remainingBalanceCount !== 1 ||
-              paycheckAmountValue <= 0
-            }
+            disabled={saveAllocationsDisabled}
             onClick={() => void handleSave()}
           >
             {isSaving ? "Saving…" : existing ? "Save changes" : "Finish setup"}

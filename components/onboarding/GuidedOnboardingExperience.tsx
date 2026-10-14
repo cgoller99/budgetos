@@ -293,7 +293,6 @@ export function GuidedOnboardingExperience() {
           },
         ],
       });
-      trackEvent(ANALYTICS_EVENTS.CREATED_INCOME_PLAN, { source: "onboarding" });
       await goToStep(5);
     } finally {
       setIsSubmitting(false);
@@ -311,7 +310,6 @@ export function GuidedOnboardingExperience() {
         type: progress.accountType as (typeof ACCOUNT_TYPE_OPTIONS)[number]["value"],
         balance: progress.accountBalance ?? 0,
       });
-      trackEvent(ANALYTICS_EVENTS.ADDED_ACCOUNT, { source: "onboarding" });
       await goToStep(6, { skippedManualAccounts: false });
     } finally {
       setIsSubmitting(false);
@@ -335,7 +333,6 @@ export function GuidedOnboardingExperience() {
         recurring: true,
         category: "Bills",
       });
-      trackEvent(ANALYTICS_EVENTS.ADDED_BILL, { source: "onboarding" });
       await goToStep(7);
     } finally {
       setIsSubmitting(false);
@@ -353,7 +350,6 @@ export function GuidedOnboardingExperience() {
         current: 0,
         target: progress.goalTarget,
       });
-      trackEvent(ANALYTICS_EVENTS.CREATED_GOAL, { source: "onboarding" });
       await goToStep(8);
     } finally {
       setIsSubmitting(false);

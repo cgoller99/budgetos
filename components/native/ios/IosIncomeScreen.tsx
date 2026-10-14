@@ -31,7 +31,12 @@ import { useToast } from "@/context/ToastContext";
 import { describeCashOutlook, forecastCashOutlook } from "@/lib/finance/cashOutlook";
 import { formatCurrency } from "@/lib/finance/format";
 import { resolveAllocationAmounts } from "@/lib/incomePlan/allocations";
-import { advancePayDate, describePaySchedule, formatPayDate } from "@/lib/incomePlan/payDates";
+import {
+  advancePayDate,
+  describePaySchedule,
+  formatPayDate,
+  resolveUpcomingPayDate,
+} from "@/lib/incomePlan/payDates";
 import { INCOME_PLAN_SCHEDULE_LABELS } from "@/lib/incomePlan/types";
 import {
   getIncomeDashboardSummary,
@@ -61,12 +66,16 @@ function PaycheckPlan({
 }) {
   const plan = finance.incomePlan;
   const paycheckState = classifyUpcomingPaycheck(finance);
-  const paydayLabel =
-    paycheckState.lifecycle === "received"
+  const upcomingPayDate = plan ? resolveUpcomingPayDate(plan) : null;
+  const showingProjectedDate = Boolean(
+    plan && upcomingPayDate && upcomingPayDate !== plan.nextPayDate,
+  );
+  const caughtUp = paycheckState.lifecycle === "applied" && !showingProjectedDate;
+  const paydayLabel = caughtUp
+    ? "Applied paycheck"
+    : paycheckState.lifecycle === "received"
       ? "Received paycheck"
-      : paycheckState.lifecycle === "applied"
-        ? "Applied paycheck"
-        : "Expected paycheck";
+      : "Expected paycheck";
   const outlook = forecastCashOutlook(finance);
   const cashOutlook = describeCashOutlook(outlook);
   const showOutlook = outlook.availableCash !== 0 || outlook.events.length > 0;
@@ -96,7 +105,7 @@ function PaycheckPlan({
       <IosCard padding="md">
         <p className="text-[12px] font-medium text-[var(--text-muted)]">{paydayLabel}</p>
         <p className="mt-1 text-[20px] font-semibold text-[var(--foreground)]">
-          {nextPaycheck?.formattedDate ?? formatPayDate(plan.nextPayDate)}
+          {nextPaycheck?.formattedDate ?? formatPayDate(resolveUpcomingPayDate(plan))}
         </p>
         <p className="mt-1 text-[13px] text-[var(--text-secondary)]">
           {describePaySchedule(plan)} · {INCOME_PLAN_SCHEDULE_LABELS[plan.paySchedule]}
@@ -107,11 +116,11 @@ function PaycheckPlan({
                 ? " · Tomorrow"
                 : ` · In ${nextPaycheck.daysUntil} days`
             : ""}
-          {paycheckState.lifecycle === "expected"
-            ? " · Forecast only"
+          {caughtUp
+            ? " · Allocations already applied"
             : paycheckState.lifecycle === "received"
               ? " · Confirm before allocations apply"
-              : " · Allocations already applied"}
+              : " · Forecast only"}
         </p>
         <div className="mt-3 flex items-end justify-between">
           <div>
@@ -167,8 +176,8 @@ function PaycheckPlan({
         {showEditor ? "Hide plan editor" : "Review plan"}
       </IosPrimaryButton>
       {(() => {
-        const dates = [plan.nextPayDate];
-        let cursor = plan;
+        const dates = [resolveUpcomingPayDate(plan)];
+        let cursor = { ...plan, nextPayDate: dates[0] };
         for (let index = 0; index < 2; index += 1) {
           const next = advancePayDate(cursor);
           if (!next || dates.includes(next)) break;

@@ -11,7 +11,6 @@ import { IosIncomeScreen } from "@/components/native/ios/IosIncomeScreen";
 import { MobileCollapsibleSection } from "@/components/ui/MobileCollapsibleSection";
 import { SkeletonGrid } from "@/components/ui";
 import { cn } from "@/components/ui/cn";
-import { pageContainerWideClassName } from "@/components/ui/tokens";
 import { useNativeIos } from "@/lib/native/useNativeIos";
 
 const DESKTOP_TABS = [
@@ -83,12 +82,12 @@ export function IncomeHubContent() {
     activeTab === "plan" || activeTab === "sources" ? activeTab : "plan";
 
   return (
-    <div className={cn(pageContainerWideClassName, "space-y-6")}>
+    <div className="mx-auto flex w-full min-w-0 max-w-6xl flex-col gap-4">
       <div>
-        <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-subtle)]">
+        <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-secondary)]">
           Cash Flow
         </p>
-        <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
+        <p className="mt-1 max-w-2xl text-sm text-[var(--text-secondary)]">
           Paychecks, your plan, allocation history, and forecasts — all in one
           place. Plans run automatically on your schedule.
         </p>
@@ -168,7 +167,7 @@ export function IncomeHubContent() {
           ))}
         </div>
 
-        <div className="mt-6" role="tabpanel">
+        <div className="mt-4" role="tabpanel">
           {activeTab === "sources" ? <IncomeContent embedded /> : null}
           {activeTab === "plan" ? <IncomePlanContent embedded /> : null}
           {activeTab === "history" ? <IncomeLedgerPanel /> : null}

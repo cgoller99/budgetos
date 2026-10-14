@@ -8,6 +8,9 @@ import {
 } from "@/lib/iap/appleServerClient";
 import { applyAppleSubscriptionByOriginalTransaction } from "@/lib/iap/appleSubscriptionService";
 import { getAppleIapConfig } from "@/lib/iap/config";
+import { planFromIapProductId } from "@/lib/iap/products";
+import { captureServerEvent } from "@/lib/analytics/server";
+import { subscriptionLifecycleCaptures } from "@/lib/analytics/subscriptionLifecycle";
 
 export type AppleNotificationHandleResult = {
   ok: true;
@@ -122,6 +125,21 @@ export async function handleAppleServerNotificationV2(
     environment: String(transactionEnvironment),
     status: action.kind === "deactivate" ? "canceled" : action.status,
   });
+
+  if (result.userId && notificationType) {
+    const captures = subscriptionLifecycleCaptures({
+      provider: "apple",
+      eventType: notificationType,
+      plan: planFromIapProductId(productId),
+      offerType:
+        typeof transaction.offerType === "number" ? transaction.offerType : null,
+    });
+    for (const capture of captures) {
+      await captureServerEvent(capture.event, capture.properties, {
+        distinctId: result.userId,
+      });
+    }
+  }
 
   return {
     ok: true,

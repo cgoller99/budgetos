@@ -56,6 +56,39 @@ function parseCreatedAt(value: string): Date {
   return new Date(value);
 }
 
+/** Weekly rate implied by a planned per-paycheck contribution. Does not move money. */
+export function weeklySavingsFromPaycheckAmount(
+  perPaycheckAmount: number,
+  paySchedule: IncomePlanSchedule | null | undefined,
+  customIntervalDays?: number | null,
+): number | null {
+  if (perPaycheckAmount <= 0 || !paySchedule) {
+    return null;
+  }
+
+  switch (paySchedule) {
+    case "weekly":
+      return roundCurrency(perPaycheckAmount);
+    case "biweekly":
+      return roundCurrency(perPaycheckAmount / 2);
+    case "twice_monthly":
+      return roundCurrency((perPaycheckAmount * 2) / WEEKS_PER_MONTH);
+    case "monthly":
+      return roundCurrency(perPaycheckAmount / WEEKS_PER_MONTH);
+    case "quarterly":
+      return roundCurrency(perPaycheckAmount / (WEEKS_PER_MONTH * 3));
+    case "yearly":
+      return roundCurrency(perPaycheckAmount / (WEEKS_PER_MONTH * 12));
+    case "custom":
+      if (!customIntervalDays || customIntervalDays <= 0) {
+        return null;
+      }
+      return roundCurrency((perPaycheckAmount * 7) / customIntervalDays);
+    default:
+      return null;
+  }
+}
+
 export function perPaycheckSavings(
   weeklySavings: number,
   paySchedule: IncomePlanSchedule | null | undefined,

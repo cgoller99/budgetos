@@ -55,6 +55,7 @@ assert.match(goals, /IosRing/);
 
 const plan = read("components/native/ios/IosIncomeScreen.tsx");
 assert.match(plan, /Cash-flow outlook/);
+assert.match(plan, /resolveUpcomingPayDate/);
 assert.match(plan, /Confirm before allocations apply/);
 assert.match(plan, /30-day low/);
 assert.match(plan, /footer=/);
