@@ -35,6 +35,7 @@ jobs:
           npm run test:alias-hook
           npm run test:subscription-lifecycle
           npm run test:debt-payoff
+          npm run test:household-member-rls
           npm run test:ios-ui-21
           npm run test:onboarding-progress
           npm run test:plaid-credit-mapping

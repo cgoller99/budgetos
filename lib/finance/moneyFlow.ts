@@ -1,8 +1,10 @@
 import { calculateMonthlyIncome, calculateMonthlySpending } from "@/lib/calculations/cashFlow";
 import { calculateAvailableCash, hasPlaidLinkedCashAccounts } from "@/lib/calculations/availableCash";
-import { getTotalMinimumPayments } from "@/lib/finance/debts";
 import { plannedExtraDebtMonthly } from "@/lib/finance/debtPayoff";
+import { isPersonalOwnerRow } from "@/lib/finance/personalIncomeScope";
 import type { FinanceData } from "@/lib/finance/types";
+import { getTransactionsForMonth } from "@/lib/transactions";
+import { isInternalTransferExpense } from "@/lib/transactions/transferDetection";
 
 export type MoneyFlowStageId =
   | "income"
@@ -46,6 +48,61 @@ const GOAL_ALLOCATION_MONTHS = 12;
 
 function sum(values: number[]): number {
   return values.reduce((total, value) => total + value, 0);
+}
+
+function roundCurrency(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+/**
+ * Debt minimums are reserved once. A posted payment on that debt counts
+ * toward the minimum, and only the amount above the minimum is extra.
+ */
+function reservedDebtPayments(data: FinanceData, referenceDate: Date): number {
+  const paidByDebt = new Map<string, number>();
+  for (const transaction of getTransactionsForMonth(data, referenceDate)) {
+    if (
+      transaction.type !== "expense" ||
+      !transaction.debtId ||
+      transaction.goalId ||
+      transaction.amount <= 0 ||
+      isInternalTransferExpense(data, transaction) ||
+      !isPersonalOwnerRow(transaction.ownerUserId, data.viewerUserId)
+    ) {
+      continue;
+    }
+    paidByDebt.set(
+      transaction.debtId,
+      (paidByDebt.get(transaction.debtId) ?? 0) + transaction.amount,
+    );
+  }
+
+  const activeIds = new Set<string>();
+  let reserved = 0;
+  let paidBeyondMinimum = 0;
+  for (const debt of data.debts ?? []) {
+    if (debt.balance <= 0.009) {
+      continue;
+    }
+    activeIds.add(debt.id);
+    const minimum = Math.max(debt.minimumPayment, 0);
+    const posted = paidByDebt.get(debt.id) ?? 0;
+    reserved += minimum;
+    if (posted > minimum) {
+      paidBeyondMinimum += posted - minimum;
+    }
+  }
+
+  let orphanPayments = 0;
+  for (const [debtId, amount] of paidByDebt) {
+    if (!activeIds.has(debtId)) {
+      orphanPayments += amount;
+    }
+  }
+
+  return roundCurrency(
+    reserved + Math.max(plannedExtraDebtMonthly(data.incomePlan), paidBeyondMinimum) + orphanPayments,
+  );
 }
 
 function calculateRawGoalContributions(data: FinanceData): number {
@@ -208,10 +265,7 @@ export function calculateMoneyFlow(
   const bills = calculateMonthlySpending(data, referenceDate);
   const afterBills = Math.max(income - bills, 0);
 
-  const rawDebts =
-    Math.round(
-      (getTotalMinimumPayments(data) + plannedExtraDebtMonthly(data.incomePlan)) * 100,
-    ) / 100;
+  const rawDebts = reservedDebtPayments(data, referenceDate);
   const debts = Math.min(rawDebts, afterBills);
   const afterDebts = Math.max(afterBills - debts, 0);
 

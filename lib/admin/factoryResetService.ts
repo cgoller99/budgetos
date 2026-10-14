@@ -19,6 +19,7 @@ const USER_FINANCE_TABLES = [
   "goals",
   "investments",
   "accounts",
+  "category_budgets",
   "plaid_recurring_dismissals",
   "notifications",
   "recurring_items",
