@@ -1,7 +1,7 @@
 import { resolveAuthorizedPaycheckInput } from "@/lib/automation/paycheckReview";
 import { resolvePaymentAccountId } from "@/lib/finance/balanceEffects";
 import type { FinanceData, Transaction } from "@/lib/finance/types";
-import { advancePayDate } from "@/lib/incomePlan/payDates";
+import { advancePayDate, resolveUpcomingPayDate } from "@/lib/incomePlan/payDates";
 import { resolveAllocations } from "@/lib/allocation/allocationEngine";
 import {
   applyEnvelopeContribution,
@@ -188,7 +188,7 @@ export function executePaycheckAllocations(
     throw new Error("Add a checking account to receive paychecks.");
   }
 
-  const payDate = plan.nextPayDate;
+  const payDate = resolveUpcomingPayDate(plan, referenceDate);
   const date =
     referenceDate.toISOString().split("T")[0] ?? referenceDate.toISOString();
   const resolved = resolveAllocations(plan, input.customAllocations);
@@ -278,7 +278,7 @@ export function executePaycheckAllocations(
   const updatedPlan: IncomePlan = {
     ...plan,
     lastProcessedDate: payDate,
-    nextPayDate: advancePayDate(plan),
+    nextPayDate: advancePayDate({ ...plan, nextPayDate: payDate }),
   };
 
   const paycheckEvent: IncomePlanPaycheckEvent = {

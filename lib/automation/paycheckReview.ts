@@ -6,7 +6,7 @@ import {
 } from "@/lib/finance/personalIncomeScope";
 import type { FinanceData, IncomeSource, Transaction } from "@/lib/finance/types";
 import { formatCurrency } from "@/lib/finance/format";
-import { formatPayDate } from "@/lib/incomePlan/payDates";
+import { formatPayDate, resolveUpcomingPayDate } from "@/lib/incomePlan/payDates";
 import {
   INCOME_PLAN_SCHEDULE_LABELS,
   type IncomePlan,
@@ -301,7 +301,12 @@ export function resolveAuthorizedPaycheckInput(
   const plan = filterPersonalIncomePlan(data.incomePlan, data.viewerUserId);
   const events = data.incomePlanPaychecks ?? [];
 
-  if (plan && events.some((event) => event.payDate === plan.nextPayDate)) {
+  const upcomingPayDate = plan ? resolveUpcomingPayDate(plan, referenceDate) : null;
+  if (
+    plan &&
+    upcomingPayDate &&
+    events.some((event) => event.payDate === upcomingPayDate)
+  ) {
     throw new Error("This paycheck was already applied.");
   }
 

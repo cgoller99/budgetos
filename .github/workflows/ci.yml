@@ -30,6 +30,7 @@ jobs:
         run: |
           npm run test:finance-calculations
           npm run test:income-annualization
+          npm run test:income-pay-dates
           npm run test:onboarding-progress
           npm run test:plaid-credit-mapping
           npm run test:recurring-bill-detection
