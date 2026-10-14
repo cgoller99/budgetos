@@ -29,6 +29,7 @@ jobs:
       - name: Run calculation tests
         run: |
           npm run test:finance-calculations
+          npm run test:p1-financial-accuracy
           npm run test:income-annualization
           npm run test:income-pay-dates
           npm run test:paycheck-goal-allocations

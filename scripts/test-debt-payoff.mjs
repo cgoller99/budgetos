@@ -357,6 +357,16 @@ function paycheckFlow(payment) {
   return calculateMoneyFlow(
     {
       ...emptyFinanceData,
+      accounts: [
+        {
+          id: "checking",
+          name: "Checking",
+          institution: "Bank",
+          type: "checking",
+          balance: 10_000,
+          includeInSafeToSpend: true,
+        },
+      ],
       income: [
         {
           id: "job",

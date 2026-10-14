@@ -578,6 +578,7 @@ export type IncomePlanRow = {
   monthly_days: number[];
   custom_interval_days: number | null;
   deposit_account_id: string | null;
+  linked_income_source_id?: string | null;
   next_pay_date: string;
   last_processed_date: string | null;
   is_active: boolean;

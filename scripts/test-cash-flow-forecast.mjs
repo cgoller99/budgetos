@@ -112,8 +112,9 @@ assert.equal(forecast.nextPayDate, "2026-10-30");
 assert.equal(forecast.daysUntilPayday, 18);
 assert.equal(forecast.availableCash, 1000);
 assert.equal(forecast.billsDueBeforePayday, 400);
-assert.equal(forecast.scheduledGoalSavings, 75);
-assert.equal(forecast.safeUntilPayday, 525);
+// Weekly $75 on 2026-10-20 and 2026-10-27 before payday 2026-10-30.
+assert.equal(forecast.scheduledGoalSavings, 150);
+assert.equal(forecast.safeUntilPayday, 450);
 assert.equal(Object.hasOwn(forecast, "projectedReturn"), false);
 
 const noPayday = forecastCashUntilPayday(

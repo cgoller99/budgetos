@@ -56,7 +56,11 @@ export function accountToFormState(account: Account): AccountFormState {
     icon: account.icon ?? "🏦",
     color: account.color ?? "blue",
     includeInNetWorth: account.includeInNetWorth !== false,
-    includeInSafeToSpend: account.includeInSafeToSpend !== false,
+    // Savings are not freely spendable by default — require an explicit opt-in.
+    includeInSafeToSpend:
+      account.type === "savings"
+        ? account.includeInSafeToSpend === true
+        : account.includeInSafeToSpend !== false,
     isHidden: account.isHidden === true,
     isArchived: Boolean(account.archivedAt),
   };

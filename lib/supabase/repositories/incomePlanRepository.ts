@@ -84,6 +84,7 @@ export function mapIncomePlanRow(
     monthlyDays: row.monthly_days ?? [1, 15],
     customIntervalDays: row.custom_interval_days,
     depositAccountId: row.deposit_account_id,
+    linkedIncomeSourceId: row.linked_income_source_id ?? null,
     nextPayDate: row.next_pay_date,
     lastProcessedDate: row.last_processed_date,
     isActive: row.is_active,
@@ -196,6 +197,7 @@ export class IncomePlanRepository {
           monthly_days: input.monthlyDays,
           custom_interval_days: input.customIntervalDays,
           deposit_account_id: input.depositAccountId,
+          linked_income_source_id: input.linkedIncomeSourceId ?? null,
           next_pay_date: nextPayDate,
           updated_at: timestamp,
         })
@@ -222,6 +224,7 @@ export class IncomePlanRepository {
             monthly_days: input.monthlyDays,
             custom_interval_days: input.customIntervalDays,
             deposit_account_id: input.depositAccountId,
+            linked_income_source_id: input.linkedIncomeSourceId ?? null,
             next_pay_date: nextPayDate,
             is_active: true,
             created_at: timestamp,

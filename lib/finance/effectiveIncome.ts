@@ -32,33 +32,45 @@ function mapPayScheduleToFrequency(schedule: IncomePlanSchedule): IncomeFrequenc
   }
 }
 
+/**
+ * Deterministic overlap between an Income Plan and an income source.
+ * Prefer an explicit linkedIncomeSourceId. Otherwise require the same
+ * deposit account and pay frequency — never name matching or amount tolerance alone.
+ */
+export function incomePlanRepresentsSource(
+  source: IncomeSource,
+  plan: IncomePlan,
+): boolean {
+  if (source.schedule?.status === "paused") {
+    return false;
+  }
+
+  if (plan.linkedIncomeSourceId && plan.linkedIncomeSourceId === source.id) {
+    return true;
+  }
+
+  const planFrequency = normalizeIncomeFrequency(
+    mapPayScheduleToFrequency(plan.paySchedule),
+  );
+  const sourceFrequency = normalizeIncomeFrequency(source.frequency);
+
+  if (
+    plan.depositAccountId &&
+    source.depositAccountId &&
+    plan.depositAccountId === source.depositAccountId &&
+    sourceFrequency === planFrequency
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
 function hasOverlappingIncomeSource(
   sources: IncomeSource[],
   plan: IncomePlan,
 ): boolean {
-  const planFrequency = mapPayScheduleToFrequency(plan.paySchedule);
-
-  return sources.some((source) => {
-    if (source.schedule?.status === "paused") {
-      return false;
-    }
-
-    const name = source.name.trim().toLowerCase();
-    if (name.includes("paycheck") || name.includes("salary")) {
-      return true;
-    }
-
-    if (plan.paycheckAmount <= 0) {
-      return false;
-    }
-
-    const amountMatch =
-      Math.abs(source.amount - plan.paycheckAmount) / plan.paycheckAmount <= 0.02;
-    const frequencyMatch =
-      normalizeIncomeFrequency(source.frequency) === planFrequency;
-
-    return amountMatch && frequencyMatch;
-  });
+  return sources.some((source) => incomePlanRepresentsSource(source, plan));
 }
 
 export function incomePlanToIncomeSource(plan: IncomePlan): IncomeSource | null {
