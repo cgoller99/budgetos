@@ -4,6 +4,13 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { trackFirstBudget } from "@/lib/analytics/client";
 import { useFinance } from "@/context/FinanceContext";
+import {
+  roundBudgetCurrency,
+  scheduleForEdit,
+  storedScheduleFields,
+  type BudgetFrequency,
+  type BudgetSchedule,
+} from "@/lib/budgets/budgetPeriod";
 import { createBrowserCategoryBudgetSession } from "@/lib/budgets/categoryBudgetClient";
 import {
   buildCategoryBudgetViews,
@@ -29,6 +36,11 @@ export function useCategoryBudgets() {
   const [seenUserId, setSeenUserId] = useState<string | null>(userId);
   const [category, setCategory] = useState("");
   const [amount, setAmount] = useState("");
+  const [frequency, setFrequency] = useState<BudgetFrequency>("monthly");
+  const [anchorDate, setAnchorDate] = useState("");
+  const [weekday, setWeekday] = useState(1);
+  const [monthDays, setMonthDays] = useState<[number, number]>([1, 15]);
+  const [intervalDays, setIntervalDays] = useState(14);
 
   if (userId !== seenUserId) {
     setSeenUserId(userId);
@@ -79,6 +91,25 @@ export function useCategoryBudgets() {
     () => buildCategoryBudgetViews(saved, finance),
     [finance, saved],
   );
+  const monthlyBudgetTotal = useMemo(
+    () =>
+      roundBudgetCurrency(
+        views.reduce((total, view) => total + view.monthlyEquivalent, 0),
+      ),
+    [views],
+  );
+
+  function budgetFromSchedule(
+    categoryName: string,
+    nextAmount: number,
+    schedule: BudgetSchedule,
+  ): SavedCategoryBudget {
+    return {
+      category: categoryName,
+      amount: roundBudgetCurrency(nextAmount),
+      ...storedScheduleFields(schedule),
+    };
+  }
 
   function acceptSuggestion(nextCategory: string, limit: number) {
     const categoryName = getDisplayCategory(nextCategory);
@@ -88,19 +119,47 @@ export function useCategoryBudgets() {
     ]);
   }
 
-  function updateAmount(nextCategory: string, nextAmount: number) {
-    if (!Number.isFinite(nextAmount) || nextAmount < 0) {
-      return;
-    }
-
+  function updateBudget(
+    nextCategory: string,
+    patch: Partial<BudgetSchedule> & { amount?: number },
+  ) {
     const categoryName = getDisplayCategory(nextCategory);
+    const current = saved.find((item) => getDisplayCategory(item.category) === categoryName);
+    if (!current) return;
+    const nextAmount = patch.amount ?? current.amount;
+    if (!Number.isFinite(nextAmount) || nextAmount < 0) return;
+    const schedule = scheduleForEdit(current, patch);
     persist(
       saved.map((item) =>
         getDisplayCategory(item.category) === categoryName
-          ? { ...item, category: categoryName, amount: Math.round(nextAmount * 100) / 100 }
+          ? budgetFromSchedule(categoryName, nextAmount, schedule)
           : item,
       ),
     );
+  }
+
+  function updateAmount(nextCategory: string, nextAmount: number) {
+    updateBudget(nextCategory, { amount: nextAmount });
+  }
+
+  function applyDraftSchedule(
+    patch: Partial<BudgetSchedule>,
+  ) {
+    const next = scheduleForEdit(
+      {
+        frequency,
+        anchorDate: anchorDate || null,
+        weekday,
+        monthDays,
+        intervalDays,
+      },
+      patch,
+    );
+    setFrequency(next.frequency);
+    setAnchorDate(next.anchorDate ?? "");
+    setWeekday(next.weekday ?? 1);
+    setMonthDays(next.monthDays ?? [1, 15]);
+    setIntervalDays(next.intervalDays ?? 14);
   }
 
   function removeBudget(nextCategory: string) {
@@ -116,20 +175,47 @@ export function useCategoryBudgets() {
       return;
     }
 
-    acceptSuggestion(name, Math.round(limit * 100) / 100);
+    const schedule = scheduleForEdit(
+      {
+        frequency,
+        anchorDate: anchorDate || null,
+        weekday,
+        monthDays,
+        intervalDays,
+      },
+      {},
+    );
+    const categoryName = getDisplayCategory(name);
+    persist([
+      ...saved.filter((item) => getDisplayCategory(item.category) !== categoryName),
+      budgetFromSchedule(categoryName, limit, schedule),
+    ]);
     setCategory("");
     setAmount("");
+    setFrequency("monthly");
+    setAnchorDate("");
+    setWeekday(1);
+    setMonthDays([1, 15]);
+    setIntervalDays(14);
   }
 
   return {
     suggestions,
     views,
+    monthlyBudgetTotal,
     category,
     setCategory,
     amount,
     setAmount,
+    frequency,
+    anchorDate,
+    weekday,
+    monthDays,
+    intervalDays,
+    applyDraftSchedule,
     acceptSuggestion,
     updateAmount,
+    updateBudget,
     removeBudget,
     addBudget,
     status: syncState.status,
