@@ -4,6 +4,7 @@ export {
   calculateDaysUntilNextPaycheck,
   calculateNetWorthMonthlyChange,
   calculateSafeToSpendBeforePaycheck,
+  calculateWeeklySpendingAllowance,
   estimateExtraDebtPayoffSavings,
   getEmergencyFundStatus,
   getHighestInterestDebt,

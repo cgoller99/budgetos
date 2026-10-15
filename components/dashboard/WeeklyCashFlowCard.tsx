@@ -61,7 +61,7 @@ function CashFlowGauge({
       <div className="absolute inset-x-0 bottom-0 text-center">
         {!compact ? (
           <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
-            Left
+            Weekly left
           </p>
         ) : null}
         <p
@@ -126,7 +126,8 @@ export function WeeklyCashFlowCard() {
       }
       insights={
         <p className="text-xs text-[var(--text-muted)]">
-          Net weekly position after planned bills and debt payments.
+          Weekly spending allowance (monthly Safe to Spend ÷ 4.33), separate from
+          cash available until payday below.
         </p>
       }
     >
@@ -151,7 +152,7 @@ export function WeeklyCashFlowCard() {
           </div>
           <div>
             <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
-              Left
+              Weekly left
             </p>
             <p className="mt-1 text-lg font-semibold tabular-nums text-[var(--accent-light)]">
               {formatCurrency(weekly.remaining)}

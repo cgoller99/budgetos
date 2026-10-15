@@ -16,6 +16,7 @@ import {
   getOnboardingTotalSteps,
   MANUAL_ONBOARDING_TOTAL_STEPS,
 } from "@/lib/onboarding/progress";
+import { resolveIncomePlanLinkedSourceId } from "@/lib/incomePlan/linkIncomeSource";
 import type { IncomePlanSchedule } from "@/lib/incomePlan/types";
 import { INCOME_PLAN_SCHEDULE_LABELS } from "@/lib/incomePlan/types";
 
@@ -158,8 +159,16 @@ export function GuidedOnboardingExperience() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuth();
-  const { addAccount, addBill, createGoal, saveIncomePlan, completeGuidedOnboarding, refreshFinance } =
-    useFinance();
+  const {
+    income,
+    incomePlan,
+    addAccount,
+    addBill,
+    createGoal,
+    saveIncomePlan,
+    completeGuidedOnboarding,
+    refreshFinance,
+  } = useFinance();
   const { inviteMember } = useHousehold();
   const [step, setStep] = useState(1);
   const [progress, setProgress] = useState<OnboardingProgress>({});
@@ -272,6 +281,11 @@ export function GuidedOnboardingExperience() {
     setIsSubmitting(true);
     try {
       const today = new Date().toISOString().slice(0, 10);
+      const link = resolveIncomePlanLinkedSourceId({
+        incomeSources: income,
+        existingLinkedIncomeSourceId: incomePlan?.linkedIncomeSourceId ?? null,
+      });
+
       await saveIncomePlan({
         paySchedule: progress.paySchedule,
         paycheckAmount: progress.paycheckAmount,
@@ -279,7 +293,9 @@ export function GuidedOnboardingExperience() {
         weeklyDayOfWeek: 5,
         monthlyDays: [1, 15],
         customIntervalDays: null,
-        depositAccountId: null,
+        // Deposit account is independent of the income-source ownership link.
+        depositAccountId: incomePlan?.depositAccountId ?? null,
+        linkedIncomeSourceId: link.incomeSourceId,
         allocations: [
           {
             name: "Spending",

@@ -1281,9 +1281,18 @@ export class FinanceService {
     input: SaveIncomePlanInput,
   ): Promise<FinanceData> {
     const current = await this.loadFinanceData(userId);
+    const { resolveIncomePlanLinkedSourceId } = await import(
+      "@/lib/incomePlan/linkIncomeSource"
+    );
+    const link = resolveIncomePlanLinkedSourceId({
+      incomeSources: current.income,
+      existingLinkedIncomeSourceId:
+        current.incomePlan?.linkedIncomeSourceId ?? null,
+      explicitLinkedIncomeSourceId: input.linkedIncomeSourceId,
+    });
     await this.incomePlans.saveIncomePlan(
       userId,
-      input,
+      { ...input, linkedIncomeSourceId: link.incomeSourceId },
       current.incomePlan?.id ?? null,
     );
     return this.loadFinanceData(userId);

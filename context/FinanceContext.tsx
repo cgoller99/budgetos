@@ -1154,6 +1154,44 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
         frequency: input.frequency,
         source: "manual",
       });
+
+      // If an Income Plan exists without a link and this is now the only active
+      // income source, persist the singleton ownership link (no name/amount match).
+      const plan = data.incomePlan;
+      if (plan?.isActive && !plan.linkedIncomeSourceId) {
+        const { resolveIncomePlanLinkedSourceId } = await import(
+          "@/lib/incomePlan/linkIncomeSource"
+        );
+        const link = resolveIncomePlanLinkedSourceId({
+          incomeSources: next.income,
+          existingLinkedIncomeSourceId: plan.linkedIncomeSourceId ?? null,
+        });
+        if (link.status === "linked" && link.reason === "singleton") {
+          const linkInput: SaveIncomePlanInput = {
+            paySchedule: plan.paySchedule,
+            paycheckAmount: plan.paycheckAmount,
+            anchorDate: plan.anchorDate,
+            weeklyDayOfWeek: plan.weeklyDayOfWeek,
+            monthlyDays: plan.monthlyDays,
+            customIntervalDays: plan.customIntervalDays,
+            depositAccountId: plan.depositAccountId,
+            linkedIncomeSourceId: link.incomeSourceId,
+            allocations: plan.allocations.map(
+              ({ id: _id, ...allocation }) => allocation,
+            ),
+          };
+          await runMutation(
+            {
+              ...next,
+              incomePlan: {
+                ...plan,
+                linkedIncomeSourceId: link.incomeSourceId,
+              },
+            },
+            (repository, userId) => repository.saveIncomePlan(userId, linkInput),
+          );
+        }
+      }
     },
     [data, runMutation],
   );
@@ -1697,6 +1735,19 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
   const saveIncomePlan = useCallback(
     async (input: SaveIncomePlanInput) => {
       const hadPlan = Boolean(data.incomePlan);
+      const { resolveIncomePlanLinkedSourceId } = await import(
+        "@/lib/incomePlan/linkIncomeSource"
+      );
+      const resolvedLink = resolveIncomePlanLinkedSourceId({
+        incomeSources: data.income,
+        existingLinkedIncomeSourceId: data.incomePlan?.linkedIncomeSourceId ?? null,
+        explicitLinkedIncomeSourceId: input.linkedIncomeSourceId,
+      });
+      const linkedIncomeSourceId = resolvedLink.incomeSourceId;
+      const persistedInput: SaveIncomePlanInput = {
+        ...input,
+        linkedIncomeSourceId,
+      };
 
       await runMutation(
         {
@@ -1704,22 +1755,41 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
           incomePlan: data.incomePlan
             ? {
                 ...data.incomePlan,
-                paySchedule: input.paySchedule,
-                paycheckAmount: input.paycheckAmount,
-                anchorDate: input.anchorDate,
-                weeklyDayOfWeek: input.weeklyDayOfWeek,
-                monthlyDays: input.monthlyDays,
-                customIntervalDays: input.customIntervalDays,
-                depositAccountId: input.depositAccountId,
-                allocations: input.allocations.map((allocation, index) => ({
+                paySchedule: persistedInput.paySchedule,
+                paycheckAmount: persistedInput.paycheckAmount,
+                anchorDate: persistedInput.anchorDate,
+                weeklyDayOfWeek: persistedInput.weeklyDayOfWeek,
+                monthlyDays: persistedInput.monthlyDays,
+                customIntervalDays: persistedInput.customIntervalDays,
+                depositAccountId: persistedInput.depositAccountId,
+                linkedIncomeSourceId,
+                allocations: persistedInput.allocations.map((allocation, index) => ({
                   ...allocation,
                   id: crypto.randomUUID(),
                   sortOrder: allocation.sortOrder ?? index,
                 })),
               }
-            : null,
+            : {
+                id: crypto.randomUUID(),
+                paySchedule: persistedInput.paySchedule,
+                paycheckAmount: persistedInput.paycheckAmount,
+                anchorDate: persistedInput.anchorDate,
+                weeklyDayOfWeek: persistedInput.weeklyDayOfWeek,
+                monthlyDays: persistedInput.monthlyDays,
+                customIntervalDays: persistedInput.customIntervalDays,
+                depositAccountId: persistedInput.depositAccountId,
+                linkedIncomeSourceId,
+                nextPayDate: persistedInput.anchorDate,
+                lastProcessedDate: null,
+                isActive: true,
+                allocations: persistedInput.allocations.map((allocation, index) => ({
+                  ...allocation,
+                  id: crypto.randomUUID(),
+                  sortOrder: allocation.sortOrder ?? index,
+                })),
+              },
         },
-        (repository, userId) => repository.saveIncomePlan(userId, input),
+        (repository, userId) => repository.saveIncomePlan(userId, persistedInput),
       );
 
       if (!hadPlan) {

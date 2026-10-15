@@ -19,18 +19,19 @@ function buildSafeToSpendRecommendation(
   data: FinanceData,
   referenceDate: Date,
 ): PlanCandidate | null {
+  // Authoritative until-payday cash (same contract as Dashboard payday metric).
   const amount = calculateSafeToSpendBeforePaycheck(data, referenceDate);
   const moneyFlow = calculateMoneyFlow(data);
   const paycheckLabel = formatPaycheckLabel(data);
 
-  if (moneyFlow.income <= 0) {
+  if (moneyFlow.income <= 0 && amount <= 0) {
     return null;
   }
 
   if (amount <= 0) {
     return {
       id: "safe-to-spend-critical",
-      message: `Your safe-to-spend balance is depleted before your ${paycheckLabel}. Review bills and spending.`,
+      message: `Your cash until payday is depleted before your ${paycheckLabel}. Review bills and spending.`,
       priority: "critical",
       score: 92,
     };
@@ -42,7 +43,7 @@ function buildSafeToSpendRecommendation(
 
   return {
     id: "safe-to-spend",
-    message: `You have ${formatCurrency(amount)} safe to spend before your ${paycheckLabel}.`,
+    message: `You have ${formatCurrency(amount)} available until your ${paycheckLabel} after bills and scheduled savings due before then.`,
     priority,
     score: priority === "positive" ? 68 : 78,
   };
