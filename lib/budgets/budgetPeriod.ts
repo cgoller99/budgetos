@@ -246,7 +246,7 @@ export function scheduleForEdit(
   referenceDate = new Date(),
 ): BudgetSchedule {
   const base = normalizeBudgetSchedule(current);
-  let schedule = normalizeBudgetSchedule({
+  const schedule = normalizeBudgetSchedule({
     frequency: patch.frequency ?? base.frequency,
     anchorDate: patch.anchorDate !== undefined ? patch.anchorDate : base.anchorDate,
     weekday: patch.weekday !== undefined ? patch.weekday : base.weekday,
@@ -369,6 +369,43 @@ export function currentBudgetPeriod(input: unknown, referenceDate = new Date()):
     default:
       return calendarMonth(today);
   }
+}
+
+/** Comparable previous period for the same schedule (not a simplistic /4 conversion). */
+export function previousBudgetPeriod(
+  input: unknown,
+  referenceDate = new Date(),
+): BudgetPeriod {
+  const current = currentBudgetPeriod(input, referenceDate);
+  const dayBefore = addDays(parseDateString(current.start), -1);
+  return currentBudgetPeriod(input, dayBefore);
+}
+
+export function budgetPeriodLengthDays(period: BudgetPeriod): number {
+  return calendarDaysBetween(parseDateString(period.start), parseDateString(period.end)) + 1;
+}
+
+export function budgetPeriodDaysElapsed(
+  period: BudgetPeriod,
+  referenceDate = new Date(),
+): number {
+  const today = startOfDay(referenceDate);
+  const start = parseDateString(period.start);
+  const end = parseDateString(period.end);
+  if (today.getTime() < start.getTime()) return 0;
+  if (today.getTime() > end.getTime()) {
+    return budgetPeriodLengthDays(period);
+  }
+  return calendarDaysBetween(start, today) + 1;
+}
+
+export function budgetPeriodDaysRemaining(
+  period: BudgetPeriod,
+  referenceDate = new Date(),
+): number {
+  const length = budgetPeriodLengthDays(period);
+  const elapsed = budgetPeriodDaysElapsed(period, referenceDate);
+  return Math.max(0, length - elapsed);
 }
 
 export function dateInBudgetPeriod(date: string, period: BudgetPeriod): boolean {

@@ -6,6 +6,7 @@ type NavIconName =
   | "accounts"
   | "income"
   | "bills"
+  | "budgets"
   | "calendar"
   | "transactions"
   | "savings"
@@ -53,6 +54,14 @@ export function NavIcon({ name, className = "h-[18px] w-[18px]" }: NavIconProps)
         <path d="M17 4v3h3" />
         <path d="M10 12h6" />
         <path d="M10 16h4" />
+      </>
+    ),
+    budgets: (
+      <>
+        <rect x="4" y="4" width="16" height="16" rx="2" />
+        <path d="M8 15V9" />
+        <path d="M12 15v-4" />
+        <path d="M16 15V7" />
       </>
     ),
     calendar: (

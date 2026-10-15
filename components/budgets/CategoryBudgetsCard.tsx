@@ -37,6 +37,14 @@ export function CategoryBudgetsCard() {
       <CardHeader
         title="Budgets"
         description="Category limits on the schedule you choose. Suggestions stay off until you confirm."
+        action={
+          <a
+            href="/budgets"
+            className="text-sm font-medium text-[var(--accent-light)] hover:underline"
+          >
+            Open Budgets
+          </a>
+        }
       />
       <CardContent className="space-y-5">
         <CategoryBudgetStatus status={status} message={syncMessage} onRetry={retry} />

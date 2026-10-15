@@ -116,6 +116,7 @@
     "test:paycheck-review": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-paycheck-review.mjs",
     "test:category-budgets": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-category-budgets.mjs",
     "test:budget-frequencies": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-budget-frequencies.mjs",
+    "test:budget-hub-goals": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-budget-hub-goals.mjs",
     "test:cash-flow-forecast": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-cash-flow-forecast.mjs",
     "test:cash-outlook": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-cash-outlook.mjs",
     "test:goal-forecast": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-goal-forecast.mjs"

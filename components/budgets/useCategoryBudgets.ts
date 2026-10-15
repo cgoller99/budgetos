@@ -20,6 +20,10 @@ import {
   type CategoryBudgetSyncState,
   type SavedCategoryBudget,
 } from "@/lib/budgets/categoryBudgetSync";
+import {
+  readBudgetRolloverCategories,
+  writeBudgetRolloverCategories,
+} from "@/lib/budgets/budgetRollover";
 import { getDisplayCategory } from "@/lib/transactions/categoryPresentation";
 
 const INITIAL_SYNC: CategoryBudgetSyncState = {
@@ -41,10 +45,14 @@ export function useCategoryBudgets() {
   const [weekday, setWeekday] = useState(1);
   const [monthDays, setMonthDays] = useState<[number, number]>([1, 15]);
   const [intervalDays, setIntervalDays] = useState(14);
+  const [rolloverCategories, setRolloverCategories] = useState<Set<string>>(
+    () => new Set(),
+  );
 
   if (userId !== seenUserId) {
     setSeenUserId(userId);
     setSyncState(INITIAL_SYNC);
+    setRolloverCategories(new Set());
   }
 
   useEffect(() => {
@@ -57,6 +65,9 @@ export function useCategoryBudgets() {
       }
     });
     void session.load();
+    if (typeof window !== "undefined") {
+      setRolloverCategories(readBudgetRolloverCategories(window.localStorage, userId));
+    }
     return () => {
       cancelled = true;
       unsubscribe();
@@ -88,8 +99,11 @@ export function useCategoryBudgets() {
     [finance, saved],
   );
   const views = useMemo(
-    () => buildCategoryBudgetViews(saved, finance),
-    [finance, saved],
+    () =>
+      buildCategoryBudgetViews(saved, finance, new Date(), {
+        rolloverCategories,
+      }),
+    [finance, saved, rolloverCategories],
   );
   const monthlyBudgetTotal = useMemo(
     () =>
@@ -167,6 +181,22 @@ export function useCategoryBudgets() {
     persist(saved.filter((item) => getDisplayCategory(item.category) !== categoryName));
   }
 
+  function setRollover(nextCategory: string, enabled: boolean) {
+    const categoryName = getDisplayCategory(nextCategory);
+    setRolloverCategories((current) => {
+      const next = new Set(current);
+      if (enabled) {
+        next.add(categoryName);
+      } else {
+        next.delete(categoryName);
+      }
+      if (typeof window !== "undefined") {
+        writeBudgetRolloverCategories(window.localStorage, userId, next);
+      }
+      return next;
+    });
+  }
+
   function addBudget(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const name = category.trim();
@@ -217,6 +247,7 @@ export function useCategoryBudgets() {
     updateAmount,
     updateBudget,
     removeBudget,
+    setRollover,
     addBudget,
     status: syncState.status,
     syncMessage: syncState.message,

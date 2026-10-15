@@ -2,7 +2,7 @@
 export const MOBILE_PRIMARY_NAV = [
   { href: "/dashboard", label: "Home", icon: "dashboard" as const },
   { href: "/accounts", label: "Accounts", icon: "accounts" as const },
-  { href: "/income", label: "Income", icon: "income" as const },
+  { href: "/budgets", label: "Budgets", icon: "budgets" as const },
   { href: "/bills", label: "Bills", icon: "bills" as const },
 ] as const;
 
@@ -17,6 +17,7 @@ export const IOS_PRIMARY_NAV = [
 /** Web mobile “More” sheet — secondary destinations. */
 export const MOBILE_MORE_NAV = [
   { href: "/savings", label: "Goals", icon: "savings" as const },
+  { href: "/income", label: "Income", icon: "income" as const },
   { href: "/calendar", label: "Calendar", icon: "calendar" as const },
   { href: "/transactions", label: "Transactions", icon: "transactions" as const },
   { href: "/debt", label: "Debt", icon: "debt" as const },
@@ -34,6 +35,7 @@ export const MOBILE_MORE_NAV = [
 /** iOS More menu — screens that are not primary tabs. */
 export const IOS_MORE_NAV = [
   { href: "/bills", label: "Bills", icon: "bills" as const, group: "money" as const },
+  { href: "/budgets", label: "Budgets", icon: "budgets" as const, group: "money" as const },
   { href: "/savings", label: "Goals", icon: "savings" as const, group: "money" as const },
   { href: "/debt", label: "Debt", icon: "debt" as const, group: "money" as const },
   { href: "/investments", label: "Investments", icon: "reports" as const, group: "money" as const },

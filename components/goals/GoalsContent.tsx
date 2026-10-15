@@ -6,10 +6,13 @@ import { CreateGoalModal } from "@/components/goals/CreateGoalModal";
 import { EditGoalModal } from "@/components/goals/EditGoalModal";
 import { GoalCard } from "@/components/goals/GoalCard";
 import { IosGoalsScreen } from "@/components/native/ios/IosGoalsScreen";
-import { Button, EmptyState, PageHeader, SkeletonGrid } from "@/components/ui";
+import { Button, Card, CardContent, EmptyState, PageHeader, SkeletonGrid } from "@/components/ui";
 import { pageContainerWideClassName } from "@/components/ui/tokens";
 import { useFinance } from "@/context/FinanceContext";
+import { formatCurrency } from "@/lib/finance/format";
 import { getGoalProgressList } from "@/lib/finance/goals";
+import { calculateMoneyLeftUntilPayday } from "@/lib/finance/moneyLeftUntilPayday";
+import { buildPaycheckPlanSummary } from "@/lib/finance/paycheckPlanSummary";
 import type { SavingsGoal } from "@/lib/finance/types";
 import { useNativeIos } from "@/lib/native/useNativeIos";
 import { cn } from "@/components/ui/cn";
@@ -25,6 +28,11 @@ export function GoalsContent() {
     () => getGoalProgressList(finance),
     [finance],
   );
+  const moneyLeft = useMemo(
+    () => calculateMoneyLeftUntilPayday(finance),
+    [finance],
+  );
+  const paycheck = useMemo(() => buildPaycheckPlanSummary(finance), [finance]);
 
   function findGoal(id: string) {
     return finance.savingsGoals.find((goal) => goal.id === id) ?? null;
@@ -59,6 +67,31 @@ export function GoalsContent() {
           <Button onClick={() => setIsCreateOpen(true)}>Create goal</Button>
         }
       />
+
+      <Card className="mb-5">
+        <CardContent className="grid gap-3 sm:grid-cols-3">
+          <div>
+            <p className="text-xs text-[var(--text-muted)]">Money left until payday</p>
+            <p className="mt-1 text-sm font-semibold tabular-nums text-[var(--foreground)]">
+              {formatCurrency(moneyLeft.moneyLeftAfterCommitments)}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-[var(--text-muted)]">Planned goal savings</p>
+            <p className="mt-1 text-sm font-semibold tabular-nums text-[var(--foreground)]">
+              {formatCurrency(moneyLeft.plannedSavingsCommitments)}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-[var(--text-muted)]">Paycheck goal allocations</p>
+            <p className="mt-1 text-sm font-semibold tabular-nums text-[var(--foreground)]">
+              {paycheck
+                ? formatCurrency(paycheck.savingsGoalAllocations)
+                : "No Income Plan"}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
 
       {goals.length === 0 ? (
         <EmptyState

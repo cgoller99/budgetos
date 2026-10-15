@@ -390,7 +390,7 @@ assert.match(effect[0], /session\.load\(\)/);
 assert.doesNotMatch(effect[0], /writeSavedCategoryBudgets|suggestCategoryBudgetLimits/);
 assert.match(hook, /!saved\.some/);
 assert.match(hook, /getDisplayCategory/);
-assert.match(hook, /buildCategoryBudgetViews\(saved, finance\)/);
+assert.match(hook, /buildCategoryBudgetViews\(saved, finance/);
 assert.match(hook, /Loading budgets/);
 assert.doesNotMatch(read("lib/automation/savedBudgets.ts"), /spent/);
 assert.match(read("components/budgets/CategoryBudgetStatus.tsx"), /Try again/);

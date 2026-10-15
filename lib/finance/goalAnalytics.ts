@@ -2,6 +2,9 @@ import { resolveAllocations } from "@/lib/allocation/allocationEngine";
 import type { FinanceData, SavingsGoal, Transaction } from "@/lib/finance/types";
 import { weeklySavingsFromPaycheckAmount } from "@/lib/finance/goalForecast";
 import { getGoalTypeMeta } from "@/lib/finance/goalTypes";
+import { calculateMoneyLeftUntilPayday } from "@/lib/finance/moneyLeftUntilPayday";
+import { buildPaycheckPlanSummary } from "@/lib/finance/paycheckPlanSummary";
+import { formatCurrency } from "@/lib/finance/format";
 
 export type GoalContributionSource =
   | "manual"
@@ -247,28 +250,63 @@ export function getGoalSuggestions(
 ): GoalSuggestion[] {
   const suggestions: GoalSuggestion[] = [];
   const weeks = weeksUntilCompletion(remaining, weeklyContribution);
+  const moneyLeft = calculateMoneyLeftUntilPayday(data);
+  const paycheck = buildPaycheckPlanSummary(data);
 
   if (weeks !== null && weeks > 0) {
+    const finish = new Date();
+    finish.setDate(finish.getDate() + weeks * 7);
     suggestions.push({
       id: "weeks-to-finish",
-      message: `You'll reach your ${goal.name} in ${weeks} week${weeks === 1 ? "" : "s"}.`,
+      message: `At your current pace, ${goal.name} is projected around ${finish.toLocaleDateString("en-US", { month: "short", year: "numeric" })}.`,
+    });
+  } else if (remaining > 0 && weeklyContribution <= 0) {
+    suggestions.push({
+      id: "no-schedule",
+      message: "Completion date cannot be estimated yet — add a contribution schedule or Income Plan allocation.",
     });
   }
 
-  const soonerMonths = monthsSoonerIfIncrease(remaining, weeklyContribution, 15);
-
-  if (soonerMonths) {
+  const boost = 15;
+  const soonerMonths = monthsSoonerIfIncrease(remaining, weeklyContribution, boost);
+  if (soonerMonths && moneyLeft.moneyLeftAfterCommitments >= boost) {
     suggestions.push({
       id: "boost-15",
-      message: `Increase weekly savings by $15 to finish one month sooner.`,
+      message: `Increase contributions by ${formatCurrency(boost)}/week to reach your goal about ${soonerMonths} month${soonerMonths === 1 ? "" : "s"} earlier.`,
     });
   }
 
-  if (data.incomePlan && remaining > 0) {
-    suggestions.push({
-      id: "extra-paycheck",
-      message: "You could complete this goal with your next extra paycheck.",
-    });
+  if (paycheck && remaining > 0) {
+    const required =
+      weeklyContribution > 0
+        ? null
+        : paycheck.expectedPaycheck > 0
+          ? roundCurrency(Math.min(remaining, moneyLeft.moneyLeftAfterCommitments))
+          : null;
+    if (paycheck.remainingUnallocated > 0 && moneyLeft.moneyLeftAfterCommitments > 0) {
+      const available = roundCurrency(
+        Math.min(paycheck.remainingUnallocated, moneyLeft.moneyLeftAfterCommitments),
+      );
+      if (available >= 1) {
+        suggestions.push({
+          id: "unallocated-paycheck",
+          message: `You have ${formatCurrency(available)} unallocated in your paycheck plan that could go toward this goal.`,
+        });
+      }
+    } else if (
+      paycheck.savingsGoalAllocations > moneyLeft.moneyLeftAfterCommitments &&
+      moneyLeft.moneyLeftAfterCommitments >= 0
+    ) {
+      suggestions.push({
+        id: "overcommitted",
+        message: `Your current planned savings may exceed available money until payday (${formatCurrency(moneyLeft.moneyLeftAfterCommitments)} left after commitments).`,
+      });
+    } else if (required != null && required > 0) {
+      suggestions.push({
+        id: "per-paycheck-need",
+        message: `You need about ${formatCurrency(required)} from available paycheck money to move this goal forward.`,
+      });
+    }
   }
 
   return suggestions.slice(0, 3);

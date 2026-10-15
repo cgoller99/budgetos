@@ -35,6 +35,9 @@ jobs:
           npm run test:cash-outlook
           npm run test:cash-flow-forecast
           npm run test:budget-frequencies
+          npm run test:budget-hub-goals
+          npm run test:category-budgets
+          npm run test:goal-forecast
           npm run test:income-annualization
           npm run test:income-pay-dates
           npm run test:paycheck-goal-allocations
