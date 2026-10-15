@@ -15,6 +15,7 @@ import {
   isPersonalOwnerRow,
 } from "@/lib/finance/personalIncomeScope";
 import type { FinanceData } from "@/lib/finance/types";
+import { resolveAllocationAmounts } from "@/lib/incomePlan/allocations";
 import { describePaySchedule, resolveUpcomingPayDate } from "@/lib/incomePlan/payDates";
 import { getDisplayCategory } from "@/lib/transactions/categoryPresentation";
 import { isConfidentInternalTransfer } from "@/lib/transactions/transferDetection";
@@ -144,12 +145,12 @@ export function buildMoneyPlan(
             paycheckAmount: plan.paycheckAmount,
             nextPayDate: resolveUpcomingPayDate(plan, referenceDate),
             scheduleLabel: describePaySchedule(plan),
-            allocations: plan.allocations.map((allocation) => ({
-              id: allocation.id,
-              name: allocation.name,
-              amountLabel: allocation.isRemainingBalance
+            allocations: resolveAllocationAmounts(plan).map((item) => ({
+              id: item.allocation.id,
+              name: item.allocation.name,
+              amountLabel: item.allocation.isRemainingBalance
                 ? "Remainder of the paycheck"
-                : formatCurrency(allocation.amount ?? 0),
+                : formatCurrency(item.amount),
             })),
           }
         : null,

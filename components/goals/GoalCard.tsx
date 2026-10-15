@@ -141,7 +141,7 @@ export function GoalCard({
           <GoalWhatIfPanel goal={savingsGoal} />
         </MobileCollapsibleSection>
 
-        <div className="mt-8 flex gap-3 border-t border-[var(--surface-border)] pt-6">
+        <div className="mt-8 flex flex-col gap-3 border-t border-[var(--surface-border)] pt-6 sm:flex-row">
           <Button
             type="button"
             fullWidth
@@ -153,6 +153,12 @@ export function GoalCard({
           <Button type="button" variant="secondary" fullWidth onClick={onEdit}>
             Edit goal
           </Button>
+          <a
+            href="/income?tab=plan"
+            className="inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-button)] border border-[var(--surface-border)] px-4 text-sm font-semibold text-[var(--accent-light)]"
+          >
+            Edit paycheck allocation
+          </a>
         </div>
       </CardContent>
     </Card>

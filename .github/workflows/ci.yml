@@ -36,6 +36,7 @@ jobs:
           npm run test:cash-flow-forecast
           npm run test:budget-frequencies
           npm run test:budget-hub-goals
+          npm run test:unified-financial-plan
           npm run test:category-budgets
           npm run test:goal-forecast
           npm run test:income-annualization

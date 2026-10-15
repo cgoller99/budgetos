@@ -23,8 +23,9 @@ import { buildBudgetHubSummary } from "@/lib/budgets/budgetHub";
 import { budgetLimitLabel } from "@/lib/budgets/budgetPeriod";
 import { getUpcomingBills } from "@/lib/finance/bills";
 import { formatCurrency } from "@/lib/finance/format";
-import { buildPaycheckPlanSummary } from "@/lib/finance/paycheckPlanSummary";
 import { calculateMoneyLeftUntilPayday } from "@/lib/finance/moneyLeftUntilPayday";
+import { buildUnifiedFinancialPlan } from "@/lib/finance/unifiedFinancialPlan";
+import Link from "next/link";
 
 export function BudgetsContent() {
   const finance = useFinance();
@@ -37,7 +38,8 @@ export function BudgetsContent() {
     () => calculateMoneyLeftUntilPayday(finance),
     [finance],
   );
-  const paycheck = useMemo(() => buildPaycheckPlanSummary(finance), [finance]);
+  const unified = useMemo(() => buildUnifiedFinancialPlan(finance), [finance]);
+  const paycheck = unified.paycheck;
   const upcomingBills = useMemo(() => getUpcomingBills(finance).slice(0, 4), [finance]);
 
   if (finance.isLoading && budgets.status === "loading") {
@@ -153,7 +155,7 @@ export function BudgetsContent() {
         <Card>
           <CardHeader
             title="Paycheck commitments"
-            description="Savings and flexible allocations from Income Plan."
+            description="Planned Income Plan rows by stable IDs — not cash yet."
           />
           <CardContent className="space-y-2 text-sm">
             {paycheck ? (
@@ -163,8 +165,16 @@ export function BudgetsContent() {
                   value={formatCurrency(paycheck.expectedPaycheck)}
                 />
                 <Detail
+                  label="Bills allocated"
+                  value={formatCurrency(paycheck.billsAllocated)}
+                />
+                <Detail
                   label="Goal allocations"
                   value={formatCurrency(paycheck.savingsGoalAllocations)}
+                />
+                <Detail
+                  label="Extra debt"
+                  value={formatCurrency(paycheck.extraDebtPayments)}
                 />
                 <Detail
                   label="Flexible spending"
@@ -174,6 +184,28 @@ export function BudgetsContent() {
                   label="Unallocated"
                   value={formatCurrency(paycheck.remainingUnallocated)}
                 />
+                {unified.goals.length > 0 ? (
+                  <ul className="mt-2 space-y-1 border-t border-[var(--surface-border)] pt-2">
+                    {unified.goals.map((goal) => (
+                      <li key={goal.goalId} className="flex justify-between gap-2 text-xs">
+                        <Link
+                          href={`/savings`}
+                          className="text-[var(--accent-light)] hover:underline"
+                        >
+                          {goal.name}
+                        </Link>
+                        <span className="tabular-nums text-[var(--text-muted)]">
+                          {formatCurrency(goal.perPaycheck)} / paycheck
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+                <p className="pt-1 text-xs text-[var(--text-muted)]">
+                  <Link href="/income?tab=plan" className="text-[var(--accent-light)] hover:underline">
+                    Edit Income Plan
+                  </Link>
+                </p>
               </>
             ) : (
               <p className="text-[var(--text-muted)]">

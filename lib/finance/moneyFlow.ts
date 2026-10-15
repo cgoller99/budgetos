@@ -5,6 +5,7 @@ import {
 } from "@/lib/calculations/availableCash";
 import { plannedExtraDebtMonthly } from "@/lib/finance/debtPayoff";
 import { isPersonalOwnerRow } from "@/lib/finance/personalIncomeScope";
+import { plannedOrHeuristicGoalMonthly } from "@/lib/finance/unifiedFinancialPlan";
 import type { FinanceData } from "@/lib/finance/types";
 import { getTransactionsForMonth } from "@/lib/transactions";
 import { isInternalTransferExpense } from "@/lib/transactions/transferDetection";
@@ -51,8 +52,6 @@ export type MoneyFlowResult = {
   stages: MoneyFlowStage[];
   breakdown: MoneyFlowBreakdownLine[];
 };
-
-const GOAL_ALLOCATION_MONTHS = 12;
 
 function sum(values: number[]): number {
   return values.reduce((total, value) => total + value, 0);
@@ -114,16 +113,12 @@ function reservedDebtPayments(data: FinanceData, referenceDate: Date): number {
   );
 }
 
+/**
+ * Prefer Income Plan goal allocations (stable goalId) for the STS waterfall.
+ * Goals without a paycheck allocation still use the remaining/12 heuristic.
+ */
 function calculateRawGoalContributions(data: FinanceData): number {
-  const activeGoals = (data.savingsGoals ?? []).filter(
-    (goal) => goal.current < goal.target,
-  );
-
-  return activeGoals.reduce((total, goal) => {
-    const remaining = goal.target - goal.current;
-    const monthlyNeed = Math.ceil(remaining / GOAL_ALLOCATION_MONTHS);
-    return total + monthlyNeed;
-  }, 0);
+  return plannedOrHeuristicGoalMonthly(data);
 }
 
 function calculateRawInvestmentContributions(data: FinanceData): number {

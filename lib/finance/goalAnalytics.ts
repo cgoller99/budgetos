@@ -96,11 +96,13 @@ export function getGoalContributionBreakdown(
           : 0;
 
   if (incomeWeekly > 0 && autoWeekly > 0) {
+    // Income Plan goalId allocation is authoritative for this goal.
+    // Do not stack a separate auto schedule as the same planned money.
     return {
-      weeklyContribution: roundCurrency(incomeWeekly + autoWeekly),
-      monthlyContribution: roundCurrency((incomeWeekly + autoWeekly) * 4.33),
-      source: "mixed",
-      sourceLabel: "Income Plan + Automatic",
+      weeklyContribution: roundCurrency(incomeWeekly),
+      monthlyContribution: roundCurrency(incomeWeekly * 4.33),
+      source: "income_plan",
+      sourceLabel: "Income Plan (paycheck allocation)",
     };
   }
 
