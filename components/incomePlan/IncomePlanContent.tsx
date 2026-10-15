@@ -325,6 +325,11 @@ export function IncomePlanContent({ embedded = false }: { embedded?: boolean }) 
           monthlyDays: existing!.monthlyDays,
           customIntervalDays: existing!.customIntervalDays,
           depositAccountId: existing!.depositAccountId,
+          // Preserve ownership link across amount/frequency/allocation edits.
+          // Omit when unset so save can singleton-resolve; never coerce to null.
+          ...(existing!.linkedIncomeSourceId
+            ? { linkedIncomeSourceId: existing!.linkedIncomeSourceId }
+            : {}),
           allocations: normalizedAllocations,
         }
       : {
@@ -346,6 +351,9 @@ export function IncomePlanContent({ embedded = false }: { embedded?: boolean }) 
               ? Number.parseInt(customIntervalDays, 10) || 14
               : null,
           depositAccountId,
+          ...(existing?.linkedIncomeSourceId
+            ? { linkedIncomeSourceId: existing.linkedIncomeSourceId }
+            : {}),
           allocations: normalizedAllocations,
         };
 

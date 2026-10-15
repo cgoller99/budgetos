@@ -255,19 +255,47 @@ function round(value) {
   assert.equal(effective.length, 1);
   assert.equal(effective[0].id, "src-job");
 
-  // Genuinely separate job (different deposit + no link) keeps both.
+  // Exactly one unlinked personal source → singleton represents it (no synthetic duplicate).
   effective = getEffectiveIncomeSources(
     base({
-      income: [source],
+      income: [{ ...source, depositAccountId: "other" }],
       incomePlan: {
         ...plan,
-        depositAccountId: "side-gig-acct",
-        paycheckAmount: 500,
+        depositAccountId: null,
+        linkedIncomeSourceId: null,
+      },
+    }),
+  );
+  assert.equal(effective.length, 1);
+  assert.equal(effective[0].id, "src-job");
+
+  // Two legitimate jobs + unlinked plan → keep both sources, no synthetic third paycheck.
+  effective = getEffectiveIncomeSources(
+    base({
+      income: [
+        source,
+        {
+          ...source,
+          id: "src-side",
+          name: "Side Gig",
+          depositAccountId: "side-gig-acct",
+          amount: 500,
+        },
+      ],
+      incomePlan: {
+        ...plan,
+        depositAccountId: null,
         linkedIncomeSourceId: null,
       },
     }),
   );
   assert.equal(effective.length, 2);
+  assert.ok(effective.every((row) => row.id !== "__buxme_income_plan__"));
+
+  // Missing source: plan alone still projects once.
+  effective = getEffectiveIncomeSources(base({ income: [], incomePlan: plan }));
+  assert.equal(effective.length, 1);
+  assert.equal(effective[0].id, "__buxme_income_plan__");
 }
 
 // ── 3. Debt allocation double-counting via debtId ───────────────────────────

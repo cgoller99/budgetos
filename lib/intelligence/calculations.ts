@@ -1,6 +1,7 @@
 import { calculateEmergencyFundMonths } from "@/lib/calculations/financialHealth";
 import { calculateNetWorth } from "@/lib/calculations/netWorth";
 import { getBillsDueThisWeek } from "@/lib/finance/bills";
+import { forecastCashUntilPayday } from "@/lib/finance/cashFlowForecast";
 import { formatCurrency } from "@/lib/finance/format";
 import { getNextGoal } from "@/lib/finance/goals";
 import { calculateMoneyFlow } from "@/lib/finance/moneyFlow";
@@ -72,7 +73,20 @@ export function calculateDaysUntilNextPaycheck(
   return Math.max(Math.round(payPeriodDays / 2), 1);
 }
 
+/**
+ * Cash available to spend until the next paycheck.
+ * Uses the same cash-capped payday forecast as Dashboard / Home
+ * (`safeUntilPayday`) — not the weekly allowance derived from monthly STS.
+ */
 export function calculateSafeToSpendBeforePaycheck(
+  data: FinanceData,
+  referenceDate = new Date(),
+): number {
+  return forecastCashUntilPayday(data, referenceDate).safeUntilPayday;
+}
+
+/** Weekly spending allowance derived from monthly cash-capped Safe to Spend. */
+export function calculateWeeklySpendingAllowance(
   data: FinanceData,
   referenceDate = new Date(),
 ): number {

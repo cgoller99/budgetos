@@ -70,7 +70,21 @@ function hasOverlappingIncomeSource(
   sources: IncomeSource[],
   plan: IncomePlan,
 ): boolean {
-  return sources.some((source) => incomePlanRepresentsSource(source, plan));
+  if (sources.some((source) => incomePlanRepresentsSource(source, plan))) {
+    return true;
+  }
+
+  // Deterministic singleton: an unlinked plan with exactly one active income
+  // source represents that source. Avoids duplicate projections when onboarding
+  // created a plan before linked_income_source_id was persisted.
+  if (!plan.linkedIncomeSourceId) {
+    const active = sources.filter(isIncomeSourceActive);
+    if (active.length === 1) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 export function incomePlanToIncomeSource(plan: IncomePlan): IncomeSource | null {
@@ -112,6 +126,15 @@ export function getEffectiveIncomeSources(data: FinanceData): IncomeSource[] {
   }
 
   if (hasOverlappingIncomeSource(personalSources, plan)) {
+    return personalSources;
+  }
+
+  const activePersonalSources = personalSources.filter(isIncomeSourceActive);
+
+  // Ambiguous unresolved relationship: multiple personal income sources and no
+  // explicit link / deposit+frequency overlap. Prefer existing sources only —
+  // never invent a synthetic paycheck that could double-count one of the jobs.
+  if (!plan.linkedIncomeSourceId && activePersonalSources.length > 1) {
     return personalSources;
   }
 

@@ -217,6 +217,9 @@ export function DebtPayoffPlanner({ variant = "web" }: DebtPayoffPlannerProps) {
           monthlyDays: plan.monthlyDays,
           customIntervalDays: plan.customIntervalDays,
           depositAccountId: plan.depositAccountId,
+          ...(plan.linkedIncomeSourceId
+            ? { linkedIncomeSourceId: plan.linkedIncomeSourceId }
+            : {}),
           allocations: incomePlanAllocationsWithExtraDebt(plan.allocations, {
             amount: paycheckAmount,
             debtId: paycheckDebtId,
