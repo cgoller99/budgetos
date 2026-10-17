@@ -1,21 +1,37 @@
+import {
+  schedulesEqual,
+  storedScheduleFields,
+  type BudgetFrequency,
+  type StoredBudgetSchedule,
+} from "@/lib/budgets/budgetPeriod";
 import { getDisplayCategory } from "@/lib/transactions/categoryPresentation";
 
 export type SavedCategoryBudget = {
   category: string;
   amount: number;
-};
+} & StoredBudgetSchedule;
 
 export type CategoryBudgetRecord = {
   category: string;
   amount: number;
   updatedAt: string;
-};
+} & StoredBudgetSchedule;
 
 export type PendingCategoryBudget = {
   category: string;
   amount: number | null;
   updatedAt: string;
   legacy?: boolean;
+} & StoredBudgetSchedule;
+
+export type CategoryBudgetDraft = {
+  category: string;
+  amount: number;
+  frequency?: BudgetFrequency;
+  anchorDate?: string | null;
+  weekday?: number | null;
+  monthDays?: [number, number] | number[] | null;
+  intervalDays?: number | null;
 };
 
 export type CategoryBudgetSnapshot = {
@@ -77,13 +93,22 @@ function sortRecords(records: CategoryBudgetRecord[]): CategoryBudgetRecord[] {
   return [...records].sort((left, right) => left.category.localeCompare(right.category));
 }
 
+function scheduled<T extends object>(item: T, source: unknown): T & StoredBudgetSchedule {
+  return { ...item, ...storedScheduleFields(source) };
+}
+
 export function visibleCategoryBudgets(
   snapshot: CategoryBudgetSnapshot,
 ): SavedCategoryBudget[] {
-  return sortRecords(snapshot.records).map((record) => ({
-    category: record.category,
-    amount: record.amount,
-  }));
+  return sortRecords(snapshot.records).map((record) =>
+    scheduled(
+      {
+        category: record.category,
+        amount: record.amount,
+      },
+      record,
+    ),
+  );
 }
 
 function recordFromUnknown(value: unknown): CategoryBudgetRecord | null {
@@ -98,11 +123,14 @@ function recordFromUnknown(value: unknown): CategoryBudgetRecord | null {
   if (!category) {
     return null;
   }
-  return {
-    category,
-    amount: normalizeAmount(item.amount),
-    updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : "",
-  };
+  return scheduled(
+    {
+      category,
+      amount: normalizeAmount(item.amount),
+      updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : "",
+    },
+    value,
+  );
 }
 
 function pendingFromUnknown(value: unknown): PendingCategoryBudget | null {
@@ -126,12 +154,15 @@ function pendingFromUnknown(value: unknown): PendingCategoryBudget | null {
   if (amount === undefined) {
     return null;
   }
-  return {
-    category,
-    amount,
-    updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : "",
-    legacy: item.legacy === true,
-  };
+  return scheduled(
+    {
+      category,
+      amount,
+      updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : "",
+      legacy: item.legacy === true,
+    },
+    value,
+  );
 }
 
 export function parseCategoryBudgetCache(raw: string | null): CategoryBudgetSnapshot {
@@ -155,12 +186,17 @@ export function parseCategoryBudgetCache(raw: string | null): CategoryBudgetSnap
         continue;
       }
       records.push(record);
-      pending.push({
-        category: record.category,
-        amount: record.amount,
-        updatedAt: "",
-        legacy: true,
-      });
+      pending.push(
+        scheduled(
+          {
+            category: record.category,
+            amount: record.amount,
+            updatedAt: "",
+            legacy: true,
+          },
+          record,
+        ),
+      );
     }
     return { records: sortRecords(records), pending };
   }
@@ -254,16 +290,22 @@ export function mergeCategoryBudgetSnapshot(
         continue;
       }
       if (draft.amount != null) {
-        records.push({
-          category,
-          amount: draft.amount,
-          updatedAt: draft.updatedAt,
-        });
+        records.push(
+          scheduled(
+            {
+              category,
+              amount: draft.amount,
+              updatedAt: draft.updatedAt,
+            },
+            draft,
+          ),
+        );
         pending.push(draft);
       }
       continue;
     }
 
+    const scheduleSource = draft ?? localRow ?? null;
     const device = draft
       ? {
           amount: draft.amount,
@@ -285,21 +327,32 @@ export function mergeCategoryBudgetSnapshot(
         continue;
       }
 
-      records.push({
-        category,
-        amount: device.amount,
-        updatedAt: device.updatedAt,
-      });
+      records.push(
+        scheduled(
+          {
+            category,
+            amount: device.amount,
+            updatedAt: device.updatedAt,
+          },
+          scheduleSource,
+        ),
+      );
       const matchesRemote =
         remoteRow != null &&
         remoteRow.amount === device.amount &&
-        remoteRow.updatedAt === device.updatedAt;
+        remoteRow.updatedAt === device.updatedAt &&
+        schedulesEqual(remoteRow, scheduleSource);
       if (!matchesRemote) {
-        pending.push({
-          category,
-          amount: device.amount,
-          updatedAt: device.updatedAt,
-        });
+        pending.push(
+          scheduled(
+            {
+              category,
+              amount: device.amount,
+              updatedAt: device.updatedAt,
+            },
+            scheduleSource,
+          ),
+        );
       }
       continue;
     }
@@ -314,10 +367,10 @@ export function mergeCategoryBudgetSnapshot(
 
 export function applyCategoryBudgetEdits(
   snapshot: CategoryBudgetSnapshot,
-  next: Array<{ category: string; amount: number }>,
+  next: CategoryBudgetDraft[],
   updatedAt: string,
 ): CategoryBudgetSnapshot {
-  const normalized = new Map<string, number>();
+  const normalized = new Map<string, CategoryBudgetDraft>();
   for (const item of next) {
     if (!isFiniteAmount(item.amount)) {
       continue;
@@ -326,19 +379,28 @@ export function applyCategoryBudgetEdits(
     if (!category) {
       continue;
     }
-    normalized.set(category, normalizeAmount(item.amount));
+    normalized.set(category, { ...item, category, amount: normalizeAmount(item.amount) });
   }
 
   const records = new Map(snapshot.records.map((record) => [record.category, record]));
   const pending = new Map(snapshot.pending.map((item) => [item.category, item]));
 
-  for (const [category, amount] of normalized) {
+  for (const [category, item] of normalized) {
     const existing = records.get(category);
-    if (existing && existing.amount === amount && !pending.get(category)?.legacy) {
+    if (
+      existing &&
+      existing.amount === item.amount &&
+      schedulesEqual(existing, item) &&
+      !pending.get(category)?.legacy
+    ) {
       continue;
     }
-    records.set(category, { category, amount, updatedAt });
-    pending.set(category, { category, amount, updatedAt });
+    const nextRecord = scheduled(
+      { category, amount: item.amount, updatedAt },
+      item,
+    );
+    records.set(category, nextRecord);
+    pending.set(category, nextRecord);
   }
 
   for (const category of [...records.keys()]) {
@@ -366,7 +428,8 @@ function acknowledgePush(
         item.category !== pushed.category ||
         item.updatedAt !== pushed.updatedAt ||
         item.amount !== pushed.amount ||
-        Boolean(item.legacy) !== Boolean(pushed.legacy),
+        Boolean(item.legacy) !== Boolean(pushed.legacy) ||
+        !schedulesEqual(item, pushed),
     ),
   };
 }
@@ -413,7 +476,7 @@ export class CategoryBudgetSession {
     return describeSyncState(this.snapshot, hasLocal ? "ready" : "loading");
   }
 
-  commit(next: Array<{ category: string; amount: number }>): CategoryBudgetSyncState {
+  commit(next: CategoryBudgetDraft[]): CategoryBudgetSyncState {
     const changed = this.changedCategories(next);
     this.mutationEpoch += 1;
     for (const category of changed) {
@@ -472,8 +535,8 @@ export class CategoryBudgetSession {
     return this.tail;
   }
 
-  private changedCategories(next: Array<{ category: string; amount: number }>): string[] {
-    const nextCategories = new Map<string, number>();
+  private changedCategories(next: CategoryBudgetDraft[]): string[] {
+    const nextCategories = new Map<string, CategoryBudgetDraft>();
     for (const item of next) {
       if (!isFiniteAmount(item.amount)) {
         continue;
@@ -482,12 +545,12 @@ export class CategoryBudgetSession {
       if (!category) {
         continue;
       }
-      nextCategories.set(category, normalizeAmount(item.amount));
+      nextCategories.set(category, { ...item, category, amount: normalizeAmount(item.amount) });
     }
     const changed = new Set<string>();
-    for (const [category, amount] of nextCategories) {
+    for (const [category, item] of nextCategories) {
       const existing = this.snapshot.records.find((record) => record.category === category);
-      if (!existing || existing.amount !== amount) {
+      if (!existing || existing.amount !== item.amount || !schedulesEqual(existing, item)) {
         changed.add(category);
       }
     }
@@ -539,20 +602,26 @@ export class CategoryBudgetSession {
             this.persist();
             continue;
           }
-          const stamped: PendingCategoryBudget = {
-            category: item.category,
-            amount: item.amount,
-            updatedAt: this.now(),
-          };
+          const stamped: PendingCategoryBudget = scheduled(
+            {
+              category: item.category,
+              amount: item.amount,
+              updatedAt: this.now(),
+            },
+            item,
+          );
           this.snapshot = {
             records: sortRecords(
               this.snapshot.records.map((record) =>
                 record.category === stamped.category
-                  ? {
-                      category: stamped.category,
-                      amount: stamped.amount ?? record.amount,
-                      updatedAt: stamped.updatedAt,
-                    }
+                  ? scheduled(
+                      {
+                        category: stamped.category,
+                        amount: stamped.amount ?? record.amount,
+                        updatedAt: stamped.updatedAt,
+                      },
+                      item,
+                    )
                   : record,
               ),
             ),
@@ -560,11 +629,16 @@ export class CategoryBudgetSession {
               pending.category === item.category && pending.legacy ? stamped : pending,
             ),
           };
-          await this.remote.save({
-            category: stamped.category,
-            amount: stamped.amount ?? item.amount,
-            updatedAt: stamped.updatedAt,
-          });
+          await this.remote.save(
+            scheduled(
+              {
+                category: stamped.category,
+                amount: stamped.amount ?? item.amount,
+                updatedAt: stamped.updatedAt,
+              },
+              item,
+            ),
+          );
           if (epoch !== this.mutationEpoch) {
             return;
           }
@@ -576,11 +650,16 @@ export class CategoryBudgetSession {
         if (item.amount == null) {
           await this.remote.remove(item.category);
         } else {
-          await this.remote.save({
-            category: item.category,
-            amount: item.amount,
-            updatedAt: item.updatedAt,
-          });
+          await this.remote.save(
+            scheduled(
+              {
+                category: item.category,
+                amount: item.amount,
+                updatedAt: item.updatedAt,
+              },
+              item,
+            ),
+          );
         }
         if (epoch !== this.mutationEpoch) {
           return;

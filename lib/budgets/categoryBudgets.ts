@@ -1,3 +1,16 @@
+import {
+  budgetMonthlyEquivalent,
+  budgetPeriodDaysElapsed,
+  budgetPeriodDaysRemaining,
+  budgetPeriodLengthDays,
+  BUDGET_FREQUENCY_LABELS,
+  currentBudgetPeriod,
+  formatBudgetPeriodLabel,
+  normalizeBudgetSchedule,
+  previousBudgetPeriod,
+  roundBudgetCurrency,
+  type BudgetFrequency,
+} from "@/lib/budgets/budgetPeriod";
 import { isPersonalOwnerRow } from "@/lib/finance/personalIncomeScope";
 import type { FinanceData, Transaction } from "@/lib/finance/types";
 import { getDisplayCategory } from "@/lib/transactions/categoryPresentation";
@@ -19,18 +32,52 @@ export type CategoryBudgetSuggestion = {
   months: number;
 };
 
+export type CategoryBudgetLimitInput = {
+  category: string;
+  amount: number;
+  frequency?: BudgetFrequency;
+  anchorDate?: string | null;
+  weekday?: number | null;
+  monthDays?: number[] | [number, number] | null;
+  intervalDays?: number | null;
+};
+
 export type CategoryBudgetView = {
   category: string;
   limit: number;
+  /** Base limit plus optional previous-period surplus when rollover is on. */
+  effectiveLimit: number;
+  rolloverCredit: number;
+  rolloverEnabled: boolean;
   spent: number;
   remaining: number;
   progress: number;
   overspent: boolean;
   alert: string | null;
+  frequency: BudgetFrequency;
+  frequencyLabel: string;
+  periodStart: string;
+  periodEnd: string;
+  periodLabel: string;
+  anchorDate: string | null;
+  weekday: number | null;
+  monthDays: [number, number] | null;
+  intervalDays: number | null;
+  monthlyEquivalent: number;
+  daysRemaining: number;
+  daysElapsed: number;
+  periodLengthDays: number;
+  averageDailySpent: number;
+  recommendedDailyRemaining: number;
+  projectedEndOfPeriodSpent: number;
+  estimatedOverageOrSurplus: number;
+  previousPeriodSpent: number;
+  /** 1 = on pace; >1 spending faster than linear period pace. */
+  paceRatio: number | null;
 };
 
 function roundCurrency(value: number): number {
-  return Math.round(value * 100) / 100;
+  return roundBudgetCurrency(value);
 }
 
 function monthKey(date: Date): string {
@@ -69,14 +116,19 @@ function refundBucket(transaction: Transaction): string | null {
   return display;
 }
 
+function matchesPostedDate(date: string, matches: (posted: string) => boolean): boolean {
+  return matches(date.slice(0, 10));
+}
+
 /**
- * Net category spending for one month.
+ * Net category spending for transactions whose posted date matches.
  * Transfers and another household member's rows are excluded.
  * Merchant refunds reduce the matching spending category.
+ * A date is counted once: the caller supplies one window.
  */
-export function netCategorySpending(
+function netCategorySpendingWhere(
   data: FinanceData,
-  month: string,
+  matches: (posted: string) => boolean,
 ): Map<string, number> {
   const totals = new Map<string, number>();
   const expenses = filterRealExpenseTransactions(
@@ -85,7 +137,7 @@ export function netCategorySpending(
       (transaction) =>
         transaction.type === "expense" &&
         !transaction.goalId &&
-        transaction.date.slice(0, 7) === month &&
+        matchesPostedDate(transaction.date, matches) &&
         ownedTransaction(data, transaction),
     ),
   );
@@ -102,7 +154,7 @@ export function netCategorySpending(
     if (
       transaction.type !== "income" ||
       !isRefundActivity(transaction) ||
-      transaction.date.slice(0, 7) !== month ||
+      !matchesPostedDate(transaction.date, matches) ||
       !ownedTransaction(data, transaction)
     ) {
       continue;
@@ -119,6 +171,28 @@ export function netCategorySpending(
   }
 
   return totals;
+}
+
+/**
+ * Net category spending for one calendar month.
+ * Transfers and another household member's rows are excluded.
+ * Merchant refunds reduce the matching spending category.
+ */
+export function netCategorySpending(
+  data: FinanceData,
+  month: string,
+): Map<string, number> {
+  return netCategorySpendingWhere(data, (posted) => posted.slice(0, 7) === month);
+}
+
+export function netCategorySpendingInPeriod(
+  data: FinanceData,
+  period: { start: string; end: string },
+): Map<string, number> {
+  return netCategorySpendingWhere(
+    data,
+    (posted) => posted >= period.start && posted <= period.end,
+  );
 }
 
 export function suggestCategoryBudgetLimits(
@@ -157,12 +231,15 @@ export function suggestCategoryBudgetLimits(
 }
 
 export function buildCategoryBudgetViews(
-  limits: Array<{ category: string; amount: number }>,
+  limits: CategoryBudgetLimitInput[],
   data: FinanceData,
   referenceDate = new Date(),
+  options?: { rolloverCategories?: ReadonlySet<string> },
 ): CategoryBudgetView[] {
-  const spentByCategory = netCategorySpending(data, monthKey(referenceDate));
-  const limitsByCategory = new Map<string, number>();
+  const limitsByCategory = new Map<
+    string,
+    { limit: number; schedule: ReturnType<typeof normalizeBudgetSchedule> }
+  >();
 
   for (const item of limits) {
     const category = getDisplayCategory(item.category);
@@ -175,24 +252,95 @@ export function buildCategoryBudgetViews(
       continue;
     }
     // Keep one limit per display category. A later edit replaces the earlier one.
-    limitsByCategory.set(category, roundCurrency(item.amount));
+    limitsByCategory.set(category, {
+      limit: roundCurrency(item.amount),
+      schedule: normalizeBudgetSchedule(item),
+    });
   }
 
+  const month = monthKey(referenceDate);
+
   return [...limitsByCategory.entries()]
-    .map(([category, limit]) => {
+    .map(([category, entry]) => {
+      const period = currentBudgetPeriod(entry.schedule, referenceDate);
+      const previous = previousBudgetPeriod(entry.schedule, referenceDate);
+      const spentByCategory =
+        entry.schedule.frequency === "monthly"
+          ? netCategorySpending(data, month)
+          : netCategorySpendingInPeriod(data, period);
+      const previousSpentByCategory = netCategorySpendingInPeriod(data, previous);
       const spent = roundCurrency(spentByCategory.get(category) ?? 0);
-      const remaining = roundCurrency(limit - spent);
+      const previousPeriodSpent = roundCurrency(
+        previousSpentByCategory.get(category) ?? 0,
+      );
+      const rolloverEnabled = options?.rolloverCategories?.has(category) === true;
+      const rolloverCredit = rolloverEnabled
+        ? roundCurrency(Math.max(0, entry.limit - previousPeriodSpent))
+        : 0;
+      // Rollover expands allowance only — never Safe to Spend or bank cash.
+      const effectiveLimit = roundCurrency(entry.limit + rolloverCredit);
+      const remaining = roundCurrency(effectiveLimit - spent);
       const progress =
-        limit > 0 ? Math.max(0, Math.round((spent / limit) * 100)) : 0;
-      const overspent = spent > limit;
+        effectiveLimit > 0
+          ? Math.max(0, Math.round((spent / effectiveLimit) * 100))
+          : 0;
+      const overspent = spent > effectiveLimit;
+      const periodLengthDays = budgetPeriodLengthDays(period);
+      const daysElapsed = budgetPeriodDaysElapsed(period, referenceDate);
+      const daysRemaining = budgetPeriodDaysRemaining(period, referenceDate);
+      const averageDailySpent =
+        daysElapsed > 0 ? roundCurrency(spent / daysElapsed) : 0;
+      const recommendedDailyRemaining =
+        daysRemaining > 0 ? roundCurrency(Math.max(remaining, 0) / daysRemaining) : 0;
+      const projectedEndOfPeriodSpent =
+        daysElapsed > 0
+          ? roundCurrency(averageDailySpent * periodLengthDays)
+          : spent;
+      const estimatedOverageOrSurplus = roundCurrency(
+        effectiveLimit - projectedEndOfPeriodSpent,
+      );
+      const expectedSpent =
+        effectiveLimit > 0 && periodLengthDays > 0
+          ? (effectiveLimit * daysElapsed) / periodLengthDays
+          : 0;
+      const paceRatio =
+        expectedSpent > 0 ? roundCurrency(spent / expectedSpent) : null;
       return {
         category,
-        limit,
+        limit: entry.limit,
+        effectiveLimit,
+        rolloverCredit,
+        rolloverEnabled,
         spent,
         remaining,
         progress,
         overspent,
-        alert: overspent ? "Over budget" : null,
+        alert: overspent
+          ? "Over budget"
+          : paceRatio != null && paceRatio >= 1.15
+            ? "Spending faster than pace"
+            : progress >= 80
+              ? "Approaching limit"
+              : null,
+        frequency: entry.schedule.frequency,
+        frequencyLabel: BUDGET_FREQUENCY_LABELS[entry.schedule.frequency],
+        periodStart: period.start,
+        periodEnd: period.end,
+        periodLabel: formatBudgetPeriodLabel(period),
+        anchorDate: entry.schedule.anchorDate,
+        weekday: entry.schedule.weekday,
+        monthDays: entry.schedule.monthDays,
+        intervalDays: entry.schedule.intervalDays,
+        monthlyEquivalent: budgetMonthlyEquivalent(entry.limit, entry.schedule),
+        daysRemaining,
+        daysElapsed,
+        periodLengthDays,
+        averageDailySpent,
+        recommendedDailyRemaining,
+        projectedEndOfPeriodSpent,
+        estimatedOverageOrSurplus,
+        previousPeriodSpent,
+        paceRatio,
       };
     })
     .sort((left, right) => right.spent - left.spent);

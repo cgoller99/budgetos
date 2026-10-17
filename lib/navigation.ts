@@ -28,6 +28,13 @@ export const NAV_ROUTES = [
     subtitle: "Keep upcoming payments easy to see.",
   },
   {
+    label: "Budgets",
+    icon: "budgets",
+    href: "/budgets",
+    eyebrow: "Cash Flow",
+    subtitle: "Flexible category limits and spending pace.",
+  },
+  {
     label: "Calendar",
     icon: "calendar",
     href: "/calendar",

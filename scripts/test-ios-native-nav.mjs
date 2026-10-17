@@ -20,12 +20,14 @@ assert.match(src, /href: "\/bills"/);
 assert.match(src, /href: "\/debt"/);
 assert.match(src, /href: "\/transactions"/);
 
-// Web primary should still include Income (unchanged web mobile IA)
+// Web primary includes Budgets; Income remains available in More.
 const webPrimary = src.slice(
   src.indexOf("MOBILE_PRIMARY_NAV"),
   src.indexOf("IOS_PRIMARY_NAV"),
 );
-assert.match(webPrimary, /\/income/);
+assert.match(webPrimary, /\/budgets/);
+assert.match(webPrimary, /label: "Budgets"/);
+assert.match(src.slice(src.indexOf("MOBILE_MORE_NAV"), src.indexOf("IOS_MORE_NAV")), /\/income/);
 
 const iosPrimary = src.slice(
   src.indexOf("IOS_PRIMARY_NAV"),

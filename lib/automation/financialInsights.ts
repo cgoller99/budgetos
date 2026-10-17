@@ -1,3 +1,4 @@
+import { currentBudgetPeriod, normalizeBudgetSchedule } from "@/lib/budgets/budgetPeriod";
 import { getUpcomingBills } from "@/lib/finance/bills";
 import { getBillPaymentHistory } from "@/lib/finance/billPayments";
 import { formatCurrency } from "@/lib/finance/format";
@@ -20,6 +21,11 @@ export type FinancialInsight = {
 export type InsightBudgetLimit = {
   category: string;
   amount: number;
+  frequency?: string;
+  anchorDate?: string | null;
+  weekday?: number | null;
+  monthDays?: number[] | [number, number] | null;
+  intervalDays?: number | null;
 };
 
 export type CategoryBudgetSuggestion = {
@@ -189,20 +195,10 @@ export function findBudgetOverspending(
   referenceDate = new Date(),
 ): FinancialInsight[] {
   const month = monthKey(referenceDate);
-  const spent = new Map<string, number>();
-
-  for (const transaction of confirmedExpenses(data)) {
-    if (transaction.date.slice(0, 7) !== month || transaction.goalId) {
-      continue;
-    }
-    const category = getDisplayCategory(transaction.category);
-    if (EXCLUDED_INSIGHT_CATEGORIES.has(category)) {
-      continue;
-    }
-    spent.set(category, (spent.get(category) ?? 0) + transaction.amount);
-  }
-
-  const limitByCategory = new Map<string, number>();
+  const limitByCategory = new Map<
+    string,
+    { amount: number; schedule: ReturnType<typeof normalizeBudgetSchedule> }
+  >();
   for (const limit of limits) {
     const category = getDisplayCategory(limit.category);
     if (
@@ -212,26 +208,43 @@ export function findBudgetOverspending(
     ) {
       continue;
     }
+    const schedule = normalizeBudgetSchedule(limit);
     const existing = limitByCategory.get(category);
-    limitByCategory.set(
-      category,
-      existing == null ? limit.amount : Math.min(existing, limit.amount),
-    );
+    if (existing == null || limit.amount < existing.amount) {
+      limitByCategory.set(category, { amount: limit.amount, schedule });
+    }
   }
 
   const overs: Array<{ over: number; insight: FinancialInsight }> = [];
-  for (const [category, limit] of limitByCategory) {
-    const amount = roundCurrency(spent.get(category) ?? 0);
-    if (amount <= limit) {
+  for (const [category, entry] of limitByCategory) {
+    const period = currentBudgetPeriod(entry.schedule, referenceDate);
+    let raw = 0;
+    for (const transaction of confirmedExpenses(data)) {
+      if (transaction.goalId) continue;
+      const posted = transaction.date.slice(0, 10);
+      const inWindow =
+        entry.schedule.frequency === "monthly"
+          ? transaction.date.slice(0, 7) === month
+          : posted >= period.start && posted <= period.end;
+      if (!inWindow) continue;
+      if (getDisplayCategory(transaction.category) !== category) continue;
+      raw += transaction.amount;
+    }
+    const amount = roundCurrency(raw);
+    if (amount <= entry.amount) {
       continue;
     }
-    const over = roundCurrency(amount - limit);
+    const over = roundCurrency(amount - entry.amount);
+    const detail =
+      entry.schedule.frequency === "monthly"
+        ? `${formatCurrency(amount)} of confirmed ${category} expenses posted in ${month}, against a ${formatCurrency(entry.amount)} limit, so it is ${formatCurrency(over)} over.`
+        : `${formatCurrency(amount)} of confirmed ${category} expenses posted from ${period.start} to ${period.end}, against a ${formatCurrency(entry.amount)} limit, so it is ${formatCurrency(over)} over.`;
     overs.push({
       over,
       insight: {
         id: `insight-budget-${category}`,
         title: `${category} is over budget`,
-        detail: `${formatCurrency(amount)} of confirmed ${category} expenses posted in ${month}, against a ${formatCurrency(limit)} limit, so it is ${formatCurrency(over)} over.`,
+        detail,
         tone: "negative",
         href: "/reports",
       },

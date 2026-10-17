@@ -5,6 +5,8 @@ import { GoalInsightList } from "@/components/goals/GoalInsightList";
 import { GoalMilestoneConfetti } from "@/components/goals/GoalMilestoneConfetti";
 import { GoalTimelineChart } from "@/components/goals/GoalTimelineChart";
 import { GoalForecastPanel } from "@/components/goals/GoalForecastPanel";
+import { GoalWhatIfPanel } from "@/components/goals/GoalWhatIfPanel";
+import { MobileCollapsibleSection } from "@/components/ui/MobileCollapsibleSection";
 import { formatCurrency } from "@/lib/finance/format";
 import { formatGoalDate, type GoalProgress } from "@/lib/finance/goals";
 import { getGoalTypeMeta } from "@/lib/finance/goalTypes";
@@ -75,19 +77,25 @@ export function GoalCard({
                   : `${formatCurrency(goal.remaining)} remaining`}
               </p>
               <p className="mt-1 text-sm text-[var(--text-muted)]">
-                Projected finish: {formatGoalDate(goal.estimatedCompletionDate)}
+                Projected finish:{" "}
+                {goal.weeklyContribution > 0
+                  ? formatGoalDate(goal.estimatedCompletionDate)
+                  : "Cannot estimate yet — no reliable contribution schedule"}
+              </p>
+              <p className="mt-1 text-xs text-[var(--text-muted)]">
+                Actual saved balance is separate from planned and projected amounts.
               </p>
             </div>
           </div>
 
           <div className="grid flex-1 gap-3 sm:grid-cols-2">
-            <DetailStat label="Current balance" value={formatCurrency(goal.current)} />
-            <DetailStat label="Target balance" value={formatCurrency(goal.target)} />
-            <DetailStat label="Remaining" value={formatCurrency(goal.remaining)} />
-            <DetailStat label="Complete" value={`${goal.percentComplete}%`} />
+            <DetailStat label="Actual saved" value={formatCurrency(goal.current)} />
+            <DetailStat label="Target amount" value={formatCurrency(goal.target)} />
+            <DetailStat label="Amount remaining" value={formatCurrency(goal.remaining)} />
+            <DetailStat label="% complete" value={`${goal.percentComplete}%`} />
             <DetailStat
-              label="Weekly contribution"
-              value={formatCurrency(goal.weeklyContribution)}
+              label="Current contribution rate"
+              value={`${formatCurrency(goal.weeklyContribution)} / week`}
             />
             <DetailStat
               label="Monthly contribution"
@@ -125,7 +133,15 @@ export function GoalCard({
 
         <GoalForecastPanel goal={savingsGoal} onSave={onSavePlan} />
 
-        <div className="mt-8 flex gap-3 border-t border-[var(--surface-border)] pt-6">
+        <MobileCollapsibleSection
+          title="What-If & horizons"
+          description="Test extra savings without changing your plan"
+          className="mt-4"
+        >
+          <GoalWhatIfPanel goal={savingsGoal} />
+        </MobileCollapsibleSection>
+
+        <div className="mt-8 flex flex-col gap-3 border-t border-[var(--surface-border)] pt-6 sm:flex-row">
           <Button
             type="button"
             fullWidth
@@ -137,6 +153,12 @@ export function GoalCard({
           <Button type="button" variant="secondary" fullWidth onClick={onEdit}>
             Edit goal
           </Button>
+          <a
+            href="/income?tab=plan"
+            className="inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-button)] border border-[var(--surface-border)] px-4 text-sm font-semibold text-[var(--accent-light)]"
+          >
+            Edit paycheck allocation
+          </a>
         </div>
       </CardContent>
     </Card>

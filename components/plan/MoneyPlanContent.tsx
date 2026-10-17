@@ -109,6 +109,11 @@ function PlanSections({ plan }: { plan: MoneyPlan }) {
 
       <section>
         <h2 className="text-[15px] font-semibold text-[var(--foreground)]">Saved budgets</h2>
+        {plan.budgets.length > 0 ? (
+          <p className="mt-1 text-[13px] text-[var(--text-muted)]">
+            Monthly budget total {formatCurrency(plan.monthlyBudgetTotal)}, on the same monthly basis as Safe to Spend ({formatCurrency(plan.safeToSpend)}).
+          </p>
+        ) : null}
         {plan.budgets.length === 0 ? (
           <p className="mt-1 text-[13px] text-[var(--text-muted)]">
             No saved category limits yet.

@@ -84,20 +84,28 @@ function GoalAllocationFacts({
   });
 
   return (
-    <dl
-      className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3"
-      data-goal-allocation={goal.id}
-    >
-      <Fact label="Saved balance" value={formatCurrency(goal.current)} />
-      <Fact label="Target" value={formatCurrency(goal.target)} />
-      <Fact label="Still to save" value={formatCurrency(stillToSave)} />
-      <Fact
-        label="Projected finish"
-        value={formatGoalDate(forecast.estimatedCompletionDate)}
-      />
-      <Fact label="Time remaining" value={forecast.timeLabel} />
-      <Fact label="From this paycheck" value={formatCurrency(plannedAmount)} />
-    </dl>
+    <div className="mt-3" data-goal-allocation={goal.id}>
+      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <Fact label="Saved balance" value={formatCurrency(goal.current)} />
+        <Fact label="Target" value={formatCurrency(goal.target)} />
+        <Fact label="Still to save" value={formatCurrency(stillToSave)} />
+        <Fact
+          label="Projected finish"
+          value={formatGoalDate(forecast.estimatedCompletionDate)}
+        />
+        <Fact label="Time remaining" value={forecast.timeLabel} />
+        <Fact label="From this paycheck" value={formatCurrency(plannedAmount)} />
+      </dl>
+      <a
+        href="/savings"
+        className="mt-2 inline-block text-xs font-medium text-[var(--accent-light)] hover:underline"
+      >
+        Open {goal.name} goal
+      </a>
+      <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+        Planned only — does not change the saved balance until you confirm a paycheck.
+      </p>
+    </div>
   );
 }
 

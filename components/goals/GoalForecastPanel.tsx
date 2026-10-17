@@ -141,7 +141,7 @@ export function GoalForecastPanel({ goal, onSave }: GoalForecastPanelProps) {
       <p className="mt-2 text-[12px] leading-snug text-[var(--text-secondary)]">
         This preview stays here until you save the plan. Saving does not move money.
         {paycheckWeekly > 0
-          ? ` The finish date includes ${formatCurrency(paycheckWeekly)} / week from your paycheck plan.`
+          ? ` The finish date includes ${formatCurrency(paycheckWeekly)} / week from your paycheck plan. Saving here only updates the separate weekly schedule — it does not replace the Income Plan allocation.`
           : ""}
       </p>
       <button

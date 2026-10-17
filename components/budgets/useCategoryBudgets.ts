@@ -4,6 +4,13 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { trackFirstBudget } from "@/lib/analytics/client";
 import { useFinance } from "@/context/FinanceContext";
+import {
+  roundBudgetCurrency,
+  scheduleForEdit,
+  storedScheduleFields,
+  type BudgetFrequency,
+  type BudgetSchedule,
+} from "@/lib/budgets/budgetPeriod";
 import { createBrowserCategoryBudgetSession } from "@/lib/budgets/categoryBudgetClient";
 import {
   buildCategoryBudgetViews,
@@ -13,6 +20,10 @@ import {
   type CategoryBudgetSyncState,
   type SavedCategoryBudget,
 } from "@/lib/budgets/categoryBudgetSync";
+import {
+  readBudgetRolloverCategories,
+  writeBudgetRolloverCategories,
+} from "@/lib/budgets/budgetRollover";
 import { getDisplayCategory } from "@/lib/transactions/categoryPresentation";
 
 const INITIAL_SYNC: CategoryBudgetSyncState = {
@@ -29,10 +40,19 @@ export function useCategoryBudgets() {
   const [seenUserId, setSeenUserId] = useState<string | null>(userId);
   const [category, setCategory] = useState("");
   const [amount, setAmount] = useState("");
+  const [frequency, setFrequency] = useState<BudgetFrequency>("monthly");
+  const [anchorDate, setAnchorDate] = useState("");
+  const [weekday, setWeekday] = useState(1);
+  const [monthDays, setMonthDays] = useState<[number, number]>([1, 15]);
+  const [intervalDays, setIntervalDays] = useState(14);
+  const [rolloverCategories, setRolloverCategories] = useState<Set<string>>(
+    () => new Set(),
+  );
 
   if (userId !== seenUserId) {
     setSeenUserId(userId);
     setSyncState(INITIAL_SYNC);
+    setRolloverCategories(new Set());
   }
 
   useEffect(() => {
@@ -45,6 +65,9 @@ export function useCategoryBudgets() {
       }
     });
     void session.load();
+    if (typeof window !== "undefined") {
+      setRolloverCategories(readBudgetRolloverCategories(window.localStorage, userId));
+    }
     return () => {
       cancelled = true;
       unsubscribe();
@@ -76,9 +99,31 @@ export function useCategoryBudgets() {
     [finance, saved],
   );
   const views = useMemo(
-    () => buildCategoryBudgetViews(saved, finance),
-    [finance, saved],
+    () =>
+      buildCategoryBudgetViews(saved, finance, new Date(), {
+        rolloverCategories,
+      }),
+    [finance, saved, rolloverCategories],
   );
+  const monthlyBudgetTotal = useMemo(
+    () =>
+      roundBudgetCurrency(
+        views.reduce((total, view) => total + view.monthlyEquivalent, 0),
+      ),
+    [views],
+  );
+
+  function budgetFromSchedule(
+    categoryName: string,
+    nextAmount: number,
+    schedule: BudgetSchedule,
+  ): SavedCategoryBudget {
+    return {
+      category: categoryName,
+      amount: roundBudgetCurrency(nextAmount),
+      ...storedScheduleFields(schedule),
+    };
+  }
 
   function acceptSuggestion(nextCategory: string, limit: number) {
     const categoryName = getDisplayCategory(nextCategory);
@@ -88,24 +133,68 @@ export function useCategoryBudgets() {
     ]);
   }
 
-  function updateAmount(nextCategory: string, nextAmount: number) {
-    if (!Number.isFinite(nextAmount) || nextAmount < 0) {
-      return;
-    }
-
+  function updateBudget(
+    nextCategory: string,
+    patch: Partial<BudgetSchedule> & { amount?: number },
+  ) {
     const categoryName = getDisplayCategory(nextCategory);
+    const current = saved.find((item) => getDisplayCategory(item.category) === categoryName);
+    if (!current) return;
+    const nextAmount = patch.amount ?? current.amount;
+    if (!Number.isFinite(nextAmount) || nextAmount < 0) return;
+    const schedule = scheduleForEdit(current, patch);
     persist(
       saved.map((item) =>
         getDisplayCategory(item.category) === categoryName
-          ? { ...item, category: categoryName, amount: Math.round(nextAmount * 100) / 100 }
+          ? budgetFromSchedule(categoryName, nextAmount, schedule)
           : item,
       ),
     );
   }
 
+  function updateAmount(nextCategory: string, nextAmount: number) {
+    updateBudget(nextCategory, { amount: nextAmount });
+  }
+
+  function applyDraftSchedule(
+    patch: Partial<BudgetSchedule>,
+  ) {
+    const next = scheduleForEdit(
+      {
+        frequency,
+        anchorDate: anchorDate || null,
+        weekday,
+        monthDays,
+        intervalDays,
+      },
+      patch,
+    );
+    setFrequency(next.frequency);
+    setAnchorDate(next.anchorDate ?? "");
+    setWeekday(next.weekday ?? 1);
+    setMonthDays(next.monthDays ?? [1, 15]);
+    setIntervalDays(next.intervalDays ?? 14);
+  }
+
   function removeBudget(nextCategory: string) {
     const categoryName = getDisplayCategory(nextCategory);
     persist(saved.filter((item) => getDisplayCategory(item.category) !== categoryName));
+  }
+
+  function setRollover(nextCategory: string, enabled: boolean) {
+    const categoryName = getDisplayCategory(nextCategory);
+    setRolloverCategories((current) => {
+      const next = new Set(current);
+      if (enabled) {
+        next.add(categoryName);
+      } else {
+        next.delete(categoryName);
+      }
+      if (typeof window !== "undefined") {
+        writeBudgetRolloverCategories(window.localStorage, userId, next);
+      }
+      return next;
+    });
   }
 
   function addBudget(event: FormEvent<HTMLFormElement>) {
@@ -116,21 +205,49 @@ export function useCategoryBudgets() {
       return;
     }
 
-    acceptSuggestion(name, Math.round(limit * 100) / 100);
+    const schedule = scheduleForEdit(
+      {
+        frequency,
+        anchorDate: anchorDate || null,
+        weekday,
+        monthDays,
+        intervalDays,
+      },
+      {},
+    );
+    const categoryName = getDisplayCategory(name);
+    persist([
+      ...saved.filter((item) => getDisplayCategory(item.category) !== categoryName),
+      budgetFromSchedule(categoryName, limit, schedule),
+    ]);
     setCategory("");
     setAmount("");
+    setFrequency("monthly");
+    setAnchorDate("");
+    setWeekday(1);
+    setMonthDays([1, 15]);
+    setIntervalDays(14);
   }
 
   return {
     suggestions,
     views,
+    monthlyBudgetTotal,
     category,
     setCategory,
     amount,
     setAmount,
+    frequency,
+    anchorDate,
+    weekday,
+    monthDays,
+    intervalDays,
+    applyDraftSchedule,
     acceptSuggestion,
     updateAmount,
+    updateBudget,
     removeBudget,
+    setRollover,
     addBudget,
     status: syncState.status,
     syncMessage: syncState.message,
