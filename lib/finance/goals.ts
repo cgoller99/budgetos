@@ -1,5 +1,8 @@
 import type { FinanceData, SavingsGoal } from "@/lib/finance/types";
-import { calculateMonthlySavings } from "@/lib/calculations/savingsProgress";
+import {
+  resolveGoalProgressAmounts,
+  type GoalProgressAmounts,
+} from "@/lib/finance/goalAccountLink";
 import {
   getGoalAccentColor,
   getGoalContributionBreakdown,
@@ -12,12 +15,18 @@ import {
   type GoalSuggestion,
   type GoalTimelineMonth,
 } from "@/lib/finance/goalAnalytics";
+import {
+  forecastGoalSavings,
+  sumGoalContributions,
+  type GoalForecast,
+} from "@/lib/finance/goalForecast";
 
 export type GoalProgress = {
   id: string;
   name: string;
   icon: string;
   type: SavingsGoal["type"];
+  /** Tracked progress (linked assigned amount or confirmed contributions). */
   current: number;
   target: number;
   remaining: number;
@@ -33,6 +42,10 @@ export type GoalProgress = {
   suggestions: GoalSuggestion[];
   timeline: GoalTimelineMonth[];
   reachedMilestones: number[];
+  /** Distinct money layers for the goal card. */
+  progressAmounts: GoalProgressAmounts;
+  /** Authoritative forecast shared with Forecast / What-If / insights. */
+  forecast: GoalForecast;
 };
 
 const PROGRESS_RING_CIRCUMFERENCE = 264;
@@ -63,32 +76,42 @@ export function estimateCompletionDate(
 }
 
 export function enrichGoal(data: FinanceData, goal: SavingsGoal): GoalProgress {
-  const remaining = Math.max(goal.target - goal.current, 0);
+  const progressAmounts = resolveGoalProgressAmounts(data, goal);
+  const tracked = progressAmounts.trackedAmount;
+  const remaining = Math.max(goal.target - tracked, 0);
   const percentComplete =
     goal.target > 0
-      ? Math.min(Math.round((goal.current / goal.target) * 100), 100)
+      ? Math.min(Math.round((tracked / goal.target) * 100), 100)
       : 0;
   const contribution = getGoalContributionBreakdown(data, goal);
-  const activeGoalCount = Math.max(
-    (data.savingsGoals ?? []).filter((item) => item.current < item.target).length,
-    1,
+  // Authoritative weekly rate only — never invent a completion date from household averages.
+  const weeklyForEstimate = contribution.weeklyContribution;
+  const contributed = sumGoalContributions(
+    data.transactions,
+    goal.id,
+    goal.createdAt,
   );
-  const weeklyForEstimate =
-    contribution.weeklyContribution > 0
-      ? contribution.weeklyContribution
-      : calculateMonthlySavings(data) / activeGoalCount / 4.33;
+  const forecast = forecastGoalSavings({
+    current: tracked,
+    target: goal.target,
+    createdAt: goal.createdAt,
+    weeklySavings: weeklyForEstimate,
+    contributed,
+    paySchedule: data.incomePlan?.paySchedule ?? null,
+    customIntervalDays: data.incomePlan?.customIntervalDays ?? null,
+  });
 
   return {
     id: goal.id,
     name: goal.name,
     icon: goal.icon,
     type: goal.type,
-    current: goal.current,
+    current: tracked,
     target: goal.target,
     remaining,
     percentComplete,
-    estimatedCompletionDate: estimateCompletionDate(goal, weeklyForEstimate),
-    isComplete: goal.current >= goal.target,
+    estimatedCompletionDate: forecast.estimatedCompletionDate,
+    isComplete: tracked >= goal.target,
     weeklyContribution: contribution.weeklyContribution,
     monthlyContribution: contribution.monthlyContribution,
     contributionSource: contribution.source,
@@ -98,6 +121,8 @@ export function enrichGoal(data: FinanceData, goal: SavingsGoal): GoalProgress {
     suggestions: getGoalSuggestions(data, goal, remaining, weeklyForEstimate),
     timeline: getGoalTimeline(data, goal.id),
     reachedMilestones: getReachedMilestones(percentComplete),
+    progressAmounts,
+    forecast,
   };
 }
 
@@ -130,7 +155,7 @@ export function getNextGoal(data: FinanceData): GoalProgress | null {
 
 export function formatGoalDate(date: Date | null): string {
   if (!date) {
-    return "TBD";
+    return "Not estimable yet";
   }
 
   return date.toLocaleDateString("en-US", {

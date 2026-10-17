@@ -18,6 +18,7 @@ type GoalCardProps = {
   savingsGoal: SavingsGoal;
   onAddMoney: () => void;
   onEdit: () => void;
+  onLinkAccount: () => void;
   onSavePlan: (weeklySavings: number) => Promise<void>;
 };
 
@@ -26,9 +27,16 @@ export function GoalCard({
   savingsGoal,
   onAddMoney,
   onEdit,
+  onLinkAccount,
   onSavePlan,
 }: GoalCardProps) {
   const typeMeta = getGoalTypeMeta(goal.type);
+  const amounts = goal.progressAmounts;
+  const forecast = goal.forecast;
+  const completionLabel =
+    forecast.weeklySavings > 0
+      ? formatGoalDate(forecast.estimatedCompletionDate)
+      : "Not estimable yet — no reliable contribution schedule";
 
   return (
     <Card hover className="goal-card-enter relative overflow-hidden">
@@ -36,126 +44,195 @@ export function GoalCard({
         goalId={goal.id}
         percentComplete={goal.percentComplete}
       />
-      <CardContent>
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-          <div className="flex items-start gap-5">
-            <ProgressRing
-              value={goal.percentComplete}
-              size={112}
-              accentColor={goal.accentColor}
-            >
-              <div className="text-center">
-                <span className="text-xl">{goal.icon}</span>
-                <p className="mt-1 text-sm font-semibold tabular-nums text-[var(--foreground)]">
-                  {goal.percentComplete}%
-                </p>
-              </div>
-            </ProgressRing>
+      <CardContent className="min-w-0 space-y-6">
+        {/* Progress header */}
+        <div className="flex min-w-0 flex-col gap-5 sm:flex-row sm:items-start">
+          <ProgressRing
+            value={goal.percentComplete}
+            size={104}
+            accentColor={goal.accentColor}
+          >
+            <div className="text-center">
+              <span className="text-xl">{goal.icon}</span>
+              <p className="mt-1 text-sm font-semibold tabular-nums text-[var(--foreground)]">
+                {goal.percentComplete}%
+              </p>
+            </div>
+          </ProgressRing>
 
-            <div className="min-w-0 flex-1">
-              <h3 className="truncate text-lg font-semibold tracking-tight text-[var(--foreground)]">
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <h3 className="min-w-0 break-words text-lg font-semibold tracking-tight text-[var(--foreground)]">
                 {goal.name}
               </h3>
               <Badge
                 variant="accent"
-                className="mt-3"
                 style={{ borderColor: `${goal.accentColor}40` }}
               >
                 {typeMeta.label}
               </Badge>
-
-              <p className="mt-5 text-2xl font-semibold tabular-nums text-[var(--foreground)]">
-                {formatCurrency(goal.current)}
-                <span className="text-base font-normal text-[var(--text-muted)]">
-                  {" "}
-                  / {formatCurrency(goal.target)}
-                </span>
-              </p>
-              <p className="mt-2 text-sm text-[var(--text-muted)]">
-                {goal.isComplete
-                  ? "Goal complete"
-                  : `${formatCurrency(goal.remaining)} remaining`}
-              </p>
-              <p className="mt-1 text-sm text-[var(--text-muted)]">
-                Projected finish:{" "}
-                {goal.weeklyContribution > 0
-                  ? formatGoalDate(goal.estimatedCompletionDate)
-                  : "Cannot estimate yet — no reliable contribution schedule"}
-              </p>
-              <p className="mt-1 text-xs text-[var(--text-muted)]">
-                Actual saved balance is separate from planned and projected amounts.
-              </p>
+              {amounts.linkedAccountId ? (
+                <Badge variant={amounts.linkStale ? "warning" : "accent"}>
+                  {amounts.linkStale ? "Linked · stale" : "Linked account"}
+                </Badge>
+              ) : (
+                <Badge variant="default">Manual tracking</Badge>
+              )}
             </div>
-          </div>
 
-          <div className="grid flex-1 gap-3 sm:grid-cols-2">
-            <DetailStat label="Actual saved" value={formatCurrency(goal.current)} />
-            <DetailStat label="Target amount" value={formatCurrency(goal.target)} />
-            <DetailStat label="Amount remaining" value={formatCurrency(goal.remaining)} />
-            <DetailStat label="% complete" value={`${goal.percentComplete}%`} />
-            <DetailStat
-              label="Current contribution rate"
-              value={`${formatCurrency(goal.weeklyContribution)} / week`}
-            />
-            <DetailStat
-              label="Monthly contribution"
-              value={formatCurrency(goal.monthlyContribution)}
-            />
-            <DetailStat
-              label="Contribution source"
-              value={goal.contributionSourceLabel}
-              className="sm:col-span-2"
-            />
+            <p className="break-words text-2xl font-semibold tabular-nums text-[var(--foreground)]">
+              {formatCurrency(goal.current)}
+              <span className="text-base font-normal text-[var(--text-muted)]">
+                {" "}
+                / {formatCurrency(goal.target)}
+              </span>
+            </p>
+            <p className="text-sm text-[var(--text-muted)]">
+              {goal.isComplete
+                ? "Goal complete"
+                : `${formatCurrency(goal.remaining)} remaining`}
+            </p>
+            <p className="text-sm text-[var(--text-secondary)]">
+              Projected finish: {completionLabel}
+            </p>
           </div>
         </div>
 
-        {goal.suggestions.length > 0 && (
-          <div className="mt-6 flex flex-wrap gap-2">
+        {/* Money layers — responsive 1/2 cols, never cramped 4-across */}
+        <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+          <DetailStat
+            label="Confirmed contributions"
+            value={formatCurrency(amounts.confirmedContributions)}
+            hint="Ledger only — not replaced by account balance"
+          />
+          <DetailStat
+            label="Planned contributions"
+            value={`${formatCurrency(goal.weeklyContribution)} / week`}
+            hint={goal.contributionSourceLabel}
+          />
+          {amounts.accountBalance != null ? (
+            <DetailStat
+              label="Account balance"
+              value={formatCurrency(amounts.accountBalance)}
+              hint={
+                amounts.linkStale
+                  ? "Last known value — connection stale or disconnected"
+                  : amounts.linkedAccountName
+                    ? `Linked · ${amounts.linkedAccountName}`
+                    : "Linked account"
+              }
+              stale={amounts.linkStale}
+            />
+          ) : null}
+          {amounts.assignedToGoal != null ? (
+            <DetailStat
+              label="Assigned to this goal"
+              value={formatCurrency(amounts.assignedToGoal)}
+              hint={
+                amounts.linkMode === "full"
+                  ? "Full eligible balance"
+                  : "Partial allocation"
+              }
+            />
+          ) : null}
+          <DetailStat
+            label="Projected finish"
+            value={completionLabel}
+            className="sm:col-span-2"
+          />
+          {amounts.marketChangeEstimate != null ? (
+            <DetailStat
+              label="Market change (est.)"
+              value={formatCurrency(amounts.marketChangeEstimate)}
+              hint="Not a paycheck contribution"
+              className="sm:col-span-2"
+            />
+          ) : null}
+        </div>
+
+        {amounts.linkedAccountId ? (
+          <div className="rounded-xl border border-[var(--surface-border)] bg-[var(--surface-subtle)] p-3 text-sm text-[var(--text-secondary)]">
+            <p className="font-medium text-[var(--foreground)]">
+              Linked account details
+            </p>
+            <p className="mt-1 break-words">
+              {amounts.linkedAccountName ?? "Account"}
+              {amounts.lastRefreshedAt
+                ? ` · refreshed ${new Date(amounts.lastRefreshedAt).toLocaleString()}`
+                : " · refresh time unavailable"}
+            </p>
+            {amounts.linkMode === "full" ? (
+              <p className="mt-1 text-xs text-[var(--text-muted)]">
+                Withdrawals and market moves can change tracked progress.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+
+        {goal.suggestions.length > 0 ? (
+          <ul className="space-y-2">
             {goal.suggestions.map((suggestion) => (
-              <span
+              <li
                 key={suggestion.id}
-                className="rounded-full border border-[var(--accent)]/20 bg-[var(--accent)]/8 px-3 py-1.5 text-xs text-[var(--text-secondary)]"
+                className="rounded-xl border border-[var(--accent)]/20 bg-[var(--accent)]/8 px-3 py-2 text-sm leading-snug text-[var(--text-secondary)]"
               >
                 {suggestion.message}
-              </span>
+              </li>
             ))}
-          </div>
-        )}
+          </ul>
+        ) : null}
 
-        <GoalInsightList insights={goal.insights} className="mt-4" />
+        <GoalInsightList insights={goal.insights} />
 
-        <div className="mt-6">
+        <div>
           <p className="mb-3 text-sm font-medium text-[var(--foreground)]">
             Contribution history
           </p>
           <GoalTimelineChart timeline={goal.timeline} />
         </div>
 
-        <GoalForecastPanel goal={savingsGoal} onSave={onSavePlan} />
+        <GoalForecastPanel
+          goal={savingsGoal}
+          trackedAmount={goal.current}
+          authoritativeForecast={forecast}
+          onSave={onSavePlan}
+        />
 
         <MobileCollapsibleSection
           title="What-If & horizons"
           description="Test extra savings without changing your plan"
-          className="mt-4"
         >
-          <GoalWhatIfPanel goal={savingsGoal} />
+          <GoalWhatIfPanel goal={savingsGoal} trackedAmount={goal.current} />
         </MobileCollapsibleSection>
 
-        <div className="mt-8 flex flex-col gap-3 border-t border-[var(--surface-border)] pt-6 sm:flex-row">
+        <div className="flex flex-col gap-3 border-t border-[var(--surface-border)] pt-6 sm:flex-row sm:flex-wrap">
           <Button
             type="button"
-            fullWidth
+            className="sm:min-w-[10rem] sm:flex-1"
             onClick={onAddMoney}
             disabled={goal.isComplete}
           >
             Add contribution
           </Button>
-          <Button type="button" variant="secondary" fullWidth onClick={onEdit}>
+          <Button
+            type="button"
+            variant="secondary"
+            className="sm:min-w-[10rem] sm:flex-1"
+            onClick={onEdit}
+          >
             Edit goal
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            className="sm:min-w-[10rem] sm:flex-1"
+            onClick={onLinkAccount}
+          >
+            {amounts.linkedAccountId ? "Manage linked account" : "Link account"}
           </Button>
           <a
             href="/income?tab=plan"
-            className="inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-button)] border border-[var(--surface-border)] px-4 text-sm font-semibold text-[var(--accent-light)]"
+            className="inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-button)] border border-[var(--surface-border)] px-4 text-sm font-semibold text-[var(--accent-light)] sm:min-w-[10rem] sm:flex-1"
           >
             Edit paycheck allocation
           </a>
@@ -168,23 +245,37 @@ export function GoalCard({
 function DetailStat({
   label,
   value,
+  hint,
+  stale,
   className,
 }: {
   label: string;
   value: string;
+  hint?: string;
+  stale?: boolean;
   className?: string;
 }) {
   return (
     <div
       className={cn(
-        "rounded-xl border border-[var(--surface-border)] bg-[var(--surface-subtle)] px-3 py-2.5",
+        "min-w-0 rounded-xl border border-[var(--surface-border)] bg-[var(--surface-subtle)] px-3 py-3",
         className,
       )}
     >
       <p className="text-xs text-[var(--text-muted)]">{label}</p>
-      <p className="mt-1 text-sm font-semibold tabular-nums text-[var(--foreground)]">
+      <p
+        className={cn(
+          "mt-1 break-words text-sm font-semibold tabular-nums text-[var(--foreground)]",
+          stale && "text-[var(--warning)]",
+        )}
+      >
         {value}
       </p>
+      {hint ? (
+        <p className="mt-1 break-words text-xs leading-snug text-[var(--text-muted)]">
+          {hint}
+        </p>
+      ) : null}
     </div>
   );
 }

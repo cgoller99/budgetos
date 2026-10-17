@@ -203,6 +203,11 @@ export type EditGoalInput = {
   target: number;
   /** Weekly forecast rate. Omit this field to leave a saved contribution unchanged. */
   weeklySavings?: number;
+  /**
+   * Link or unlink an account. Pass `null` to clear the link.
+   * Omit to leave the existing link unchanged.
+   */
+  accountLink?: GoalAccountLink | null;
 };
 
 export type AddSavingsGoalInput = CreateGoalInput;
@@ -377,15 +382,30 @@ export type IncomeSource = {
   ownerUserId?: string | null;
 };
 
+export type GoalLinkMode = "full" | "partial";
+
+export type GoalAccountLink = {
+  accountId: string;
+  mode: GoalLinkMode;
+  /** Dollars assigned when mode is partial. */
+  allocatedAmount: number | null;
+};
+
 export type SavingsGoal = {
   id: string;
   name: string;
   type: GoalType;
   icon: string;
+  /** Confirmed contribution ledger — never replaced silently by an account balance. */
   current: number;
   target: number;
   createdAt: string;
   autoContribution?: AutoContribution;
+  /** Optional link to a checking/savings/investment account by ID. */
+  accountLink?: GoalAccountLink | null;
+  linkedAt?: string | null;
+  linkedSnapshotBalance?: number | null;
+  linkedSnapshotAt?: string | null;
 };
 
 export type DebtAccountType =

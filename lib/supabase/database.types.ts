@@ -250,6 +250,12 @@ export type GoalRow = RecurringColumns & {
   contribution_amount: number | null;
   contribution_frequency: string | null;
   household_id: string | null;
+  linked_account_id: string | null;
+  link_mode: "full" | "partial" | null;
+  linked_allocated_amount: number | null;
+  linked_at: string | null;
+  linked_snapshot_balance: number | null;
+  linked_snapshot_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -269,6 +275,12 @@ export type GoalInsert = {
   last_processed_date?: string | null;
   recurring_status?: string | null;
   household_id?: string | null;
+  linked_account_id?: string | null;
+  link_mode?: "full" | "partial" | null;
+  linked_allocated_amount?: number | null;
+  linked_at?: string | null;
+  linked_snapshot_balance?: number | null;
+  linked_snapshot_at?: string | null;
   created_at?: string;
   updated_at?: string;
 };

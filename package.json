@@ -120,7 +120,8 @@
     "test:unified-financial-plan": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-unified-financial-plan.mjs",
     "test:cash-flow-forecast": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-cash-flow-forecast.mjs",
     "test:cash-outlook": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-cash-outlook.mjs",
-    "test:goal-forecast": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-goal-forecast.mjs"
+    "test:goal-forecast": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-goal-forecast.mjs",
+    "test:goal-account-link": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-goal-account-link.mjs"
   },
   "dependencies": {
     "@apple/app-store-server-library": "^3.1.0",

@@ -7,7 +7,12 @@ import type { AutoContribution } from "@/lib/recurring/types";
 const WEEKS_PER_MONTH = 4.33;
 const ON_TRACK_BAND = 0.1;
 
-export type GoalPace = "ahead" | "on_track" | "behind" | "complete";
+export type GoalPace =
+  | "ahead"
+  | "on_track"
+  | "behind"
+  | "complete"
+  | "insufficient";
 
 export type GoalForecast = {
   remaining: number;
@@ -36,6 +41,7 @@ const PACE_LABEL: Record<GoalPace, string> = {
   on_track: "On track",
   behind: "Behind",
   complete: "Complete",
+  insufficient: "Needs schedule",
 };
 
 function roundCurrency(value: number): number {
@@ -128,8 +134,8 @@ function timeLabelFor(weeksRemaining: number | null, pace: GoalPace): string {
     return "Done";
   }
 
-  if (weeksRemaining == null) {
-    return "TBD";
+  if (weeksRemaining == null || pace === "insufficient") {
+    return "Add a contribution schedule";
   }
 
   const weeksText = weeksRemaining === 1 ? "1 week" : `${weeksRemaining} weeks`;
@@ -162,7 +168,8 @@ export function forecastGoalSavings(input: {
   if (remaining <= 0) {
     pace = "complete";
   } else if (weeklySavings <= 0) {
-    pace = "behind";
+    // No reliable contribution schedule — do not invent "Behind".
+    pace = "insufficient";
   } else if (weeksElapsed < 1) {
     const expected = weeklySavings * weeksElapsed;
     pace =
@@ -365,13 +372,38 @@ export function applyGoalEdit(
   icon: string,
   referenceDate = new Date(),
 ): SavingsGoal {
-  const next: SavingsGoal = {
+  let next: SavingsGoal = {
     ...goal,
     name: input.name.trim(),
     type: input.type,
     icon,
     target: input.target,
   };
+
+  if (input.accountLink !== undefined) {
+    if (input.accountLink == null) {
+      next = {
+        ...next,
+        accountLink: null,
+        linkedAt: null,
+        linkedSnapshotBalance: null,
+        linkedSnapshotAt: null,
+      };
+    } else {
+      next = {
+        ...next,
+        accountLink: {
+          accountId: input.accountLink.accountId,
+          mode: input.accountLink.mode,
+          allocatedAmount:
+            input.accountLink.mode === "partial"
+              ? Math.max(0, input.accountLink.allocatedAmount ?? 0)
+              : null,
+        },
+        linkedAt: goal.linkedAt ?? referenceDate.toISOString(),
+      };
+    }
+  }
 
   if (typeof input.weeklySavings !== "number") {
     return next;

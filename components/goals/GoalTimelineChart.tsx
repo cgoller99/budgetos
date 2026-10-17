@@ -6,6 +6,22 @@ type GoalTimelineChartProps = {
 };
 
 export function GoalTimelineChart({ timeline }: GoalTimelineChartProps) {
+  const hasContributions = timeline.some((item) => item.amount > 0);
+
+  if (!hasContributions) {
+    return (
+      <div className="rounded-xl border border-dashed border-[var(--surface-border)] bg-[var(--surface-subtle)] px-4 py-6 text-center">
+        <p className="text-sm font-medium text-[var(--foreground)]">
+          No contribution history yet
+        </p>
+        <p className="mt-1 text-xs text-[var(--text-muted)]">
+          Confirmed contributions will appear here after you add money or apply a paycheck.
+          Planned Income Plan amounts do not show until confirmed.
+        </p>
+      </div>
+    );
+  }
+
   const maxAmount = Math.max(...timeline.map((item) => item.amount), 1);
   const width = 280;
   const height = 72;
@@ -60,16 +76,16 @@ export function GoalTimelineChart({ timeline }: GoalTimelineChartProps) {
         })}
       </svg>
 
-      <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
         {timeline.map((item) => (
           <div
             key={item.monthKey}
-            className="rounded-xl border border-[var(--surface-border)] bg-[var(--surface-subtle)] px-2 py-2 text-center"
+            className="min-w-0 rounded-xl border border-[var(--surface-border)] bg-[var(--surface-subtle)] px-2 py-2 text-center"
           >
             <p className="text-xs font-medium text-[var(--text-muted)]">
               {item.label}
             </p>
-            <p className="mt-1 text-xs font-semibold tabular-nums text-[var(--foreground)]">
+            <p className="mt-1 break-words text-xs font-semibold tabular-nums text-[var(--foreground)]">
               {item.amount > 0 ? `+${formatCurrency(item.amount)}` : "—"}
             </p>
           </div>
