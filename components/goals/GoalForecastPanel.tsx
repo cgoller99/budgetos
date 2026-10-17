@@ -123,12 +123,12 @@ export function GoalForecastPanel({
       : "Not estimable yet";
 
   return (
-    <div className="rounded-[16px] border border-[var(--surface-border)] bg-white/[0.04] p-4">
+    <div className="rounded-[16px] border border-[var(--surface-border)] bg-white/[0.04] p-3 sm:p-4">
       <div className="flex items-center justify-between gap-3">
         <p className="text-[15px] font-semibold text-[var(--foreground)]">Forecast</p>
         <p className={cn("text-[13px] font-semibold", paceClass)}>{forecast.paceLabel}</p>
       </div>
-      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3">
         <ForecastStat label="Amount remaining" value={formatCurrency(forecast.remaining)} />
         <ForecastStat label="Estimated completion" value={completionValue} />
         <ForecastStat label="Time until completion" value={forecast.timeLabel} />

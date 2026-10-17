@@ -47,7 +47,13 @@ export function isLinkableAccount(account: Account): boolean {
   return LINKABLE_TYPES.has(account.type);
 }
 
-export function eligibleAccountBalance(account: Account): number {
+export type EligibleBalanceAccount = {
+  type: string;
+  balance: number;
+  availableBalance?: number | null;
+};
+
+export function eligibleAccountBalance(account: EligibleBalanceAccount): number {
   if (account.type === "investment") {
     return roundCurrency(Math.max(0, account.balance));
   }
@@ -163,16 +169,18 @@ export function validateGoalAccountLink(
     return {
       ok: false,
       reason:
-        "Another goal already tracks the full balance of this account. Unlink it first or use a different account.",
+        "Another goal already claims the remaining balance of this account. Switch that goal to a fixed allocation first.",
     };
   }
 
   if (link.mode === "full") {
-    if (others.totalAssigned > 0) {
+    // Full = remaining unallocated after other partials. Allowed alongside partials.
+    const remaining = roundCurrency(Math.max(0, eligible - others.totalAssigned));
+    if (remaining <= 0) {
       return {
         ok: false,
         reason:
-          "Other goals already use a portion of this account. Remove those partial links before tracking the full balance.",
+          "Nothing left unallocated on this account. Reduce other goal allocations first.",
       };
     }
     return { ok: true };
@@ -253,7 +261,11 @@ export function resolveGoalProgressAmounts(
   let assignedToGoal: number | null = null;
   if (accountBalance != null) {
     if (link.mode === "full") {
-      assignedToGoal = accountBalance;
+      // Remaining unallocated after other partial links on this account.
+      const others = assignedAmountOnAccount(data, link.accountId, goal.id);
+      assignedToGoal = roundCurrency(
+        Math.max(0, accountBalance - others.totalAssigned),
+      );
     } else {
       assignedToGoal = roundCurrency(
         Math.min(Math.max(0, link.allocatedAmount ?? 0), accountBalance),
@@ -308,4 +320,111 @@ export function linkableAccounts(data: FinanceData): Account[] {
     .filter(isLinkableAccount)
     .slice()
     .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export type AccountGoalShare = {
+  goalId: string;
+  goalName: string;
+  mode: GoalLinkMode;
+  /** Dollars of the account assigned to this goal (capped by eligible balance). */
+  amount: number;
+};
+
+export type AccountShareSummary = {
+  accountId: string;
+  /** Eligible account balance (available for checking/savings; balance for investment). */
+  totalBalance: number;
+  /** Sum of dollars assigned to goals — never exceeds totalBalance. */
+  allocated: number;
+  /** totalBalance − allocated. */
+  unallocated: number;
+  shares: AccountGoalShare[];
+  hasFullClaim: boolean;
+};
+
+/**
+ * Allocated / unallocated / total for an account shared across goals.
+ * Full-mode goals claim the remaining unallocated dollars after partials
+ * (exclusive of other full claims — validated separately).
+ */
+export function summarizeAccountGoalShares(
+  data: FinanceData,
+  accountId: string,
+  options?: {
+    exceptGoalId?: string;
+    /** Pending link for the editing goal (preview before save). */
+    pending?: GoalAccountLink | null;
+  },
+): AccountShareSummary {
+  const account = data.accounts.find((item) => item.id === accountId) ?? null;
+  const totalBalance = account ? eligibleAccountBalance(account) : 0;
+  const shares: AccountGoalShare[] = [];
+  let partialTotal = 0;
+  let hasFullClaim = false;
+  let fullGoal: { goalId: string; goalName: string } | null = null;
+
+  for (const goal of data.savingsGoals) {
+    if (goal.id === options?.exceptGoalId) continue;
+    const link = goal.accountLink;
+    if (!link || link.accountId !== accountId) continue;
+
+    if (link.mode === "full") {
+      hasFullClaim = true;
+      fullGoal = { goalId: goal.id, goalName: goal.name };
+      continue;
+    }
+
+    const amount = roundCurrency(
+      Math.min(Math.max(0, link.allocatedAmount ?? 0), totalBalance),
+    );
+    partialTotal = roundCurrency(partialTotal + amount);
+    shares.push({
+      goalId: goal.id,
+      goalName: goal.name,
+      mode: "partial",
+      amount,
+    });
+  }
+
+  if (options?.pending && options.pending.accountId === accountId) {
+    if (options.pending.mode === "full") {
+      hasFullClaim = true;
+      fullGoal = {
+        goalId: options.exceptGoalId ?? "pending",
+        goalName: "This goal",
+      };
+    } else {
+      const amount = roundCurrency(
+        Math.min(Math.max(0, options.pending.allocatedAmount ?? 0), totalBalance),
+      );
+      partialTotal = roundCurrency(partialTotal + amount);
+      shares.push({
+        goalId: options.exceptGoalId ?? "pending",
+        goalName: "This goal",
+        mode: "partial",
+        amount,
+      });
+    }
+  }
+
+  if (fullGoal) {
+    const remaining = roundCurrency(Math.max(0, totalBalance - partialTotal));
+    shares.push({
+      goalId: fullGoal.goalId,
+      goalName: fullGoal.goalName,
+      mode: "full",
+      amount: remaining,
+    });
+    partialTotal = roundCurrency(partialTotal + remaining);
+  }
+
+  const allocated = roundCurrency(Math.min(partialTotal, totalBalance));
+  return {
+    accountId,
+    totalBalance,
+    allocated,
+    unallocated: roundCurrency(Math.max(0, totalBalance - allocated)),
+    shares,
+    hasFullClaim,
+  };
 }

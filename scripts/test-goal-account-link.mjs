@@ -10,6 +10,7 @@ import {
   eligibleAccountBalance,
   isAccountLinkStale,
   resolveGoalProgressAmounts,
+  summarizeAccountGoalShares,
   validateGoalAccountLink,
 } from "../lib/finance/goalAccountLink.ts";
 import { enrichGoal } from "../lib/finance/goals.ts";
@@ -124,10 +125,33 @@ assert.equal(
   false,
 );
 
-const withFull = {
-  ...linkedPartial,
+// Full mode claims remaining unallocated — allowed alongside partials
+const onePartial = {
+  ...base,
   savingsGoals: [
-    ...linkedPartial.savingsGoals,
+    goal({
+      id: "goal-a",
+      accountLink: {
+        accountId: "acct-1",
+        mode: "partial",
+        allocatedAmount: 2000,
+      },
+    }),
+  ],
+};
+assert.equal(
+  validateGoalAccountLink(onePartial, "goal-full", {
+    accountId: "acct-1",
+    mode: "full",
+    allocatedAmount: null,
+  }).ok,
+  true,
+);
+
+const withFull = {
+  ...onePartial,
+  savingsGoals: [
+    ...onePartial.savingsGoals,
     goal({
       id: "goal-full",
       accountLink: { accountId: "acct-1", mode: "full", allocatedAmount: null },
@@ -146,6 +170,46 @@ assert.equal(
 const assigned = assignedAmountOnAccount(linkedPartial, "acct-1");
 assert.equal(assigned.totalAssigned, 5500);
 assert.equal(assigned.hasFullClaim, false);
+
+const share = summarizeAccountGoalShares(withFull, "acct-1");
+assert.equal(share.totalBalance, 5000);
+assert.equal(share.allocated, 5000);
+assert.equal(share.unallocated, 0);
+assert.equal(share.shares.length, 2);
+assert.equal(
+  share.shares.find((item) => item.goalId === "goal-full")?.amount,
+  3000,
+);
+
+// Shared partials never overlap
+const sharePartials = summarizeAccountGoalShares(
+  {
+    ...base,
+    savingsGoals: [
+      goal({
+        id: "inv",
+        name: "Investments",
+        accountLink: {
+          accountId: "acct-1",
+          mode: "partial",
+          allocatedAmount: 3000,
+        },
+      }),
+      goal({
+        id: "house",
+        name: "House",
+        accountLink: {
+          accountId: "acct-1",
+          mode: "partial",
+          allocatedAmount: 1500,
+        },
+      }),
+    ],
+  },
+  "acct-1",
+);
+assert.equal(sharePartials.allocated, 4500);
+assert.equal(sharePartials.unallocated, 500);
 
 // Stale disconnected Plaid uses snapshot
 const staleData = {

@@ -25,6 +25,7 @@ import {
   pendingIdsSupersededByPosted,
   reclassifyOwnedAccountTransfers,
 } from "@/lib/plaid/transactionIntelligence";
+import { refreshGoalLinkSnapshotsForAccounts } from "@/lib/finance/refreshGoalLinkSnapshots";
 
 function toNumber(value: number | string | null | undefined): number {
   if (typeof value === "number") return value;
@@ -524,6 +525,27 @@ export class BankConnectionsRepository {
       updated,
       insertedExternalIds,
     });
+
+    if (accountIdMap.size > 0) {
+      const snapshotAccounts = input.accounts
+        .map((account) => {
+          const id = accountIdMap.get(account.externalAccountId);
+          if (!id) return null;
+          return {
+            id,
+            type: account.type,
+            balance: account.balance,
+            availableBalance: account.availableBalance,
+          };
+        })
+        .filter((item): item is NonNullable<typeof item> => item != null);
+
+      await refreshGoalLinkSnapshotsForAccounts(
+        this.supabase,
+        input.userId,
+        snapshotAccounts,
+      );
+    }
 
     return { accountIdMap, insertedExternalIds, updatedExternalIds };
   }
