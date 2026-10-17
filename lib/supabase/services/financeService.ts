@@ -13,6 +13,10 @@ import { buildUpdatedBill, findBillSplit, getCurrentYearMonth } from "@/lib/fina
 import { isUserInDemoMode } from "@/lib/finance/demoData";
 import { emptyFinanceData } from "@/lib/finance/emptyFinanceData";
 import {
+  snapshotFieldsForLink,
+  validateGoalAccountLink,
+} from "@/lib/finance/goalAccountLink";
+import {
   buildGoalSavingsPlan,
   contributionFromStoredGoal,
   goalSavingsPlanColumns,
@@ -41,6 +45,7 @@ import type {
   FinanceData,
   Transaction,
 } from "@/lib/finance/types";
+import type { GoalUpdate } from "@/lib/supabase/database.types";
 import type { MarkPaycheckReceivedInput, SaveIncomePlanInput } from "@/lib/incomePlan/types";
 import { applyIncomePlanPaycheckToData } from "@/lib/incomePlan/applyPaycheck";
 import {
@@ -1078,7 +1083,7 @@ export class FinanceService {
     input: EditGoalInput,
   ): Promise<FinanceData | null> {
     const meta = getGoalTypeMeta(input.type);
-    const base = {
+    const base: GoalUpdate = {
       name: input.name.trim(),
       goal_type: input.type,
       icon: meta.icon,
@@ -1105,6 +1110,41 @@ export class FinanceService {
           input.weeklySavings,
         ),
       );
+    }
+
+    if (input.accountLink !== undefined) {
+      if (input.accountLink == null) {
+        base.linked_account_id = null;
+        base.link_mode = null;
+        base.linked_allocated_amount = null;
+        base.linked_at = null;
+        base.linked_snapshot_balance = null;
+        base.linked_snapshot_at = null;
+      } else {
+        const current = await this.loadFinanceData(userId);
+        const validation = validateGoalAccountLink(
+          current,
+          goalId,
+          input.accountLink,
+        );
+        if (!validation.ok) {
+          throw new Error(validation.reason);
+        }
+        const account =
+          current.accounts.find(
+            (item) => item.id === input.accountLink!.accountId,
+          ) ?? null;
+        const snapshot = snapshotFieldsForLink(account);
+        base.linked_account_id = input.accountLink.accountId;
+        base.link_mode = input.accountLink.mode;
+        base.linked_allocated_amount =
+          input.accountLink.mode === "partial"
+            ? (input.accountLink.allocatedAmount ?? 0)
+            : null;
+        base.linked_at = new Date().toISOString();
+        base.linked_snapshot_balance = snapshot.linked_snapshot_balance;
+        base.linked_snapshot_at = snapshot.linked_snapshot_at;
+      }
     }
 
     const { error } = await this.supabase

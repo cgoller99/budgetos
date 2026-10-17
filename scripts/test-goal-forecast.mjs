@@ -66,9 +66,9 @@ assert.equal(complete.timeLabel, "Done");
 assert.equal(completionDateKey(complete.estimatedCompletionDate), "2026-10-15");
 
 const unscheduled = forecast({ weeklySavings: 0, contributed: 0, paySchedule: null });
-assert.equal(unscheduled.pace, "behind");
+assert.equal(unscheduled.pace, "insufficient");
 assert.equal(unscheduled.estimatedCompletionDate, null);
-assert.equal(unscheduled.timeLabel, "TBD");
+assert.equal(unscheduled.timeLabel, "Add a contribution schedule");
 assert.equal(unscheduled.perPaycheckSavings, null);
 
 const early = forecast({
@@ -241,6 +241,15 @@ const removed = applyGoalEdit(
 );
 assert.equal(removed.autoContribution, undefined);
 
+const linkColumns = {
+  linked_account_id: null,
+  link_mode: null,
+  linked_allocated_amount: null,
+  linked_at: null,
+  linked_snapshot_balance: null,
+  linked_snapshot_at: null,
+};
+
 const mapped = mapGoalRow({
   id: "goal-1",
   user_id: "user-a",
@@ -252,6 +261,7 @@ const mapped = mapGoalRow({
   household_id: null,
   created_at: "2026-10-01T00:00:00.000Z",
   updated_at: "2026-10-15T00:00:00.000Z",
+  ...linkColumns,
   ...columns,
 });
 assert.equal(mapped.autoContribution.amount, 40);
@@ -280,11 +290,12 @@ const dropped = mapGoalRow({
 assert.equal(dropped.autoContribution, undefined);
 
 const panel = read("components/goals/GoalForecastPanel.tsx");
-assert.match(panel, /What if I save more\?/);
+assert.match(panel, /Adjust weekly savings schedule/);
 assert.match(panel, /Save plan/);
-assert.match(panel, /This preview stays here until you save the plan/);
+assert.match(panel, /Preview only until you save/);
 assert.match(panel, /Saving does not move money/);
 assert.match(panel, /onChange=\{\(event\) => setDraft\(Number\(event\.target\.value\)\)\}/);
+assert.match(panel, /saveDisabledReason/);
 assert.doesNotMatch(
   panel.slice(panel.indexOf("type=\"range\""), panel.indexOf("Save plan")),
   /onSave|editGoal/,

@@ -290,6 +290,8 @@ export function IosGoalsScreen() {
                 return (
                   <GoalForecastPanel
                     goal={savingsGoal}
+                    trackedAmount={goal.current}
+                    authoritativeForecast={goal.forecast}
                     onSave={(weeklySavings) => savePlan(goal.id, weeklySavings)}
                   />
                 );

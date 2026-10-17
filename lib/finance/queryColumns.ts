@@ -95,6 +95,12 @@ export const GOAL_SELECT_COLUMNS = [
   "next_occurrence",
   "last_processed_date",
   "recurring_status",
+  "linked_account_id",
+  "link_mode",
+  "linked_allocated_amount",
+  "linked_at",
+  "linked_snapshot_balance",
+  "linked_snapshot_at",
   "created_at",
   "updated_at",
 ].join(",");

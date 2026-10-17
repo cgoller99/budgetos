@@ -315,6 +315,9 @@ export function mapBillRow(row: BillRow, splits: BillSplit[] = []): Bill {
 }
 
 export function mapGoalRow(row: GoalRow): SavingsGoal {
+  const linkedAccountId = row.linked_account_id ?? null;
+  const linkMode = row.link_mode ?? null;
+  const hasLink = Boolean(linkedAccountId && linkMode);
   return {
     id: row.id,
     name: row.name,
@@ -324,6 +327,22 @@ export function mapGoalRow(row: GoalRow): SavingsGoal {
     target: toNumber(row.target_amount),
     createdAt: row.created_at,
     autoContribution: mapGoalContribution(row),
+    accountLink: hasLink
+      ? {
+          accountId: linkedAccountId as string,
+          mode: linkMode as "full" | "partial",
+          allocatedAmount:
+            linkMode === "partial"
+              ? toNumber(row.linked_allocated_amount)
+              : null,
+        }
+      : null,
+    linkedAt: row.linked_at ?? null,
+    linkedSnapshotBalance:
+      row.linked_snapshot_balance == null || row.linked_snapshot_balance === undefined
+        ? null
+        : toNumber(row.linked_snapshot_balance),
+    linkedSnapshotAt: row.linked_snapshot_at ?? null,
   };
 }
 
@@ -560,6 +579,7 @@ export function buildBillUpdate(bill: Bill) {
 }
 
 export function buildGoalUpdate(goal: SavingsGoal) {
+  const link = goal.accountLink;
   return {
     name: goal.name,
     goal_type: goal.type,
@@ -571,6 +591,13 @@ export function buildGoalUpdate(goal: SavingsGoal) {
     ...(goal.autoContribution
       ? serializeSchedule(goal.autoContribution.schedule)
       : {}),
+    linked_account_id: link?.accountId ?? null,
+    link_mode: link?.mode ?? null,
+    linked_allocated_amount:
+      link?.mode === "partial" ? (link.allocatedAmount ?? null) : null,
+    linked_at: link ? (goal.linkedAt ?? new Date().toISOString()) : null,
+    linked_snapshot_balance: link ? (goal.linkedSnapshotBalance ?? null) : null,
+    linked_snapshot_at: link ? (goal.linkedSnapshotAt ?? null) : null,
     updated_at: new Date().toISOString(),
   };
 }

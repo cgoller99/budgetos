@@ -5,6 +5,7 @@ import { AddMoneyModal } from "@/components/goals/AddMoneyModal";
 import { CreateGoalModal } from "@/components/goals/CreateGoalModal";
 import { EditGoalModal } from "@/components/goals/EditGoalModal";
 import { GoalCard } from "@/components/goals/GoalCard";
+import { LinkAccountModal } from "@/components/goals/LinkAccountModal";
 import { IosGoalsScreen } from "@/components/native/ios/IosGoalsScreen";
 import { Button, Card, CardContent, EmptyState, PageHeader, SkeletonGrid } from "@/components/ui";
 import { pageContainerWideClassName } from "@/components/ui/tokens";
@@ -23,6 +24,7 @@ export function GoalsContent() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [moneyGoal, setMoneyGoal] = useState<SavingsGoal | null>(null);
   const [editGoal, setEditGoal] = useState<SavingsGoal | null>(null);
+  const [linkGoal, setLinkGoal] = useState<SavingsGoal | null>(null);
 
   const goals = useMemo(
     () => getGoalProgressList(finance),
@@ -116,6 +118,7 @@ export function GoalsContent() {
                 savingsGoal={savingsGoal}
                 onAddMoney={() => setMoneyGoal(savingsGoal)}
                 onEdit={() => setEditGoal(savingsGoal)}
+                onLinkAccount={() => setLinkGoal(savingsGoal)}
                 onSavePlan={(weeklySavings) => savePlan(goal.id, weeklySavings)}
               />
             );
@@ -129,6 +132,7 @@ export function GoalsContent() {
       />
       <AddMoneyModal goal={moneyGoal} onClose={() => setMoneyGoal(null)} />
       <EditGoalModal goal={editGoal} onClose={() => setEditGoal(null)} />
+      <LinkAccountModal goal={linkGoal} onClose={() => setLinkGoal(null)} />
     </div>
   );
 }

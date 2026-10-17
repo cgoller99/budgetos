@@ -4,14 +4,8 @@ import { useMemo, useState } from "react";
 import { Button, Input } from "@/components/ui";
 import { useFinance } from "@/context/FinanceContext";
 import { formatCurrency } from "@/lib/finance/format";
-import {
-  getGoalContributionBreakdown,
-  paycheckWeeklyForGoal,
-} from "@/lib/finance/goalAnalytics";
-import {
-  sumGoalContributions,
-  weeklySavingsFromContribution,
-} from "@/lib/finance/goalForecast";
+import { getGoalContributionBreakdown } from "@/lib/finance/goalAnalytics";
+import { sumGoalContributions } from "@/lib/finance/goalForecast";
 import { buildGoalHorizonProjections } from "@/lib/finance/goalHorizon";
 import { formatGoalDate } from "@/lib/finance/goals";
 import { simulateGoalWhatIf } from "@/lib/finance/goalWhatIf";
@@ -21,21 +15,23 @@ import type { SavingsGoal } from "@/lib/finance/types";
 
 type GoalWhatIfPanelProps = {
   goal: SavingsGoal;
+  /** Tracked progress from enrichGoal (linked or confirmed). */
+  trackedAmount?: number;
 };
 
-export function GoalWhatIfPanel({ goal }: GoalWhatIfPanelProps) {
+export function GoalWhatIfPanel({
+  goal,
+  trackedAmount,
+}: GoalWhatIfPanelProps) {
   const finance = useFinance();
   const [extraWeekly, setExtraWeekly] = useState("10");
   const [extraPerPaycheck, setExtraPerPaycheck] = useState("0");
   const [oneTime, setOneTime] = useState("0");
   const [alternateTarget, setAlternateTarget] = useState(String(goal.target));
+  const progressCurrent = trackedAmount ?? goal.current;
 
   const baselineWeekly = useMemo(() => {
-    const saved = weeklySavingsFromContribution(goal.autoContribution) ?? 0;
-    const paycheck = paycheckWeeklyForGoal(finance, goal.id);
-    if (saved > 0 || paycheck > 0) {
-      return Math.round((saved + paycheck) * 100) / 100;
-    }
+    // Same non-stacking rule as card / STS: Income Plan wins over auto schedule.
     return getGoalContributionBreakdown(finance, goal).weeklyContribution;
   }, [finance, goal]);
 
@@ -50,7 +46,7 @@ export function GoalWhatIfPanel({ goal }: GoalWhatIfPanelProps) {
   const simulation = useMemo(
     () =>
       simulateGoalWhatIf({
-        current: goal.current,
+        current: progressCurrent,
         target: goal.target,
         createdAt: goal.createdAt,
         baselineWeeklySavings: baselineWeekly,
@@ -70,21 +66,21 @@ export function GoalWhatIfPanel({ goal }: GoalWhatIfPanelProps) {
       extraPerPaycheck,
       extraWeekly,
       goal.createdAt,
-      goal.current,
       goal.target,
       oneTime,
       paySchedule,
+      progressCurrent,
     ],
   );
 
   const horizons = useMemo(
     () =>
       buildGoalHorizonProjections({
-        current: goal.current + simulation.oneTimeApplied,
+        current: progressCurrent + simulation.oneTimeApplied,
         target: simulation.targetUsed,
         weeklySavings: simulation.weeklySavingsUsed,
       }),
-    [goal.current, simulation],
+    [progressCurrent, simulation],
   );
 
   const moneyLeft = useMemo(
