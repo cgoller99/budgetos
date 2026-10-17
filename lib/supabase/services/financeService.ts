@@ -16,6 +16,7 @@ import {
   snapshotFieldsForLink,
   validateGoalAccountLink,
 } from "@/lib/finance/goalAccountLink";
+import { refreshGoalLinkSnapshotsForAccounts } from "@/lib/finance/refreshGoalLinkSnapshots";
 import {
   buildGoalSavingsPlan,
   contributionFromStoredGoal,
@@ -521,6 +522,21 @@ export class FinanceService {
     }
 
     if (error) throw error;
+
+    if (
+      typeof sanitizedInput.balance === "number" &&
+      sanitizedInput.balance !== existing.balance
+    ) {
+      await refreshGoalLinkSnapshotsForAccounts(this.supabase, userId, [
+        {
+          id: accountId,
+          type: updated.type,
+          balance: updated.balance,
+          availableBalance: updated.availableBalance,
+        },
+      ]);
+    }
+
     return null;
   }
 

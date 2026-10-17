@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { Badge, Button, Card, CardContent, ProgressRing } from "@/components/ui";
 import { GoalInsightList } from "@/components/goals/GoalInsightList";
 import { GoalMilestoneConfetti } from "@/components/goals/GoalMilestoneConfetti";
@@ -7,6 +8,8 @@ import { GoalTimelineChart } from "@/components/goals/GoalTimelineChart";
 import { GoalForecastPanel } from "@/components/goals/GoalForecastPanel";
 import { GoalWhatIfPanel } from "@/components/goals/GoalWhatIfPanel";
 import { MobileCollapsibleSection } from "@/components/ui/MobileCollapsibleSection";
+import { useFinance } from "@/context/FinanceContext";
+import { summarizeAccountGoalShares } from "@/lib/finance/goalAccountLink";
 import { formatCurrency } from "@/lib/finance/format";
 import { formatGoalDate, type GoalProgress } from "@/lib/finance/goals";
 import { getGoalTypeMeta } from "@/lib/finance/goalTypes";
@@ -30,13 +33,19 @@ export function GoalCard({
   onLinkAccount,
   onSavePlan,
 }: GoalCardProps) {
+  const finance = useFinance();
   const typeMeta = getGoalTypeMeta(goal.type);
   const amounts = goal.progressAmounts;
   const forecast = goal.forecast;
   const completionLabel =
     forecast.weeklySavings > 0
       ? formatGoalDate(forecast.estimatedCompletionDate)
-      : "Not estimable yet — no reliable contribution schedule";
+      : "Not estimable yet";
+
+  const share = useMemo(() => {
+    if (!amounts.linkedAccountId) return null;
+    return summarizeAccountGoalShares(finance, amounts.linkedAccountId);
+  }, [amounts.linkedAccountId, finance]);
 
   return (
     <Card hover className="goal-card-enter relative overflow-hidden">
@@ -44,23 +53,22 @@ export function GoalCard({
         goalId={goal.id}
         percentComplete={goal.percentComplete}
       />
-      <CardContent className="min-w-0 space-y-6">
-        {/* Progress header */}
-        <div className="flex min-w-0 flex-col gap-5 sm:flex-row sm:items-start">
+      <CardContent className="min-w-0 space-y-4">
+        <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start">
           <ProgressRing
             value={goal.percentComplete}
-            size={104}
+            size={88}
             accentColor={goal.accentColor}
           >
             <div className="text-center">
-              <span className="text-xl">{goal.icon}</span>
-              <p className="mt-1 text-sm font-semibold tabular-nums text-[var(--foreground)]">
+              <span className="text-lg">{goal.icon}</span>
+              <p className="mt-0.5 text-sm font-semibold tabular-nums text-[var(--foreground)]">
                 {goal.percentComplete}%
               </p>
             </div>
           </ProgressRing>
 
-          <div className="min-w-0 flex-1 space-y-2">
+          <div className="min-w-0 flex-1 space-y-1.5">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               <h3 className="min-w-0 break-words text-lg font-semibold tracking-tight text-[var(--foreground)]">
                 {goal.name}
@@ -90,91 +98,107 @@ export function GoalCard({
             <p className="text-sm text-[var(--text-muted)]">
               {goal.isComplete
                 ? "Goal complete"
-                : `${formatCurrency(goal.remaining)} remaining`}
-            </p>
-            <p className="text-sm text-[var(--text-secondary)]">
-              Projected finish: {completionLabel}
+                : `${formatCurrency(goal.remaining)} remaining · finish ${completionLabel}`}
             </p>
           </div>
         </div>
 
-        {/* Money layers — responsive 1/2 cols, never cramped 4-across */}
-        <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
           <DetailStat
             label="Confirmed contributions"
             value={formatCurrency(amounts.confirmedContributions)}
-            hint="Ledger only — not replaced by account balance"
+            hint="Ledger — not replaced by account balance"
           />
           <DetailStat
             label="Planned contributions"
             value={`${formatCurrency(goal.weeklyContribution)} / week`}
             hint={goal.contributionSourceLabel}
           />
-          {amounts.accountBalance != null ? (
-            <DetailStat
-              label="Account balance"
-              value={formatCurrency(amounts.accountBalance)}
-              hint={
-                amounts.linkStale
-                  ? "Last known value — connection stale or disconnected"
-                  : amounts.linkedAccountName
-                    ? `Linked · ${amounts.linkedAccountName}`
-                    : "Linked account"
-              }
-              stale={amounts.linkStale}
-            />
-          ) : null}
           {amounts.assignedToGoal != null ? (
             <DetailStat
               label="Assigned to this goal"
               value={formatCurrency(amounts.assignedToGoal)}
               hint={
                 amounts.linkMode === "full"
-                  ? "Full eligible balance"
-                  : "Partial allocation"
+                  ? "Remaining unallocated on account"
+                  : "Fixed allocation"
               }
             />
           ) : null}
-          <DetailStat
-            label="Projected finish"
-            value={completionLabel}
-            className="sm:col-span-2"
-          />
           {amounts.marketChangeEstimate != null ? (
             <DetailStat
-              label="Market change (est.)"
+              label="Market / other change (est.)"
               value={formatCurrency(amounts.marketChangeEstimate)}
               hint="Not a paycheck contribution"
-              className="sm:col-span-2"
             />
           ) : null}
         </div>
 
-        {amounts.linkedAccountId ? (
-          <div className="rounded-xl border border-[var(--surface-border)] bg-[var(--surface-subtle)] p-3 text-sm text-[var(--text-secondary)]">
-            <p className="font-medium text-[var(--foreground)]">
-              Linked account details
-            </p>
-            <p className="mt-1 break-words">
-              {amounts.linkedAccountName ?? "Account"}
-              {amounts.lastRefreshedAt
-                ? ` · refreshed ${new Date(amounts.lastRefreshedAt).toLocaleString()}`
-                : " · refresh time unavailable"}
-            </p>
-            {amounts.linkMode === "full" ? (
-              <p className="mt-1 text-xs text-[var(--text-muted)]">
-                Withdrawals and market moves can change tracked progress.
+        {share ? (
+          <div
+            className={cn(
+              "rounded-xl border p-3",
+              amounts.linkStale
+                ? "border-[var(--warning)]/40 bg-[var(--warning)]/5"
+                : "border-[var(--surface-border)] bg-[var(--surface-subtle)]",
+            )}
+          >
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <p className="text-sm font-medium text-[var(--foreground)]">
+                {amounts.linkedAccountName ?? "Linked account"}
               </p>
+              <p className="text-xs text-[var(--text-muted)]">
+                {amounts.linkStale
+                  ? "Stale — last known balance"
+                  : amounts.lastRefreshedAt
+                    ? `Refreshed ${new Date(amounts.lastRefreshedAt).toLocaleString()}`
+                    : "Balance live in app"}
+              </p>
+            </div>
+            <div className="mt-2 grid grid-cols-3 gap-2 text-center text-sm">
+              <div>
+                <p className="text-[11px] text-[var(--text-muted)]">Total</p>
+                <p className="font-semibold tabular-nums text-[var(--foreground)]">
+                  {formatCurrency(share.totalBalance)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] text-[var(--text-muted)]">Allocated</p>
+                <p className="font-semibold tabular-nums text-[var(--foreground)]">
+                  {formatCurrency(share.allocated)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] text-[var(--text-muted)]">Unallocated</p>
+                <p className="font-semibold tabular-nums text-[var(--accent-light)]">
+                  {formatCurrency(share.unallocated)}
+                </p>
+              </div>
+            </div>
+            {share.shares.length > 1 ? (
+              <ul className="mt-2 space-y-1 border-t border-[var(--surface-border)] pt-2 text-xs text-[var(--text-secondary)]">
+                {share.shares.map((item) => (
+                  <li
+                    key={item.goalId}
+                    className="flex justify-between gap-2"
+                  >
+                    <span className="min-w-0 truncate">{item.goalName}</span>
+                    <span className="tabular-nums text-[var(--foreground)]">
+                      {formatCurrency(item.amount)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             ) : null}
           </div>
         ) : null}
 
         {goal.suggestions.length > 0 ? (
-          <ul className="space-y-2">
+          <ul className="space-y-1.5">
             {goal.suggestions.map((suggestion) => (
               <li
                 key={suggestion.id}
-                className="rounded-xl border border-[var(--accent)]/20 bg-[var(--accent)]/8 px-3 py-2 text-sm leading-snug text-[var(--text-secondary)]"
+                className="rounded-lg border border-[var(--accent)]/20 bg-[var(--accent)]/8 px-3 py-2 text-sm leading-snug text-[var(--text-secondary)]"
               >
                 {suggestion.message}
               </li>
@@ -185,7 +209,7 @@ export function GoalCard({
         <GoalInsightList insights={goal.insights} />
 
         <div>
-          <p className="mb-3 text-sm font-medium text-[var(--foreground)]">
+          <p className="mb-2 text-sm font-medium text-[var(--foreground)]">
             Contribution history
           </p>
           <GoalTimelineChart timeline={goal.timeline} />
@@ -205,10 +229,10 @@ export function GoalCard({
           <GoalWhatIfPanel goal={savingsGoal} trackedAmount={goal.current} />
         </MobileCollapsibleSection>
 
-        <div className="flex flex-col gap-3 border-t border-[var(--surface-border)] pt-6 sm:flex-row sm:flex-wrap">
+        <div className="flex flex-col gap-2 border-t border-[var(--surface-border)] pt-4 sm:flex-row sm:flex-wrap">
           <Button
             type="button"
-            className="sm:min-w-[10rem] sm:flex-1"
+            className="sm:min-w-[9rem] sm:flex-1"
             onClick={onAddMoney}
             disabled={goal.isComplete}
           >
@@ -217,7 +241,7 @@ export function GoalCard({
           <Button
             type="button"
             variant="secondary"
-            className="sm:min-w-[10rem] sm:flex-1"
+            className="sm:min-w-[9rem] sm:flex-1"
             onClick={onEdit}
           >
             Edit goal
@@ -225,14 +249,14 @@ export function GoalCard({
           <Button
             type="button"
             variant="secondary"
-            className="sm:min-w-[10rem] sm:flex-1"
+            className="sm:min-w-[9rem] sm:flex-1"
             onClick={onLinkAccount}
           >
             {amounts.linkedAccountId ? "Manage linked account" : "Link account"}
           </Button>
           <a
             href="/income?tab=plan"
-            className="inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-button)] border border-[var(--surface-border)] px-4 text-sm font-semibold text-[var(--accent-light)] sm:min-w-[10rem] sm:flex-1"
+            className="inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-button)] border border-[var(--surface-border)] px-4 text-sm font-semibold text-[var(--accent-light)] sm:min-w-[9rem] sm:flex-1"
           >
             Edit paycheck allocation
           </a>
@@ -258,7 +282,7 @@ function DetailStat({
   return (
     <div
       className={cn(
-        "min-w-0 rounded-xl border border-[var(--surface-border)] bg-[var(--surface-subtle)] px-3 py-3",
+        "min-w-0 rounded-xl border border-[var(--surface-border)] bg-[var(--surface-subtle)] px-3 py-2.5",
         className,
       )}
     >
@@ -272,7 +296,7 @@ function DetailStat({
         {value}
       </p>
       {hint ? (
-        <p className="mt-1 break-words text-xs leading-snug text-[var(--text-muted)]">
+        <p className="mt-0.5 break-words text-[11px] leading-snug text-[var(--text-muted)]">
           {hint}
         </p>
       ) : null}
