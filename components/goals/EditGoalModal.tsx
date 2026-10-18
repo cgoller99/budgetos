@@ -2,12 +2,12 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import {
-  Button,
   FormField,
   Input,
   Modal,
   Select,
 } from "@/components/ui";
+import { NativeEditorActions } from "@/components/native/NativeEditorActions";
 import { useFinance } from "@/context/FinanceContext";
 import { useToast } from "@/context/ToastContext";
 import { GOAL_TYPE_OPTIONS } from "@/lib/finance/goalTypes";
@@ -82,8 +82,15 @@ export function EditGoalModal({ goal, onClose }: EditGoalModalProps) {
   }
 
   return (
-    <Modal isOpen={Boolean(goal)} onClose={handleClose} title="Edit Goal">
-      <form onSubmit={handleSubmit} className="space-y-4">
+    <Modal isOpen={Boolean(goal)} onClose={handleClose} title="Edit Goal" footer={
+        <NativeEditorActions
+          formId="save-changes-form"
+          onCancel={handleClose}
+          submitLabel="Save Changes"
+        />
+      }>
+      <form id="save-changes-form" onSubmit={handleSubmit} className="space-y-4">
+
         <FormField label="Goal Name">
           <Input
             type="text"
@@ -127,15 +134,6 @@ export function EditGoalModal({ goal, onClose }: EditGoalModalProps) {
             required
           />
         </FormField>
-
-        <div className="flex gap-3 pt-2">
-          <Button type="button" variant="secondary" fullWidth onClick={handleClose}>
-            Cancel
-          </Button>
-          <Button type="submit" fullWidth>
-            Save Changes
-          </Button>
-        </div>
       </form>
     </Modal>
   );

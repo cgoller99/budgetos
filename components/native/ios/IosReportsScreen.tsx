@@ -12,7 +12,6 @@ import {
   IosSkeletonScreen,
   IosTextButton,
 } from "@/components/native/ios/IosPrimitives";
-import { IosBudgetsSection } from "@/components/native/ios/IosBudgetsSection";
 import { ProUpgradeBanner } from "@/components/subscription/ProUpgradeBanner";
 import { NetWorthTimeline } from "@/components/dashboard/NetWorthTimeline";
 import { useFinance } from "@/context/FinanceContext";
@@ -68,11 +67,9 @@ export function IosReportsScreen() {
       <IosHeroMetric
         label="Financial Health"
         value={String(health.score)}
-        hint="Score out of 100"
+        hint={health.reasons[0] || "Score out of 100"}
         tone={health.score >= 70 ? "positive" : health.score >= 40 ? "warning" : "danger"}
       />
-
-      <IosBudgetsSection />
 
       <div className="grid grid-cols-2 gap-3">
         <IosCard padding="md">

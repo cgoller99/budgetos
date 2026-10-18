@@ -2,7 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { IosCard, IosScreen, IosSection } from "@/components/native/ios/IosPrimitives";
+import {
+  IosEmptyState,
+  IosList,
+  IosListRow,
+  IosScreen,
+  IosSection,
+} from "@/components/native/ios/IosPrimitives";
 import { Card, CardContent, CardHeader } from "@/components/ui";
 import { pageContainerWideClassName } from "@/components/ui/tokens";
 import { cn } from "@/components/ui/cn";
@@ -67,34 +73,24 @@ export function InsightsContent() {
   if (nativeIos) {
     return (
       <IosScreen>
-        <IosSection title="Insights">
+        <IosSection>
           {insights.length === 0 ? (
-            <IosCard padding="md">
-              <p className="text-[15px] font-semibold text-[var(--foreground)]">Nothing to flag</p>
-              <p className="mt-1 text-[13px] text-[var(--text-muted)]">
-                Insights show up when confirmed spending, bills, paychecks, budgets, or goals move in a meaningful way.
-              </p>
-            </IosCard>
+            <IosEmptyState
+              title="Nothing to flag"
+              subtitle="Insights appear when spending, bills, paychecks, or goals change meaningfully."
+            />
           ) : (
-            insights.map((insight) => (
-              <Link key={insight.id} href={insight.href} className="block">
-                <IosCard padding="md">
-                  <p
-                    className={cn(
-                      "text-[15px] font-semibold",
-                      insight.tone === "negative"
-                        ? "text-[var(--danger)]"
-                        : insight.tone === "positive"
-                          ? "text-[var(--success)]"
-                          : "text-[var(--foreground)]",
-                    )}
-                  >
-                    {insight.title}
-                  </p>
-                  <p className="mt-1 text-[13px] leading-snug text-[var(--text-muted)]">{insight.detail}</p>
-                </IosCard>
-              </Link>
-            ))
+            <IosList>
+              {insights.map((insight) => (
+                <IosListRow
+                  key={insight.id}
+                  href={insight.href}
+                  title={insight.title}
+                  subtitle={insight.detail}
+                  danger={insight.tone === "negative"}
+                />
+              ))}
+            </IosList>
           )}
         </IosSection>
       </IosScreen>

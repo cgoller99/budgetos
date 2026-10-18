@@ -549,11 +549,19 @@ export function DebtPayoffPlanner({ variant = "web" }: DebtPayoffPlannerProps) {
 
         <div
           className={cn(
-            "sticky bottom-0 z-10 -mx-1 bg-[var(--background)]/95 py-3",
-            variant === "ios" && "pb-[calc(env(safe-area-inset-bottom)+12px)]",
+            "mt-2 border-t border-white/[0.08] pt-3",
+            variant === "ios" && "pb-1",
           )}
+          data-debt-payoff-footer="true"
         >
-          <Button type="button" size="lg" fullWidth disabled={!dirty || saving} onClick={() => void saveStrategy()}>
+          <Button
+            type="button"
+            size="lg"
+            fullWidth
+            className="min-h-12"
+            disabled={!dirty || saving}
+            onClick={() => void saveStrategy()}
+          >
             {saving ? "Saving…" : "Save strategy"}
           </Button>
         </div>

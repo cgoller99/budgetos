@@ -96,7 +96,10 @@ export function AppLayout({ children }: AppLayoutProps) {
       data-native-shell={nativeIos ? "ios" : undefined}
     >
       <DashboardSectionFocus />
-      <Sidebar className="hidden lg:flex" activeHref={pathname} />
+      {/* Capacitor iOS uses tab bar + More sheet only — never desktop sidebar. */}
+      {!nativeIos ? (
+        <Sidebar className="hidden lg:flex" activeHref={pathname} />
+      ) : null}
 
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar

@@ -7,11 +7,17 @@ import {
   initialAccountFormState,
   parseAccountForm,
 } from "@/components/accounts/AccountFormFields";
-import { Button, Modal } from "@/components/ui";
+import { Modal } from "@/components/ui";
+import {
+  NativeDestructiveButton,
+  NativeEditorActions,
+} from "@/components/native/NativeEditorActions";
 import { useFinance } from "@/context/FinanceContext";
 import { useToast } from "@/context/ToastContext";
 import { getAccountDisplayName } from "@/lib/finance/accountPreferences";
 import type { Account } from "@/lib/finance/types";
+
+const EDIT_ACCOUNT_FORM_ID = "edit-account-form";
 
 type EditAccountModalProps = {
   account: Account | null;
@@ -69,32 +75,34 @@ export function EditAccountModal({ account, onClose, onRemove }: EditAccountModa
       isOpen={account !== null}
       onClose={onClose}
       title={account?.isPlaidLinked ? "Edit Linked Account" : "Edit Account"}
+      footer={
+        <NativeEditorActions
+          formId={EDIT_ACCOUNT_FORM_ID}
+          onCancel={onClose}
+          submitLabel="Save Changes"
+          submittingLabel="Saving…"
+          isSubmitting={isSubmitting}
+          destructive={
+            account?.isPlaidLinked && onRemove ? (
+              <NativeDestructiveButton
+                label="Remove bank account"
+                onClick={onRemove}
+                disabled={isSubmitting}
+              />
+            ) : undefined
+          }
+        />
+      }
     >
-      {account && (
-        <form onSubmit={(event) => void handleSubmit(event)} className="space-y-4">
+      {account ? (
+        <form
+          id={EDIT_ACCOUNT_FORM_ID}
+          onSubmit={(event) => void handleSubmit(event)}
+          className="space-y-4"
+        >
           <AccountFormFields account={account} form={form} onChange={setForm} />
-
-          <div className="flex gap-3 pt-2">
-            <Button type="button" variant="secondary" fullWidth onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="submit" fullWidth disabled={isSubmitting}>
-              {isSubmitting ? "Saving..." : "Save Changes"}
-            </Button>
-          </div>
-          {account.isPlaidLinked && onRemove ? (
-            <Button
-              type="button"
-              variant="ghost"
-              fullWidth
-              className="text-rose-400 hover:text-rose-300"
-              onClick={onRemove}
-            >
-              Remove bank account
-            </Button>
-          ) : null}
         </form>
-      )}
+      ) : null}
     </Modal>
   );
 }

@@ -176,16 +176,19 @@ export function IosSettingsScreen() {
 
     return (
       <IosScreen data-ios-settings-panel={panel}>
-        <div className="sticky top-0 z-20 -mx-0.5 mb-1 bg-[#060b14]/95 pb-2 pt-0.5 backdrop-blur-md">
+        <div
+          className="mb-3 shrink-0 px-0.5"
+          data-ios-settings-back="true"
+        >
           <button
             type="button"
             onClick={closePanel}
-            className="flex min-h-11 touch-manipulation items-center gap-1 px-0.5 text-[15px] font-semibold text-[var(--accent-light)]"
+            className="flex min-h-11 touch-manipulation items-center gap-1 text-[15px] font-semibold text-[var(--accent-light)] active:opacity-80"
           >
             <span aria-hidden>‹</span>
             Settings
           </button>
-          <h1 className="mt-1 px-0.5 text-[22px] font-semibold tracking-tight text-[var(--foreground)]">
+          <h1 className="mt-1 text-[22px] font-semibold tracking-tight text-[var(--foreground)]">
             {title}
           </h1>
         </div>

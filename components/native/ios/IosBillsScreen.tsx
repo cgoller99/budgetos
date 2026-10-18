@@ -84,17 +84,11 @@ function BillDetail({
   source,
   payments,
   accountName,
-  onMarkPaid,
-  onEdit,
-  onRemove,
 }: {
   bill: BillProgress;
   source: Bill | null;
   payments: { id: string; amount: number; date: string; notes: string }[];
   accountName: string | null;
-  onMarkPaid: () => void;
-  onEdit: () => void;
-  onRemove: () => void;
 }) {
   const frequency = source?.frequency ? getBillFrequencyLabel(source.frequency) : null;
 
@@ -133,40 +127,6 @@ function BillDetail({
         {bill.paidAmount > 0 ? (
           <DetailLine label="Paid so far" value={formatCurrency(bill.paidAmount)} />
         ) : null}
-      </div>
-      <div className="mt-4 flex flex-col gap-2">
-        {bill.status !== "paid" ? (
-          <button
-            type="button"
-            className="min-h-12 w-full rounded-[14px] bg-[var(--accent)] text-[16px] font-semibold text-white shadow-[0_8px_24px_rgba(59,130,246,0.28)] active:opacity-90"
-            onClick={() => {
-              void triggerHaptic("light");
-              onMarkPaid();
-            }}
-          >
-            Mark paid
-          </button>
-        ) : null}
-        <button
-          type="button"
-          className="min-h-12 w-full rounded-[14px] bg-white/[0.06] text-[16px] font-semibold text-[var(--foreground)] active:opacity-90"
-          onClick={() => {
-            void triggerHaptic("light");
-            onEdit();
-          }}
-        >
-          Edit bill
-        </button>
-        <button
-          type="button"
-          className="min-h-12 w-full rounded-[14px] bg-rose-500 text-[16px] font-semibold text-white shadow-[0_8px_20px_rgba(244,63,94,0.35)] active:opacity-90"
-          onClick={() => {
-            void triggerHaptic("light");
-            onRemove();
-          }}
-        >
-          Delete Bill
-        </button>
       </div>
       <div className="mt-5">
         <p className="px-0.5 text-[13px] font-semibold text-[var(--foreground)]">
@@ -462,7 +422,7 @@ export function IosBillsScreen() {
               {needsPayChip(bill) ? (
                 <button
                   type="button"
-                  className="min-h-8 shrink-0 rounded-full bg-[var(--accent)] px-3 text-[13px] font-semibold text-white active:opacity-80"
+                  className="min-h-11 shrink-0 rounded-full bg-[var(--accent)] px-3.5 text-[13px] font-semibold text-white active:opacity-80"
                   onClick={() => {
                     void handleMarkPaid(bill.billId, bill.splitId);
                   }}
@@ -505,6 +465,47 @@ export function IosBillsScreen() {
         open={selectedBill !== null}
         title={selectedBill?.name}
         onClose={() => setSelectedBill(null)}
+        footer={
+          selectedBill ? (
+            <div className="flex flex-col gap-2" data-bill-detail-footer="true">
+              {selectedBill.status !== "paid" ? (
+                <button
+                  type="button"
+                  className="min-h-12 w-full rounded-[14px] bg-[var(--accent)] text-[16px] font-semibold text-white shadow-[0_8px_24px_rgba(59,130,246,0.28)] active:opacity-90"
+                  onClick={() => {
+                    void triggerHaptic("light");
+                    void handleMarkPaid(selectedBill.billId, selectedBill.splitId);
+                    setSelectedBill(null);
+                  }}
+                >
+                  Mark paid
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="min-h-12 w-full rounded-[14px] bg-white/[0.06] text-[16px] font-semibold text-[var(--foreground)] active:opacity-90"
+                onClick={() => {
+                  void triggerHaptic("light");
+                  setEditBillId(selectedBill.billId);
+                  setSelectedBill(null);
+                }}
+              >
+                Edit bill
+              </button>
+              <button
+                type="button"
+                className="min-h-12 w-full rounded-[14px] bg-rose-500 text-[16px] font-semibold text-white shadow-[0_8px_20px_rgba(244,63,94,0.35)] active:opacity-90"
+                onClick={() => {
+                  void triggerHaptic("light");
+                  setRemoveBillId(selectedBill.billId);
+                  setSelectedBill(null);
+                }}
+              >
+                Delete Bill
+              </button>
+            </div>
+          ) : null
+        }
       >
         {selectedBill ? (
           <BillDetail
@@ -512,18 +513,6 @@ export function IosBillsScreen() {
             source={bills.find((item) => item.id === selectedBill.billId) ?? null}
             payments={selectedPayments}
             accountName={selectedAccount}
-            onMarkPaid={() => {
-              void handleMarkPaid(selectedBill.billId, selectedBill.splitId);
-              setSelectedBill(null);
-            }}
-            onEdit={() => {
-              setEditBillId(selectedBill.billId);
-              setSelectedBill(null);
-            }}
-            onRemove={() => {
-              setRemoveBillId(selectedBill.billId);
-              setSelectedBill(null);
-            }}
           />
         ) : null}
       </IosBottomSheet>

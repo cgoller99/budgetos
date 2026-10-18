@@ -38,7 +38,7 @@ export function IosBudgetsScreen() {
 
   return (
     <IosScreen>
-      <IosSection title="Budgets">
+      <IosSection>
         <PaycheckPlanDashboard compact />
       </IosSection>
 

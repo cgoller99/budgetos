@@ -2,11 +2,11 @@
 
 import { useState, type FormEvent } from "react";
 import {
-  Button,
   FormField,
   Input,
   Modal,
 } from "@/components/ui";
+import { NativeEditorActions } from "@/components/native/NativeEditorActions";
 import { useFinance } from "@/context/FinanceContext";
 import { useToast } from "@/context/ToastContext";
 import { GOAL_TYPE_OPTIONS } from "@/lib/finance/goalTypes";
@@ -67,8 +67,15 @@ export function CreateGoalModal({ isOpen, onClose }: CreateGoalModalProps) {
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Create Goal">
-      <form onSubmit={handleSubmit} className="space-y-4">
+    <Modal isOpen={isOpen} onClose={handleClose} title="Create Goal" footer={
+        <NativeEditorActions
+          formId="create-goal-form"
+          onCancel={handleClose}
+          submitLabel="Save Goal"
+        />
+      }>
+      <form id="create-goal-form" onSubmit={handleSubmit} className="space-y-4">
+
         <FormField label="Goal Type">
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {GOAL_TYPE_OPTIONS.map((option) => (
@@ -143,15 +150,6 @@ export function CreateGoalModal({ isOpen, onClose }: CreateGoalModalProps) {
               required
             />
           </FormField>
-        </div>
-
-        <div className="flex gap-3 pt-2">
-          <Button type="button" variant="secondary" fullWidth onClick={handleClose}>
-            Cancel
-          </Button>
-          <Button type="submit" fullWidth>
-            Save Goal
-          </Button>
         </div>
       </form>
     </Modal>

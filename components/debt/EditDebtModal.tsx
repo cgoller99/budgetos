@@ -6,7 +6,8 @@ import {
   debtToFormState,
   parseDebtForm,
 } from "@/components/debt/DebtFormFields";
-import { Button, Modal } from "@/components/ui";
+import { Modal } from "@/components/ui";
+import { NativeEditorActions } from "@/components/native/NativeEditorActions";
 import { useFinance } from "@/context/FinanceContext";
 import { useToast } from "@/context/ToastContext";
 import type { Debt } from "@/lib/finance/types";
@@ -66,18 +67,16 @@ export function EditDebtModal({ debt, onClose }: EditDebtModalProps) {
   }
 
   return (
-    <Modal isOpen={debt !== null} onClose={onClose} title="Edit Debt">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <DebtFormFields form={form} onChange={setForm} />
+    <Modal isOpen={debt !== null} onClose={onClose} title="Edit Debt" footer={
+        <NativeEditorActions
+          formId="save-changes-form"
+          onCancel={onClose}
+          submitLabel="Save Changes"
+        />
+      }>
+      <form id="save-changes-form" onSubmit={handleSubmit} className="space-y-4">
 
-        <div className="flex gap-3 pt-2">
-          <Button type="button" variant="secondary" fullWidth onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit" fullWidth>
-            Save Changes
-          </Button>
-        </div>
+        <DebtFormFields form={form} onChange={setForm} />
       </form>
     </Modal>
   );
