@@ -8,13 +8,25 @@ import { filterPersonalIncomePlan } from "@/lib/finance/personalIncomeScope";
 import type { Account, FinanceData } from "@/lib/finance/types";
 import { resolveAllocationAmounts } from "@/lib/incomePlan/allocations";
 import type { IncomePlanSchedule } from "@/lib/incomePlan/types";
+import { isBalanceStale } from "@/lib/budgets/accountDisplay";
 import {
   buildPaycheckBreakdown,
   type PaycheckBreakdownRow,
 } from "@/lib/budgets/paycheckBreakdown";
 
+/** Approximate calendar months without treating a month as exactly 4 weeks. */
+export const FORECAST_HORIZONS = [
+  { weeks: 4.33, id: "1m", label: "1 month", shortLabel: "1 mo" },
+  { weeks: 13, id: "3m", label: "3 months", shortLabel: "3 mo" },
+  { weeks: 26, id: "6m", label: "6 months", shortLabel: "6 mo" },
+  { weeks: 52, id: "12m", label: "12 months", shortLabel: "12 mo" },
+] as const;
+
+export type ForecastHorizonId = (typeof FORECAST_HORIZONS)[number]["id"];
+export type ForecastHorizonWeeks = (typeof FORECAST_HORIZONS)[number]["weeks"];
+
+/** @deprecated Prefer FORECAST_HORIZONS — kept for tests that assert 13/26 week totals. */
 export const FORECAST_HORIZONS_WEEKS = [4, 13, 26, 52] as const;
-export type ForecastHorizonWeeks = (typeof FORECAST_HORIZONS_WEEKS)[number];
 
 export type ForecastPurposeKind =
   | "accumulate"
@@ -30,12 +42,14 @@ export type PurposeContribution = {
   purposeKind: ForecastPurposeKind;
   weeklyAddition: number;
   /** Cumulative planned contributions at each horizon (not ending balances). */
-  contributionsByHorizon: Record<ForecastHorizonWeeks, number>;
+  contributionsByHorizon: ContributionByHorizon;
   purposeNote: string | null;
 };
 
 export type AccountHorizonProjection = {
-  weeks: ForecastHorizonWeeks;
+  weeks: number;
+  id: ForecastHorizonId;
+  label: string;
   projectedBalance: number;
   plannedDeposits: number;
   plannedWithdrawals: number;
@@ -56,6 +70,8 @@ export type LinkedAccountForecast = {
   purposes: PurposeContribution[];
   isSharedDestination: boolean;
   excludesMarketPerformance: boolean;
+  /** True when bank sync is missing or older than 7 days. */
+  isStale: boolean;
   estimateDisclaimer: string;
 };
 
@@ -68,7 +84,7 @@ export type AllocationContributionRow = {
   purposeKind: ForecastPurposeKind;
   weeklyAmount: number;
   amountPerPaycheck: number;
-  contributionsByHorizon: Record<ForecastHorizonWeeks, number>;
+  contributionsByHorizon: ContributionByHorizon;
 };
 
 export type AccountForecastBundle = {
@@ -99,8 +115,24 @@ function weeklyFromPaycheck(
   );
 }
 
-function contributionTable(weekly: number): Record<ForecastHorizonWeeks, number> {
+export type ContributionByHorizon = {
+  "1m": number;
+  "3m": number;
+  "6m": number;
+  "12m": number;
+  /** Exact week multiples used by regression tests (4/13/26/52). */
+  4: number;
+  13: number;
+  26: number;
+  52: number;
+};
+
+function contributionTable(weekly: number): ContributionByHorizon {
   return {
+    "1m": round(weekly * 4.33),
+    "3m": round(weekly * 13),
+    "6m": round(weekly * 26),
+    "12m": round(weekly * 52),
     4: round(weekly * 4),
     13: round(weekly * 13),
     26: round(weekly * 26),
@@ -211,12 +243,14 @@ function projectHorizons(
   weeklyContributions: number,
 ): AccountHorizonProjection[] {
   const weeklyNet = weeklyDeposits - weeklyWithdrawals;
-  return FORECAST_HORIZONS_WEEKS.map((weeks) => ({
-    weeks,
-    projectedBalance: round(currentBalance + weeklyNet * weeks),
-    plannedDeposits: round(weeklyDeposits * weeks),
-    plannedWithdrawals: round(weeklyWithdrawals * weeks),
-    plannedContributions: round(weeklyContributions * weeks),
+  return FORECAST_HORIZONS.map((horizon) => ({
+    weeks: horizon.weeks,
+    id: horizon.id,
+    label: horizon.label,
+    projectedBalance: round(currentBalance + weeklyNet * horizon.weeks),
+    plannedDeposits: round(weeklyDeposits * horizon.weeks),
+    plannedWithdrawals: round(weeklyWithdrawals * horizon.weeks),
+    plannedContributions: round(weeklyContributions * horizon.weeks),
   }));
 }
 
@@ -408,6 +442,7 @@ export function buildAccountForecasts(
         item.purposeKind === "rent_reserve",
     );
 
+    const stale = isBalanceStale(account.lastSyncedAt ?? null);
     accounts.push({
       accountId: account.id,
       accountName: account.name,
@@ -422,11 +457,12 @@ export function buildAccountForecasts(
       purposes: purposeReserves,
       isSharedDestination: purposes.length > 1,
       excludesMarketPerformance,
+      isStale: stale,
       estimateDisclaimer: excludesMarketPerformance
         ? "Estimate from planned cash deposits only — not market performance."
         : hasSpendOrBills
-          ? "Ending balance = posted balance + planned deposits − expected spending/bills/rent. Contribution totals above are planned additions, not guaranteed cash."
-          : "Ending balance = posted balance + planned deposits − known withdrawals. Contribution totals are planned additions until confirmed.",
+          ? "Future balance = actual money + planned deposits − expected spending/bills/rent. Not a guarantee."
+          : "Future balance = actual money + planned deposits − known withdrawals. Not a guarantee.",
     });
   }
 

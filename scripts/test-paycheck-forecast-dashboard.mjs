@@ -305,25 +305,22 @@ const sharedPlan = {
     }),
   ],
 };
-const shared = buildAccountForecasts(
-  {
-    ...data,
-    incomePlan: sharedPlan,
-    savingsGoals: [
-      ...data.savingsGoals,
-      {
-        id: "goal-invest",
-        name: "Investments",
-        type: "investment",
-        icon: "📈",
-        current: 0,
-        target: 10000,
-        createdAt: "2026-01-01",
-      },
-    ],
-  },
-  { horizonWeeks: 4 },
-);
+const shared = buildAccountForecasts({
+  ...data,
+  incomePlan: sharedPlan,
+  savingsGoals: [
+    ...data.savingsGoals,
+    {
+      id: "goal-invest",
+      name: "Investments",
+      type: "investment",
+      icon: "📈",
+      current: 0,
+      target: 10000,
+      createdAt: "2026-01-01",
+    },
+  ],
+});
 const investing = shared.accounts.find(
   (item) => item.accountId === investingChecking.id,
 );
@@ -332,10 +329,10 @@ assert.equal(investing.isSharedDestination, true);
 assert.equal(investing.weeklyPlannedDeposits, 200); // 175 rent + 25 invest
 assert.equal(investing.purposes.length, 2);
 const purposeContrib = investing.purposes.reduce(
-  (sum, item) => sum + item.contributionsByHorizon[4],
+  (sum, item) => sum + item.contributionsByHorizon[13],
   0,
 );
-assert.equal(purposeContrib, 800);
+assert.equal(purposeContrib, 2600);
 
 console.log("8) Investment projections exclude market performance");
 const investForecast = forecasts.accounts.find(
@@ -381,13 +378,14 @@ const billsForecast = forecasts.accounts.find((item) => item.accountId === bills
 assert.ok(billsForecast);
 assert.equal(billsForecast.weeklyPlannedDeposits, 110);
 assert.ok(billsForecast.weeklyPlannedWithdrawals > 0);
-const bills4 = billsForecast.horizons.find((item) => item.weeks === 4);
+const bills3m = billsForecast.horizons.find((item) => item.id === "3m");
+assert.ok(bills3m);
 assert.equal(
-  bills4.projectedBalance,
+  bills3m.projectedBalance,
   Math.round(
     (220 +
       (billsForecast.weeklyPlannedDeposits - billsForecast.weeklyPlannedWithdrawals) *
-        4) *
+        13) *
       100,
   ) / 100,
 );
