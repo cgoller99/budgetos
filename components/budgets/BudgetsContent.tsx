@@ -269,7 +269,11 @@ export function BudgetsContent() {
           <EmptyState
             icon="📊"
             title="No category budgets yet"
-            description="Add weekly, biweekly, twice-monthly, monthly, or custom limits per category."
+            description={
+              paycheck
+                ? "Your Income Plan is set up, but category spending limits are separate. Add a weekly/monthly limit per spending category (for example Personal Spending) to track it here."
+                : "Add weekly, biweekly, twice-monthly, monthly, or custom limits per category. Income Plan paycheck allocations live under Paycheck commitments above — they do not create category budgets automatically."
+            }
           />
         ) : (
           budgets.views.map((view) => (

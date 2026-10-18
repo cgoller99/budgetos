@@ -105,7 +105,17 @@ export function IosBudgetsSection() {
               : " · nothing over budget"}
           </p>
         </IosCard>
-      ) : null}
+      ) : glance ? null : (
+        <IosCard padding="md">
+          <p className="text-[15px] font-semibold text-[var(--foreground)]">
+            No category budgets yet
+          </p>
+          <p className="mt-1 text-[13px] text-[var(--text-muted)]">
+            Income Plan paycheck allocations are separate. Add a category spending limit
+            below to track it on Budgets.
+          </p>
+        </IosCard>
+      )}
       {!glance && suggestions.length > 0 ? (
         <IosCard padding="md">
           <p className="text-[15px] font-semibold text-[var(--foreground)]">
