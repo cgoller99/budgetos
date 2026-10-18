@@ -47,6 +47,10 @@ const editors = [
   "components/goals/EditGoalModal.tsx",
   "components/goals/AddMoneyModal.tsx",
   "components/bills/PayBillSplitModal.tsx",
+  "components/income/AddIncomeModal.tsx",
+  "components/income/EditIncomeModal.tsx",
+  "components/income/DeleteIncomeModal.tsx",
+  "components/debt/DeleteDebtModal.tsx",
 ];
 
 for (const file of editors) {

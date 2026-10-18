@@ -35,29 +35,32 @@ export function DeleteDebtModal({ debt, onClose }: DeleteDebtModalProps) {
   }
 
   return (
-    <Modal isOpen={debt !== null} onClose={onClose} title="Delete Debt">
-      <div className="space-y-4">
-        <p className="text-sm leading-relaxed text-white/60">
-          Are you sure you want to delete{" "}
-          <span className="font-medium text-white">{debt?.name}</span>? This
-          removes {formatCurrency(debt?.balance ?? 0)} from your debt planner
-          and dashboard projections.
-        </p>
-
-        <div className="flex gap-3 pt-2">
-          <Button type="button" variant="secondary" fullWidth onClick={onClose}>
+    <Modal
+      isOpen={debt !== null}
+      onClose={onClose}
+      title="Delete Debt"
+      footer={
+        <div className="flex gap-3">
+          <Button type="button" variant="secondary" fullWidth className="min-h-12" onClick={onClose}>
             Cancel
           </Button>
           <Button
             type="button"
             fullWidth
+            className="min-h-12 bg-rose-500 hover:bg-rose-600"
             onClick={() => void handleDelete()}
-            className="bg-rose-500 hover:bg-rose-600"
           >
             Delete Debt
           </Button>
         </div>
-      </div>
+      }
+    >
+      <p className="text-sm leading-relaxed text-white/60">
+        Are you sure you want to delete{" "}
+        <span className="font-medium text-white">{debt?.name}</span>? This
+        removes {formatCurrency(debt?.balance ?? 0)} from your debt planner
+        and dashboard projections.
+      </p>
     </Modal>
   );
 }
