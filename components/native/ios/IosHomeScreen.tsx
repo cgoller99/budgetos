@@ -40,6 +40,7 @@ import { isDisplayedInflow, isRefundActivity } from "@/lib/transactions/refunds"
 import { IosMerchantMark } from "@/components/native/ios/IosMerchantMark";
 import { isConfidentInternalTransfer } from "@/lib/transactions/transferDetection";
 import { getPlaidConnectionUiState } from "@/lib/native/plaidConnectionUi";
+import { triggerHaptic } from "@/lib/native/haptics";
 import { isPlaidClientEnabled } from "@/lib/plaid/clientConfig";
 import { cn } from "@/components/ui/cn";
 
@@ -199,8 +200,11 @@ export function IosHomeScreen() {
           {upcomingBills.some((bill) => bill.status === "overdue") ? "Review bills" : "Bills"}
         </Link>
         <Link
-          href="/reports"
+          href="/budgets"
           className="inline-flex min-h-11 shrink-0 items-center rounded-full bg-white/[0.06] px-3.5 text-[15px] font-semibold text-[var(--foreground)]"
+          onClick={() => {
+            void triggerHaptic("selection");
+          }}
         >
           Budgets
         </Link>
@@ -212,10 +216,10 @@ export function IosHomeScreen() {
         </Link>
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid min-w-0 grid-cols-3 gap-2">
         <Link
           href="/accounts"
-          className="ios-metric-chip flex min-h-[72px] flex-col justify-center gap-0.5 rounded-[16px] bg-[var(--surface)] px-3 py-2.5 active:bg-white/[0.06]"
+          className="ios-metric-chip flex min-h-[72px] min-w-0 flex-col justify-center gap-0.5 rounded-[16px] bg-[var(--surface)] px-3 py-2.5 active:bg-white/[0.06]"
         >
           <span className="text-[11px] font-medium text-[var(--text-muted)]">Cash</span>
           <strong className="text-[15px] font-semibold tabular-nums text-[var(--foreground)]">
@@ -232,7 +236,7 @@ export function IosHomeScreen() {
         </Link>
         <Link
           href="/debt"
-          className="ios-metric-chip flex min-h-[72px] flex-col justify-center gap-0.5 rounded-[16px] bg-[var(--surface)] px-3 py-2.5 active:bg-white/[0.06]"
+          className="ios-metric-chip flex min-h-[72px] min-w-0 flex-col justify-center gap-0.5 rounded-[16px] bg-[var(--surface)] px-3 py-2.5 active:bg-white/[0.06]"
         >
           <span className="text-[11px] font-medium text-[var(--text-muted)]">Debt</span>
           <strong className="text-[15px] font-semibold tabular-nums text-[var(--foreground)]">
@@ -249,7 +253,7 @@ export function IosHomeScreen() {
         </Link>
         <Link
           href="/accounts"
-          className="ios-metric-chip flex min-h-[72px] flex-col justify-center gap-0.5 rounded-[16px] bg-[var(--surface)] px-3 py-2.5 active:bg-white/[0.06]"
+          className="ios-metric-chip flex min-h-[72px] min-w-0 flex-col justify-center gap-0.5 rounded-[16px] bg-[var(--surface)] px-3 py-2.5 active:bg-white/[0.06]"
         >
           <span className="text-[11px] font-medium text-[var(--text-muted)]">Net Worth</span>
           <strong className="text-[15px] font-semibold tabular-nums text-[var(--foreground)]">

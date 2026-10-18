@@ -45,6 +45,9 @@ export function PullToRefresh({
     }
   }, [onRefresh, refreshing]);
 
+  const pullRef = useRef(0);
+  pullRef.current = pull;
+
   useEffect(() => {
     if (!native || disabled) {
       return;
@@ -89,7 +92,7 @@ export function PullToRefresh({
         return;
       }
 
-      const shouldRefresh = pull >= THRESHOLD;
+      const shouldRefresh = pullRef.current >= THRESHOLD;
       startY.current = null;
       setIsDragging(false);
 
@@ -109,7 +112,7 @@ export function PullToRefresh({
       el.removeEventListener("touchmove", onTouchMove);
       el.removeEventListener("touchend", onTouchEnd);
     };
-  }, [disabled, native, pull, refreshing, runRefresh]);
+  }, [disabled, native, refreshing, runRefresh]);
 
   if (!native) {
     return <>{children}</>;

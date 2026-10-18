@@ -625,12 +625,13 @@ html[data-native-platform="ios"] .ios-page-header {
 }
 
 html[data-native-platform="ios"] .ios-page-header-actions {
-  min-height: 32px;
+  min-height: 44px;
 }
 
-html[data-native-platform="ios"] .ios-page-header-actions button {
-  min-height: 32px;
-  min-width: 32px;
+html[data-native-platform="ios"] .ios-page-header-actions button,
+html[data-native-platform="ios"] .ios-page-header-actions a {
+  min-height: 44px;
+  min-width: 44px;
 }
 
 html[data-native-platform="ios"] .native-main {
@@ -765,22 +766,31 @@ html[data-native-platform="ios"] .native-tab-active > span:first-child {
 
 html[data-native-platform="ios"] .ios-metric-chip {
   display: flex;
+  min-width: 0;
   min-height: 44px;
   flex-direction: column;
   justify-content: center;
   gap: 2px;
+  overflow: hidden;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.06);
   padding: 8px 10px;
 }
 
 html[data-native-platform="ios"] .ios-metric-chip span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 11px;
   font-weight: 500;
   color: var(--text-muted);
 }
 
 html[data-native-platform="ios"] .ios-metric-chip strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
   font-size: 13px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -888,10 +898,28 @@ html[data-native-platform="ios"] .ios-list-row {
 
 html[data-native-platform="ios"] .ios-day-header {
   position: sticky;
-  top: calc(44px + env(safe-area-inset-top, 0px));
+  /* Header = safe-area + 44pt title row + bottom padding */
+  top: calc(44px + env(safe-area-inset-top, 0px) + 0.625rem);
   z-index: 15;
   background: color-mix(in srgb, #060b14 92%, transparent);
   backdrop-filter: blur(16px);
+}
+
+/* Compact forecast / goal stats inside native sheets */
+html[data-native-platform="ios"] .native-sheet .goal-forecast-panel {
+  padding: 0.75rem;
+}
+
+html[data-native-platform="ios"] .native-sheet .goal-forecast-panel .forecast-stat-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-native-platform="ios"] .native-page-enter,
+  html[data-native-platform="ios"] .native-modal-panel-enter {
+    animation: none !important;
+  }
 }
 
 html[data-native-platform="ios"] .ios-more-sheet {

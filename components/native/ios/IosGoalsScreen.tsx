@@ -21,6 +21,7 @@ import { GoalForecastPanel } from "@/components/goals/GoalForecastPanel";
 import { AddMoneyModal } from "@/components/goals/AddMoneyModal";
 import { CreateGoalModal } from "@/components/goals/CreateGoalModal";
 import { EditGoalModal } from "@/components/goals/EditGoalModal";
+import { LinkAccountModal } from "@/components/goals/LinkAccountModal";
 import { useFinance } from "@/context/FinanceContext";
 import { formatCurrency } from "@/lib/finance/format";
 import { formatGoalDate, getGoalProgressList } from "@/lib/finance/goals";
@@ -45,6 +46,7 @@ export function IosGoalsScreen() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [moneyGoal, setMoneyGoal] = useState<SavingsGoal | null>(null);
   const [editGoal, setEditGoal] = useState<SavingsGoal | null>(null);
+  const [linkGoal, setLinkGoal] = useState<SavingsGoal | null>(null);
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
   const [filter, setFilter] = useState<GoalFilter>("all");
 
@@ -220,30 +222,45 @@ export function IosGoalsScreen() {
         onClose={() => setSelectedGoalId(null)}
         footer={
           selectedGoal ? (
-            <div className="flex gap-2">
-              {!selectedGoal.isComplete ? (
+            <div className="flex flex-col gap-2">
+              <div className="flex gap-2">
+                {!selectedGoal.isComplete ? (
+                  <button
+                    type="button"
+                    className="min-h-12 flex-1 rounded-[14px] bg-[var(--accent)] text-[16px] font-semibold text-white"
+                    onClick={() => {
+                      void triggerHaptic("light");
+                      setMoneyGoal(findGoal(selectedGoal.id));
+                      setSelectedGoalId(null);
+                    }}
+                  >
+                    Add money
+                  </button>
+                ) : null}
                 <button
                   type="button"
-                  className="min-h-12 flex-1 rounded-[14px] bg-[var(--accent)] text-[16px] font-semibold text-white"
+                  className="min-h-12 flex-1 rounded-[14px] bg-white/[0.06] text-[16px] font-semibold text-[var(--foreground)]"
                   onClick={() => {
                     void triggerHaptic("light");
-                    setMoneyGoal(findGoal(selectedGoal.id));
+                    setEditGoal(findGoal(selectedGoal.id));
                     setSelectedGoalId(null);
                   }}
                 >
-                  Add money
+                  Edit
                 </button>
-              ) : null}
+              </div>
               <button
                 type="button"
-                className="min-h-12 flex-1 rounded-[14px] bg-white/[0.06] text-[16px] font-semibold text-[var(--foreground)]"
+                className="min-h-12 w-full rounded-[14px] bg-white/[0.06] text-[15px] font-semibold text-[var(--accent-light)]"
                 onClick={() => {
                   void triggerHaptic("light");
-                  setEditGoal(findGoal(selectedGoal.id));
+                  setLinkGoal(findGoal(selectedGoal.id));
                   setSelectedGoalId(null);
                 }}
               >
-                Edit
+                {selectedGoal.progressAmounts.linkedAccountId
+                  ? "Manage linked account"
+                  : "Link account"}
               </button>
             </div>
           ) : null
@@ -281,6 +298,13 @@ export function IosGoalsScreen() {
                   value={`${formatCurrency(goal.monthlyContribution)} / month`}
                 />
                 <IosDetailLine label="Source" value={goal.contributionSourceLabel} />
+                <IosDetailLine
+                  label="Linked account"
+                  value={
+                    goal.progressAmounts.linkedAccountName ??
+                    "None — link a savings account"
+                  }
+                />
               </div>
               {(() => {
                 const savingsGoal = findGoal(goal.id);
@@ -288,12 +312,15 @@ export function IosGoalsScreen() {
                   return null;
                 }
                 return (
-                  <GoalForecastPanel
-                    goal={savingsGoal}
-                    trackedAmount={goal.current}
-                    authoritativeForecast={goal.forecast}
-                    onSave={(weeklySavings) => savePlan(goal.id, weeklySavings)}
-                  />
+                  <div className="mt-4">
+                    <GoalForecastPanel
+                      goal={savingsGoal}
+                      trackedAmount={goal.current}
+                      authoritativeForecast={goal.forecast}
+                      onSave={(weeklySavings) => savePlan(goal.id, weeklySavings)}
+                      compact
+                    />
+                  </div>
                 );
               })()}
             </div>
@@ -303,6 +330,7 @@ export function IosGoalsScreen() {
       <CreateGoalModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} />
       <AddMoneyModal goal={moneyGoal} onClose={() => setMoneyGoal(null)} />
       <EditGoalModal goal={editGoal} onClose={() => setEditGoal(null)} />
+      <LinkAccountModal goal={linkGoal} onClose={() => setLinkGoal(null)} />
     </IosScreen>
   );
 }

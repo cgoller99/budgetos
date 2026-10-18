@@ -5,6 +5,7 @@ import { BudgetCategoryPanel, BudgetHealthSummary } from "@/components/budgets/B
 import { BudgetScheduleFields } from "@/components/budgets/BudgetScheduleFields";
 import { CategoryBudgetStatus } from "@/components/budgets/CategoryBudgetStatus";
 import { useCategoryBudgets } from "@/components/budgets/useCategoryBudgets";
+import { IosBudgetsScreen } from "@/components/native/ios/IosBudgetsScreen";
 import {
   Button,
   Card,
@@ -25,10 +26,12 @@ import { getUpcomingBills } from "@/lib/finance/bills";
 import { formatCurrency } from "@/lib/finance/format";
 import { calculateMoneyLeftUntilPayday } from "@/lib/finance/moneyLeftUntilPayday";
 import { buildUnifiedFinancialPlan } from "@/lib/finance/unifiedFinancialPlan";
+import { useNativeIos } from "@/lib/native/useNativeIos";
 import Link from "next/link";
 
 export function BudgetsContent() {
   const finance = useFinance();
+  const nativeIos = useNativeIos();
   const budgets = useCategoryBudgets();
   const hub = useMemo(
     () => buildBudgetHubSummary(budgets.views, finance),
@@ -41,6 +44,10 @@ export function BudgetsContent() {
   const unified = useMemo(() => buildUnifiedFinancialPlan(finance), [finance]);
   const paycheck = unified.paycheck;
   const upcomingBills = useMemo(() => getUpcomingBills(finance).slice(0, 4), [finance]);
+
+  if (nativeIos) {
+    return <IosBudgetsScreen />;
+  }
 
   if (finance.isLoading && budgets.status === "loading") {
     return <SkeletonGrid count={4} />;

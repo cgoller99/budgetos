@@ -159,7 +159,7 @@ export function IosTransactionDetailSheet({
         aria-modal="true"
         aria-label="Transaction details"
         className={cn(
-          "native-sheet native-keyboard-avoid absolute inset-x-0 bottom-0 max-h-[88dvh] overflow-y-auto rounded-t-[22px] border border-white/[0.08] border-b-0 bg-[#0b0f14] px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-2 transition-transform duration-200 ease-out",
+          "native-sheet native-keyboard-avoid absolute inset-x-0 bottom-0 max-h-[88dvh] overflow-y-auto rounded-t-[22px] border border-white/[0.08] border-b-0 bg-[#0b0f14] px-4 pb-0 pt-2 transition-transform duration-200 ease-out",
           animating ? "translate-y-0" : "translate-y-full",
         )}
         style={
@@ -236,7 +236,7 @@ export function IosTransactionDetailSheet({
           {shown.notes.trim() ? <DetailRow label="Notes" value={shown.notes} /> : null}
         </div>
 
-        <div className="native-sheet-footer sticky bottom-0 -mx-4 mt-4 grid grid-cols-2 gap-2 border-t border-white/[0.06] bg-[#0b0f14] px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
+        <div className="native-sheet-footer sticky bottom-0 -mx-4 mt-4 grid grid-cols-2 gap-2 border-t border-white/[0.06] bg-[#0b0f14] px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] pt-3">
           <button
             type="button"
             className="min-h-12 rounded-[14px] bg-[var(--accent)] text-[16px] font-semibold text-white active:opacity-90"

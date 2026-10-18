@@ -24,6 +24,8 @@ type GoalForecastPanelProps = {
   /** Shared forecast from enrichGoal when the slider is unchanged. */
   authoritativeForecast: GoalForecast;
   onSave: (weeklySavings: number) => Promise<void>;
+  /** Denser layout for native iPhone sheets. */
+  compact?: boolean;
 };
 
 function ForecastStat({ label, value }: { label: string; value: string }) {
@@ -42,6 +44,7 @@ export function GoalForecastPanel({
   trackedAmount,
   authoritativeForecast,
   onSave,
+  compact = false,
 }: GoalForecastPanelProps) {
   const finance = useFinance();
   const [draft, setDraft] = useState(0);
@@ -123,15 +126,27 @@ export function GoalForecastPanel({
       : "Not estimable yet";
 
   return (
-    <div className="rounded-[16px] border border-[var(--surface-border)] bg-white/[0.04] p-3 sm:p-4">
+    <div
+      className={cn(
+        "goal-forecast-panel rounded-[16px] border border-[var(--surface-border)] bg-white/[0.04]",
+        compact ? "p-3" : "p-3 sm:p-4",
+      )}
+    >
       <div className="flex items-center justify-between gap-3">
         <p className="text-[15px] font-semibold text-[var(--foreground)]">Forecast</p>
         <p className={cn("text-[13px] font-semibold", paceClass)}>{forecast.paceLabel}</p>
       </div>
-      <div className="mt-3 grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3">
+      <div
+        className={cn(
+          "forecast-stat-grid mt-3 grid min-w-0 gap-2",
+          compact ? "grid-cols-2" : "grid-cols-2 sm:gap-3 lg:grid-cols-3",
+        )}
+      >
         <ForecastStat label="Amount remaining" value={formatCurrency(forecast.remaining)} />
         <ForecastStat label="Estimated completion" value={completionValue} />
-        <ForecastStat label="Time until completion" value={forecast.timeLabel} />
+        {!compact ? (
+          <ForecastStat label="Time until completion" value={forecast.timeLabel} />
+        ) : null}
         <ForecastStat
           label="Weekly savings"
           value={`${formatCurrency(forecast.weeklySavings)} / week`}
@@ -140,14 +155,21 @@ export function GoalForecastPanel({
           label="Monthly savings"
           value={`${formatCurrency(forecast.monthlySavings)} / month`}
         />
-        <ForecastStat
-          label="Per paycheck"
-          value={
-            forecast.perPaycheckSavings == null
-              ? "No paycheck schedule"
-              : `${formatCurrency(forecast.perPaycheckSavings)} / paycheck`
-          }
-        />
+        {!compact ? (
+          <ForecastStat
+            label="Per paycheck"
+            value={
+              forecast.perPaycheckSavings == null
+                ? "No paycheck schedule"
+                : `${formatCurrency(forecast.perPaycheckSavings)} / paycheck`
+            }
+          />
+        ) : (
+          <ForecastStat
+            label="Time left"
+            value={forecast.timeLabel}
+          />
+        )}
       </div>
       <label className="mt-4 block text-[12px] text-[var(--text-muted)]">
         Adjust weekly schedule (preview)

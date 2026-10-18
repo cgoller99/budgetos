@@ -40,7 +40,9 @@ const config: CapacitorConfig = {
       backgroundColor: "#0b0f14",
     },
     Keyboard: {
-      resize: KeyboardResize.Body,
+      // None + --keyboard-inset (NativeIosChrome) lifts sheets without
+      // double-resizing the WKWebView body under the keyboard.
+      resize: KeyboardResize.None,
       resizeOnFullScreen: true,
     },
   },
