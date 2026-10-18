@@ -29,6 +29,8 @@ export function PullToRefresh({
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  const pullRef = useRef(0);
+
   const runRefresh = useCallback(async () => {
     if (refreshing) {
       return;
@@ -41,12 +43,10 @@ export function PullToRefresh({
       await onRefresh();
     } finally {
       setRefreshing(false);
+      pullRef.current = 0;
       setPull(0);
     }
   }, [onRefresh, refreshing]);
-
-  const pullRef = useRef(0);
-  pullRef.current = pull;
 
   useEffect(() => {
     if (!native || disabled) {
@@ -83,7 +83,9 @@ export function PullToRefresh({
       const currentY = event.touches[0]?.clientY ?? startY.current;
       const delta = Math.max(0, currentY - startY.current);
       if (delta > 8) {
-        setPull(Math.min(delta * 0.55, THRESHOLD + 28));
+        const next = Math.min(delta * 0.55, THRESHOLD + 28);
+        pullRef.current = next;
+        setPull(next);
       }
     }
 
@@ -99,6 +101,7 @@ export function PullToRefresh({
       if (shouldRefresh) {
         void runRefresh();
       } else {
+        pullRef.current = 0;
         setPull(0);
       }
     }
