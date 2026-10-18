@@ -120,7 +120,7 @@ export function IosAccountDetailSheet({
         aria-modal="true"
         aria-label="Account details"
         className={cn(
-          "native-sheet native-keyboard-avoid absolute inset-x-0 bottom-0 max-h-[88dvh] overflow-y-auto rounded-t-[22px] border border-white/[0.08] border-b-0 bg-[#0b0f14] px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-2 transition-transform duration-200 ease-out",
+          "native-sheet native-keyboard-avoid absolute inset-x-0 bottom-0 flex max-h-[88dvh] flex-col rounded-t-[22px] border border-white/[0.08] border-b-0 bg-[#0b0f14] pt-2 transition-transform duration-200 ease-out",
           animating ? "translate-y-0" : "translate-y-full",
         )}
         style={
@@ -130,7 +130,7 @@ export function IosAccountDetailSheet({
         }
       >
         <div
-          className="mx-auto mb-2 flex h-7 w-full touch-none items-center justify-center"
+          className="mx-auto mb-2 flex h-7 w-full shrink-0 touch-none items-center justify-center px-4"
           data-sheet-handle="true"
           onPointerDown={(event) => {
             dragOrigin.current = event.clientY;
@@ -146,94 +146,104 @@ export function IosAccountDetailSheet({
           <div className="h-1 w-10 rounded-full bg-white/25" />
         </div>
 
-        <p className="text-center text-[13px] font-medium text-[var(--text-muted)]">
-          {shown.nickname || shown.name}
-        </p>
-        <p className="mt-1 text-center text-[34px] font-semibold leading-none tracking-tight tabular-nums text-[var(--foreground)]">
-          {formatCurrency(shown.balance)}
-        </p>
-        <p className="mt-2 text-center text-[13px] text-[var(--text-secondary)]">
-          {formatMonthlyChange(shown.monthlyChange)}
-        </p>
-        <p
-          className={cn(
-            "mt-1 text-center text-[13px] font-medium",
-            connection?.status === "error"
-              ? "text-[var(--warning)]"
-              : "text-[var(--text-muted)]",
-          )}
-        >
-          {syncLabel(shown, connection)}
-        </p>
+        <div className="min-h-0 flex-1 overflow-y-auto px-4">
+          <p className="text-center text-[13px] font-medium text-[var(--text-muted)]">
+            {shown.nickname || shown.name}
+          </p>
+          <p className="mt-1 text-center text-[34px] font-semibold leading-none tracking-tight tabular-nums text-[var(--foreground)]">
+            {formatCurrency(shown.balance)}
+          </p>
+          <p className="mt-2 text-center text-[13px] text-[var(--text-secondary)]">
+            {formatMonthlyChange(shown.monthlyChange)}
+          </p>
+          <p
+            className={cn(
+              "mt-1 text-center text-[13px] font-medium",
+              connection?.status === "error"
+                ? "text-[var(--warning)]"
+                : "text-[var(--text-muted)]",
+            )}
+          >
+            {syncLabel(shown, connection)}
+          </p>
 
-        <div className="mt-4 rounded-[16px] bg-white/[0.04] px-3.5 py-3">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-[12px] font-medium text-[var(--text-muted)]">6-month activity</p>
-              <p className="mt-0.5 text-[12px] text-[var(--text-subtle)]">
-                {[shown.institution, mask].filter(Boolean).join(" · ") || shown.type}
-              </p>
+          <div className="mt-4 rounded-[16px] bg-white/[0.04] px-3.5 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[12px] font-medium text-[var(--text-muted)]">6-month activity</p>
+                <p className="mt-0.5 text-[12px] text-[var(--text-subtle)]">
+                  {[shown.institution, mask].filter(Boolean).join(" · ") || shown.type}
+                </p>
+              </div>
+              <Sparkline values={activity} color={CHART_COLORS.primary} width={112} height={40} />
             </div>
-            <Sparkline values={activity} color={CHART_COLORS.primary} width={112} height={40} />
           </div>
-        </div>
 
-        {recent.length > 0 ? (
-          <ul className="mt-4 overflow-hidden rounded-[16px] bg-white/[0.04]">
-            {recent.map((transaction) => (
-              <li
-                key={transaction.id}
-                className="flex items-center justify-between gap-3 border-b border-white/[0.06] px-3.5 py-3 last:border-b-0"
-              >
-                <p className="truncate text-[14px] text-[var(--foreground)]">
-                  {transaction.notes || transaction.category}
-                </p>
-                <p
-                  className={cn(
-                    "shrink-0 text-[14px] font-medium tabular-nums",
-                    isDisplayedInflow(transaction)
-                      ? "text-[var(--success)]"
-                      : transaction.type === "expense"
-                        ? "text-[var(--danger)]"
-                        : "text-[var(--text-secondary)]",
-                  )}
+          {recent.length > 0 ? (
+            <ul className="mt-4 overflow-hidden rounded-[16px] bg-white/[0.04]">
+              {recent.map((transaction) => (
+                <li
+                  key={transaction.id}
+                  className="flex items-center justify-between gap-3 border-b border-white/[0.06] px-3.5 py-3 last:border-b-0"
                 >
-                  {isDisplayedInflow(transaction) ? "+" : transaction.type === "expense" ? "−" : ""}
-                  {formatCurrency(Math.abs(transaction.amount))}
-                </p>
-              </li>
-            ))}
-          </ul>
-        ) : null}
+                  <p className="truncate text-[14px] text-[var(--foreground)]">
+                    {transaction.notes || transaction.category}
+                  </p>
+                  <p
+                    className={cn(
+                      "shrink-0 text-[14px] font-medium tabular-nums",
+                      isDisplayedInflow(transaction)
+                        ? "text-[var(--success)]"
+                        : transaction.type === "expense"
+                          ? "text-[var(--danger)]"
+                          : "text-[var(--text-secondary)]",
+                    )}
+                  >
+                    {isDisplayedInflow(transaction) ? "+" : transaction.type === "expense" ? "−" : ""}
+                    {formatCurrency(Math.abs(transaction.amount))}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          <div className="h-3" />
+        </div>
 
         {onEdit || onRemove ? (
-        <div className="mt-4 flex gap-2">
-          {onEdit ? (
-            <button
-              type="button"
-              className="min-h-12 flex-1 rounded-[14px] bg-[var(--accent)] text-[16px] font-semibold text-white active:opacity-90"
-              onClick={() => {
-                void triggerHaptic("light");
-                onEdit();
-              }}
-            >
-              Edit
-            </button>
-          ) : null}
-          {onRemove ? (
-            <button
-              type="button"
-              className="min-h-12 flex-1 rounded-[14px] bg-white/[0.06] text-[16px] font-semibold text-[var(--danger)] active:opacity-90"
-              onClick={() => {
-                void triggerHaptic("light");
-                onRemove();
-              }}
-            >
-              Remove
-            </button>
-          ) : null}
-        </div>
-        ) : null}
+          <div
+            className="shrink-0 border-t border-white/[0.06] px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3"
+            data-account-detail-footer="true"
+          >
+            <div className="flex gap-2">
+              {onEdit ? (
+                <button
+                  type="button"
+                  className="min-h-12 flex-1 rounded-[14px] bg-[var(--accent)] text-[16px] font-semibold text-white active:opacity-90"
+                  onClick={() => {
+                    void triggerHaptic("light");
+                    onEdit();
+                  }}
+                >
+                  Edit
+                </button>
+              ) : null}
+              {onRemove ? (
+                <button
+                  type="button"
+                  className="min-h-12 flex-1 rounded-[14px] bg-white/[0.06] text-[16px] font-semibold text-[var(--danger)] active:opacity-90"
+                  onClick={() => {
+                    void triggerHaptic("light");
+                    onRemove();
+                  }}
+                >
+                  Remove
+                </button>
+              ) : null}
+            </div>
+          </div>
+        ) : (
+          <div className="pb-[calc(1rem+env(safe-area-inset-bottom))]" />
+        )}
       </div>
     </div>,
     document.body,

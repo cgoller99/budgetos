@@ -33,12 +33,11 @@ const income = read("components/native/ios/IosIncomeScreen.tsx");
 assert.match(income, /AllocationEditSheet/);
 assert.match(income, /IosPaycheckPlanDashboard/);
 assert.match(income, /data-ios-income-plan-tab/);
-assert.match(income, /data-ios-income-schedule-sheet/);
+assert.match(income, /IosIncomeScheduleSheet/);
 assert.match(income, /Edit allocations/);
-// Full-page ios-embedded IncomePlanContent removed from plan/upcoming tabs
-assert.doesNotMatch(income, /ios-embedded-panel \[&_\.page-header\]:hidden/);
-// Setup/schedule still available via sheet (preserves wizard functionality)
-assert.match(income, /IncomePlanContent embedded/);
+// Full-page ios-embedded IncomePlanContent removed from plan/upcoming/history
+assert.doesNotMatch(income, /ios-embedded-panel/);
+assert.doesNotMatch(income, /IncomePlanContent/);
 
 // Web dashboard still exists for desktop
 const webDash = read("components/budgets/PaycheckPlanDashboard.tsx");

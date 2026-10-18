@@ -352,7 +352,7 @@ export function AllocationEditSheet({
                 <p className="text-[11px] text-[var(--text-muted)]">
                   Planning link only — choosing an account does not transfer money.
                 </p>
-                <div className="max-h-56 space-y-2 overflow-y-auto rounded-2xl border border-white/[0.08] p-2">
+                <div className="space-y-2 rounded-2xl border border-white/[0.08] p-2">
                   <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl px-3 py-2 hover:bg-white/[0.04]">
                     <input
                       type="radio"
