@@ -71,11 +71,20 @@ import {
   buildPaycheckProcessedEvent,
   buildTransactionAddedEvent,
   deriveEvents,
-  markAllEventsRead,
-  markEventRead,
-  deleteEvent,
-  clearNotificationEvents,
+  getNotifications,
+  getUnreadNotificationCount,
 } from "@/lib/events";
+import {
+  clearAllNotificationsInData,
+  dismissNotificationFromData,
+  markAllNotificationsReadInData,
+  markNotificationReadInData,
+  type NotificationIdentity,
+} from "@/lib/notifications/readDismiss";
+import {
+  dismissVirtualNotification as persistDismissedVirtualNotification,
+  readDismissedVirtualNotificationIds,
+} from "@/lib/notifications/center";
 import { normalizePaycheckAssignment } from "@/lib/finance/paycheckSplit";
 import { applyIncomePlanPaycheckToData } from "@/lib/incomePlan/applyPaycheck";
 import {
@@ -343,6 +352,8 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
     null,
   );
   const [automationDismissRevision, setAutomationDismissRevision] = useState(0);
+  const [virtualDismissRevision, setVirtualDismissRevision] = useState(0);
+  const notificationPersistInFlightRef = useRef(0);
   const [recurringBillCandidates, setRecurringBillCandidates] = useState<
     RecurringBillCandidate[]
   >([]);
@@ -384,6 +395,11 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
     void automationDismissRevision;
     return getDismissedAutomationIds();
   }, [automationDismissRevision]);
+
+  const dismissedVirtualIds = useMemo(() => {
+    void virtualDismissRevision;
+    return readDismissedVirtualNotificationIds();
+  }, [virtualDismissRevision]);
 
   const automationSuggestions = useMemo(
     () => computeAutomationSuggestions(data, dismissedAutomationIds),
@@ -705,75 +721,161 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
     [applyFinanceData, error, financeDataUpdatedAt, showToast],
   );
 
-  const markNotificationRead = useCallback((notificationId: string) => {
-    setData((previous) => {
-      const next = markEventRead(previous, notificationId);
-      const repository = repositoryRef.current;
-      const userId = userIdRef.current;
+  const resolveNotificationIdentity = useCallback(
+    (financeData: FinanceData, notificationId: string): NotificationIdentity => {
+      const item = getNotifications(financeData).find(
+        (notification) => notification.id === notificationId,
+      );
+      const stored = (financeData.events ?? []).some(
+        (event) => event.id === notificationId,
+      );
 
-      if (repository && userId) {
-        void repository.markNotificationRead(userId, notificationId);
+      if (!item) {
+        return { id: notificationId, isVirtual: !stored };
       }
 
-      return next;
-    });
-  }, []);
+      return {
+        id: item.id,
+        eventType: item.eventType,
+        entityId: item.entityId,
+        title: item.title,
+        subtitle: item.subtitle,
+        isVirtual: !stored,
+      };
+    },
+    [],
+  );
+
+  const persistNotificationEvents = useCallback(
+    async (previous: FinanceData, next: FinanceData, mode: "save" | "markAll" | "clear" | "delete", notificationId?: string) => {
+      const repository = repositoryRef.current;
+      const userId = userIdRef.current;
+      if (!repository || !userId) {
+        return;
+      }
+
+      const flight = ++notificationPersistInFlightRef.current;
+
+      try {
+        if (mode === "clear") {
+          await repository.clearAllNotifications(userId);
+          // Virtual acknowledgments may have been written as non-notification events
+          await repository.saveEvents(userId, next.events ?? []);
+        } else if (mode === "delete" && notificationId) {
+          const previousEvent = (previous.events ?? []).find(
+            (event) => event.id === notificationId,
+          );
+          const nextEvent = (next.events ?? []).find(
+            (event) => event.id === notificationId,
+          );
+          if (previousEvent && !nextEvent) {
+            await repository.deleteNotification(userId, notificationId);
+          } else {
+            // Surface-stripped suppressions (or virtual acks) must be upserted.
+            await repository.saveEvents(userId, next.events ?? []);
+          }
+        } else if (mode === "markAll") {
+          await repository.markAllNotificationsRead(userId);
+          await repository.saveEvents(userId, next.events ?? []);
+        } else if (notificationId) {
+          const wasStored = (previous.events ?? []).some(
+            (event) => event.id === notificationId,
+          );
+          if (wasStored) {
+            await repository.markNotificationRead(userId, notificationId);
+          } else {
+            await repository.saveEvents(userId, next.events ?? []);
+          }
+        } else {
+          await repository.saveEvents(userId, next.events ?? []);
+        }
+      } catch (persistError) {
+        if (flight !== notificationPersistInFlightRef.current) {
+          return;
+        }
+        setData(previous);
+        dataRef.current = previous;
+        const message =
+          persistError instanceof Error
+            ? persistError.message
+            : "Could not update notifications.";
+        showToast({
+          title: "Notification update failed",
+          subtitle: message,
+          type: "error",
+        });
+      }
+    },
+    [showToast],
+  );
+
+  const markNotificationRead = useCallback(
+    (notificationId: string) => {
+      const previous = dataRef.current;
+      const identity = resolveNotificationIdentity(previous, notificationId);
+      const next = markNotificationReadInData(previous, identity);
+      if (next === previous) {
+        return;
+      }
+      setData(next);
+      dataRef.current = next;
+      void persistNotificationEvents(previous, next, "save", notificationId);
+    },
+    [persistNotificationEvents, resolveNotificationIdentity],
+  );
 
   const acknowledgeWeeklySummary = useCallback(() => {
-    setData((previous) => {
-      const next = acknowledgeWeeklySummaryEvent(previous);
-      const repository = repositoryRef.current;
-      const userId = userIdRef.current;
-
-      if (repository && userId && next.events !== previous.events) {
-        void repository.saveEvents(userId, next.events);
-      }
-
-      return next;
-    });
-  }, []);
+    const previous = dataRef.current;
+    const next = acknowledgeWeeklySummaryEvent(previous);
+    if (next === previous) {
+      return;
+    }
+    setData(next);
+    dataRef.current = next;
+    void persistNotificationEvents(previous, next, "save");
+  }, [persistNotificationEvents]);
 
   const markAllNotificationsRead = useCallback(() => {
-    setData((previous) => {
-      const next = markAllEventsRead(previous);
-      const repository = repositoryRef.current;
-      const userId = userIdRef.current;
+    if (notificationPersistInFlightRef.current > 0) {
+      // Allow overlapping mark-all only if prior flight finished counting;
+      // still proceed — in-flight guard in persist compares flight ids.
+    }
+    const previous = dataRef.current;
+    const next = markAllNotificationsReadInData(previous);
+    setData(next);
+    dataRef.current = next;
+    void persistNotificationEvents(previous, next, "markAll");
+  }, [persistNotificationEvents]);
 
-      if (repository && userId) {
-        void repository.markAllNotificationsRead(userId);
+  const deleteNotification = useCallback(
+    (notificationId: string) => {
+      const previous = dataRef.current;
+      const identity = resolveNotificationIdentity(previous, notificationId);
+      const next = dismissNotificationFromData(previous, identity);
+
+      if (identity.isVirtual || identity.id.startsWith("virtual-")) {
+        persistDismissedVirtualNotification(notificationId);
+        setVirtualDismissRevision((value) => value + 1);
       }
 
-      return next;
-    });
-  }, []);
-
-  const deleteNotification = useCallback((notificationId: string) => {
-    setData((previous) => {
-      const next = deleteEvent(previous, notificationId);
-      const repository = repositoryRef.current;
-      const userId = userIdRef.current;
-
-      if (repository && userId) {
-        void repository.deleteNotification(userId, notificationId);
+      if (next === previous && !identity.isVirtual) {
+        return;
       }
 
-      return next;
-    });
-  }, []);
+      setData(next);
+      dataRef.current = next;
+      void persistNotificationEvents(previous, next, "delete", notificationId);
+    },
+    [persistNotificationEvents, resolveNotificationIdentity],
+  );
 
   const clearAllNotifications = useCallback(() => {
-    setData((previous) => {
-      const next = clearNotificationEvents(previous);
-      const repository = repositoryRef.current;
-      const userId = userIdRef.current;
-
-      if (repository && userId) {
-        void repository.clearAllNotifications(userId);
-      }
-
-      return next;
-    });
-  }, []);
+    const previous = dataRef.current;
+    const next = clearAllNotificationsInData(previous);
+    setData(next);
+    dataRef.current = next;
+    void persistNotificationEvents(previous, next, "clear");
+  }, [persistNotificationEvents]);
 
   const requestDashboardSection = useCallback((section: DashboardSectionId) => {
     setDashboardSectionRequest({ section, token: Date.now() });
@@ -2071,12 +2173,17 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
 
   const hub = useMemo(() => computeFinanceHub(data), [data]);
   const mergedNotifications = useMemo(
-    () => mergeAutomationNotifications(hub.notifications, automationSuggestions),
-    [automationSuggestions, hub.notifications],
+    () =>
+      mergeAutomationNotifications(hub.notifications, automationSuggestions).filter(
+        (notification) => !dismissedVirtualIds.has(notification.id),
+      ),
+    [automationSuggestions, dismissedVirtualIds, hub.notifications],
   );
   const mergedUnreadCount = useMemo(
-    () => hub.unreadNotificationCount + automationSuggestions.length,
-    [automationSuggestions.length, hub.unreadNotificationCount],
+    () =>
+      getUnreadNotificationCount(data, dismissedVirtualIds) +
+      automationSuggestions.length,
+    [automationSuggestions.length, data, dismissedVirtualIds],
   );
   const isDemoMode = isUserInDemoMode(onboardingMode, data);
   const financeDataFreshnessLabel = financeDataUpdatedAt

@@ -141,7 +141,10 @@ export function getNotifications(data: FinanceData): NotificationItem[] {
   return [...virtual, ...stored];
 }
 
-export function getUnreadNotificationCount(data: FinanceData): number {
+export function getUnreadNotificationCount(
+  data: FinanceData,
+  dismissedVirtualIds?: ReadonlySet<string>,
+): number {
   const events = data.events ?? [];
   const storedUnread = events.filter(
     (event) =>
@@ -150,7 +153,9 @@ export function getUnreadNotificationCount(data: FinanceData): number {
       isCategoryEnabled(event),
   ).length;
 
-  const virtualUnread = getVirtualNotifications(data).length;
+  const virtualUnread = getVirtualNotifications(data).filter(
+    (item) => !dismissedVirtualIds?.has(item.id),
+  ).length;
 
   return storedUnread + virtualUnread;
 }
