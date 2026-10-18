@@ -240,18 +240,7 @@ export function BillsContent() {
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
       />
-      <EditBillModal
-        bill={editBill}
-        onClose={() => setEditBillId(null)}
-        onRemove={
-          editBillId
-            ? () => {
-                setDeleteBillId(editBillId);
-                setEditBillId(null);
-              }
-            : undefined
-        }
-      />
+      <EditBillModal bill={editBill} onClose={() => setEditBillId(null)} />
       <DeleteBillModal bill={deleteBill} onClose={() => setDeleteBillId(null)} />
     </div>
   );

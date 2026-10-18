@@ -158,13 +158,13 @@ function BillDetail({
         </button>
         <button
           type="button"
-          className="min-h-12 w-full rounded-[14px] bg-white/[0.04] text-[16px] font-semibold text-[var(--danger)] active:opacity-90"
+          className="min-h-12 w-full rounded-[14px] bg-rose-500 text-[16px] font-semibold text-white shadow-[0_8px_20px_rgba(244,63,94,0.35)] active:opacity-90"
           onClick={() => {
             void triggerHaptic("light");
             onRemove();
           }}
         >
-          Remove bill
+          Delete Bill
         </button>
       </div>
       <div className="mt-5">
@@ -536,14 +536,6 @@ export function IosBillsScreen() {
       <EditBillModal
         bill={editBill as Bill | null}
         onClose={() => setEditBillId(null)}
-        onRemove={
-          editBillId
-            ? () => {
-                setRemoveBillId(editBillId);
-                setEditBillId(null);
-              }
-            : undefined
-        }
       />
       <DeleteBillModal
         bill={removeBill as Bill | null}
