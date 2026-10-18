@@ -23,9 +23,10 @@ assert.match(screen, /data-bill-edit=\{bill\.billId\}/);
 assert.match(screen, />\s*Edit\s*</);
 assert.match(screen, /EditBillModal/);
 assert.match(screen, /DeleteBillModal/);
-assert.match(screen, /onRemove=\{/);
+assert.match(screen, /data-bill-detail-footer/);
 assert.match(screen, /setEditBillId\(bill\.billId\)/);
 assert.match(screen, /setRemoveBillId/);
+assert.match(screen, /Delete Bill/);
 
 assert.match(editModal, /BillFormFields/);
 assert.match(editModal, /Cancel/);
