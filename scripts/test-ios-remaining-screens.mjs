@@ -28,5 +28,18 @@ assert.match(topBar, /GlobalSearch variant="icon"/);
 assert.match(topBar, /return "Plan"/);
 assert.match(notifications, /rounded-t-\[22px\]/);
 assert.match(notifications, /safe-area-inset-bottom/);
+assert.match(notifications, /size-11/);
+
+const budgetsScreen = read("components/native/ios/IosBudgetsScreen.tsx");
+assert.match(budgetsScreen, /Safe to Spend/);
+assert.match(budgetsScreen, /ios-metric-chip/);
+
+const capacitorConfig = read("capacitor.config.ts");
+assert.match(capacitorConfig, /KeyboardResize\.None/);
+
+const css = read("app/globals.css");
+assert.match(css, /ios-page-header-actions/);
+assert.match(css, /min-height: 44px/);
+assert.match(css, /goal-forecast-panel/);
 
 console.log("✅ Remaining iOS screen checks passed.");
