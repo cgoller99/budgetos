@@ -342,6 +342,13 @@ function isSameWeek(left: string, right: Date): boolean {
   return leftDate >= startOfWeek && leftDate < endOfWeek;
 }
 
+function weeklySummaryVirtualId(referenceDate = new Date()): string {
+  const startOfWeek = new Date(referenceDate);
+  startOfWeek.setDate(referenceDate.getDate() - referenceDate.getDay());
+  startOfWeek.setHours(0, 0, 0, 0);
+  return `virtual-weekly-summary-${startOfWeek.toISOString().slice(0, 10)}`;
+}
+
 export function deriveWeeklySummaryEvent(data: FinanceData): FinanceEvent | null {
   const plan = generateWeeklyPlan(data);
 
@@ -359,7 +366,11 @@ export function deriveWeeklySummaryEvent(data: FinanceData): FinanceEvent | null
     return null;
   }
 
-  return buildWeeklySummaryEvent(plan.length);
+  return {
+    ...buildWeeklySummaryEvent(plan.length),
+    // Stable id so dismiss / unread filters work across renders.
+    id: weeklySummaryVirtualId(),
+  };
 }
 
 export function acknowledgeWeeklySummaryEvent(data: FinanceData): FinanceData {
@@ -392,12 +403,11 @@ function hasStoredNotificationForEntity(
   entityId: string,
   types: FinanceEventType[],
 ): boolean {
+  // Any stored event for this entity+type suppresses virtual regeneration,
+  // including dismiss acknowledgments that intentionally omit the
+  // "notification" surface so they do not reappear in the panel.
   return events.some(
-    (event) =>
-      types.includes(event.type) &&
-      event.entityId === entityId &&
-      Array.isArray(event.surfaces) &&
-      event.surfaces.includes("notification"),
+    (event) => types.includes(event.type) && event.entityId === entityId,
   );
 }
 
