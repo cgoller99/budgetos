@@ -146,7 +146,7 @@ export function GlobalSearch({ className, variant = "bar" }: GlobalSearchProps) 
         onClick={open}
         className={cn(
           variant === "icon"
-            ? "focus-ring flex size-8 items-center justify-center rounded-full text-[var(--text-secondary)] active:bg-white/[0.06]"
+            ? "focus-ring flex size-11 min-h-11 min-w-11 items-center justify-center rounded-full text-[var(--text-secondary)] active:bg-white/[0.06]"
             : "inline-flex min-h-11 items-center gap-3 rounded-2xl border border-white/[0.04] bg-white/[0.02] px-4 py-2 text-sm text-white/45 transition-colors hover:bg-white/[0.04] hover:text-white/70",
           className,
         )}

@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useMemo } from "react";
+import Link from "next/link";
 import { Sparkline } from "@/components/charts/Sparkline";
 import { CHART_COLORS } from "@/components/charts/constants";
 import { IconBadge, StatCard } from "@/components/ui";
@@ -75,22 +76,25 @@ export function DashboardHero() {
   }, [dashboard.financialHealthScore.score, snapshot.monthlyTrends]);
 
   const metrics = useMemo(() => {
-    const netWorth = dashboard.kpiMetrics.find((m) => m.label === "Net Worth");
+    // Net Worth is the Home centerpiece (HomeNetWorthCard) — keep supporting KPIs here.
     const cash = dashboard.kpiMetrics.find((m) => m.label === "Cash");
     const debt = dashboard.kpiMetrics.find((m) => m.label === "Debt");
     const health = dashboard.financialHealthScore;
     const savingsRate = health.metrics.find((m) => m.label === "Savings rate");
+    const safeToSpend = dashboard.moneyFlow.safeToSpend;
 
     return [
       {
-        label: "Net Worth",
-        value: netWorth ? formatCurrency(netWorth.value) : "—",
-        change: netWorth ? formatMonthlyChange(netWorth.monthlyChange) : "",
-        positive: (netWorth?.monthlyChange ?? 0) >= 0,
-        icon: "netWorth" as const,
+        label: "Safe to Spend",
+        value: formatCurrency(safeToSpend),
+        change: "After bills & planned savings",
+        positive: safeToSpend >= 0,
+        mutedChange: true,
+        icon: "savings" as const,
         tone: "accent" as const,
-        sparkline: sparklines.netWorth,
+        sparkline: sparklines.savings,
         sparkColor: CHART_COLORS.primary,
+        href: "/budgets",
       },
       {
         label: "Cash",
@@ -101,6 +105,7 @@ export function DashboardHero() {
         tone: "success" as const,
         sparkline: sparklines.cash,
         sparkColor: CHART_COLORS.income,
+        href: "/accounts",
       },
       {
         label: "Debt",
@@ -112,6 +117,7 @@ export function DashboardHero() {
         tone: "danger" as const,
         sparkline: sparklines.debt,
         sparkColor: CHART_COLORS.debt,
+        href: "/debt",
       },
       {
         label: "Financial Health",
@@ -125,6 +131,7 @@ export function DashboardHero() {
         tone: "success" as const,
         sparkline: sparklines.health,
         sparkColor: CHART_COLORS.income,
+        href: "/reports",
       },
     ];
   }, [dashboard, sparklines]);
@@ -132,24 +139,29 @@ export function DashboardHero() {
   return (
     <section className={dashboardKpiGridClassName}>
       {metrics.map((metric) => (
-        <StatCard
+        <Link
           key={metric.label}
-          label={metric.label}
-          value={metric.value}
-          change={metric.change}
-          positive={metric.positive}
-          mutedChange={metric.mutedChange ?? false}
-          prominent
-          icon={
-            <IconBadge tone={metric.tone}>
-              <MetricIcon name={metric.icon} />
-            </IconBadge>
-          }
-          trailing={
-            <Sparkline values={metric.sparkline} color={metric.sparkColor} />
-          }
-          className="h-full"
-        />
+          href={metric.href}
+          className="focus-ring block h-full rounded-[var(--radius-card)]"
+        >
+          <StatCard
+            label={metric.label}
+            value={metric.value}
+            change={metric.change}
+            positive={metric.positive}
+            mutedChange={metric.mutedChange ?? false}
+            prominent
+            icon={
+              <IconBadge tone={metric.tone}>
+                <MetricIcon name={metric.icon} />
+              </IconBadge>
+            }
+            trailing={
+              <Sparkline values={metric.sparkline} color={metric.sparkColor} />
+            }
+            className="h-full"
+          />
+        </Link>
       ))}
     </section>
   );

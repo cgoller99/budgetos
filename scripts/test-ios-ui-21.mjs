@@ -23,14 +23,25 @@ assert.equal(
 );
 
 const home = read("components/native/ios/IosHomeScreen.tsx");
-assert.match(home, /Available cash/);
-assert.match(home, /data-home-hero="safe-to-spend"/);
+assert.match(home, /IosNetWorthHero/);
+assert.match(home, /Available Cash/);
+assert.match(home, /data-home-section="safe-to-spend"/);
 assert.match(home, /<IosBudgetsSection \/>/);
 assert.match(home, /describeTimeRemaining/);
 assert.match(home, /href="\/income"/);
-assert.match(home, /href="\/reports"/);
+assert.match(home, /href="\/budgets"/);
 assert.match(home, /detail="summary"/);
-assert.match(home, /IosMerchantMark/);
+assert.match(home, /Debt Progress/);
+assert.match(home, /Next Paycheck/);
+assert.doesNotMatch(home, /data-home-hero="safe-to-spend"/);
+
+const netWorthHero = read("components/native/ios/IosNetWorthHero.tsx");
+assert.match(netWorthHero, /data-home-hero="net-worth"/);
+assert.match(netWorthHero, /calculateNetWorth/);
+assert.match(netWorthHero, /calculateAssets/);
+assert.match(netWorthHero, /calculateLiabilities/);
+assert.match(netWorthHero, /Historical net worth chart/);
+assert.doesNotMatch(netWorthHero, /buildTimeline/);
 
 const transactions = read("components/native/ios/IosTransactionsScreen.tsx");
 assert.match(transactions, /isRefundActivity/);
@@ -46,12 +57,22 @@ assert.match(budgets, /Save limit/);
 assert.match(budgets, /native-sheet-footer|footer=/);
 assert.match(budgets, /pathname === "\/dashboard"/);
 assert.match(budgets, /Edit limits/);
+assert.match(budgets, /href="\/budgets"/);
+
+const budgetsScreen = read("components/native/ios/IosBudgetsScreen.tsx");
+assert.match(budgetsScreen, /Safe to Spend/);
+assert.match(budgetsScreen, /IosBudgetsSection/);
+const budgetsContent = read("components/budgets/BudgetsContent.tsx");
+assert.match(budgetsContent, /IosBudgetsScreen/);
+assert.match(budgetsContent, /nativeIos/);
 
 const goals = read("components/native/ios/IosGoalsScreen.tsx");
 assert.match(goals, /Time remaining/);
 assert.match(goals, /GoalForecastPanel/);
 assert.match(goals, /Add money/);
 assert.match(goals, /IosRing/);
+assert.match(goals, /LinkAccountModal/);
+assert.match(goals, /compact/);
 
 const plan = read("components/native/ios/IosIncomeScreen.tsx");
 assert.match(plan, /Cash-flow outlook/);

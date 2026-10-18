@@ -176,25 +176,19 @@ export function IosAccountsScreen() {
         </IosIconButton>
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
-        <IosCard padding="sm">
-          <p className="text-[11px] font-medium text-[var(--text-muted)]">Cash</p>
-          <p className="mt-1 text-[14px] font-semibold tabular-nums text-[var(--foreground)]">
-            {formatCurrency(cashTotal)}
-          </p>
-        </IosCard>
-        <IosCard padding="sm">
-          <p className="text-[11px] font-medium text-[var(--text-muted)]">Credit / Debt</p>
-          <p className="mt-1 text-[14px] font-semibold tabular-nums text-[var(--danger)]">
-            {formatCurrency(debtTotal)}
-          </p>
-        </IosCard>
-        <IosCard padding="sm">
-          <p className="text-[11px] font-medium text-[var(--text-muted)]">Investments</p>
-          <p className="mt-1 text-[14px] font-semibold tabular-nums text-[var(--foreground)]">
-            {formatCurrency(investmentTotal)}
-          </p>
-        </IosCard>
+      <div className="grid min-w-0 grid-cols-3 gap-2">
+        <div className="ios-metric-chip min-w-0">
+          <span>Cash</span>
+          <strong>{formatCurrency(cashTotal)}</strong>
+        </div>
+        <div className="ios-metric-chip min-w-0">
+          <span>Credit / Debt</span>
+          <strong className="!text-[var(--danger)]">{formatCurrency(debtTotal)}</strong>
+        </div>
+        <div className="ios-metric-chip min-w-0">
+          <span>Investments</span>
+          <strong>{formatCurrency(investmentTotal)}</strong>
+        </div>
       </div>
 
       {plaidEnabled && connection.phase === "empty" ? (

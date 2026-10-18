@@ -6,24 +6,18 @@ import { useFinance } from "@/context/FinanceContext";
 import { forecastCashUntilPayday } from "@/lib/finance/cashFlowForecast";
 import { describeCashOutlook, forecastCashOutlook } from "@/lib/finance/cashOutlook";
 import { formatCurrency } from "@/lib/finance/format";
-import { buildTransactionsHref, getCurrentMonthDateRange } from "@/lib/transactions/filterParams";
 
 export function MobileSafeToSpendCard() {
   const finance = useFinance();
   const safeToSpend = finance.dashboard.moneyFlow.safeToSpend;
   const paydayForecast = forecastCashUntilPayday(finance);
   const cashOutlook = describeCashOutlook(forecastCashOutlook(finance));
-  const { dateFrom, dateTo } = getCurrentMonthDateRange();
 
   return (
     <Link
-      href={buildTransactionsHref({
-        type: "expense",
-        dateFrom,
-        dateTo,
-        filterLabel: "Recent spending",
-      })}
+      href="/budgets"
       className="focus-ring block rounded-3xl"
+      aria-label="Safe to Spend breakdown"
     >
       <section className="rounded-3xl border border-[var(--accent)]/25 bg-gradient-to-br from-[var(--accent)]/15 to-transparent p-6 transition-colors hover:border-[var(--accent)]/35">
       <div className="flex items-start justify-between gap-3">

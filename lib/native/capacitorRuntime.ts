@@ -54,7 +54,7 @@ export async function configureNativeChrome(): Promise<void> {
   }
 
   try {
-    await Keyboard.setResizeMode({ mode: KeyboardResize.Body });
+    await Keyboard.setResizeMode({ mode: KeyboardResize.None });
   } catch {
     // Resize mode may be unavailable on some platforms.
   }

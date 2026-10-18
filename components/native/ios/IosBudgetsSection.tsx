@@ -85,7 +85,7 @@ export function IosBudgetsSection() {
   return (
     <IosSection
       title="Budgets"
-      action={glance ? <IosLink href="/reports">Edit limits</IosLink> : undefined}
+      action={glance ? <IosLink href="/budgets">Edit limits</IosLink> : undefined}
     >
       <CategoryBudgetStatus status={status} message={syncMessage} onRetry={retry} />
       {views.length > 0 ? (

@@ -346,7 +346,7 @@ export function IosBillsScreen() {
           action={
             <button
               type="button"
-              className="min-h-10 shrink-0 rounded-full bg-[var(--accent)] px-3.5 text-[13px] font-semibold text-white active:opacity-90"
+              className="min-h-11 shrink-0 rounded-full bg-[var(--accent)] px-3.5 text-[13px] font-semibold text-white active:opacity-90"
               onClick={() => {
                 void triggerHaptic("light");
                 openRecurringBillsModal();

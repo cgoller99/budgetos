@@ -2186,9 +2186,13 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
     [automationSuggestions.length, data, dismissedVirtualIds],
   );
   const isDemoMode = isUserInDemoMode(onboardingMode, data);
-  const financeDataFreshnessLabel = financeDataUpdatedAt
-    ? getFinanceCacheAgeLabel(financeDataUpdatedAt)
-    : null;
+  // Snapshot age once per financeDataUpdatedAt change. Calling Date.now() on
+  // every provider render churns the context value and re-renders every screen.
+  const financeDataFreshnessLabel = useMemo(
+    () =>
+      financeDataUpdatedAt ? getFinanceCacheAgeLabel(financeDataUpdatedAt) : null,
+    [financeDataUpdatedAt],
+  );
 
   const value = useMemo<FinanceContextValue>(
     () => ({

@@ -306,9 +306,9 @@ export function IosSkeletonScreen({
 
 export function IosDetailLine({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-start justify-between gap-4 border-b border-white/[0.06] py-3 last:border-b-0">
-      <p className="text-[13px] text-[var(--text-muted)]">{label}</p>
-      <p className="max-w-[65%] text-right text-[15px] font-medium text-[var(--foreground)]">
+    <div className="flex items-start justify-between gap-3 border-b border-white/[0.06] py-3 last:border-b-0">
+      <p className="shrink-0 text-[13px] text-[var(--text-muted)]">{label}</p>
+      <p className="min-w-0 max-w-[65%] break-words text-right text-[15px] font-medium text-[var(--foreground)]">
         {value}
       </p>
     </div>

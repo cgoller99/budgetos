@@ -452,7 +452,7 @@ export function NotificationCenter() {
         className={cn(
           "focus-ring relative flex items-center justify-center text-[var(--text-muted)] transition-colors",
           nativeIos
-            ? "size-8 rounded-full border-0 bg-transparent text-[var(--text-secondary)] hover:bg-white/[0.06] hover:text-[var(--foreground)]"
+            ? "size-11 min-h-11 min-w-11 rounded-full border-0 bg-transparent text-[var(--text-secondary)] hover:bg-white/[0.06] hover:text-[var(--foreground)]"
             : "h-11 w-11 rounded-[var(--radius-card)] border border-[var(--surface-border)] bg-[var(--surface-subtle)] hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)]",
         )}
         aria-label={`Notifications${mergedUnreadCount > 0 ? `, ${mergedUnreadCount} unread` : ""}`}

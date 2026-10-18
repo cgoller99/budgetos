@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Badge, Button, Card, CardContent, ProgressRing } from "@/components/ui";
 import { GoalInsightList } from "@/components/goals/GoalInsightList";
 import { GoalMilestoneConfetti } from "@/components/goals/GoalMilestoneConfetti";
@@ -41,6 +41,15 @@ export function GoalCard({
     forecast.weeklySavings > 0
       ? formatGoalDate(forecast.estimatedCompletionDate)
       : "Not estimable yet";
+  // Compact forecast grid on phone widths (avoids compressed/overlapping stats).
+  const [compactForecast, setCompactForecast] = useState(false);
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 640px)");
+    const sync = () => setCompactForecast(media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
 
   const share = useMemo(() => {
     if (!amounts.linkedAccountId) return null;
@@ -220,6 +229,7 @@ export function GoalCard({
           trackedAmount={goal.current}
           authoritativeForecast={forecast}
           onSave={onSavePlan}
+          compact={compactForecast}
         />
 
         <MobileCollapsibleSection
