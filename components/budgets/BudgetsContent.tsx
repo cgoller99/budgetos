@@ -65,8 +65,8 @@ export function BudgetsContent() {
           Budgets
         </h1>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Ongoing paycheck plan first — then linked accounts, projections, spending, and
-          suggestions last.
+          See where your paycheck goes, pick the right bank account, and peek at future
+          balances.
         </p>
       </div>
 
@@ -76,16 +76,16 @@ export function BudgetsContent() {
         onRetry={budgets.retry}
       />
 
-      {/* 1–3: Ongoing Budget, Linked Accounts, Projected Balances */}
+      {/* 1–4: My Budget, Where Money Goes, My Accounts, Future Balances */}
       <div className="mt-4">
         <PaycheckPlanDashboard />
       </div>
 
-      {/* 4. Spending Progress and Upcoming Bills */}
+      {/* Spending / bills sit with category tools; suggestions are section 5 */}
       <Card className="mt-4">
         <CardHeader
-          title="4. Spending Progress & Upcoming Bills"
-          description="Category limits and bills — separate from paycheck parking and Safe to Spend cash."
+          title="Spending & bills"
+          description="Category limits and upcoming bills — separate from your paycheck plan."
         />
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

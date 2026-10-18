@@ -42,7 +42,7 @@ export function IosBudgetsScreen() {
         <PaycheckPlanDashboard compact />
       </IosSection>
 
-      <IosSection title="4. Spending & bills">
+      <IosSection title="Spending & bills">
         <IosCard padding="md">
           <div className="grid grid-cols-2 gap-2">
             <Metric label="Safe to Spend" value={formatCurrency(hub.safeToSpend)} />
