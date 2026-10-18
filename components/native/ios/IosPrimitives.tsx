@@ -260,6 +260,31 @@ export function IosBanner({
   );
 }
 
+export function IosEmptyState({
+  title,
+  subtitle,
+  action,
+}: {
+  title: string;
+  subtitle?: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div
+      className="ios-empty-state flex flex-col items-center justify-center rounded-[16px] border border-dashed border-white/[0.08] bg-white/[0.02] px-5 py-10 text-center"
+      data-ios-empty-state="true"
+    >
+      <p className="text-[16px] font-semibold text-[var(--foreground)]">{title}</p>
+      {subtitle ? (
+        <p className="mt-1.5 max-w-[18rem] text-[13px] leading-snug text-[var(--text-muted)]">
+          {subtitle}
+        </p>
+      ) : null}
+      {action ? <div className="mt-4">{action}</div> : null}
+    </div>
+  );
+}
+
 export function IosSkeletonScreen({
   rows = 4,
   variant = "list",

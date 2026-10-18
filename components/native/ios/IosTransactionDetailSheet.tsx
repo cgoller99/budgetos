@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useState } from "react";
 import { formatCurrency } from "@/lib/finance/format";
 import type { FinanceData, Transaction } from "@/lib/finance/types";
 import { getLinkedAccountName } from "@/lib/transactions/accountLookup";
@@ -12,11 +11,11 @@ import {
   getDisplayCategory,
   getDisplayMerchant,
 } from "@/lib/transactions/categoryPresentation";
+import { IosBottomSheet } from "@/components/native/ios/IosBottomSheet";
 import { IosAvatar } from "@/components/native/ios/IosPrimitives";
 import { IosMerchantMark } from "@/components/native/ios/IosMerchantMark";
 import { triggerHaptic } from "@/lib/native/haptics";
 import { cn } from "@/components/ui/cn";
-import { lockBodyScroll, unlockBodyScroll } from "@/lib/ui/bodyScrollLock";
 
 type IosTransactionDetailSheetProps = {
   transaction: Transaction | null;
@@ -37,6 +36,9 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+/**
+ * Transaction detail — scrollable body + fixed Edit/Delete footer via IosBottomSheet.
+ */
 export function IosTransactionDetailSheet({
   transaction,
   finance,
@@ -44,82 +46,16 @@ export function IosTransactionDetailSheet({
   onEdit,
   onDelete,
 }: IosTransactionDetailSheetProps) {
-  const [visible, setVisible] = useState(false);
-  const [animating, setAnimating] = useState(false);
   const [presented, setPresented] = useState<Transaction | null>(transaction);
-  const [dragOffset, setDragOffset] = useState(0);
-  const dragOrigin = useRef<number | null>(null);
-  const dragOffsetRef = useRef(0);
-  const lastPointer = useRef<{ y: number; time: number } | null>(null);
-  const velocityRef = useRef(0);
-  const onCloseRef = useRef(onClose);
-
-  useEffect(() => {
-    onCloseRef.current = onClose;
-  }, [onClose]);
 
   useEffect(() => {
     if (transaction) {
       setPresented(transaction);
-      setVisible(true);
-      const frame = window.requestAnimationFrame(() => {
-        window.requestAnimationFrame(() => setAnimating(true));
-      });
-      lockBodyScroll();
-      const onKeyDown = (event: KeyboardEvent) => {
-        if (event.key === "Escape") onCloseRef.current();
-      };
-      window.addEventListener("keydown", onKeyDown);
-      return () => {
-        window.cancelAnimationFrame(frame);
-        unlockBodyScroll();
-        window.removeEventListener("keydown", onKeyDown);
-      };
     }
-
-    setAnimating(false);
-    dragOffsetRef.current = 0;
-    setDragOffset(0);
-    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const timeout = window.setTimeout(() => {
-      setVisible(false);
-      setPresented(null);
-    }, reduceMotion ? 0 : 220);
-    return () => window.clearTimeout(timeout);
   }, [transaction]);
 
-  function setDrag(next: number) {
-    dragOffsetRef.current = next;
-    setDragOffset(next);
-  }
-
-  function moveDrag(clientY: number) {
-    if (dragOrigin.current == null) return;
-    const now = performance.now();
-    const previous = lastPointer.current;
-    if (previous) {
-      const elapsed = Math.max(now - previous.time, 1);
-      velocityRef.current = (clientY - previous.y) / elapsed;
-    }
-    lastPointer.current = { y: clientY, time: now };
-    setDrag(Math.max(0, clientY - dragOrigin.current));
-  }
-
-  function endDrag() {
-    const shouldClose = dragOffsetRef.current > 96 || velocityRef.current > 0.65;
-    dragOrigin.current = null;
-    lastPointer.current = null;
-    velocityRef.current = 0;
-    setDrag(0);
-    if (shouldClose) {
-      void triggerHaptic("light");
-      onCloseRef.current();
-    }
-  }
-
   const shown = transaction ?? presented;
-
-  if (!visible || !shown || typeof document === "undefined") {
+  if (!shown) {
     return null;
   }
 
@@ -143,49 +79,37 @@ export function IosTransactionDetailSheet({
     ? finance.savingsGoals.find((goal) => goal.id === shown.goalId)?.name
     : null;
 
-  return createPortal(
-    <div className="fixed inset-0 z-[80]">
-      <button
-        type="button"
-        aria-label="Close transaction"
-        className={cn(
-          "absolute inset-0 bg-black/50 transition-opacity duration-200",
-          animating ? "opacity-100" : "opacity-0",
-        )}
-        onClick={() => onCloseRef.current()}
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Transaction details"
-        className={cn(
-          "native-sheet native-keyboard-avoid absolute inset-x-0 bottom-0 max-h-[88dvh] overflow-y-auto rounded-t-[22px] border border-white/[0.08] border-b-0 bg-[#0b0f14] px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-2 transition-transform duration-200 ease-out",
-          animating ? "translate-y-0" : "translate-y-full",
-        )}
-        style={
-          dragOffset > 0
-            ? { transform: `translateY(${dragOffset}px)`, transition: "none" }
-            : undefined
-        }
-      >
-        <div
-          className="mx-auto mb-2 flex h-7 w-full touch-none items-center justify-center"
-          data-sheet-handle="true"
-          onPointerDown={(event) => {
-            dragOrigin.current = event.clientY;
-            lastPointer.current = { y: event.clientY, time: performance.now() };
-            velocityRef.current = 0;
-            event.currentTarget.setPointerCapture(event.pointerId);
-          }}
-          onPointerMove={(event) => {
-            moveDrag(event.clientY);
-          }}
-          onPointerUp={endDrag}
-          onPointerCancel={endDrag}
-        >
-          <div className="h-1 w-10 rounded-full bg-white/25" />
+  return (
+    <IosBottomSheet
+      open={transaction !== null}
+      onClose={onClose}
+      labelledBy="ios-transaction-detail-title"
+      footer={
+        <div className="grid grid-cols-2 gap-2" data-transaction-detail-footer="true">
+          <button
+            type="button"
+            className="min-h-12 rounded-[14px] bg-[var(--accent)] text-[16px] font-semibold text-white active:opacity-90"
+            onClick={() => {
+              void triggerHaptic("light");
+              onEdit();
+            }}
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            className="min-h-12 rounded-[14px] bg-white/[0.06] text-[16px] font-semibold text-[var(--danger)] active:opacity-90"
+            onClick={() => {
+              void triggerHaptic("light");
+              onDelete();
+            }}
+          >
+            Delete
+          </button>
         </div>
-
+      }
+    >
+      <div className="pb-2">
         <div className="mb-3 flex justify-center">
           <IosAvatar
             fallback={
@@ -210,7 +134,10 @@ export function IosTransactionDetailSheet({
           {isInflow ? "+" : isTransfer ? "" : "−"}
           {formatCurrency(Math.abs(shown.amount))}
         </p>
-        <p className="mt-2 text-center text-[17px] font-semibold text-[var(--foreground)]">
+        <p
+          id="ios-transaction-detail-title"
+          className="mt-2 text-center text-[17px] font-semibold text-[var(--foreground)]"
+        >
           {label}
         </p>
         <p className="mt-1 text-center text-[13px] text-[var(--text-muted)]">
@@ -235,31 +162,7 @@ export function IosTransactionDetailSheet({
           {goalName ? <DetailRow label="Goal" value={goalName} /> : null}
           {shown.notes.trim() ? <DetailRow label="Notes" value={shown.notes} /> : null}
         </div>
-
-        <div className="native-sheet-footer sticky bottom-0 -mx-4 mt-4 grid grid-cols-2 gap-2 border-t border-white/[0.06] bg-[#0b0f14] px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
-          <button
-            type="button"
-            className="min-h-12 rounded-[14px] bg-[var(--accent)] text-[16px] font-semibold text-white active:opacity-90"
-            onClick={() => {
-              void triggerHaptic("light");
-              onEdit();
-            }}
-          >
-            Edit
-          </button>
-          <button
-            type="button"
-            className="min-h-12 rounded-[14px] bg-white/[0.06] text-[16px] font-semibold text-[var(--danger)] active:opacity-90"
-            onClick={() => {
-              void triggerHaptic("light");
-              onDelete();
-            }}
-          >
-            Delete
-          </button>
-        </div>
       </div>
-    </div>,
-    document.body,
+    </IosBottomSheet>
   );
 }

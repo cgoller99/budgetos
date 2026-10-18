@@ -29,10 +29,10 @@ assert.match(screen, /setRemoveBillId/);
 
 assert.match(editModal, /BillFormFields/);
 assert.match(editModal, /Cancel/);
-assert.match(editModal, /"Save"/);
 assert.match(editModal, /Delete Bill/);
-assert.match(editModal, /data-bill-delete="true"/);
+assert.match(editModal, /data-bill-editor-footer="true"/);
 assert.match(editModal, /await editBill\(bill\.id, parsed\)/);
+assert.match(editModal, /footer=\{/);
 
 for (const field of [
   "Bill Name",

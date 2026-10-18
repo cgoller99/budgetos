@@ -39,15 +39,16 @@ assert.match(screen, /Delete Bill/);
 assert.match(screen, /setRemoveBillId/);
 assert.match(screen, /setEditBillId\(bill\.billId\)/);
 
-assert.match(editModal, /data-bill-delete="true"/);
+assert.match(editModal, /data-bill-editor-footer="true"/);
 assert.match(editModal, /Delete Bill/);
 assert.match(editModal, /await editBill/);
-assert.match(editModal, /"Save"/);
-assert.match(editModal, /sticky bottom-0/);
+assert.match(editModal, /footer=\{/);
+assert.doesNotMatch(editModal, /sticky bottom-0/);
 
 assert.match(deleteModal, /Delete Bill/);
 assert.match(deleteModal, /Bank transactions are never deleted/);
 assert.match(deleteModal, /await deleteBill/);
+assert.match(deleteModal, /footer=\{/);
 
 assert.match(form, /Due date reminders/);
 assert.match(form, /Linked bank account/);

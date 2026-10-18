@@ -8,11 +8,16 @@ import {
   parseBillForm,
 } from "@/components/bills/BillFormFields";
 import { DeleteBillModal } from "@/components/bills/DeleteBillModal";
-import { Button, Modal } from "@/components/ui";
-import { cn } from "@/components/ui/cn";
+import {
+  NativeDestructiveButton,
+  NativeEditorActions,
+} from "@/components/native/NativeEditorActions";
+import { Modal } from "@/components/ui";
 import { useFinance } from "@/context/FinanceContext";
 import { useToast } from "@/context/ToastContext";
 import type { Bill } from "@/lib/finance/types";
+
+const EDIT_BILL_FORM_ID = "edit-bill-form";
 
 type EditBillModalProps = {
   bill: Bill | null;
@@ -22,9 +27,9 @@ type EditBillModalProps = {
 };
 
 /**
- * Bill editor used by iOS and desktop.
- * A solid red "Delete Bill" control is always pinned in a sticky footer so it
- * cannot sit behind the keyboard, tab bar, or home-indicator safe area.
+ * Bill editor — scrollable fields + fixed footer (Save/Cancel + Delete Bill).
+ * Footer is Modal chrome (not sticky-inside-scroll), so it stays clear of the
+ * keyboard, tab bar, and safe-area inset.
  */
 export function EditBillModal({ bill, onClose }: EditBillModalProps) {
   const { editBill } = useFinance();
@@ -90,59 +95,32 @@ export function EditBillModal({ bill, onClose }: EditBillModalProps) {
         isOpen={bill !== null && !confirmDelete}
         onClose={handleClose}
         title="Edit Bill"
+        footer={
+          <div data-bill-editor-footer="true">
+            <NativeEditorActions
+              formId={EDIT_BILL_FORM_ID}
+              onCancel={handleClose}
+              isSubmitting={isSubmitting}
+              destructive={
+                <NativeDestructiveButton
+                  label="Delete Bill"
+                  billDelete
+                  disabled={isSubmitting || !bill}
+                  onClick={() => setConfirmDelete(true)}
+                  hint="Removes this bill from your list. Payment history and bank transactions stay."
+                />
+              }
+            />
+          </div>
+        }
       >
         <form
+          id={EDIT_BILL_FORM_ID}
           onSubmit={(event) => void handleSubmit(event)}
-          className="flex min-h-0 flex-col"
+          className="space-y-4"
+          data-bill-editor-fields="true"
         >
-          <div className="min-h-0 flex-1 space-y-4 pb-4">
-            <BillFormFields form={form} onChange={setForm} />
-          </div>
-
-          <div
-            data-bill-editor-footer="true"
-            className={cn(
-              "sticky bottom-0 z-10 -mx-4 mt-2 border-t border-white/[0.08] bg-[var(--surface)] px-4 pt-3",
-              "pb-[max(0.75rem,env(safe-area-inset-bottom))]",
-              "sm:mx-0 sm:px-0 sm:pb-1",
-            )}
-          >
-            <div className="flex gap-3">
-              <Button
-                type="button"
-                variant="secondary"
-                fullWidth
-                onClick={handleClose}
-                disabled={isSubmitting}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" fullWidth disabled={isSubmitting}>
-                {isSubmitting ? "Saving…" : "Save"}
-              </Button>
-            </div>
-
-            <button
-              type="button"
-              data-bill-delete="true"
-              aria-label="Delete Bill"
-              disabled={isSubmitting || !bill}
-              onClick={() => setConfirmDelete(true)}
-              className={cn(
-                "mt-3 flex min-h-12 w-full items-center justify-center rounded-[14px]",
-                "bg-rose-500 text-[16px] font-semibold text-white",
-                "shadow-[0_8px_20px_rgba(244,63,94,0.35)]",
-                "active:opacity-90 hover:bg-rose-600",
-                "disabled:cursor-not-allowed disabled:opacity-50",
-              )}
-            >
-              Delete Bill
-            </button>
-            <p className="mt-2 text-center text-[11px] leading-snug text-white/45">
-              Removes this bill from your list. Payment history and bank
-              transactions stay.
-            </p>
-          </div>
+          <BillFormFields form={form} onChange={setForm} />
         </form>
       </Modal>
 

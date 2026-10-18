@@ -107,6 +107,7 @@
     "test:ios-bills-sheet": "node scripts/test-ios-bills-sheet.mjs",
     "test:bills-edit-remove": "node scripts/test-bills-edit-remove.mjs",
     "test:bills-delete-button": "node scripts/test-bills-delete-button.mjs",
+    "test:native-editor-chrome": "node scripts/test-native-editor-chrome.mjs",
     "test:ios-plan-sheets": "node scripts/test-ios-plan-sheets.mjs",
     "test:ios-keyboard-offline": "node scripts/test-ios-keyboard-offline.mjs",
     "test:ios-remaining-screens": "node scripts/test-ios-remaining-screens.mjs",
