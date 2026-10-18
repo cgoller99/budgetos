@@ -182,8 +182,12 @@ function NotificationRow({
             {!notification.read && !notification.actions ? (
               <button
                 type="button"
-                onClick={onMarkRead}
-                className="focus-ring min-h-9 rounded-[var(--radius-button)] px-3 text-sm text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)]"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onMarkRead();
+                }}
+                className="focus-ring min-h-11 rounded-[var(--radius-button)] px-3 text-sm text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)]"
               >
                 Mark read
               </button>
@@ -191,10 +195,14 @@ function NotificationRow({
 
             <button
               type="button"
-              onClick={onDelete}
-              className="focus-ring ml-auto min-h-9 rounded-[var(--radius-button)] px-3 text-sm text-[var(--text-subtle)] opacity-100 transition-all sm:opacity-0 sm:group-hover:opacity-100 hover:bg-[var(--surface-hover)] hover:text-[var(--danger)]"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onDelete();
+              }}
+              className="focus-ring ml-auto min-h-11 rounded-[var(--radius-button)] px-3 text-sm text-[var(--text-subtle)] opacity-100 transition-all hover:bg-[var(--surface-hover)] hover:text-[var(--danger)]"
             >
-              Delete
+              Dismiss
             </button>
           </div>
         </div>
@@ -226,6 +234,7 @@ export function NotificationCenter() {
   const [dismissedVirtualIds, setDismissedVirtualIds] = useState<Set<string>>(
     () => new Set(),
   );
+  const [isMarkingAll, setIsMarkingAll] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
@@ -275,21 +284,35 @@ export function NotificationCenter() {
   useEffect(() => {
     if (!isOpen) return;
 
-    function handleClickOutside(event: MouseEvent) {
-      const target = event.target as Node;
+    // Use pointerdown in the bubble phase so in-panel action handlers run first.
+    // Ignore the opening gesture and any event whose target is inside the panel.
+    let armed = false;
+    const armTimer = window.setTimeout(() => {
+      armed = true;
+    }, 0);
 
-      if (
-        panelRef.current &&
-        !panelRef.current.contains(target) &&
-        triggerRef.current &&
-        !triggerRef.current.contains(target)
-      ) {
-        setIsOpen(false);
+    function handlePointerOutside(event: Event) {
+      if (!armed) {
+        return;
       }
+
+      const target = event.target as Node | null;
+      if (!target) {
+        return;
+      }
+
+      if (panelRef.current?.contains(target) || triggerRef.current?.contains(target)) {
+        return;
+      }
+
+      setIsOpen(false);
     }
 
-    document.addEventListener("click", handleClickOutside);
-    return () => document.removeEventListener("click", handleClickOutside);
+    document.addEventListener("pointerdown", handlePointerOutside);
+    return () => {
+      window.clearTimeout(armTimer);
+      document.removeEventListener("pointerdown", handlePointerOutside);
+    };
   }, [isOpen]);
 
   useEffect(() => {
@@ -305,6 +328,11 @@ export function NotificationCenter() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen]);
+
+  // Sync local virtual-dismiss mirror when finance context dismisses virtuals.
+  useEffect(() => {
+    setDismissedVirtualIds(readDismissedVirtualNotificationIds());
+  }, [notifications, unreadNotificationCount]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -369,19 +397,41 @@ export function NotificationCenter() {
 
       if (notification.automationSuggestionId) {
         dismissAutomationSuggestion(notification.automationSuggestionId);
-        return;
-      }
-
-      if (notification.isVirtual) {
-        dismissVirtualNotification(notification.id);
         setDismissedVirtualIds(readDismissedVirtualNotificationIds());
         return;
       }
 
+      // Context persists dismissal (stored delete or virtual ack) and updates badge.
       deleteNotification(notification.id);
+      if (notification.isVirtual) {
+        dismissVirtualNotification(notification.id);
+        setDismissedVirtualIds(readDismissedVirtualNotificationIds());
+      }
     },
     [deleteNotification, dismissAutomationSuggestion, whatsNew],
   );
+
+  const handleClose = useCallback(() => {
+    setIsOpen(false);
+    triggerRef.current?.focus();
+  }, []);
+
+  const handleMarkAllRead = useCallback(() => {
+    if (isMarkingAll) {
+      return;
+    }
+    setIsMarkingAll(true);
+    try {
+      markAllNotificationsRead();
+      if (whatsNew?.releaseNotification) {
+        const releaseId = whatsNew.releaseNotification.id.replace("release-", "");
+        void markReleaseSeen(releaseId);
+        whatsNew.dismissReleaseNotification();
+      }
+    } finally {
+      window.setTimeout(() => setIsMarkingAll(false), 400);
+    }
+  }, [isMarkingAll, markAllNotificationsRead, whatsNew]);
 
   const handleOpen = () => {
     setIsOpen((current) => {
@@ -433,7 +483,7 @@ export function NotificationCenter() {
             type="button"
             aria-label="Close notifications"
             className="notification-backdrop-enter pointer-events-auto fixed inset-0 z-0 bg-black/45 backdrop-blur-[2px] lg:bg-black/30"
-            onClick={() => setIsOpen(false)}
+            onClick={handleClose}
           />
 
           <div
@@ -441,6 +491,7 @@ export function NotificationCenter() {
             role="dialog"
             aria-label="Notifications"
             aria-modal="true"
+            onPointerDown={(event) => event.stopPropagation()}
             onMouseDown={(event) => event.stopPropagation()}
             onClick={(event) => event.stopPropagation()}
             className={cn(
@@ -452,9 +503,14 @@ export function NotificationCenter() {
             )}
             style={nativeIos || isMobile ? undefined : panelStyle}
           >
+            {nativeIos ? (
+              <div className="flex justify-center pt-2" aria-hidden>
+                <span className="h-1 w-10 rounded-full bg-white/20" />
+              </div>
+            ) : null}
             <div className="border-b border-[var(--surface-border)] bg-[var(--surface-soft)] px-4 py-3.5 sm:px-5">
               <div className="flex items-center justify-between gap-3">
-                <div>
+                <div className="min-w-0">
                   <p className="text-sm font-semibold text-[var(--foreground)]">
                     Notifications
                   </p>
@@ -464,28 +520,47 @@ export function NotificationCenter() {
                       : "You're all caught up"}
                   </p>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex shrink-0 items-center gap-1">
                   {mergedUnreadCount > 0 ? (
                     <button
                       type="button"
-                      onClick={markAllNotificationsRead}
-                      className="focus-ring rounded-[var(--radius-button)] px-2.5 py-1.5 text-xs font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)]"
+                      disabled={isMarkingAll}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        handleMarkAllRead();
+                      }}
+                      className="focus-ring min-h-11 rounded-[var(--radius-button)] px-2.5 py-1.5 text-xs font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)] disabled:opacity-50"
                     >
-                      Mark all read
+                      {isMarkingAll ? "Updating…" : "Mark all read"}
                     </button>
                   ) : null}
                   {mergedNotifications.length > 0 ? (
                     <button
                       type="button"
-                      onClick={() => {
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
                         clearAllNotifications();
                         setDismissedVirtualIds(readDismissedVirtualNotificationIds());
                       }}
-                      className="focus-ring rounded-[var(--radius-button)] px-2.5 py-1.5 text-xs font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--danger)]"
+                      className="focus-ring min-h-11 rounded-[var(--radius-button)] px-2.5 py-1.5 text-xs font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--danger)]"
                     >
                       Clear all
                     </button>
                   ) : null}
+                  <button
+                    type="button"
+                    aria-label="Close notifications"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      handleClose();
+                    }}
+                    className="focus-ring flex min-h-11 min-w-11 items-center justify-center rounded-[var(--radius-button)] text-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)]"
+                  >
+                    ✕
+                  </button>
                 </div>
               </div>
 

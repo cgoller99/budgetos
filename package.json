@@ -121,7 +121,8 @@
     "test:cash-flow-forecast": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-cash-flow-forecast.mjs",
     "test:cash-outlook": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-cash-outlook.mjs",
     "test:goal-forecast": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-goal-forecast.mjs",
-    "test:goal-account-link": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-goal-account-link.mjs"
+    "test:goal-account-link": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-goal-account-link.mjs",
+    "test:notification-read-dismiss": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-notification-read-dismiss.mjs"
   },
   "dependencies": {
     "@apple/app-store-server-library": "^3.1.0",
