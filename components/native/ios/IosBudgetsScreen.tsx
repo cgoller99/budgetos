@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo } from "react";
-import { PaycheckPlanDashboard } from "@/components/budgets/PaycheckPlanDashboard";
 import { useCategoryBudgets } from "@/components/budgets/useCategoryBudgets";
 import { IosBudgetsSection } from "@/components/native/ios/IosBudgetsSection";
+import { IosPaycheckPlanDashboard } from "@/components/native/ios/IosPaycheckPlanDashboard";
 import {
   IosCard,
   IosScreen,
@@ -17,8 +17,7 @@ import { calculateMoneyLeftUntilPayday } from "@/lib/finance/moneyLeftUntilPayda
 import { cn } from "@/components/ui/cn";
 
 /**
- * Native Budgets — Ongoing Budget first (matches web section order).
- * Coordinates with iPhone polish (#114).
+ * Native Budgets — paycheck plan + spending limits with shared iOS chrome.
  */
 export function IosBudgetsScreen() {
   const finance = useFinance();
@@ -38,9 +37,7 @@ export function IosBudgetsScreen() {
 
   return (
     <IosScreen>
-      <IosSection>
-        <PaycheckPlanDashboard compact />
-      </IosSection>
+      <IosPaycheckPlanDashboard />
 
       <IosSection title="Spending & bills">
         <IosCard padding="md">

@@ -20,18 +20,23 @@ const debt = fs.readFileSync(
 assert.match(income, /IosBottomSheet/);
 assert.match(income, /Left to assign/);
 assert.match(income, /resolveAllocationAmounts/);
-assert.match(income, /Upcoming payday/);
+assert.match(income, /Expected paycheck/);
+assert.match(income, /paydayLabel/);
 assert.match(income, /label: "Upcoming"/);
 assert.match(income, /label: "History"/);
 assert.match(goals, /Debt payoff/);
 assert.match(goals, /Investing/);
 assert.match(debt, /Payoff strategy/);
-assert.match(income, /Review plan/);
+assert.match(income, /Edit allocations/);
+assert.match(income, /Change schedule/);
+assert.match(income, /AllocationEditSheet/);
 assert.match(income, /IosDonut/);
 assert.match(income, /Upcoming paychecks/);
 assert.match(income, /Mark received/);
 assert.match(income, /setSelectedSource/);
 assert.doesNotMatch(income, /onClick=\{\(\) => setEditIncomeId\(row\.id\)\}/);
+assert.doesNotMatch(income, /Review plan/);
+assert.doesNotMatch(income, /Upcoming payday/);
 
 assert.match(goals, /IosBottomSheet/);
 assert.match(goals, /Add money/);

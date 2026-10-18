@@ -109,6 +109,7 @@
     "test:bills-delete-button": "node scripts/test-bills-delete-button.mjs",
     "test:native-editor-chrome": "node scripts/test-native-editor-chrome.mjs",
     "test:native-ui-complete": "node scripts/test-native-ui-complete.mjs",
+    "test:native-paycheck-income": "node scripts/test-native-paycheck-income.mjs",
     "test:ios-plan-sheets": "node scripts/test-ios-plan-sheets.mjs",
     "test:ios-keyboard-offline": "node scripts/test-ios-keyboard-offline.mjs",
     "test:ios-remaining-screens": "node scripts/test-ios-remaining-screens.mjs",

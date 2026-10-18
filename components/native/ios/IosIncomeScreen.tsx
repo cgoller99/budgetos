@@ -18,10 +18,12 @@ import {
   IosSkeletonScreen,
   IosTextButton,
 } from "@/components/native/ios/IosPrimitives";
+import { AllocationEditSheet } from "@/components/budgets/AllocationEditSheet";
 import { AddIncomeModal } from "@/components/income/AddIncomeModal";
 import { DeleteIncomeModal } from "@/components/income/DeleteIncomeModal";
 import { EditIncomeModal } from "@/components/income/EditIncomeModal";
 import { IosBottomSheet } from "@/components/native/ios/IosBottomSheet";
+import { IosPaycheckPlanDashboard } from "@/components/native/ios/IosPaycheckPlanDashboard";
 import { IncomePlanContent } from "@/components/incomePlan/IncomePlanContent";
 import { PaycheckDetectedPromptList } from "@/components/incomePlan/PaycheckDetectedPrompt";
 import { IncomeLedgerPanel } from "@/components/income/IncomeLedgerPanel";
@@ -51,8 +53,8 @@ type IncomeTab = "upcoming" | "plan" | "sources" | "history";
 function PaycheckPlan({
   finance,
   nextPaycheck,
-  showEditor,
-  onToggleEditor,
+  onEditAllocations,
+  onSetupPlan,
 }: {
   finance: ReturnType<typeof useFinance>;
   nextPaycheck: {
@@ -61,8 +63,8 @@ function PaycheckPlan({
     amount: number;
     daysUntil: number;
   } | null;
-  showEditor: boolean;
-  onToggleEditor: () => void;
+  onEditAllocations: () => void;
+  onSetupPlan: () => void;
 }) {
   const plan = finance.incomePlan;
   const paycheckState = classifyUpcomingPaycheck(finance);
@@ -94,14 +96,14 @@ function PaycheckPlan({
             Set a payday and split each check across bills, goals, and what’s left.
           </p>
         </IosCard>
-        <IncomePlanContent embedded />
+        <IosPrimaryButton onClick={onSetupPlan}>Set up paycheck plan</IosPrimaryButton>
       </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-3">
-      {!showEditor ? <PaycheckDetectedPromptList /> : null}
+      <PaycheckDetectedPromptList />
       <IosCard padding="md">
         <p className="text-[12px] font-medium text-[var(--text-muted)]">{paydayLabel}</p>
         <p className="mt-1 text-[20px] font-semibold text-[var(--foreground)]">
@@ -172,9 +174,8 @@ function PaycheckPlan({
           </div>
         </IosCard>
       ) : null}
-      <IosPrimaryButton onClick={onToggleEditor}>
-        {showEditor ? "Hide plan editor" : "Review plan"}
-      </IosPrimaryButton>
+      <IosPrimaryButton onClick={onEditAllocations}>Edit allocations</IosPrimaryButton>
+      <IosTextButton onClick={onSetupPlan}>Change schedule</IosTextButton>
       {(() => {
         const dates = [resolveUpcomingPayDate(plan)];
         let cursor = { ...plan, nextPayDate: dates[0] };
@@ -244,16 +245,12 @@ function PaycheckPlan({
                 subtitle={item.allocation.isRemainingBalance ? "Whatever is left" : "Each paycheck"}
                 leading={<IosAvatar fallback={item.allocation.icon || item.allocation.name.slice(0, 1)} tone="success" />}
                 trailing={formatCurrency(item.amount)}
+                onClick={onEditAllocations}
               />
             ))}
           </IosList>
         )}
       </IosSection>
-      {showEditor ? (
-        <div className="ios-embedded-panel [&_.page-header]:hidden [&_h1]:text-[17px] [&_h2]:text-[15px]">
-          <IncomePlanContent embedded />
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -281,7 +278,8 @@ export function IosIncomeScreen() {
   const [editIncomeId, setEditIncomeId] = useState<string | null>(null);
   const [deleteIncomeId, setDeleteIncomeId] = useState<string | null>(null);
   const [selectedSource, setSelectedSource] = useState<IncomeTableRow | null>(null);
-  const [showPlanEditor, setShowPlanEditor] = useState(false);
+  const [editAllocations, setEditAllocations] = useState(false);
+  const [scheduleSetupOpen, setScheduleSetupOpen] = useState(false);
 
   const summary = useMemo(() => getIncomeDashboardSummary(finance), [finance]);
   const rows = useMemo(() => getIncomeTableRows(finance), [finance]);
@@ -357,17 +355,56 @@ export function IosIncomeScreen() {
         <PaycheckPlan
           finance={finance}
           nextPaycheck={summary.nextPaycheck}
-          showEditor={showPlanEditor}
-          onToggleEditor={() => {
+          onEditAllocations={() => {
             void triggerHaptic("light");
-            setShowPlanEditor((current) => !current);
+            if (finance.incomePlan) {
+              setEditAllocations(true);
+            } else {
+              setScheduleSetupOpen(true);
+            }
+          }}
+          onSetupPlan={() => {
+            void triggerHaptic("light");
+            setScheduleSetupOpen(true);
           }}
         />
       ) : null}
 
       {tab === "plan" ? (
-        <div className="ios-embedded-panel [&_.page-header]:hidden [&_h1]:text-[17px] [&_h2]:text-[15px]">
-          <IncomePlanContent embedded />
+        <div className="flex flex-col gap-3" data-ios-income-plan-tab="true">
+          {finance.incomePlan ? (
+            <>
+              <IosPaycheckPlanDashboard />
+              <IosTextButton
+                onClick={() => {
+                  void triggerHaptic("light");
+                  setScheduleSetupOpen(true);
+                }}
+              >
+                Change pay schedule
+              </IosTextButton>
+            </>
+          ) : (
+            <>
+              <IosCard padding="md">
+                <p className="text-[15px] font-semibold text-[var(--foreground)]">
+                  Build your paycheck plan
+                </p>
+                <p className="mt-1 text-[13px] text-[var(--text-muted)]">
+                  Choose a schedule, paycheck amount, and how each check splits across
+                  accounts and goals.
+                </p>
+              </IosCard>
+              <IosPrimaryButton
+                onClick={() => {
+                  void triggerHaptic("light");
+                  setScheduleSetupOpen(true);
+                }}
+              >
+                Start setup
+              </IosPrimaryButton>
+            </>
+          )}
         </div>
       ) : null}
 
@@ -441,6 +478,22 @@ export function IosIncomeScreen() {
           ) : null}
         </div>
       ) : null}
+
+      <AllocationEditSheet
+        target={null}
+        editAll={editAllocations}
+        onClose={() => setEditAllocations(false)}
+      />
+
+      <IosBottomSheet
+        open={scheduleSetupOpen}
+        title={finance.incomePlan ? "Pay schedule" : "Set up paycheck plan"}
+        onClose={() => setScheduleSetupOpen(false)}
+      >
+        <div className="pb-4" data-ios-income-schedule-sheet="true">
+          <IncomePlanContent embedded />
+        </div>
+      </IosBottomSheet>
 
       <IosBottomSheet
         open={selectedSource !== null}

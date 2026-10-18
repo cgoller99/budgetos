@@ -54,6 +54,8 @@ jobs:
           npm run test:bills-delete-button
           npm run test:native-editor-chrome
           npm run test:native-ui-complete
+          npm run test:native-paycheck-income
+          npm run test:ios-plan-sheets
           npm run test:onboarding-progress
           npm run test:plaid-credit-mapping
           npm run test:recurring-bill-detection
