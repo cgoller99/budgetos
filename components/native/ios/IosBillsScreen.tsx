@@ -5,6 +5,7 @@ import {
   IosAvatar,
   IosBanner,
   IosCard,
+  IosEmptyState,
   IosPrimaryButton,
   IosProgressBar,
   IosScreen,
@@ -377,14 +378,10 @@ export function IosBillsScreen() {
       ) : null}
 
       {bills.length === 0 ? (
-        <IosCard padding="md">
-          <p className="text-[15px] font-semibold text-[var(--foreground)]">
-            No upcoming bills
-          </p>
-          <p className="mt-1 text-[13px] text-[var(--text-muted)]">
-            Add bills to track due dates and monthly totals.
-          </p>
-          <div className="mt-4">
+        <IosEmptyState
+          title="No upcoming bills"
+          subtitle="Add bills to track due dates and monthly totals."
+          action={
             <IosPrimaryButton
               onClick={() => {
                 void triggerHaptic("light");
@@ -393,19 +390,17 @@ export function IosBillsScreen() {
             >
               Add bill
             </IosPrimaryButton>
-          </div>
-        </IosCard>
+          }
+        />
       ) : tabItems.length === 0 ? (
-        <IosCard padding="md">
-          <p className="text-[15px] font-semibold text-[var(--foreground)]">
-            {tab === "recurring" ? "No recurring bills" : "Nothing coming up"}
-          </p>
-          <p className="mt-1 text-[13px] text-[var(--text-muted)]">
-            {tab === "recurring"
+        <IosEmptyState
+          title={tab === "recurring" ? "No recurring bills" : "Nothing coming up"}
+          subtitle={
+            tab === "recurring"
               ? "Recurring bills show up here after you add a repeating schedule."
-              : "Upcoming bills will show their due dates here."}
-          </p>
-        </IosCard>
+              : "Upcoming bills will show their due dates here."
+          }
+        />
       ) : (
         <ul className="overflow-hidden rounded-[16px] bg-[var(--surface)]">
           {tabItems.map((bill) => (
@@ -456,7 +451,7 @@ export function IosBillsScreen() {
                 type="button"
                 aria-label={`Edit ${bill.name}`}
                 data-bill-edit={bill.billId}
-                className="min-h-8 shrink-0 rounded-full bg-white/[0.08] px-3 text-[13px] font-semibold text-[var(--accent-light)] active:opacity-80"
+                className="min-h-11 shrink-0 rounded-full bg-white/[0.08] px-3.5 text-[14px] font-semibold text-[var(--accent-light)] active:opacity-80"
                 onClick={() => {
                   void triggerHaptic("light");
                   setEditBillId(bill.billId);

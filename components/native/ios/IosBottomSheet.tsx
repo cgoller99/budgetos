@@ -121,7 +121,7 @@ export function IosBottomSheet({
         aria-labelledby={title ? labelledBy : undefined}
         aria-label={title ? undefined : "Details"}
         className={cn(
-          "native-sheet native-keyboard-avoid absolute inset-x-0 bottom-0 max-h-[88dvh] overflow-y-auto rounded-t-[22px] border border-white/[0.08] border-b-0 bg-[#0b0f14] px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-2 transition-transform duration-200 ease-out",
+          "native-sheet native-keyboard-avoid absolute inset-x-0 bottom-0 flex max-h-[min(88dvh,calc(100dvh-var(--keyboard-inset,0px)-12px))] flex-col overflow-hidden rounded-t-[22px] border border-white/[0.08] border-b-0 bg-[#0b0f14] pt-2 transition-transform duration-200 ease-out",
           animating ? "translate-y-0" : "translate-y-full",
         )}
         style={
@@ -131,7 +131,7 @@ export function IosBottomSheet({
         }
       >
         <div
-          className="mx-auto mb-2 flex h-7 w-full touch-none items-center justify-center"
+          className="mx-auto mb-1 flex h-7 w-full shrink-0 touch-none items-center justify-center px-4"
           data-sheet-handle="true"
           onPointerDown={(event) => {
             beginDrag(event.clientY);
@@ -148,7 +148,7 @@ export function IosBottomSheet({
         {title ? (
           <h2
             id={labelledBy}
-            className="mb-3 touch-none text-center text-[17px] font-semibold text-[var(--foreground)]"
+            className="mb-2 shrink-0 touch-none px-4 text-center text-[17px] font-semibold text-[var(--foreground)]"
             onPointerDown={(event) => {
               beginDrag(event.clientY);
               event.currentTarget.setPointerCapture(event.pointerId);
@@ -162,9 +162,18 @@ export function IosBottomSheet({
             {title}
           </h2>
         ) : null}
-        {open ? children : retained}
+        <div
+          className={cn(
+            "min-h-0 flex-1 overflow-y-auto overscroll-contain px-4",
+            footer
+              ? "pb-3"
+              : "pb-[calc(1rem+env(safe-area-inset-bottom))]",
+          )}
+        >
+          {open ? children : retained}
+        </div>
         {footer ? (
-          <div className="native-sheet-footer sticky bottom-0 -mx-4 mt-4 border-t border-white/[0.06] bg-[#0b0f14] px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
+          <div className="native-sheet-footer shrink-0 border-t border-white/[0.06] bg-[#0b0f14] px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
             {footer}
           </div>
         ) : null}

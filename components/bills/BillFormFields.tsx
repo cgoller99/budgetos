@@ -181,7 +181,7 @@ export function BillFormFields({ form, onChange }: BillFormFieldsProps) {
         {form.splits.map((split, index) => (
           <div
             key={split.id ?? `split-${index}`}
-            className="space-y-4 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4"
+            className="space-y-3 rounded-[16px] border border-white/[0.08] bg-white/[0.03] p-3.5"
           >
             <div className="flex items-center justify-between gap-3">
               <p className="text-sm font-medium text-white/70">

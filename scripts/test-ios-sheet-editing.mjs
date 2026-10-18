@@ -20,11 +20,17 @@ const goals = read("components/native/ios/IosGoalsScreen.tsx");
 const debt = read("components/native/ios/IosDebtScreen.tsx");
 const income = read("components/native/ios/IosIncomeScreen.tsx");
 
-for (const source of [sheet, transaction, account, more, search]) {
+for (const source of [sheet, account, more, search]) {
   assert.match(source, /lockBodyScroll/);
   assert.match(source, /unlockBodyScroll/);
   assert.doesNotMatch(source, /document\.body\.style\.overflow/);
 }
+
+// Transaction detail reuses IosBottomSheet (scroll body + fixed footer).
+assert.match(transaction, /IosBottomSheet/);
+assert.match(transaction, /data-transaction-detail-footer/);
+assert.doesNotMatch(transaction, /sticky bottom-0/);
+assert.doesNotMatch(transaction, /document\.body\.style\.overflow/);
 
 assert.match(sheet, /native-keyboard-avoid/);
 assert.match(modal, /native-modal-panel/);

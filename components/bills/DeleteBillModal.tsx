@@ -12,9 +12,7 @@ import type { Bill } from "@/lib/finance/types";
 type DeleteBillModalProps = {
   bill: Bill | null;
   onClose: () => void;
-  /** Called after a successful delete (edit sheet should close). */
   onDeleted?: () => void;
-  /** Called when user cancels — return to the editor when applicable. */
   onCancel?: () => void;
 };
 
@@ -47,7 +45,7 @@ export function DeleteBillModal({
     try {
       await dismissPlaidRecurringSuggestion(merchantKey);
     } catch {
-      // Non-fatal: bill is already removed from the active list.
+      // Non-fatal
     }
   }
 
@@ -86,6 +84,27 @@ export function DeleteBillModal({
       isOpen={bill !== null}
       onClose={handleDismiss}
       title={mode === "not_a_bill" ? "Not a Bill" : "Delete Bill"}
+      footer={
+        <div className="flex gap-3" data-bill-delete-footer="true">
+          <Button type="button" variant="secondary" fullWidth onClick={handleDismiss}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            fullWidth
+            onClick={() => void handleConfirm()}
+            disabled={isSubmitting}
+            className="min-h-12 bg-rose-500 hover:bg-rose-600"
+            data-bill-delete-confirm="true"
+          >
+            {isSubmitting
+              ? "Working…"
+              : mode === "not_a_bill"
+                ? "Remove from Bills"
+                : "Delete Bill"}
+          </Button>
+        </div>
+      }
     >
       <div className="space-y-4">
         <p className="text-sm leading-relaxed text-white/70">
@@ -134,31 +153,6 @@ export function DeleteBillModal({
           >
             Not a Bill — remove and exclude from auto-detect
           </button>
-        </div>
-
-        <div
-          className="sticky bottom-0 space-y-3 border-t border-white/[0.06] bg-[var(--surface)] pt-3 pb-[max(0.25rem,env(safe-area-inset-bottom))]"
-          data-bill-delete-footer="true"
-        >
-          <div className="flex gap-3">
-            <Button type="button" variant="secondary" fullWidth onClick={handleDismiss}>
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              fullWidth
-              onClick={() => void handleConfirm()}
-              disabled={isSubmitting}
-              className="bg-rose-500 hover:bg-rose-600"
-              data-bill-delete-confirm="true"
-            >
-              {isSubmitting
-                ? "Working…"
-                : mode === "not_a_bill"
-                  ? "Remove from Bills"
-                  : "Delete Bill"}
-            </Button>
-          </div>
         </div>
       </div>
     </Modal>

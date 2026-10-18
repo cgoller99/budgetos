@@ -831,16 +831,38 @@ html[data-native-platform="ios"] .native-modal-panel #modal-title {
   font-weight: 600;
 }
 
-html[data-native-platform="ios"] .native-modal-panel form > div:last-child:has(> button) {
+/* Legacy single-button stacks only — never rewrite editor footers. */
+html[data-native-platform="ios"]
+  .native-modal-panel
+  form:not(:has([data-bill-editor-footer],[data-native-editor-actions],[data-native-modal-footer]))
+  > div:last-child:has(> button) {
   display: flex;
   flex-direction: column-reverse;
   gap: 0.5rem;
 }
 
-html[data-native-platform="ios"] .native-modal-panel form > div:last-child:has(> button) > button {
+html[data-native-platform="ios"]
+  .native-modal-panel
+  form:not(:has([data-bill-editor-footer],[data-native-editor-actions],[data-native-modal-footer]))
+  > div:last-child:has(> button)
+  > button {
   width: 100%;
   min-height: 48px;
   flex: 1 1 auto;
+}
+
+/* Native editor footer chrome — fixed outside scroll */
+html[data-native-platform="ios"] [data-native-modal-footer],
+html[data-native-platform="ios"] .native-sheet-footer {
+  background: #11161d;
+}
+
+html[data-native-platform="ios"] .ios-list-row {
+  min-height: 52px;
+}
+
+html[data-native-platform="ios"] .ios-screen {
+  padding-bottom: 0.25rem;
 }
 
 /* Skeleton preference over blank regions while loading */

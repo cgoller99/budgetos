@@ -13,9 +13,14 @@ type ModalProps = {
   onClose: () => void;
   title: string;
   children: ReactNode;
+  /**
+   * Optional chrome footer rendered outside the scroll region.
+   * Use for Save / Cancel / Delete so actions stay above the keyboard and safe area.
+   */
+  footer?: ReactNode;
 };
 
-export function Modal({ isOpen, onClose, title, children }: ModalProps) {
+export function Modal({ isOpen, onClose, title, children, footer }: ModalProps) {
   const [isMounted, setIsMounted] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -25,8 +30,6 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
   const dragOrigin = useRef<number | null>(null);
   const dragOffsetRef = useRef(0);
 
-  // Keep latest onClose without re-running focus trap when parent re-renders
-  // with a new callback identity (e.g. form typing recreating handleClose).
   useEffect(() => {
     onCloseRef.current = onClose;
   }, [onClose]);
@@ -146,7 +149,7 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
         className={cn(
           "relative flex h-[100dvh] max-h-[100dvh] w-full max-w-none flex-col overflow-hidden rounded-none border border-[var(--surface-border)] bg-[var(--surface)] shadow-2xl sm:h-auto sm:max-h-[min(90dvh,calc(100vh-2rem))] sm:max-w-md sm:rounded-3xl",
           nativeIos &&
-            "native-modal-panel native-keyboard-avoid h-auto max-h-[92dvh] rounded-t-[22px] rounded-b-none border-b-0 sm:h-auto sm:max-h-[92dvh] sm:max-w-none sm:rounded-t-[22px] sm:rounded-b-none",
+            "native-modal-panel native-keyboard-avoid h-auto max-h-[min(92dvh,calc(100dvh-var(--keyboard-inset,0px)-8px))] rounded-t-[22px] rounded-b-none border-b-0 sm:h-auto sm:max-h-[min(92dvh,calc(100dvh-var(--keyboard-inset,0px)-8px))] sm:max-w-none sm:rounded-t-[22px] sm:rounded-b-none",
           isAnimating
             ? nativeIos
               ? "native-modal-panel-enter"
@@ -179,27 +182,49 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
             <div className="h-1 w-10 rounded-full bg-white/20" />
           </div>
         ) : null}
+
         <div
           className={cn(
-            "flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:p-8",
-            nativeIos && "p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:p-4",
+            "flex shrink-0 items-start justify-between gap-4 px-5 pt-5 sm:px-8 sm:pt-8",
+            nativeIos && "px-4 pt-1 sm:px-4 sm:pt-1",
           )}
         >
-          <div className="flex items-start justify-between gap-4">
-            <h2 id="modal-title" className={panelTitleClassName}>
-              {title}
-            </h2>
-            <button
-              type="button"
-              onClick={onClose}
-              className="focus-ring min-h-11 min-w-11 rounded-xl text-sm text-white/50 hover:text-white sm:hidden"
-              aria-label="Close"
-            >
-              Close
-            </button>
-          </div>
-          <div className={cn("mt-7", nativeIos && "mt-4")}>{children}</div>
+          <h2 id="modal-title" className={panelTitleClassName}>
+            {title}
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="focus-ring min-h-11 min-w-11 rounded-xl text-sm text-white/50 hover:text-white sm:hidden"
+            aria-label="Close"
+          >
+            Close
+          </button>
         </div>
+
+        <div
+          className={cn(
+            "min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5 sm:px-8 sm:py-6",
+            nativeIos && "px-4 py-3 sm:px-4 sm:py-3",
+            !footer && "pb-[calc(1.25rem+env(safe-area-inset-bottom))]",
+            !footer && nativeIos && "pb-[calc(1rem+env(safe-area-inset-bottom))]",
+          )}
+        >
+          {children}
+        </div>
+
+        {footer ? (
+          <div
+            data-native-modal-footer="true"
+            className={cn(
+              "shrink-0 border-t border-white/[0.08] bg-[var(--surface)] px-5 pt-3 sm:px-8",
+              "pb-[max(0.75rem,env(safe-area-inset-bottom))]",
+              nativeIos && "px-4 sm:px-4",
+            )}
+          >
+            {footer}
+          </div>
+        ) : null}
       </div>
     </div>,
     document.body,
