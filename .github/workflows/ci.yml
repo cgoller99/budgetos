@@ -47,6 +47,8 @@ jobs:
           npm run test:debt-payoff
           npm run test:household-member-rls
           npm run test:ios-ui-21
+          npm run test:home-net-worth-first
+          npm run test:stage4-premium-home
           npm run test:onboarding-progress
           npm run test:plaid-credit-mapping
           npm run test:recurring-bill-detection

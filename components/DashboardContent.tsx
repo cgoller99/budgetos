@@ -4,6 +4,8 @@ import { AchievementsCard } from "@/components/dashboard/AchievementsCard";
 import { DashboardHero } from "@/components/dashboard/DashboardHero";
 import { DashboardMoreSection } from "@/components/dashboard/DashboardMoreSection";
 import { FinancialTrendsCard } from "@/components/dashboard/FinancialTrendsCard";
+import { HomeNetWorthCard } from "@/components/dashboard/HomeNetWorthCard";
+import { MobileSafeToSpendCard } from "@/components/dashboard/MobileSafeToSpendCard";
 import { RecentTransactionsCard } from "@/components/dashboard/RecentTransactionsCard";
 import { CategoryBudgetsCard } from "@/components/budgets/CategoryBudgetsCard";
 import { SpendingBreakdownCard } from "@/components/dashboard/SpendingBreakdownCard";
@@ -38,15 +40,26 @@ export function DashboardContent() {
   }
 
   return (
-    <div className={cn(pageContainerWideClassName)}>
-      <DashboardHero />
+    <div className={cn(pageContainerWideClassName, "space-y-5")}>
+      {/* 1. Net Worth centerpiece */}
+      <HomeNetWorthCard />
+
       <WelcomeChecklist />
-      <DashboardInsightsCard />
+
+      {/* 2. Safe to Spend (emphasized on narrow viewports) */}
+      <div className="lg:hidden">
+        <MobileSafeToSpendCard />
+      </div>
+
+      {/* Supporting KPIs — Cash / Debt / Health (Net Worth lives above) */}
+      <DashboardHero />
+
+      <CategoryBudgetsCard />
 
       <div className={dashboardMediumSectionClassName}>
+        <TopGoalsCard />
         <UpcomingBillsCard />
         <RecentTransactionsCard />
-        <TopGoalsCard />
       </div>
 
       <CashOutlookCard />
@@ -58,7 +71,7 @@ export function DashboardContent() {
         <AchievementsCard />
       </div>
 
-      <CategoryBudgetsCard />
+      <DashboardInsightsCard />
 
       {dashboard.weeklyPlan.length > 0 ? (
         <div id="weekly-plan" className="scroll-mt-24">

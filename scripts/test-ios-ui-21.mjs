@@ -23,14 +23,19 @@ assert.equal(
 );
 
 const home = read("components/native/ios/IosHomeScreen.tsx");
-assert.match(home, /Available cash/);
-assert.match(home, /data-home-hero="safe-to-spend"/);
+const homeHero = read("components/native/ios/IosNetWorthHero.tsx");
+assert.match(homeHero, /data-home-hero="net-worth"/);
+assert.match(home, /IosNetWorthHero/);
+assert.match(home, /Available Cash/);
+assert.match(home, /data-home-section="safe-to-spend"/);
 assert.match(home, /<IosBudgetsSection \/>/);
 assert.match(home, /describeTimeRemaining/);
 assert.match(home, /href="\/income"/);
-assert.match(home, /href="\/reports"/);
 assert.match(home, /detail="summary"/);
-assert.match(home, /IosMerchantMark/);
+assert.ok(
+  home.indexOf("<IosNetWorthHero") < home.indexOf('data-home-section="safe-to-spend"'),
+  "Net Worth must render above Safe to Spend on Home",
+);
 
 const transactions = read("components/native/ios/IosTransactionsScreen.tsx");
 assert.match(transactions, /isRefundActivity/);
