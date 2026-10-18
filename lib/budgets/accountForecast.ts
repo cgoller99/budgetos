@@ -1,7 +1,7 @@
 /**
  * Account balance projections from Income Plan links.
- * Uses posted balances + planned future deposits/withdrawals only.
- * Does not invent market returns or treat planned rows as completed cash.
+ * Separates contribution totals (planned additions) from projected ending balances.
+ * Spending / bills / rent purposes are not treated as permanent savings.
  */
 import { weeklySavingsFromPaycheckAmount } from "@/lib/finance/goalForecast";
 import { filterPersonalIncomePlan } from "@/lib/finance/personalIncomeScope";
@@ -16,13 +16,21 @@ import {
 export const FORECAST_HORIZONS_WEEKS = [4, 13, 26, 52] as const;
 export type ForecastHorizonWeeks = (typeof FORECAST_HORIZONS_WEEKS)[number];
 
-export type PurposeReserve = {
+export type ForecastPurposeKind =
+  | "accumulate"
+  | "spend"
+  | "bill_fund"
+  | "rent_reserve"
+  | "other";
+
+export type PurposeContribution = {
   allocationId: string;
   name: string;
   kind: PaycheckBreakdownRow["kind"];
+  purposeKind: ForecastPurposeKind;
   weeklyAddition: number;
-  /** Cumulative planned contributions at the selected horizon — not a separate cash pile. */
-  plannedReserveAtHorizon: number;
+  /** Cumulative planned contributions at each horizon (not ending balances). */
+  contributionsByHorizon: Record<ForecastHorizonWeeks, number>;
   purposeNote: string | null;
 };
 
@@ -31,6 +39,7 @@ export type AccountHorizonProjection = {
   projectedBalance: number;
   plannedDeposits: number;
   plannedWithdrawals: number;
+  plannedContributions: number;
 };
 
 export type LinkedAccountForecast = {
@@ -39,27 +48,39 @@ export type LinkedAccountForecast = {
   accountType: Account["type"];
   currentBalance: number;
   lastSyncedAt: string | null;
+  balanceSource: string;
   weeklyPlannedDeposits: number;
   weeklyPlannedWithdrawals: number;
   weeklyNet: number;
   horizons: AccountHorizonProjection[];
-  purposes: PurposeReserve[];
-  /** True when more than one allocation purpose shares this destination. */
+  purposes: PurposeContribution[];
   isSharedDestination: boolean;
-  /** Investment accounts: projections are cash deposits only. */
   excludesMarketPerformance: boolean;
   estimateDisclaimer: string;
 };
 
+export type AllocationContributionRow = {
+  allocationId: string;
+  name: string;
+  icon: string;
+  accountId: string | null;
+  accountName: string | null;
+  purposeKind: ForecastPurposeKind;
+  weeklyAmount: number;
+  amountPerPaycheck: number;
+  contributionsByHorizon: Record<ForecastHorizonWeeks, number>;
+};
+
 export type AccountForecastBundle = {
   accounts: LinkedAccountForecast[];
+  /** Purpose-level planned contribution totals (savings/rent/etc.), all horizons. */
+  contributionRows: AllocationContributionRow[];
   unlinkedRows: PaycheckBreakdownRow[];
   explanation: string;
 };
 
 export type WhatIfAllocationOverride = {
   allocationId: string;
-  /** Proposed per-paycheck amount (replaces saved amount for simulation). */
   amountPerPaycheck: number;
 };
 
@@ -78,19 +99,43 @@ function weeklyFromPaycheck(
   );
 }
 
+function contributionTable(weekly: number): Record<ForecastHorizonWeeks, number> {
+  return {
+    4: round(weekly * 4),
+    13: round(weekly * 13),
+    26: round(weekly * 26),
+    52: round(weekly * 52),
+  };
+}
+
 /**
- * Bill withdrawals charged against a payment account, converted to a weekly rate.
- * Only bills with a known paymentAccountId are counted — avoids inventing drains.
+ * Classify how an allocation should affect account projections.
+ * Accumulate = savings. Spend / bills / rent use matching outflows.
  */
-function weeklyBillWithdrawalsByAccount(
-  data: FinanceData,
-): Map<string, number> {
+export function classifyForecastPurpose(
+  row: Pick<PaycheckBreakdownRow, "name" | "kind" | "goalId" | "billId">,
+): ForecastPurposeKind {
+  const name = row.name.toLowerCase();
+  if (/rent/.test(name)) return "rent_reserve";
+  if (row.kind === "bill" || /^bills?\b/.test(name)) return "bill_fund";
+  if (
+    row.kind === "remaining" ||
+    row.kind === "flexible" ||
+    /spend|personal|discretionary|flexible/.test(name)
+  ) {
+    return "spend";
+  }
+  if (row.kind === "goal" || row.goalId || /saving|invest|emergency|vacation|house/.test(name)) {
+    return "accumulate";
+  }
+  return "other";
+}
+
+function weeklyBillWithdrawalsByAccount(data: FinanceData): Map<string, number> {
   const byAccount = new Map<string, number>();
   for (const bill of data.bills ?? []) {
     const accountId = bill.paymentAccountId;
     if (!accountId || bill.amount <= 0) continue;
-    // Approximate weekly from monthly-ish bill amount using 4.33 weeks/month.
-    // Prefer frequency when present on bill schedule.
     const frequency = bill.frequency ?? "monthly";
     let weekly = 0;
     switch (frequency) {
@@ -108,7 +153,6 @@ function weeklyBillWithdrawalsByAccount(
         break;
       case "monthly":
       default:
-        // Avoid treating a calendar month as exactly four weeks.
         weekly = bill.amount / 4.33;
         break;
     }
@@ -117,34 +161,69 @@ function weeklyBillWithdrawalsByAccount(
   return byAccount;
 }
 
+/** Match rent-named bills (any payment account) to a weekly rent obligation. */
+function weeklyRentObligation(data: FinanceData): number {
+  let total = 0;
+  for (const bill of data.bills ?? []) {
+    if (!/rent/i.test(bill.name) && !/rent/i.test(bill.category ?? "")) continue;
+    if (bill.amount <= 0) continue;
+    const frequency = bill.frequency ?? "monthly";
+    switch (frequency) {
+      case "weekly":
+        total += bill.amount;
+        break;
+      case "biweekly":
+        total += bill.amount / 2;
+        break;
+      default:
+        total += bill.amount / 4.33;
+        break;
+    }
+  }
+  return round(total);
+}
+
+function balanceSourceLabel(account: Account): string {
+  if (account.isPlaidLinked || account.lastSyncedAt) {
+    return account.lastSyncedAt
+      ? `Bank sync · ${account.lastSyncedAt}`
+      : "Bank-linked balance";
+  }
+  return "Manual balance";
+}
+
+function formatSyncShort(iso: string | null): string {
+  if (!iso) return "manual / unknown date";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "manual / unknown date";
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 function projectHorizons(
   currentBalance: number,
   weeklyDeposits: number,
   weeklyWithdrawals: number,
+  weeklyContributions: number,
 ): AccountHorizonProjection[] {
   const weeklyNet = weeklyDeposits - weeklyWithdrawals;
-  return FORECAST_HORIZONS_WEEKS.map((weeks) => {
-    const plannedDeposits = round(weeklyDeposits * weeks);
-    const plannedWithdrawals = round(weeklyWithdrawals * weeks);
-    return {
-      weeks,
-      projectedBalance: round(currentBalance + weeklyNet * weeks),
-      plannedDeposits,
-      plannedWithdrawals,
-    };
-  });
+  return FORECAST_HORIZONS_WEEKS.map((weeks) => ({
+    weeks,
+    projectedBalance: round(currentBalance + weeklyNet * weeks),
+    plannedDeposits: round(weeklyDeposits * weeks),
+    plannedWithdrawals: round(weeklyWithdrawals * weeks),
+    plannedContributions: round(weeklyContributions * weeks),
+  }));
 }
 
-/**
- * Build linked-account forecasts from the active Income Plan.
- * Shared destinations get one combined balance forecast plus purpose-level reserves
- * that do not invent a second balance.
- */
 export function buildAccountForecasts(
   data: FinanceData,
   options?: {
     referenceDate?: Date;
-    /** What-If overrides — simulation only; never mutates balances. */
     whatIfOverrides?: WhatIfAllocationOverride[];
     horizonWeeks?: ForecastHorizonWeeks;
   },
@@ -161,17 +240,24 @@ export function buildAccountForecasts(
   );
 
   const billWithdrawals = weeklyBillWithdrawalsByAccount(data);
+  const rentWeekly = weeklyRentObligation(data);
   const accountsById = new Map(data.accounts.map((account) => [account.id, account]));
 
-  /** Per-account deposit contributions from allocations (by purpose). */
   type PurposeAcc = {
     allocationId: string;
     name: string;
+    icon: string;
     kind: PaycheckBreakdownRow["kind"];
+    purposeKind: ForecastPurposeKind;
     weeklyAddition: number;
+    amountPerPaycheck: number;
     purposeNote: string | null;
+    accountId: string | null;
+    accountName: string | null;
   };
+
   const depositsByAccount = new Map<string, PurposeAcc[]>();
+  const contributionRows: AllocationContributionRow[] = [];
   const unlinkedRows: PaycheckBreakdownRow[] = [];
 
   for (const row of breakdown.rows) {
@@ -183,6 +269,29 @@ export function buildAccountForecasts(
       paySchedule,
       customIntervalDays,
     );
+    const purposeKind = classifyForecastPurpose(row);
+    const purposeNote =
+      row.purposeNote ??
+      (purposeKind === "spend"
+        ? "Spending allocation — projected as spent, not saved."
+        : purposeKind === "bill_fund"
+          ? "Bills fund — deposits offset expected bill payments."
+          : purposeKind === "rent_reserve"
+            ? "Rent reserve — contributions park for rent; rent payments reduce the balance when known."
+            : null);
+
+    const contrib: AllocationContributionRow = {
+      allocationId: row.allocationId,
+      name: row.name,
+      icon: row.icon,
+      accountId: row.accountId,
+      accountName: row.accountName,
+      purposeKind,
+      weeklyAmount: round(weekly),
+      amountPerPaycheck,
+      contributionsByHorizon: contributionTable(weekly),
+    };
+    contributionRows.push(contrib);
 
     if (!row.accountId || !accountsById.has(row.accountId)) {
       unlinkedRows.push({
@@ -193,28 +302,30 @@ export function buildAccountForecasts(
           breakdown.paycheckAmount > 0
             ? round((amountPerPaycheck / breakdown.paycheckAmount) * 100)
             : 0,
+        purposeNote,
       });
       continue;
     }
 
-    // Remaining / flexible spending linked to an account is still a planned parking
-    // of paycheck dollars — count as deposit for projection, not as an expense.
     const list = depositsByAccount.get(row.accountId) ?? [];
     list.push({
       allocationId: row.allocationId,
       name: row.name,
+      icon: row.icon,
       kind: row.kind,
+      purposeKind,
       weeklyAddition: round(weekly),
-      purposeNote: row.purposeNote,
+      amountPerPaycheck,
+      purposeNote,
+      accountId: row.accountId,
+      accountName: row.accountName,
     });
     depositsByAccount.set(row.accountId, list);
   }
 
-  // Also include accounts that only have bill withdrawals and no allocation link,
-  // only when they appear as payment accounts for linked bill allocations — skip
-  // orphan bill-only accounts to keep the Budgets dashboard focused.
-
   const accounts: LinkedAccountForecast[] = [];
+  let rentAssigned = false;
+
   for (const [accountId, purposes] of depositsByAccount) {
     const account = accountsById.get(accountId);
     if (!account) continue;
@@ -222,27 +333,80 @@ export function buildAccountForecasts(
     const weeklyPlannedDeposits = round(
       purposes.reduce((sum, item) => sum + item.weeklyAddition, 0),
     );
-    // Withdrawals: known bills paid from this account. Do not subtract allocation
-    // amounts again — those are destination deposits (internal transfer planning).
-    const weeklyPlannedWithdrawals = billWithdrawals.get(accountId) ?? 0;
+
+    // Known bill withdrawals from this payment account.
+    let weeklyPlannedWithdrawals = billWithdrawals.get(accountId) ?? 0;
+
+    // Spending / flexible: treat planned inflow as expected outflow (not savings).
+    const spendWeekly = round(
+      purposes
+        .filter((item) => item.purposeKind === "spend")
+        .reduce((sum, item) => sum + item.weeklyAddition, 0),
+    );
+    weeklyPlannedWithdrawals = round(weeklyPlannedWithdrawals + spendWeekly);
+
+    // Bills fund: if no payment-account bills are linked, assume the bills
+    // allocation is spent on obligations (net ~0), not accumulated.
+    const billFundWeekly = round(
+      purposes
+        .filter((item) => item.purposeKind === "bill_fund")
+        .reduce((sum, item) => sum + item.weeklyAddition, 0),
+    );
+    if (billFundWeekly > 0 && (billWithdrawals.get(accountId) ?? 0) <= 0) {
+      weeklyPlannedWithdrawals = round(weeklyPlannedWithdrawals + billFundWeekly);
+    }
+
+    // Rent reserve: apply rent bill when known; otherwise do not invent endless
+    // accumulation — assume reserve is drawn for rent at the funding rate.
+    const rentPurposeWeekly = round(
+      purposes
+        .filter((item) => item.purposeKind === "rent_reserve")
+        .reduce((sum, item) => sum + item.weeklyAddition, 0),
+    );
+    if (rentPurposeWeekly > 0) {
+      if (rentWeekly > 0 && !rentAssigned) {
+        weeklyPlannedWithdrawals = round(weeklyPlannedWithdrawals + rentWeekly);
+        rentAssigned = true;
+      } else if (rentWeekly <= 0) {
+        weeklyPlannedWithdrawals = round(
+          weeklyPlannedWithdrawals + rentPurposeWeekly,
+        );
+      }
+    }
+
+    const accumulateWeekly = round(
+      purposes
+        .filter((item) => item.purposeKind === "accumulate" || item.purposeKind === "other")
+        .reduce((sum, item) => sum + item.weeklyAddition, 0),
+    );
+
     const weeklyNet = round(weeklyPlannedDeposits - weeklyPlannedWithdrawals);
     const horizons = projectHorizons(
       account.balance,
       weeklyPlannedDeposits,
       weeklyPlannedWithdrawals,
+      accumulateWeekly + rentPurposeWeekly,
     );
-    const horizonWeeks = options?.horizonWeeks ?? 13;
-    const purposeReserves: PurposeReserve[] = purposes.map((purpose) => ({
+
+    const purposeReserves: PurposeContribution[] = purposes.map((purpose) => ({
       allocationId: purpose.allocationId,
       name: purpose.name,
       kind: purpose.kind,
+      purposeKind: purpose.purposeKind,
       weeklyAddition: purpose.weeklyAddition,
-      plannedReserveAtHorizon: round(purpose.weeklyAddition * horizonWeeks),
+      contributionsByHorizon: contributionTable(purpose.weeklyAddition),
       purposeNote: purpose.purposeNote,
     }));
 
     const excludesMarketPerformance =
       account.type === "investment" || account.type === "crypto";
+
+    const hasSpendOrBills = purposes.some(
+      (item) =>
+        item.purposeKind === "spend" ||
+        item.purposeKind === "bill_fund" ||
+        item.purposeKind === "rent_reserve",
+    );
 
     accounts.push({
       accountId: account.id,
@@ -250,6 +414,7 @@ export function buildAccountForecasts(
       accountType: account.type,
       currentBalance: round(account.balance),
       lastSyncedAt: account.lastSyncedAt ?? null,
+      balanceSource: `${balanceSourceLabel(account)} · as of ${formatSyncShort(account.lastSyncedAt ?? null)}`,
       weeklyPlannedDeposits,
       weeklyPlannedWithdrawals: round(weeklyPlannedWithdrawals),
       weeklyNet,
@@ -259,7 +424,9 @@ export function buildAccountForecasts(
       excludesMarketPerformance,
       estimateDisclaimer: excludesMarketPerformance
         ? "Estimate from planned cash deposits only — not market performance."
-        : "Estimate from current balance plus planned deposits minus known bill withdrawals. Not a guarantee.",
+        : hasSpendOrBills
+          ? "Ending balance = posted balance + planned deposits − expected spending/bills/rent. Contribution totals above are planned additions, not guaranteed cash."
+          : "Ending balance = posted balance + planned deposits − known withdrawals. Contribution totals are planned additions until confirmed.",
     });
   }
 
@@ -267,16 +434,13 @@ export function buildAccountForecasts(
 
   return {
     accounts,
+    contributionRows,
     unlinkedRows,
     explanation:
-      "Projections start from posted account balances. Planned Income Plan contributions are future deposits until confirmed — they are not double-counted as cash today. Shared destinations show one account forecast plus purpose-level reserves without inventing a second balance.",
+      "Contribution totals are planned paycheck additions over each horizon. Projected ending balances start from posted account balances and subtract expected spending, bills, and rent — they are estimates, not guarantees.",
   };
 }
 
-/**
- * Simulate What-If paycheck amounts against the same forecast engine.
- * Returns current vs proposed account projections for the chosen horizon.
- */
 export function compareWhatIfForecasts(
   data: FinanceData,
   overrides: WhatIfAllocationOverride[],
@@ -296,9 +460,6 @@ export function compareWhatIfForecasts(
   };
 }
 
-/**
- * Resolve allocation amounts for a draft What-If plan (for save preview totals).
- */
 export function summarizeWhatIfPaycheck(
   data: FinanceData,
   overrides: WhatIfAllocationOverride[],

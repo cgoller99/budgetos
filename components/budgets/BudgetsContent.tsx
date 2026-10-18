@@ -18,7 +18,6 @@ import {
   EmptyState,
   Input,
   SkeletonGrid,
-  StatCard,
 } from "@/components/ui";
 import { MobileCollapsibleSection } from "@/components/ui/MobileCollapsibleSection";
 import { pageContainerWideClassName } from "@/components/ui/tokens";
@@ -44,7 +43,7 @@ export function BudgetsContent() {
     () => calculateMoneyLeftUntilPayday(finance),
     [finance],
   );
-  const upcomingBills = useMemo(() => getUpcomingBills(finance).slice(0, 4), [finance]);
+  const upcomingBills = useMemo(() => getUpcomingBills(finance).slice(0, 6), [finance]);
   const warningCount =
     hub.overspentCategories.length +
     (moneyLeft.moneyLeftAfterCommitments < 0 ? 1 : 0) +
@@ -66,8 +65,8 @@ export function BudgetsContent() {
           Budgets
         </h1>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Paycheck plan, linked accounts, and category limits — cash stays separate from
-          allowances.
+          Ongoing paycheck plan first — then linked accounts, projections, spending, and
+          suggestions last.
         </p>
       </div>
 
@@ -77,121 +76,120 @@ export function BudgetsContent() {
         onRetry={budgets.retry}
       />
 
-      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          label="Safe to Spend"
-          value={formatCurrency(hub.safeToSpend)}
-          change="Cash-capped after bills & planned savings"
-          mutedChange
-        />
-        <StatCard
-          label="Until payday"
-          value={formatCurrency(hub.safeUntilPayday)}
-          change={
-            hub.daysUntilPayday != null
-              ? `${hub.daysUntilPayday} day${hub.daysUntilPayday === 1 ? "" : "s"} left`
-              : "No payday scheduled"
-          }
-          mutedChange
-        />
-        <StatCard
-          label="Daily allowance"
-          value={formatCurrency(hub.dailySpendingAllowance)}
-          change="From cash until payday"
-          mutedChange
-        />
-        <StatCard
-          label="Budget remaining"
-          value={formatCurrency(hub.totalRemainingBudgetAllowance)}
-          change="Unused category limits — not cash"
-          mutedChange
-        />
-      </div>
-
+      {/* 1–3: Ongoing Budget, Linked Accounts, Projected Balances */}
       <div className="mt-4">
         <PaycheckPlanDashboard />
       </div>
 
+      {/* 4. Spending Progress and Upcoming Bills */}
       <Card className="mt-4">
         <CardHeader
-          title="Spending & bills progress"
-          description="Category limits and upcoming bills — separate from paycheck parking."
+          title="4. Spending Progress & Upcoming Bills"
+          description="Category limits and bills — separate from paycheck parking and Safe to Spend cash."
         />
-        <CardContent className="grid gap-4 lg:grid-cols-2">
-          <div className="space-y-2">
-            <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
-              Upcoming bills
-            </p>
-            {upcomingBills.length === 0 ? (
-              <p className="text-sm text-[var(--text-muted)]">No upcoming bills.</p>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Metric
+              label="Safe to Spend"
+              value={formatCurrency(hub.safeToSpend)}
+              hint="Cash-capped"
+            />
+            <Metric
+              label="Until payday"
+              value={formatCurrency(hub.safeUntilPayday)}
+              hint={
+                hub.daysUntilPayday != null
+                  ? `${hub.daysUntilPayday}d left`
+                  : "No payday"
+              }
+            />
+            <Metric
+              label="Budget remaining"
+              value={formatCurrency(hub.totalRemainingBudgetAllowance)}
+              hint="Limits — not cash"
+            />
+            <Metric
+              label="After commitments"
+              value={formatCurrency(moneyLeft.moneyLeftAfterCommitments)}
+              hint="Until payday"
+            />
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="space-y-2">
+              <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
+                Upcoming bills
+              </p>
+              {upcomingBills.length === 0 ? (
+                <p className="text-sm text-[var(--text-muted)]">No upcoming bills.</p>
+              ) : (
+                upcomingBills.map((bill) => (
+                  <div
+                    key={`${bill.billId}-${bill.dueDate?.toISOString() ?? bill.name}`}
+                    className="flex justify-between gap-3 text-sm"
+                  >
+                    <span className="min-w-0 truncate text-[var(--foreground)]">
+                      {bill.name}
+                    </span>
+                    <span className="shrink-0 tabular-nums text-[var(--text-muted)]">
+                      {formatCurrency(bill.remainingAmount)}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="space-y-2 text-sm">
+              <Detail
+                label="Planned savings until payday"
+                value={formatCurrency(hub.plannedSavingsUntilPayday)}
+              />
+              <Detail
+                label="Projected period surplus / shortfall"
+                value={formatCurrency(hub.projectedPeriodSurplusOrShortfall)}
+              />
+              <p className="pt-1 text-xs text-[var(--text-muted)]">{hub.explanation}</p>
+            </div>
+          </div>
+
+          {budgets.views.length > 0 ? (
+            <div>
+              <BudgetHealthSummary views={budgets.views} />
+              <p className="mt-3 text-sm text-[var(--text-muted)]">
+                Monthly-equivalent total {formatCurrency(budgets.monthlyBudgetTotal)}. Each
+                category still uses its own period.
+              </p>
+            </div>
+          ) : null}
+
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-[var(--foreground)]">
+              Category budgets
+            </h3>
+            {budgets.views.length === 0 ? (
+              <EmptyState
+                icon="📊"
+                title="No category budgets yet"
+                description="Your Income Plan above is the paycheck source of truth. Add category limits when you want separate spending caps."
+              />
             ) : (
-              upcomingBills.map((bill) => (
-                <div
-                  key={`${bill.billId}-${bill.dueDate?.toISOString() ?? bill.name}`}
-                  className="flex justify-between gap-3 text-sm"
-                >
-                  <span className="min-w-0 truncate text-[var(--foreground)]">{bill.name}</span>
-                  <span className="shrink-0 tabular-nums text-[var(--text-muted)]">
-                    {formatCurrency(bill.remainingAmount)}
-                  </span>
-                </div>
+              budgets.views.map((view) => (
+                <BudgetCategoryPanel
+                  key={view.category}
+                  view={view}
+                  onUpdateBudget={budgets.updateBudget}
+                  onUpdateAmount={budgets.updateAmount}
+                  onRemove={budgets.removeBudget}
+                  onSetRollover={budgets.setRollover}
+                />
               ))
             )}
           </div>
-          <div className="space-y-2 text-sm">
-            <Detail
-              label="Planned savings until payday"
-              value={formatCurrency(hub.plannedSavingsUntilPayday)}
-            />
-            <Detail
-              label="Money left after commitments"
-              value={formatCurrency(moneyLeft.moneyLeftAfterCommitments)}
-            />
-            <Detail
-              label="Projected period surplus / shortfall"
-              value={formatCurrency(hub.projectedPeriodSurplusOrShortfall)}
-            />
-            <p className="pt-1 text-xs text-[var(--text-muted)]">{hub.explanation}</p>
-          </div>
-        </CardContent>
-      </Card>
 
-      {budgets.views.length > 0 ? (
-        <div className="mt-6">
-          <BudgetHealthSummary views={budgets.views} />
-          <p className="mt-3 text-sm text-[var(--text-muted)]">
-            Monthly-equivalent total {formatCurrency(budgets.monthlyBudgetTotal)} for Safe to
-            Spend context. Each category still uses its own period.
-          </p>
-        </div>
-      ) : null}
-
-      <div className="mt-6 space-y-4">
-        <h2 className="text-lg font-semibold text-[var(--foreground)]">Category budgets</h2>
-        {budgets.views.length === 0 ? (
-          <EmptyState
-            icon="📊"
-            title="No category budgets yet"
-            description="Your Income Plan above is the paycheck source of truth. Add weekly, biweekly, twice-monthly, monthly, or custom limits per spending category when you want separate caps."
-          />
-        ) : (
-          budgets.views.map((view) => (
-            <BudgetCategoryPanel
-              key={view.category}
-              view={view}
-              onUpdateBudget={budgets.updateBudget}
-              onUpdateAmount={budgets.updateAmount}
-              onRemove={budgets.removeBudget}
-              onSetRollover={budgets.setRollover}
-            />
-          ))
-        )}
-      </div>
-
-      <Card className="mt-6">
-        <CardHeader title="Add a budget" description="Each category keeps its own reset schedule." />
-        <CardContent>
-          <form onSubmit={budgets.addBudget} className="flex flex-col gap-3">
+          <form
+            onSubmit={budgets.addBudget}
+            className="flex flex-col gap-3 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-subtle)] p-4"
+          >
+            <p className="text-sm font-medium text-[var(--foreground)]">Add a category budget</p>
             <label className="block text-xs text-[var(--text-muted)]">
               Category
               <Input
@@ -225,14 +223,22 @@ export function BudgetsContent() {
               }}
               onChange={budgets.applyDraftSchedule}
             />
-            <Button type="submit" className="self-start">
+            <Button type="submit" className="self-start min-h-11">
               Save budget
             </Button>
           </form>
         </CardContent>
       </Card>
 
+      {/* 5. Suggestions & Insights — always last, collapsed */}
       <BudgetInsightsSection warningCount={warningCount}>
+        {moneyLeft.moneyLeftAfterCommitments < 0 ? (
+          <p className="mb-3 text-sm text-[var(--danger)]">
+            Bill / commitment shortfall until payday:{" "}
+            {formatCurrency(Math.abs(moneyLeft.moneyLeftAfterCommitments))} — review bills
+            before increasing discretionary spending.
+          </p>
+        ) : null}
         {(hub.approachingLimits.length > 0 || hub.overspentCategories.length > 0) && (
           <div className="mb-3 space-y-2">
             <p className="text-sm font-medium text-[var(--foreground)]">Spending pace</p>
@@ -246,13 +252,6 @@ export function BudgetsContent() {
             ))}
           </div>
         )}
-        {moneyLeft.moneyLeftAfterCommitments < 0 ? (
-          <p className="mb-3 text-sm text-[var(--danger)]">
-            Bill / commitment shortfall until payday:{" "}
-            {formatCurrency(Math.abs(moneyLeft.moneyLeftAfterCommitments))} — review bills
-            before increasing discretionary spending.
-          </p>
-        ) : null}
         {budgets.suggestions.length > 0 ? (
           <ul className="flex flex-col gap-3">
             {budgets.suggestions.map((suggestion) => (
@@ -269,6 +268,7 @@ export function BudgetsContent() {
                 <Button
                   type="button"
                   size="sm"
+                  className="min-h-11"
                   onClick={() =>
                     budgets.acceptSuggestion(
                       suggestion.category,
@@ -292,18 +292,39 @@ export function BudgetsContent() {
       </BudgetInsightsSection>
 
       <MobileCollapsibleSection
-        title="Budget history notes"
-        description="How periods and cash stay separate"
+        title="How cash stays separate"
+        description="Notes"
         className="mt-6"
       >
         <ul className="list-disc space-y-2 pl-5 text-sm text-[var(--text-secondary)]">
-          <li>Weekly, biweekly, twice monthly, monthly, and custom periods use real date boundaries.</li>
-          <li>Rollover only increases category allowance — it never invents spendable cash.</li>
-          <li>Goal contributions are planned commitments, not ordinary category spending.</li>
           <li>Safe to Spend stays cash-capped after bills and planned savings.</li>
-          <li>Account links are planning destinations — they do not initiate bank transfers.</li>
+          <li>Goal contributions are planned until a paycheck is confirmed.</li>
+          <li>Contribution totals are planned additions — not guaranteed balances.</li>
+          <li>Account links do not initiate bank transfers.</li>
         </ul>
       </MobileCollapsibleSection>
+    </div>
+  );
+}
+
+function Metric({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+}) {
+  return (
+    <div className="min-w-0 rounded-xl bg-[var(--surface-subtle)] px-3 py-2.5">
+      <p className="truncate text-[11px] font-medium text-[var(--text-muted)]">{label}</p>
+      <p className="mt-0.5 truncate text-sm font-semibold tabular-nums text-[var(--foreground)]">
+        {value}
+      </p>
+      {hint ? (
+        <p className="mt-0.5 truncate text-[10px] text-[var(--text-muted)]">{hint}</p>
+      ) : null}
     </div>
   );
 }

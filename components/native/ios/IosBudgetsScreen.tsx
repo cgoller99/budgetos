@@ -6,7 +6,6 @@ import { useCategoryBudgets } from "@/components/budgets/useCategoryBudgets";
 import { IosBudgetsSection } from "@/components/native/ios/IosBudgetsSection";
 import {
   IosCard,
-  IosHeroMetric,
   IosScreen,
   IosSection,
   IosSkeletonScreen,
@@ -18,8 +17,8 @@ import { calculateMoneyLeftUntilPayday } from "@/lib/finance/moneyLeftUntilPayda
 import { cn } from "@/components/ui/cn";
 
 /**
- * Native Budgets destination — paycheck plan first, then category limits.
- * Coordinates with iPhone polish (#114): Safe to Spend hero + compact metrics.
+ * Native Budgets — Ongoing Budget first (matches web section order).
+ * Coordinates with iPhone polish (#114).
  */
 export function IosBudgetsScreen() {
   const finance = useFinance();
@@ -39,41 +38,36 @@ export function IosBudgetsScreen() {
 
   return (
     <IosScreen>
-      <IosCard padding="md">
-        <IosHeroMetric
-          label="Safe to Spend"
-          value={formatCurrency(hub.safeToSpend)}
-          hint="Cash-capped after bills and planned savings"
-        />
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <Metric
-            label="Until payday"
-            value={formatCurrency(hub.safeUntilPayday)}
-          />
-          <Metric
-            label="Budget remaining"
-            value={formatCurrency(hub.totalRemainingBudgetAllowance)}
-            hint="Category limits — not cash"
-          />
-          <Metric
-            label="Daily allowance"
-            value={formatCurrency(hub.dailySpendingAllowance)}
-          />
-          <Metric
-            label="Left after commitments"
-            value={formatCurrency(moneyLeft.moneyLeftAfterCommitments)}
-            tone={
-              moneyLeft.moneyLeftAfterCommitments < 0 ? "danger" : "default"
-            }
-          />
-        </div>
-      </IosCard>
-
-      <IosSection title="Paycheck plan">
+      <IosSection title="Budgets">
         <PaycheckPlanDashboard compact />
       </IosSection>
 
-      <IosBudgetsSection />
+      <IosSection title="4. Spending & bills">
+        <IosCard padding="md">
+          <div className="grid grid-cols-2 gap-2">
+            <Metric label="Safe to Spend" value={formatCurrency(hub.safeToSpend)} />
+            <Metric
+              label="Until payday"
+              value={formatCurrency(hub.safeUntilPayday)}
+            />
+            <Metric
+              label="Budget remaining"
+              value={formatCurrency(hub.totalRemainingBudgetAllowance)}
+              hint="Limits — not cash"
+            />
+            <Metric
+              label="After commitments"
+              value={formatCurrency(moneyLeft.moneyLeftAfterCommitments)}
+              tone={
+                moneyLeft.moneyLeftAfterCommitments < 0 ? "danger" : "default"
+              }
+            />
+          </div>
+        </IosCard>
+        <div className="mt-3">
+          <IosBudgetsSection />
+        </div>
+      </IosSection>
     </IosScreen>
   );
 }

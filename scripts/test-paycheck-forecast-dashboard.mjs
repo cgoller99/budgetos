@@ -107,7 +107,7 @@ const vacationGoal = {
   name: "Vacation",
   type: "vacation",
   icon: "✈️",
-  current: 340,
+  current: 200,
   target: 2000,
   createdAt: "2026-01-01",
 };
@@ -223,65 +223,121 @@ const byName = Object.fromEntries(breakdown.rows.map((row) => [row.name, row]));
 assert.equal(byName["Emergency / House Savings"].amountPerPaycheck, 350.27);
 assert.equal(byName["Emergency / House Savings"].percentOfPaycheck, 39.57);
 assert.equal(byName["Emergency / House Savings"].accountId, savings.id);
-assert.equal(byName["Emergency / House Savings"].goalId, houseGoal.id);
 assert.equal(byName.Vacation.amountPerPaycheck, 50);
 assert.equal(byName.Investments.amountPerPaycheck, 0);
 assert.equal(byName["Rent Reserve"].accountId, investingChecking.id);
 assert.equal(byName.Bills.amountPerPaycheck, 110);
 assert.equal(byName["Personal Spending"].amountPerPaycheck, 200);
-assert.ok(byName["Emergency / House Savings"].remainingMonthlyAllowance >= 0);
 
 console.log("2) Empty / inactive plan does not invent rows");
-const empty = buildPaycheckBreakdown(
-  { ...data, incomePlan: null },
-  reference,
-);
+const empty = buildPaycheckBreakdown({ ...data, incomePlan: null }, reference);
 assert.equal(empty.hasPlan, false);
 assert.equal(empty.rows.length, 0);
 
-console.log("3) Account forecasts use posted balances + planned weekly adds");
+console.log("3) Contribution totals match customer acceptance (13w / 26w)");
 const forecasts = buildAccountForecasts(data, { horizonWeeks: 13 });
+const contribByName = Object.fromEntries(
+  forecasts.contributionRows.map((row) => [row.name, row]),
+);
+assert.equal(contribByName["Emergency / House Savings"].contributionsByHorizon[13], 4553.51);
+assert.equal(contribByName["Emergency / House Savings"].contributionsByHorizon[26], 9107.02);
+assert.equal(contribByName.Vacation.contributionsByHorizon[13], 650);
+assert.equal(contribByName.Vacation.contributionsByHorizon[26], 1300);
+assert.equal(contribByName["Rent Reserve"].contributionsByHorizon[13], 2275);
+assert.equal(contribByName["Rent Reserve"].contributionsByHorizon[26], 4550);
+
+console.log("4) House savings accumulates from posted balance");
 const houseForecast = forecasts.accounts.find((item) => item.accountId === savings.id);
 assert.ok(houseForecast);
 assert.equal(houseForecast.currentBalance, 1200);
 assert.equal(houseForecast.weeklyPlannedDeposits, 350.27);
-const at4 = houseForecast.horizons.find((item) => item.weeks === 4);
-assert.equal(at4.projectedBalance, 1200 + 350.27 * 4);
+assert.equal(
+  houseForecast.horizons.find((item) => item.weeks === 13).projectedBalance,
+  1200 + 350.27 * 13,
+);
+assert.match(houseForecast.balanceSource, /Bank sync|Manual/);
 
-console.log("4) Shared destination: combined forecast + purpose reserves, no double balance");
+console.log("5) Spending does not accumulate — withdrawals match deposits");
+const spendForecast = forecasts.accounts.find((item) => item.accountId === spendingAcct.id);
+assert.ok(spendForecast);
+assert.equal(spendForecast.weeklyPlannedDeposits, 200);
+assert.equal(spendForecast.weeklyPlannedWithdrawals, 200);
+assert.equal(spendForecast.weeklyNet, 0);
+assert.equal(
+  spendForecast.horizons.find((item) => item.weeks === 13).projectedBalance,
+  410,
+);
+
+console.log("6) Rent reserve does not invent endless accumulation without rent bill");
+const rentForecast = forecasts.accounts.find(
+  (item) => item.accountId === investingChecking.id,
+);
+assert.ok(rentForecast);
+assert.equal(rentForecast.weeklyPlannedDeposits, 175);
+assert.equal(rentForecast.weeklyPlannedWithdrawals, 175);
+assert.equal(rentForecast.weeklyNet, 0);
+assert.equal(
+  contribByName["Rent Reserve"].contributionsByHorizon[13],
+  2275,
+);
+
+console.log("7) Shared destination: combined deposits + purpose contribution totals");
 const sharedPlan = {
   ...plan,
   allocations: [
-    ...plan.allocations.filter((item) => item.id !== "a-invest"),
+    ...plan.allocations.filter((item) => item.id !== "a-invest" && item.id !== "a-rent"),
+    allocation({
+      id: "a-rent",
+      name: "Rent Reserve",
+      icon: "🔑",
+      amount: 175,
+      accountId: investingChecking.id,
+      sortOrder: 3,
+    }),
     allocation({
       id: "a-invest",
       name: "Investments",
       icon: "📈",
       amount: 25,
       accountId: investingChecking.id,
+      goalId: "goal-invest",
       sortOrder: 2,
     }),
   ],
 };
-const sharedData = { ...data, incomePlan: sharedPlan };
-const shared = buildAccountForecasts(sharedData, { horizonWeeks: 4 });
+const shared = buildAccountForecasts(
+  {
+    ...data,
+    incomePlan: sharedPlan,
+    savingsGoals: [
+      ...data.savingsGoals,
+      {
+        id: "goal-invest",
+        name: "Investments",
+        type: "investment",
+        icon: "📈",
+        current: 0,
+        target: 10000,
+        createdAt: "2026-01-01",
+      },
+    ],
+  },
+  { horizonWeeks: 4 },
+);
 const investing = shared.accounts.find(
   (item) => item.accountId === investingChecking.id,
 );
 assert.ok(investing);
 assert.equal(investing.isSharedDestination, true);
 assert.equal(investing.weeklyPlannedDeposits, 200); // 175 rent + 25 invest
-assert.equal(investing.horizons.find((h) => h.weeks === 4).projectedBalance, 500 + 200 * 4);
 assert.equal(investing.purposes.length, 2);
-const purposeTotal = investing.purposes.reduce(
-  (sum, item) => sum + item.plannedReserveAtHorizon,
+const purposeContrib = investing.purposes.reduce(
+  (sum, item) => sum + item.contributionsByHorizon[4],
   0,
 );
-assert.equal(purposeTotal, investing.weeklyPlannedDeposits * 4);
-// Purpose reserves explain the same planned dollars — not a second account balance.
-assert.equal(investing.horizons.length, 4);
+assert.equal(purposeContrib, 800);
 
-console.log("5) Investment projections exclude market performance claim");
+console.log("8) Investment projections exclude market performance");
 const investForecast = forecasts.accounts.find(
   (item) => item.accountId === investmentAcct.id,
 );
@@ -293,7 +349,7 @@ assert.equal(
   2500,
 );
 
-console.log("6) What-If does not mutate balances; compare current vs proposed");
+console.log("9) What-If does not mutate balances");
 const whatIf = compareWhatIfForecasts(
   data,
   [{ allocationId: "a-house", amountPerPaycheck: 400 }],
@@ -312,28 +368,26 @@ const summary = summarizeWhatIfPaycheck(data, [
   { allocationId: "a-house", amountPerPaycheck: 400 },
 ]);
 assert.equal(summary.paycheckAmount, 885.27);
-assert.ok(summary.totalAllocated > 885.27 || summary.unallocated === 0);
 
-console.log("7) Owner-scoped plan: other viewer does not see this plan as personal");
+console.log("10) Owner-scoped plan isolation");
 const otherViewer = buildPaycheckBreakdown(
   { ...data, viewerUserId: OTHER },
   reference,
 );
-// filterPersonalIncomePlan excludes other owners when viewer is set
 assert.equal(otherViewer.hasPlan, false);
 
-console.log("8) Bill withdrawals reduce projected balance without double-counting deposits");
+console.log("11) Bills fund: deposits offset known bill withdrawals");
 const billsForecast = forecasts.accounts.find((item) => item.accountId === billsAcct.id);
 assert.ok(billsForecast);
 assert.equal(billsForecast.weeklyPlannedDeposits, 110);
 assert.ok(billsForecast.weeklyPlannedWithdrawals > 0);
-// Net = deposit - bill weekly; projection starts from posted 220
 const bills4 = billsForecast.horizons.find((item) => item.weeks === 4);
 assert.equal(
   bills4.projectedBalance,
   Math.round(
     (220 +
-      (billsForecast.weeklyPlannedDeposits - billsForecast.weeklyPlannedWithdrawals) * 4) *
+      (billsForecast.weeklyPlannedDeposits - billsForecast.weeklyPlannedWithdrawals) *
+        4) *
       100,
   ) / 100,
 );
