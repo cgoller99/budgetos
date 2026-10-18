@@ -414,7 +414,8 @@ const reports = read("components/native/ios/IosReportsScreen.tsx");
 const webReports = read("components/reports/ReportsContent.tsx");
 const dashboard = read("components/DashboardContent.tsx");
 assert.match(home, /<IosBudgetsSection \/>/);
-assert.match(reports, /<IosBudgetsSection \/>/);
+// Reports is analytics-only on iOS — category budgets live on Home + Budgets.
+assert.doesNotMatch(reports, /IosBudgetsSection/);
 assert.match(webReports, /<CategoryBudgetsCard \/>/);
 assert.match(dashboard, /<CategoryBudgetsCard \/>/);
 
