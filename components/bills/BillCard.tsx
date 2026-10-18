@@ -138,7 +138,7 @@ export function BillCard({
               onClick={onDelete}
               className="text-rose-400/90 hover:text-rose-300"
             >
-              Delete
+              Remove
             </Button>
           </div>
         </CardContent>

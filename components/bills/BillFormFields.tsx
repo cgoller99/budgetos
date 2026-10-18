@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   Button,
   FormField,
@@ -11,6 +12,10 @@ import { BILL_CATEGORY_OPTIONS } from "@/lib/finance/billCategories";
 import { billAmountFromSplits } from "@/lib/finance/billSplits";
 import { PAYCHECK_ASSIGNMENT_OPTIONS } from "@/lib/finance/paycheckSplit";
 import { formatCurrency } from "@/lib/finance/format";
+import {
+  getNotificationPreferences,
+  setNotificationPreferences,
+} from "@/lib/notifications/preferences";
 import { BILL_FREQUENCY_OPTIONS } from "@/lib/recurring/frequencies";
 import type {
   Bill,
@@ -56,10 +61,22 @@ function createEmptySplit(): BillSplitFormState {
 
 export function BillFormFields({ form, onChange }: BillFormFieldsProps) {
   const { accounts } = useFinance();
+  const [billRemindersEnabled, setBillRemindersEnabled] = useState(true);
+
+  useEffect(() => {
+    setBillRemindersEnabled(getNotificationPreferences().bills);
+  }, []);
+
   const splitTotal = form.splits.reduce(
     (total, split) => total + (Number.parseFloat(split.amount) || 0),
     0,
   );
+
+  function updateBillReminders(enabled: boolean) {
+    setBillRemindersEnabled(enabled);
+    const current = getNotificationPreferences();
+    setNotificationPreferences({ ...current, bills: enabled });
+  }
 
   function updateSplit(index: number, split: BillSplitFormState) {
     onChange({
@@ -197,7 +214,7 @@ export function BillFormFields({ form, onChange }: BillFormFieldsProps) {
                 />
               </FormField>
 
-              <FormField label="Due day">
+              <FormField label="Due date (day of month)">
                 <Input
                   type="number"
                   min="1"
@@ -248,7 +265,7 @@ export function BillFormFields({ form, onChange }: BillFormFieldsProps) {
               </FormField>
             )}
 
-            <FormField label="Payment account">
+            <FormField label="Linked bank account">
               <Select
                 value={split.paymentAccountId}
                 onChange={(event) =>
@@ -301,7 +318,24 @@ export function BillFormFields({ form, onChange }: BillFormFieldsProps) {
             }
             className="h-4 w-4 rounded border-white/20 bg-white/10 accent-[var(--accent)]"
           />
-          <span className="text-sm font-medium text-white/70">Enable autopay</span>
+          <span className="text-sm font-medium text-white/70">Autopay</span>
+        </label>
+
+        <label className="flex items-center gap-3 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-3 transition-colors duration-200 hover:bg-white/[0.05]">
+          <input
+            type="checkbox"
+            checked={billRemindersEnabled}
+            onChange={(event) => updateBillReminders(event.target.checked)}
+            className="h-4 w-4 rounded border-white/20 bg-white/10 accent-[var(--accent)]"
+          />
+          <span className="min-w-0">
+            <span className="block text-sm font-medium text-white/70">
+              Due date reminders
+            </span>
+            <span className="mt-0.5 block text-xs text-white/40">
+              Uses your Bills notification setting. Change anytime in Settings.
+            </span>
+          </span>
         </label>
       </div>
     </>
