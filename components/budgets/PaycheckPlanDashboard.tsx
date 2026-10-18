@@ -296,7 +296,7 @@ export function PaycheckPlanDashboard({ compact = false }: PaycheckPlanDashboard
       <Card className={cn(compact && "border-white/[0.05]")}>
         <CardHeader
           title="4. Future Balances"
-          description="Estimates from actual balances + planned money"
+          description="Actual money + planned in − bills, rent, debt, and other known outflows"
         />
         <CardContent className="space-y-4">
           <div className="flex flex-wrap gap-2" role="group" aria-label="Time period">
@@ -330,6 +330,7 @@ export function PaycheckPlanDashboard({ compact = false }: PaycheckPlanDashboard
               const projection =
                 account.horizons.find((item) => item.id === horizon.id) ??
                 account.horizons[1];
+              const withdrawals = account.upcomingWithdrawals.slice(0, 5);
               return (
                 <div
                   key={account.accountId}
@@ -339,6 +340,9 @@ export function PaycheckPlanDashboard({ compact = false }: PaycheckPlanDashboard
                     <div className="min-w-0">
                       <p className="truncate font-semibold text-[var(--foreground)]">
                         {account.accountName}
+                      </p>
+                      <p className="text-xs text-[var(--text-muted)]">
+                        {account.balanceSource}
                       </p>
                       <p className="text-xs text-[var(--text-muted)]">
                         Weekly change {formatCurrency(account.weeklyNet)}
@@ -356,7 +360,7 @@ export function PaycheckPlanDashboard({ compact = false }: PaycheckPlanDashboard
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
                     <Detail
-                      label="Actual now"
+                      label={`Actual now (${account.balanceKind})`}
                       value={formatCurrency(account.currentBalance)}
                     />
                     <Detail
@@ -364,10 +368,36 @@ export function PaycheckPlanDashboard({ compact = false }: PaycheckPlanDashboard
                       value={`+${formatCurrency(projection.plannedDeposits)}`}
                     />
                     <Detail
-                      label="Planned out"
+                      label="Money out"
                       value={`−${formatCurrency(projection.plannedWithdrawals)}`}
                     />
                   </div>
+                  {withdrawals.length > 0 ? (
+                    <div className="mt-3 space-y-1 border-t border-[var(--surface-border)] pt-2">
+                      <p className="text-[11px] font-medium text-[var(--text-secondary)]">
+                        Upcoming money out (weekly)
+                      </p>
+                      {withdrawals.map((line) => (
+                        <div
+                          key={line.id}
+                          className="flex justify-between gap-2 text-xs text-[var(--text-muted)]"
+                        >
+                          <span className="min-w-0 truncate">
+                            {line.name}
+                            {line.confidence === "estimated" ? " · est." : ""}
+                          </span>
+                          <span className="shrink-0 tabular-nums">
+                            −{formatCurrency(Math.abs(line.weeklyAmount))}
+                          </span>
+                        </div>
+                      ))}
+                      {account.upcomingWithdrawals.length > withdrawals.length ? (
+                        <p className="text-[10px] text-[var(--text-muted)]">
+                          +{account.upcomingWithdrawals.length - withdrawals.length} more
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
                   {account.isSharedDestination ? (
                     <p className="mt-2 text-[11px] text-[var(--text-muted)]">
                       Shared account — purposes listed separately; balance counted once.
