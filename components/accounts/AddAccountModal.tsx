@@ -2,12 +2,12 @@
 
 import { useState, type FormEvent } from "react";
 import {
-  Button,
   FormField,
   Input,
   Modal,
   Select,
 } from "@/components/ui";
+import { NativeEditorActions } from "@/components/native/NativeEditorActions";
 import { useFinance } from "@/context/FinanceContext";
 import { useToast } from "@/context/ToastContext";
 import { ACCOUNT_TYPE_OPTIONS } from "@/lib/finance/accountTypes";
@@ -67,8 +67,15 @@ export function AddAccountModal({ isOpen, onClose }: AddAccountModalProps) {
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Add Account">
-      <form onSubmit={handleSubmit} className="space-y-4">
+    <Modal isOpen={isOpen} onClose={handleClose} title="Add Account" footer={
+        <NativeEditorActions
+          formId="save-account-form"
+          onCancel={handleClose}
+          submitLabel="Save Account"
+        />
+      }>
+      <form id="save-account-form" onSubmit={handleSubmit} className="space-y-4">
+
         <FormField label="Account Name">
           <Input
             type="text"
@@ -129,15 +136,6 @@ export function AddAccountModal({ isOpen, onClose }: AddAccountModalProps) {
             required
           />
         </FormField>
-
-        <div className="flex gap-3 pt-2">
-          <Button type="button" variant="secondary" fullWidth onClick={handleClose}>
-            Cancel
-          </Button>
-          <Button type="submit" fullWidth>
-            Save Account
-          </Button>
-        </div>
       </form>
     </Modal>
   );

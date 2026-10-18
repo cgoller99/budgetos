@@ -39,29 +39,28 @@ export function DeleteIncomeModal({ income, onClose }: DeleteIncomeModalProps) {
       isOpen={income !== null}
       onClose={onClose}
       title="Delete Income Source"
-    >
-      <div className="space-y-4">
-        <p className="text-sm leading-relaxed text-white/60">
-          Are you sure you want to delete{" "}
-          <span className="font-medium text-white">{income?.name}</span>? This
-          removes {formatCurrency(income?.amount ?? 0)} from your recurring
-          income projections.
-        </p>
-
-        <div className="flex gap-3 pt-2">
-          <Button type="button" variant="secondary" fullWidth onClick={onClose}>
+      footer={
+        <div className="flex gap-3">
+          <Button type="button" variant="secondary" fullWidth className="min-h-12" onClick={onClose}>
             Cancel
           </Button>
           <Button
             type="button"
             fullWidth
+            className="min-h-12 bg-rose-500 hover:bg-rose-600"
             onClick={() => void handleDelete()}
-            className="bg-rose-500 hover:bg-rose-600"
           >
             Delete Income
           </Button>
         </div>
-      </div>
+      }
+    >
+      <p className="text-sm leading-relaxed text-white/60">
+        Are you sure you want to delete{" "}
+        <span className="font-medium text-white">{income?.name}</span>? This
+        removes {formatCurrency(income?.amount ?? 0)} from your recurring
+        income projections.
+      </p>
     </Modal>
   );
 }

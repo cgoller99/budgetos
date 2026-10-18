@@ -5,6 +5,7 @@ import {
   IosAvatar,
   IosBanner,
   IosCard,
+  IosEmptyState,
   IosHeroMetric,
   IosIconButton,
   IosLink,
@@ -176,25 +177,28 @@ export function IosAccountsScreen() {
         </IosIconButton>
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
-        <IosCard padding="sm">
+      <div
+        className="flex items-center justify-between gap-3 rounded-[16px] border border-white/[0.05] bg-[var(--surface)] px-3.5 py-3"
+        data-accounts-summary-strip="true"
+      >
+        <div className="min-w-0">
           <p className="text-[11px] font-medium text-[var(--text-muted)]">Cash</p>
-          <p className="mt-1 text-[14px] font-semibold tabular-nums text-[var(--foreground)]">
+          <p className="mt-0.5 text-[15px] font-semibold tabular-nums text-[var(--foreground)]">
             {formatCurrency(cashTotal)}
           </p>
-        </IosCard>
-        <IosCard padding="sm">
-          <p className="text-[11px] font-medium text-[var(--text-muted)]">Credit / Debt</p>
-          <p className="mt-1 text-[14px] font-semibold tabular-nums text-[var(--danger)]">
+        </div>
+        <div className="min-w-0 text-center">
+          <p className="text-[11px] font-medium text-[var(--text-muted)]">Debt</p>
+          <p className="mt-0.5 text-[15px] font-semibold tabular-nums text-[var(--danger)]">
             {formatCurrency(debtTotal)}
           </p>
-        </IosCard>
-        <IosCard padding="sm">
-          <p className="text-[11px] font-medium text-[var(--text-muted)]">Investments</p>
-          <p className="mt-1 text-[14px] font-semibold tabular-nums text-[var(--foreground)]">
+        </div>
+        <div className="min-w-0 text-right">
+          <p className="text-[11px] font-medium text-[var(--text-muted)]">Invested</p>
+          <p className="mt-0.5 text-[15px] font-semibold tabular-nums text-[var(--foreground)]">
             {formatCurrency(investmentTotal)}
           </p>
-        </IosCard>
+        </div>
       </div>
 
       {plaidEnabled && connection.phase === "empty" ? (
@@ -232,14 +236,20 @@ export function IosAccountsScreen() {
       ) : null}
 
       {groups.length === 0 && connection.phase !== "empty" ? (
-        <IosCard padding="md">
-          <p className="text-[15px] font-semibold text-[var(--foreground)]">
-            No accounts yet
-          </p>
-          <p className="mt-1 text-[13px] text-[var(--text-muted)]">
-            Add a cash, credit, or investment account to get started.
-          </p>
-        </IosCard>
+        <IosEmptyState
+          title="No accounts yet"
+          subtitle="Add a cash, credit, or investment account to get started."
+          action={
+            <IosPrimaryButton
+              onClick={() => {
+                void triggerHaptic("light");
+                setAddOpen(true);
+              }}
+            >
+              Add account
+            </IosPrimaryButton>
+          }
+        />
       ) : null}
 
       {groups.map((group) => (

@@ -6,7 +6,8 @@ import {
   parseIncomeForm,
   type IncomeFormState,
 } from "@/components/income/IncomeFormFields";
-import { Button, Modal } from "@/components/ui";
+import { Modal } from "@/components/ui";
+import { NativeEditorActions } from "@/components/native/NativeEditorActions";
 import { useFinance } from "@/context/FinanceContext";
 import { useToast } from "@/context/ToastContext";
 
@@ -58,18 +59,16 @@ export function AddIncomeModal({ isOpen, onClose }: AddIncomeModalProps) {
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Add Income">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <IncomeFormFields form={form} onChange={setForm} />
+    <Modal isOpen={isOpen} onClose={handleClose} title="Add Income" footer={
+        <NativeEditorActions
+          formId="save-income-form"
+          onCancel={handleClose}
+          submitLabel="Save Income"
+        />
+      }>
+      <form id="save-income-form" onSubmit={handleSubmit} className="space-y-4">
 
-        <div className="flex gap-3 pt-2">
-          <Button type="button" variant="secondary" fullWidth onClick={handleClose}>
-            Cancel
-          </Button>
-          <Button type="submit" fullWidth>
-            Save Income
-          </Button>
-        </div>
+        <IncomeFormFields form={form} onChange={setForm} />
       </form>
     </Modal>
   );

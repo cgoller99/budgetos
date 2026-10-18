@@ -8,7 +8,7 @@ import { useFinance } from "@/context/FinanceContext";
 export function OnboardingGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { isLoading, onboardingComplete } = useFinance();
+  const { isLoading, onboardingComplete, onboardingHydrated } = useFinance();
   const skipGate = pathname.startsWith("/oauth/plaid");
 
   useEffect(() => {
@@ -16,16 +16,18 @@ export function OnboardingGate({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    if (!isLoading && !onboardingComplete) {
+    // Wait until onboarding flags are loaded — never redirect during the
+    // intentional reset of onboardingComplete while finance cache warms.
+    if (!isLoading && onboardingHydrated && !onboardingComplete) {
       router.replace("/onboarding");
     }
-  }, [isLoading, onboardingComplete, router, skipGate]);
+  }, [isLoading, onboardingComplete, onboardingHydrated, router, skipGate]);
 
   if (skipGate) {
     return children;
   }
 
-  if (isLoading) {
+  if (isLoading || !onboardingHydrated) {
     return <PageLoadingState label="Loading your finances" />;
   }
 

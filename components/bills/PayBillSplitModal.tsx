@@ -33,6 +33,11 @@ export function PayBillSplitModal({
     parsedAmount > 0 &&
     parsedAmount <= remaining + 0.001;
 
+  function handleClose() {
+    setAmount("");
+    onClose();
+  }
+
   async function handleSubmit() {
     if (!isValid) {
       return;
@@ -46,11 +51,24 @@ export function PayBillSplitModal({
   return (
     <Modal
       isOpen={isOpen}
-      onClose={() => {
-        setAmount("");
-        onClose();
-      }}
+      onClose={handleClose}
       title="Record payment"
+      footer={
+        <div className="flex gap-3">
+          <Button type="button" variant="secondary" fullWidth onClick={handleClose} className="min-h-12">
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            fullWidth
+            className="min-h-12"
+            onClick={() => void handleSubmit()}
+            disabled={!isValid || isSubmitting}
+          >
+            {isSubmitting ? "Saving…" : "Record payment"}
+          </Button>
+        </div>
+      }
     >
       <p className="text-sm text-white/45">{split.name}</p>
 
@@ -107,26 +125,6 @@ export function PayBillSplitModal({
               Pay half
             </Button>
           )}
-        </div>
-
-        <div className="flex justify-end gap-3 pt-2">
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => {
-              setAmount("");
-              onClose();
-            }}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            onClick={handleSubmit}
-            disabled={!isValid || isSubmitting}
-          >
-            {isSubmitting ? "Saving…" : "Record payment"}
-          </Button>
         </div>
       </div>
     </Modal>

@@ -187,6 +187,12 @@ export type FinanceContextValue = FinanceData & {
   isLoading: boolean;
   isSyncing: boolean;
   error: string | null;
+  /**
+   * True once onboarding flags have been loaded for the current session.
+   * Prevents OnboardingGate from redirecting during cache warm-up when
+   * onboardingComplete is still the intentional reset value (false).
+   */
+  onboardingHydrated: boolean;
   onboardingComplete: boolean;
   onboardingMode: OnboardingMode | null;
   demoProfileId: DemoProfileId | null;
@@ -344,6 +350,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
   const [isLoadingOlderTransactions, setIsLoadingOlderTransactions] = useState(false);
   const [financeDataUpdatedAt, setFinanceDataUpdatedAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [onboardingHydrated, setOnboardingHydrated] = useState(false);
   const [onboardingComplete, setOnboardingComplete] = useState(false);
   const [onboardingMode, setOnboardingMode] = useState<OnboardingMode | null>(
     null,
@@ -561,6 +568,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
             "Supabase is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to .env.local.",
           );
           setIsLoading(false);
+          setOnboardingHydrated(true);
           repositoryRef.current = null;
           userIdRef.current = null;
         }
@@ -578,6 +586,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
           setFinanceDataUpdatedAt(null);
           setIsLoading(false);
           setError(null);
+          setOnboardingHydrated(true);
           setOnboardingComplete(false);
           setOnboardingMode(null);
           setDemoProfileId(null);
@@ -591,6 +600,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
 
       setIsLoading(true);
       setError(null);
+      setOnboardingHydrated(false);
       setOnboardingComplete(false);
       setOnboardingMode(null);
       setDemoProfileId(null);
@@ -640,6 +650,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
           setOnboardingMode,
           setDemoProfileId,
         });
+        setOnboardingHydrated(true);
         const coerced = applyFinanceData(next);
         refreshRecurringBillCandidates(coerced);
 
@@ -654,6 +665,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
             setFinanceDataUpdatedAt(null);
           }
           setError(getErrorMessage(loadError));
+          setOnboardingHydrated(true);
         }
       } finally {
         if (!cancelled) {
@@ -2205,6 +2217,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
       financeDataUpdatedAt,
       financeDataFreshnessLabel,
       error,
+      onboardingHydrated,
       onboardingComplete,
       onboardingMode,
       demoProfileId,
@@ -2341,6 +2354,7 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
       makeDebtPayment,
       markNotificationRead,
       acknowledgeWeeklySummary,
+      onboardingHydrated,
       onboardingComplete,
       onboardingMode,
       pauseIncome,

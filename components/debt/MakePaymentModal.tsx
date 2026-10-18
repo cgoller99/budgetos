@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-import { Button, FormField, Input, Modal } from "@/components/ui";
+import { FormField, Input, Modal } from "@/components/ui";
+import { NativeEditorActions } from "@/components/native/NativeEditorActions";
 import { useFinance } from "@/context/FinanceContext";
 import { useToast } from "@/context/ToastContext";
 import { formatCurrency } from "@/lib/finance/format";
@@ -51,8 +52,15 @@ export function MakePaymentModal({ debt, onClose }: MakePaymentModalProps) {
   }
 
   return (
-    <Modal isOpen={debt !== null} onClose={onClose} title="Make Payment">
-      <form onSubmit={handleSubmit} className="space-y-4">
+    <Modal isOpen={debt !== null} onClose={onClose} title="Make Payment" footer={
+        <NativeEditorActions
+          formId="apply-payment-form"
+          onCancel={onClose}
+          submitLabel="Apply Payment"
+        />
+      }>
+      <form id="apply-payment-form" onSubmit={handleSubmit} className="space-y-4">
+
         <p className="text-sm text-white/60">
           Current balance:{" "}
           <span className="font-medium text-white">
@@ -72,15 +80,6 @@ export function MakePaymentModal({ debt, onClose }: MakePaymentModalProps) {
             required
           />
         </FormField>
-
-        <div className="flex gap-3 pt-2">
-          <Button type="button" variant="secondary" fullWidth onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit" fullWidth>
-            Apply Payment
-          </Button>
-        </div>
       </form>
     </Modal>
   );

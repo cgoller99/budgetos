@@ -6,7 +6,8 @@ import {
   parseTransactionForm,
   TransactionFormFields,
 } from "@/components/transactions/TransactionFormFields";
-import { Button, Modal } from "@/components/ui";
+import { Modal } from "@/components/ui";
+import { NativeEditorActions } from "@/components/native/NativeEditorActions";
 import { useFinance } from "@/context/FinanceContext";
 import { useToast } from "@/context/ToastContext";
 import { validateTransactionInput } from "@/lib/transactions";
@@ -60,23 +61,21 @@ export function AddTransactionModal({ isOpen, onClose }: AddTransactionModalProp
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Add Transaction">
-      <form onSubmit={(event) => void handleSubmit(event)} className="space-y-4">
+    <Modal isOpen={isOpen} onClose={handleClose} title="Add Transaction" footer={
+        <NativeEditorActions
+          formId="save-transaction-form"
+          onCancel={handleClose}
+          submitLabel="Save Transaction"
+        />
+      }>
+      <form id="save-transaction-form" onSubmit={(event) =>
+ void handleSubmit(event)} className="space-y-4">
         <TransactionFormFields
           form={form}
           accounts={finance.accounts}
           goals={finance.savingsGoals}
           onChange={setForm}
         />
-
-        <div className="flex gap-3 pt-2">
-          <Button type="button" variant="secondary" fullWidth onClick={handleClose}>
-            Cancel
-          </Button>
-          <Button type="submit" fullWidth>
-            Save Transaction
-          </Button>
-        </div>
       </form>
     </Modal>
   );

@@ -2,11 +2,11 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import {
-  Button,
   FormField,
   Input,
   Modal,
 } from "@/components/ui";
+import { NativeEditorActions } from "@/components/native/NativeEditorActions";
 import { useFinance } from "@/context/FinanceContext";
 import { useToast } from "@/context/ToastContext";
 import type { SavingsGoal } from "@/lib/finance/types";
@@ -65,8 +65,15 @@ export function AddMoneyModal({ goal, onClose }: AddMoneyModalProps) {
       isOpen={Boolean(goal)}
       onClose={handleClose}
       title={goal ? `Add Money to ${goal.name}` : "Add Money"}
-    >
-      <form onSubmit={handleSubmit} className="space-y-4">
+     footer={
+        <NativeEditorActions
+          formId="add-money-form"
+          onCancel={handleClose}
+          submitLabel="Add Money"
+        />
+      }>
+      <form id="add-money-form" onSubmit={handleSubmit} className="space-y-4">
+
         <FormField label="Amount">
           <Input
             type="number"
@@ -79,15 +86,6 @@ export function AddMoneyModal({ goal, onClose }: AddMoneyModalProps) {
             required
           />
         </FormField>
-
-        <div className="flex gap-3 pt-2">
-          <Button type="button" variant="secondary" fullWidth onClick={handleClose}>
-            Cancel
-          </Button>
-          <Button type="submit" fullWidth>
-            Add Money
-          </Button>
-        </div>
       </form>
     </Modal>
   );
