@@ -15,14 +15,17 @@ import type { Bill } from "@/lib/finance/types";
 type EditBillModalProps = {
   bill: Bill | null;
   onClose: () => void;
+  /** Opens the remove confirmation flow without dismissing the edit sheet until called. */
+  onRemove?: () => void;
 };
 
-export function EditBillModal({ bill, onClose }: EditBillModalProps) {
+export function EditBillModal({ bill, onClose, onRemove }: EditBillModalProps) {
   const { editBill } = useFinance();
   const { showToast } = useToast();
   const [form, setForm] = useState(() =>
     bill ? billToFormState(bill) : initialBillFormState,
   );
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (bill) {
@@ -34,7 +37,7 @@ export function EditBillModal({ bill, onClose }: EditBillModalProps) {
     onClose();
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!bill) {
@@ -44,17 +47,31 @@ export function EditBillModal({ bill, onClose }: EditBillModalProps) {
     const parsed = parseBillForm(form);
 
     if (!parsed) {
+      showToast({
+        title: "Check bill details",
+        subtitle: "Name, category, amount, and due day are required.",
+        type: "error",
+      });
       return;
     }
 
-    editBill(bill.id, parsed);
+    setIsSubmitting(true);
 
-    showToast({
-      title: `✓ ${parsed.name.trim()} Updated`,
-      subtitle: "✓ Dashboard Updated",
-    });
+    try {
+      await editBill(bill.id, parsed);
 
-    handleClose();
+      showToast({
+        title: `✓ ${parsed.name.trim()} Updated`,
+        subtitle: "✓ Dashboard Updated",
+        type: "success",
+      });
+
+      handleClose();
+    } catch {
+      // FinanceContext toast
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -63,17 +80,30 @@ export function EditBillModal({ bill, onClose }: EditBillModalProps) {
       onClose={handleClose}
       title="Edit Bill"
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={(event) => void handleSubmit(event)} className="space-y-4">
         <BillFormFields form={form} onChange={setForm} />
 
         <div className="flex gap-3 pt-2">
           <Button type="button" variant="secondary" fullWidth onClick={handleClose}>
             Cancel
           </Button>
-          <Button type="submit" fullWidth>
-            Save Changes
+          <Button type="submit" fullWidth disabled={isSubmitting}>
+            {isSubmitting ? "Saving…" : "Save"}
           </Button>
         </div>
+
+        {onRemove ? (
+          <Button
+            type="button"
+            variant="ghost"
+            fullWidth
+            className="text-rose-400 hover:text-rose-300"
+            onClick={onRemove}
+            disabled={isSubmitting}
+          >
+            Remove bill
+          </Button>
+        ) : null}
       </form>
     </Modal>
   );

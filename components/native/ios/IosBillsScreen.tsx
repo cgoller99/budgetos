@@ -13,6 +13,7 @@ import {
 } from "@/components/native/ios/IosPrimitives";
 import { IosBottomSheet } from "@/components/native/ios/IosBottomSheet";
 import { AddBillModal } from "@/components/bills/AddBillModal";
+import { DeleteBillModal } from "@/components/bills/DeleteBillModal";
 import { EditBillModal } from "@/components/bills/EditBillModal";
 import { useFinance } from "@/context/FinanceContext";
 import { findSubscriptionPriceIncreases } from "@/lib/automation/financialInsights";
@@ -84,6 +85,7 @@ function BillDetail({
   accountName,
   onMarkPaid,
   onEdit,
+  onRemove,
 }: {
   bill: BillProgress;
   source: Bill | null;
@@ -91,6 +93,7 @@ function BillDetail({
   accountName: string | null;
   onMarkPaid: () => void;
   onEdit: () => void;
+  onRemove: () => void;
 }) {
   const frequency = source?.frequency ? getBillFrequencyLabel(source.frequency) : null;
 
@@ -153,6 +156,16 @@ function BillDetail({
         >
           Edit bill
         </button>
+        <button
+          type="button"
+          className="min-h-12 w-full rounded-[14px] bg-white/[0.04] text-[16px] font-semibold text-[var(--danger)] active:opacity-90"
+          onClick={() => {
+            void triggerHaptic("light");
+            onRemove();
+          }}
+        >
+          Remove bill
+        </button>
       </div>
       <div className="mt-5">
         <p className="px-0.5 text-[13px] font-semibold text-[var(--foreground)]">
@@ -201,6 +214,7 @@ export function IosBillsScreen() {
   const { showToast } = useToast();
   const [createOpen, setCreateOpen] = useState(false);
   const [editBillId, setEditBillId] = useState<string | null>(null);
+  const [removeBillId, setRemoveBillId] = useState<string | null>(null);
   const [selectedBill, setSelectedBill] = useState<BillProgress | null>(null);
   const [tab, setTab] = useState<BillsTab>("upcoming");
 
@@ -236,6 +250,10 @@ export function IosBillsScreen() {
   const editBill =
     editBillId !== null
       ? (bills.find((bill) => bill.id === editBillId) ?? null)
+      : null;
+  const removeBill =
+    removeBillId !== null
+      ? (bills.find((bill) => bill.id === removeBillId) ?? null)
       : null;
   const nextBill = upcoming[0] ?? null;
   const tabItems =
@@ -434,6 +452,18 @@ export function IosBillsScreen() {
               <span className="shrink-0 text-[15px] font-semibold tabular-nums text-[var(--foreground)]">
                 {formatCurrency(bill.remainingAmount || bill.amount)}
               </span>
+              <button
+                type="button"
+                aria-label={`Edit ${bill.name}`}
+                data-bill-edit={bill.billId}
+                className="min-h-8 shrink-0 rounded-full bg-white/[0.08] px-3 text-[13px] font-semibold text-[var(--accent-light)] active:opacity-80"
+                onClick={() => {
+                  void triggerHaptic("light");
+                  setEditBillId(bill.billId);
+                }}
+              >
+                Edit
+              </button>
               {needsPayChip(bill) ? (
                 <button
                   type="button"
@@ -495,11 +525,30 @@ export function IosBillsScreen() {
               setEditBillId(selectedBill.billId);
               setSelectedBill(null);
             }}
+            onRemove={() => {
+              setRemoveBillId(selectedBill.billId);
+              setSelectedBill(null);
+            }}
           />
         ) : null}
       </IosBottomSheet>
       <AddBillModal isOpen={createOpen} onClose={() => setCreateOpen(false)} />
-      <EditBillModal bill={editBill as Bill | null} onClose={() => setEditBillId(null)} />
+      <EditBillModal
+        bill={editBill as Bill | null}
+        onClose={() => setEditBillId(null)}
+        onRemove={
+          editBillId
+            ? () => {
+                setRemoveBillId(editBillId);
+                setEditBillId(null);
+              }
+            : undefined
+        }
+      />
+      <DeleteBillModal
+        bill={removeBill as Bill | null}
+        onClose={() => setRemoveBillId(null)}
+      />
     </IosScreen>
   );
 }
