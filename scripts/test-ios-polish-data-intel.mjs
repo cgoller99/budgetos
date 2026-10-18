@@ -241,7 +241,16 @@ const notif = fs.readFileSync(
   "utf8",
 );
 assert.match(notif, /nativeIos/);
-assert.match(notif, /size-8/);
+// 44pt minimum touch target on native iOS header actions
+assert.match(notif, /size-11/);
+assert.match(notif, /min-h-11/);
+
+const search = fs.readFileSync(
+  path.join(ROOT, "components/search/GlobalSearch.tsx"),
+  "utf8",
+);
+assert.match(search, /size-11/);
+assert.match(search, /min-w-11/);
 
 const accountsScreen = fs.readFileSync(
   path.join(ROOT, "components/native/ios/IosAccountsScreen.tsx"),
@@ -263,6 +272,9 @@ const goalsScreen = fs.readFileSync(
 );
 assert.match(goalsScreen, /No goals yet/);
 assert.match(goalsScreen, /Create Goal/);
+assert.match(goalsScreen, /LinkAccountModal/);
+assert.match(goalsScreen, /compact/);
+assert.match(goalsScreen, /Link account/);
 
 const reportsScreen = fs.readFileSync(
   path.join(ROOT, "components/native/ios/IosReportsScreen.tsx"),
