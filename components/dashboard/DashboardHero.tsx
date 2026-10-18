@@ -75,21 +75,23 @@ export function DashboardHero() {
   }, [dashboard.financialHealthScore.score, snapshot.monthlyTrends]);
 
   const metrics = useMemo(() => {
-    const netWorth = dashboard.kpiMetrics.find((m) => m.label === "Net Worth");
+    // Net Worth is the Home centerpiece (HomeNetWorthCard) — supporting KPIs only.
     const cash = dashboard.kpiMetrics.find((m) => m.label === "Cash");
     const debt = dashboard.kpiMetrics.find((m) => m.label === "Debt");
     const health = dashboard.financialHealthScore;
     const savingsRate = health.metrics.find((m) => m.label === "Savings rate");
+    const safeToSpend = dashboard.moneyFlow.safeToSpend;
 
     return [
       {
-        label: "Net Worth",
-        value: netWorth ? formatCurrency(netWorth.value) : "—",
-        change: netWorth ? formatMonthlyChange(netWorth.monthlyChange) : "",
-        positive: (netWorth?.monthlyChange ?? 0) >= 0,
-        icon: "netWorth" as const,
+        label: "Safe to Spend",
+        value: formatCurrency(safeToSpend),
+        change: "After bills & planned savings",
+        positive: safeToSpend >= 0,
+        mutedChange: true,
+        icon: "savings" as const,
         tone: "accent" as const,
-        sparkline: sparklines.netWorth,
+        sparkline: sparklines.savings,
         sparkColor: CHART_COLORS.primary,
       },
       {
