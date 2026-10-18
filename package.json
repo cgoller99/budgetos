@@ -118,6 +118,7 @@
     "test:budget-frequencies": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-budget-frequencies.mjs",
     "test:budget-hub-goals": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-budget-hub-goals.mjs",
     "test:unified-financial-plan": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-unified-financial-plan.mjs",
+    "test:paycheck-forecast-dashboard": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-paycheck-forecast-dashboard.mjs",
     "test:cash-flow-forecast": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-cash-flow-forecast.mjs",
     "test:cash-outlook": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-cash-outlook.mjs",
     "test:goal-forecast": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-goal-forecast.mjs",
