@@ -30,7 +30,8 @@ assert.match(screen, /setRemoveBillId/);
 assert.match(editModal, /BillFormFields/);
 assert.match(editModal, /Cancel/);
 assert.match(editModal, /"Save"/);
-assert.match(editModal, /Remove bill/);
+assert.match(editModal, /Delete Bill/);
+assert.match(editModal, /data-bill-delete="true"/);
 assert.match(editModal, /await editBill\(bill\.id, parsed\)/);
 
 for (const field of [
@@ -51,14 +52,13 @@ assert.match(form, /BILL_FREQUENCY_OPTIONS/);
 assert.match(form, /paymentAccountId/);
 assert.match(form, /autopay/);
 
-assert.match(deleteModal, /Remove Bill/);
+assert.match(deleteModal, /Delete Bill/);
 assert.match(deleteModal, /active bill list/);
-assert.match(deleteModal, /Historical payments and linked transactions stay/);
+assert.match(deleteModal, /Bank transactions are never deleted/);
 assert.match(deleteModal, /await deleteBill\(bill\.id\)/);
 
 assert.match(desktop, /EditBillModal/);
 assert.match(desktop, /DeleteBillModal/);
-assert.match(desktop, /onRemove=/);
 
 assert.match(service, /async updateBill/);
 assert.match(service, /async deleteBill/);
