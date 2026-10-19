@@ -23,11 +23,10 @@ import { AddIncomeModal } from "@/components/income/AddIncomeModal";
 import { DeleteIncomeModal } from "@/components/income/DeleteIncomeModal";
 import { EditIncomeModal } from "@/components/income/EditIncomeModal";
 import { IosBottomSheet } from "@/components/native/ios/IosBottomSheet";
+import { IosIncomeHistoryPanel } from "@/components/native/ios/IosIncomeHistoryPanel";
+import { IosIncomeScheduleSheet } from "@/components/native/ios/IosIncomeScheduleSheet";
 import { IosPaycheckPlanDashboard } from "@/components/native/ios/IosPaycheckPlanDashboard";
-import { IncomePlanContent } from "@/components/incomePlan/IncomePlanContent";
 import { PaycheckDetectedPromptList } from "@/components/incomePlan/PaycheckDetectedPrompt";
-import { IncomeLedgerPanel } from "@/components/income/IncomeLedgerPanel";
-import { IncomeForecastPanel } from "@/components/income/IncomeForecastPanel";
 import { useFinance } from "@/context/FinanceContext";
 import { useToast } from "@/context/ToastContext";
 import { describeCashOutlook, forecastCashOutlook } from "@/lib/finance/cashOutlook";
@@ -271,9 +270,6 @@ export function IosIncomeScreen() {
           ? "history"
           : "upcoming";
   const [tab, setTab] = useState<IncomeTab>(initialTab);
-  const [details, setDetails] = useState<"history" | "forecast" | null>(
-    tabParam === "forecast" ? "forecast" : "history",
-  );
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editIncomeId, setEditIncomeId] = useState<string | null>(null);
   const [deleteIncomeId, setDeleteIncomeId] = useState<string | null>(null);
@@ -290,8 +286,6 @@ export function IosIncomeScreen() {
     const params = new URLSearchParams(searchParams.toString());
     if (next === "upcoming") {
       params.delete("tab");
-    } else if (next === "history") {
-      params.set("tab", details === "forecast" ? "forecast" : "history");
     } else {
       params.set("tab", next);
     }
@@ -459,24 +453,9 @@ export function IosIncomeScreen() {
       ) : null}
 
       {tab === "history" ? (
-        <div className="flex flex-col gap-3">
-          <div className="ios-embedded-panel">
-            <IncomeLedgerPanel />
-          </div>
-          <IosTextButton
-            onClick={() => {
-              void triggerHaptic("selection");
-              setDetails(details === "forecast" ? "history" : "forecast");
-            }}
-          >
-            {details === "forecast" ? "Hide forecast" : "Income forecast"}
-          </IosTextButton>
-          {details === "forecast" ? (
-            <div className="ios-embedded-panel">
-              <IncomeForecastPanel />
-            </div>
-          ) : null}
-        </div>
+        <IosIncomeHistoryPanel
+          initialView={tabParam === "forecast" ? "forecast" : "history"}
+        />
       ) : null}
 
       <AllocationEditSheet
@@ -485,15 +464,11 @@ export function IosIncomeScreen() {
         onClose={() => setEditAllocations(false)}
       />
 
-      <IosBottomSheet
+      <IosIncomeScheduleSheet
         open={scheduleSetupOpen}
-        title={finance.incomePlan ? "Pay schedule" : "Set up paycheck plan"}
         onClose={() => setScheduleSetupOpen(false)}
-      >
-        <div className="pb-4" data-ios-income-schedule-sheet="true">
-          <IncomePlanContent embedded />
-        </div>
-      </IosBottomSheet>
+        onReviewAllocations={() => setEditAllocations(true)}
+      />
 
       <IosBottomSheet
         open={selectedSource !== null}

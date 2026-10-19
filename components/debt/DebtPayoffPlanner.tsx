@@ -256,7 +256,14 @@ export function DebtPayoffPlanner({ variant = "web" }: DebtPayoffPlannerProps) {
   const maxBalance = Math.max(...chartPoints.map((month) => month.startingBalance), 1);
 
   return (
-    <Card padding={variant === "ios" ? "compact" : "lg"} className="min-w-0" data-debt-payoff="">
+    <Card
+      padding={variant === "ios" ? "compact" : "lg"}
+      className={cn(
+        "min-w-0",
+        variant === "ios" && "rounded-[16px] border-white/[0.05] bg-[var(--surface)] shadow-none",
+      )}
+      data-debt-payoff=""
+    >
       <div className="space-y-5">
         <div>
           <p className="text-[13px] font-medium text-[var(--text-secondary)]">Projected</p>
@@ -270,7 +277,12 @@ export function DebtPayoffPlanner({ variant = "web" }: DebtPayoffPlannerProps) {
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <div
+          className={cn(
+            "grid grid-cols-2 gap-3",
+            variant !== "ios" && "xl:grid-cols-4",
+          )}
+        >
           <OverviewStat label="Outstanding debt" value={formatCurrency(overview.totalBalance)} detail="Actual balance" />
           <OverviewStat label="Monthly minimums" value={formatCurrency(minimums)} detail="Actual payments" />
           <OverviewStat
@@ -571,7 +583,7 @@ export function DebtPayoffPlanner({ variant = "web" }: DebtPayoffPlannerProps) {
         title="Later months"
         onClose={() => setOpenMonth(null)}
       >
-        <div className="max-h-[50vh] space-y-3 overflow-y-auto">
+        <div className="space-y-3">
           {projected.schedule.slice(18, 36).map((month) => (
             <div key={month.index}>
               <p className="text-[14px] font-semibold">{month.label}</p>

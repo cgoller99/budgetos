@@ -255,7 +255,10 @@ export function IosReportsScreen() {
             </p>
           </IosCard>
         ) : showCharts ? (
-          <div className="ios-embedded-panel space-y-3 [&_.rounded-3xl]:rounded-[16px]">
+          <div
+            className="ios-embedded-panel space-y-3 [&_.rounded-3xl]:rounded-[16px] [&_.card]:rounded-[16px] [&_.card]:border-white/[0.05] [&_.card]:shadow-none [&_h2]:text-[15px] [&_h3]:text-[14px]"
+            data-ios-reports-timeline="true"
+          >
             <NetWorthTimeline />
           </div>
         ) : (

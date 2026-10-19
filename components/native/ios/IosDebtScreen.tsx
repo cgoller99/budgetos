@@ -189,6 +189,53 @@ export function IosDebtScreen() {
         open={selectedDebtId !== null}
         title={rows.find((row) => row.id === selectedDebtId)?.name}
         onClose={() => setSelectedDebtId(null)}
+        footer={
+          selectedDebtId
+            ? (() => {
+                const row = rows.find((item) => item.id === selectedDebtId);
+                if (!row) return null;
+                return (
+                  <div className="space-y-2" data-debt-detail-footer="true">
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        className="min-h-12 flex-1 rounded-[14px] bg-[var(--accent)] text-[16px] font-semibold text-white"
+                        onClick={() => {
+                          void triggerHaptic("light");
+                          setPaymentDebtId(row.id);
+                          setSelectedDebtId(null);
+                        }}
+                      >
+                        Record payment
+                      </button>
+                      <button
+                        type="button"
+                        className="min-h-12 flex-1 rounded-[14px] bg-white/[0.06] text-[16px] font-semibold text-[var(--foreground)]"
+                        onClick={() => {
+                          void triggerHaptic("light");
+                          setEditDebtId(row.id);
+                          setSelectedDebtId(null);
+                        }}
+                      >
+                        Edit
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      className="min-h-12 w-full rounded-[14px] text-[16px] font-semibold text-[var(--danger)]"
+                      onClick={() => {
+                        void triggerHaptic("light");
+                        setDeleteDebtId(row.id);
+                        setSelectedDebtId(null);
+                      }}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                );
+              })()
+            : null
+        }
       >
         {(() => {
           const row = rows.find((item) => item.id === selectedDebtId);
@@ -209,41 +256,6 @@ export function IosDebtScreen() {
                 <IosDetailLine label="Type" value={row.accountTypeLabel} />
                 <IosDetailLine label="Debt-free" value={summary.estimatedDebtFreeDate} />
               </div>
-              <div className="mt-4 flex gap-2">
-                <button
-                  type="button"
-                  className="min-h-12 flex-1 rounded-[14px] bg-[var(--accent)] text-[16px] font-semibold text-white"
-                  onClick={() => {
-                    void triggerHaptic("light");
-                    setPaymentDebtId(row.id);
-                    setSelectedDebtId(null);
-                  }}
-                >
-                  Record payment
-                </button>
-                <button
-                  type="button"
-                  className="min-h-12 flex-1 rounded-[14px] bg-white/[0.06] text-[16px] font-semibold text-[var(--foreground)]"
-                  onClick={() => {
-                    void triggerHaptic("light");
-                    setEditDebtId(row.id);
-                    setSelectedDebtId(null);
-                  }}
-                >
-                  Edit
-                </button>
-              </div>
-              <button
-                type="button"
-                className="mt-2 min-h-12 w-full rounded-[14px] text-[16px] font-semibold text-[var(--danger)]"
-                onClick={() => {
-                  void triggerHaptic("light");
-                  setDeleteDebtId(row.id);
-                  setSelectedDebtId(null);
-                }}
-              >
-                Remove
-              </button>
             </div>
           );
         })()}

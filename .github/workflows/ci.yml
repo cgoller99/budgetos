@@ -55,6 +55,7 @@ jobs:
           npm run test:native-editor-chrome
           npm run test:native-ui-complete
           npm run test:native-paycheck-income
+          npm run test:native-income-history-schedule
           npm run test:ios-plan-sheets
           npm run test:onboarding-progress
           npm run test:plaid-credit-mapping
