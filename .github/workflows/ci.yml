@@ -62,3 +62,13 @@ jobs:
           npm run test:recurring-bill-detection
           npm run test:profile-privilege-guard
           npm run test:beta-registration
+
+      - name: Jarvis safety and regression tests
+        run: |
+          node scripts/test-jarvis-voice.mjs
+          node scripts/test-ai-team-autonomous-priorities.mjs
+          node scripts/test-jarvis-priority-worker.mjs
+          node scripts/test-jarvis-signal-extraction.mjs
+          npm run test:ai-team-safety
+          npm run test:ai-team-v5-3
+
