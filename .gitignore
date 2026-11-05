@@ -46,3 +46,4 @@ next-env.d.ts
 # Jarvis local operational history (may contain sensitive task descriptions)
 data/jarvis-journal.jsonl
 
+data/jarvis-reviews/

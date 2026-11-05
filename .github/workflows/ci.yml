@@ -73,3 +73,4 @@ jobs:
           npm run test:ai-team-v5-3
 
           node scripts/test-jarvis-workspace.mjs
+          node scripts/test-jarvis-review.mjs
