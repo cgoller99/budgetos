@@ -1,0 +1,18 @@
+import assert from "node:assert/strict";
+import { createHmac } from "node:crypto";
+import { validTwilioSignature, jarvisIntroTwiML } from "../lib/ai-team/twilioWebhook.ts";
+import { validateJarvisCallRequest } from "../lib/ai-team/phoneCalls.ts";
+const url = "https://buxme.co/api/jarvis/voice";
+const fields = { CallSid: "CA123", From: "+15555550100" };
+const token = "test-token";
+const signature = createHmac("sha1", token).update(url + Object.keys(fields).sort().map(k => k + fields[k]).join("")).digest("base64");
+assert.equal(validTwilioSignature(url, fields, signature, token), true);
+assert.equal(validTwilioSignature(url, fields, signature, "bad-token"), false);
+assert.equal(validTwilioSignature(url, fields, null, token), false);
+assert.match(jarvisIntroTwiML(), /<Hangup\/>/);
+const valid = { to: "+15555550100", approvedByUser: true, reason: "Test", callbackUrl: url };
+assert.doesNotThrow(() => validateJarvisCallRequest(valid));
+assert.throws(() => validateJarvisCallRequest({ ...valid, approvedByUser: false }));
+assert.throws(() => validateJarvisCallRequest({ ...valid, to: "555-555-0100" }));
+assert.throws(() => validateJarvisCallRequest({ ...valid, callbackUrl: "http://example.com" }));
+console.log("Jarvis voice transport tests passed.");
