@@ -20,3 +20,4 @@ const report = { generatedAt: new Date().toISOString(), mode: "proposal_only", i
 await mkdir(dirname(outputPath), { recursive: true });
 await writeFile(outputPath, JSON.stringify(report, null, 2) + "\n", { flag: "w" });
 console.log(`Jarvis ranked ${priorities.length} evidence-backed proposals. No actions executed.`);
+
