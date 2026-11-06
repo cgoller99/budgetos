@@ -80,3 +80,4 @@ jobs:
           node scripts/test-jarvis-coding-context.mjs
           node scripts/test-jarvis-apply-patch.mjs
           node scripts/test-jarvis-generate-patch.mjs
+          node scripts/test-jarvis-publish-pr.mjs
