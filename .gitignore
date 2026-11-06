@@ -47,3 +47,6 @@ next-env.d.ts
 data/jarvis-journal.jsonl
 
 data/jarvis-reviews/
+data/jarvis-queue.json
+data/jarvis-queue.json.lock
+data/jarvis-queue.json.tmp
