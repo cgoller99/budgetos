@@ -76,3 +76,4 @@ jobs:
           node scripts/test-jarvis-review.mjs
           node scripts/test-jarvis-task-queue.mjs
           node scripts/test-jarvis-verify.mjs
+          node scripts/test-jarvis-pr-draft.mjs

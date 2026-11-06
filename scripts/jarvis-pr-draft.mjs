@@ -1,0 +1,25 @@
+/** Prepare an offline PR draft only after matching review and verification records. */
+import { readFile, mkdir, writeFile } from "node:fs/promises";
+import { join, resolve, dirname } from "node:path";
+import { spawnSync } from "node:child_process";
+const [taskId] = process.argv.slice(2);
+if (!/^[a-z][a-z0-9-]{2,39}$/.test(taskId ?? "")) throw Error("Usage: node scripts/jarvis-pr-draft.mjs <task-slug>");
+const repo = resolve(process.cwd());
+const git = spawnSync("git", ["rev-parse", "--show-toplevel"], { cwd: repo, encoding: "utf8", shell: false });
+if (git.status !== 0 || resolve(git.stdout.trim()).toLowerCase() !== repo.toLowerCase()) throw Error("Run from repository root.");
+const review = JSON.parse(await readFile(join(repo, "data", "jarvis-reviews", taskId + ".json"), "utf8"));
+const verification = JSON.parse(await readFile(join(repo, "data", "jarvis-verifications", taskId + ".json"), "utf8"));
+if (review.taskId !== taskId || verification.taskId !== taskId || review.branch !== `jarvis/${taskId}` || verification.branch !== review.branch) throw Error("Task metadata mismatch.");
+if (!review.headCommit || !/^[a-f0-9]{40}$/.test(review.headCommit) || !review.baseCommit || !/^[a-f0-9]{40}$/.test(review.baseCommit)) throw Error("Invalid review commit identifiers.");
+if (!verification.passed || !Array.isArray(verification.results) || verification.results.length === 0 || verification.results.some(r => !r.passed)) throw Error("Verification must pass.");
+if (!Array.isArray(review.files) || !review.files.length || review.files.length > 100 || !Array.isArray(review.commits)) throw Error("Invalid or empty change review.");
+const branch = spawnSync("git", ["rev-parse", review.branch], { cwd: repo, encoding: "utf8", shell: false });
+if (branch.status !== 0 || branch.stdout.trim() !== review.headCommit) throw Error("Task branch changed since review; re-verify.");
+const base = spawnSync("git", ["merge-base", review.branch, "main"], { cwd: repo, encoding: "utf8", shell: false });
+if (base.status !== 0 || base.stdout.trim() !== review.baseCommit) throw Error("Base changed; regenerate review.");
+const title = `Jarvis: ${taskId.replaceAll("-", " ")}`;
+const lines = [`# ${title}`, "", "## Changes", ...review.files.map(f => `- \`${f.replaceAll("`", "")}\``), "", "## Commits", ...review.commits.map(c => `- ${c.replace(/[\r\n]/g, " ").slice(0, 160)}`), "", "## Verification", ...verification.results.map(r => `- ${r.passed ? "PASS" : "FAIL"}: ${r.command}`), "", "## Release gate", "- [ ] Human code review", "- [ ] CI checks verified", "- [ ] Production deployment approved", "", "Draft only. No pull request created, no merge, no deployment.", ""];
+const output = join(repo, "data", "jarvis-pr-drafts", taskId + ".md");
+await mkdir(dirname(output), { recursive: true });
+await writeFile(output, lines.join("\n"));
+console.log(JSON.stringify({ output, branch: review.branch, headCommit: review.headCommit, mode: "draft_only" }));
