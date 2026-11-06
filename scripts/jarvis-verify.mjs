@@ -23,9 +23,12 @@ for (const [cmd, args] of commands) {
   results.push({ command: [cmd, ...args].join(" "), passed: result.status === 0, exitCode: result.status, outputTail: (result.stdout ?? "").slice(-1000), errorTail: (result.stderr ?? "").slice(-1000) });
   if (result.status !== 0) break;
 }
-const report = { taskId, branch: `jarvis/${taskId}`, generatedAt: new Date().toISOString(), results, passed: results.length === commands.length && results.every(r => r.passed), approvalRequired: true };
+const head = run("git", ["rev-parse", "HEAD"], worktree);
+if (head.status !== 0 || !/^[a-f0-9]{40}$/.test(head.stdout.trim())) throw Error("Unable to identify verified commit.");
+const report = { taskId, headCommit: head.stdout.trim(), branch: `jarvis/${taskId}`, generatedAt: new Date().toISOString(), results, passed: results.length === commands.length && results.every(r => r.passed), approvalRequired: true };
 const destination = join(repo, "data", "jarvis-verifications");
 await mkdir(destination, { recursive: true });
 await writeFile(join(destination, `${taskId}.json`), JSON.stringify(report, null, 2) + "\n");
 console.log(JSON.stringify({ taskId, passed: report.passed, checks: results.length }));
 if (!report.passed) process.exitCode = 1;
+

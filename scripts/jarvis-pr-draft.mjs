@@ -11,6 +11,7 @@ const review = JSON.parse(await readFile(join(repo, "data", "jarvis-reviews", ta
 const verification = JSON.parse(await readFile(join(repo, "data", "jarvis-verifications", taskId + ".json"), "utf8"));
 if (review.taskId !== taskId || verification.taskId !== taskId || review.branch !== `jarvis/${taskId}` || verification.branch !== review.branch) throw Error("Task metadata mismatch.");
 if (!review.headCommit || !/^[a-f0-9]{40}$/.test(review.headCommit) || !review.baseCommit || !/^[a-f0-9]{40}$/.test(review.baseCommit)) throw Error("Invalid review commit identifiers.");
+if (verification.headCommit !== review.headCommit) throw Error("Verification does not match reviewed commit; re-run tests.");
 if (!verification.passed || !Array.isArray(verification.results) || verification.results.length === 0 || verification.results.some(r => !r.passed)) throw Error("Verification must pass.");
 if (!Array.isArray(review.files) || !review.files.length || review.files.length > 100 || !Array.isArray(review.commits)) throw Error("Invalid or empty change review.");
 const branch = spawnSync("git", ["rev-parse", review.branch], { cwd: repo, encoding: "utf8", shell: false });
@@ -23,3 +24,4 @@ const output = join(repo, "data", "jarvis-pr-drafts", taskId + ".md");
 await mkdir(dirname(output), { recursive: true });
 await writeFile(output, lines.join("\n"));
 console.log(JSON.stringify({ output, branch: review.branch, headCommit: review.headCommit, mode: "draft_only" }));
+
