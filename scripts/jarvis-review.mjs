@@ -18,7 +18,8 @@ if (!git(["worktree", "list", "--porcelain"], repo).split("\n").some(line => lin
 if (git(["branch", "--show-current"], worktree) !== branch) throw new Error("Worktree branch mismatch.");
 const changes = git(["status", "--porcelain", "--untracked-files=all"], worktree);
 if (changes) throw new Error("Commit or discard all worktree changes before generating review.");
-const base = git(["merge-base", "HEAD", "origin/main"], worktree);
+const baseRef = spawnSync("git", ["show-ref", "--verify", "--quiet", "refs/remotes/origin/main"], { cwd: repo, shell: false }).status === 0 ? "origin/main" : "main";
+const base = git(["merge-base", "HEAD", baseRef], worktree);
 const files = git(["diff", "--name-only", `${base}..HEAD`], worktree).split("\n").filter(Boolean);
 if (files.length > 100) throw new Error("Review exceeds 100 changed files.");
 const summary = git(["diff", "--stat", `${base}..HEAD`], worktree);
@@ -30,4 +31,5 @@ const output = join(repo, "data", "jarvis-reviews", `${taskId}.json`);
 await mkdir(dirname(output), { recursive: true });
 await writeFile(output, JSON.stringify(report, null, 2) + "\n", { flag: "w" });
 console.log(JSON.stringify({ output, changedFiles: files.length, requiresHumanReview: true }, null, 2));
+
 
