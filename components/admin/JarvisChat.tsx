@@ -28,36 +28,46 @@ export function JarvisChat() {
   const handsFreeRef = useRef(false);
   const startListeningRef = useRef<() => Promise<void>>(async () => {});
   const recognition = useRef<SpeechRecognizer | null>(null);
+  const listeningRef = useRef(false);
+  const startingRef = useRef(false);
+  const microphoneReadyRef = useRef(false);
+  const playbackRef = useRef(false);
+  const speechSequenceRef = useRef(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const voiceOnRef = useRef(false);
   const busyRef = useRef(false);
   const messagesRef = useRef<Message[]>([]);
   useEffect(() => () => {
+    handsFreeRef.current = false;
     recognition.current?.stop();
+    audioRef.current?.pause();
     if (typeof window !== "undefined") window.speechSynthesis?.cancel();
   }, []);
   async function speakReply(message: string) {
+    const sequence = ++speechSequenceRef.current;
+    playbackRef.current = true;
+    recognition.current?.stop();
     audioRef.current?.pause();
     audioRef.current = null;
     try {
       const response = await fetch("/api/admin/jarvis-speech", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: message.slice(0, 2400) }) });
       if (response.ok) {
         const blob = await response.blob();
-        if (!voiceOnRef.current) return;
+        if (!voiceOnRef.current || sequence !== speechSequenceRef.current) return;
         const url = URL.createObjectURL(blob);
         const audio = new Audio(url);
         audioRef.current = audio;
-        audio.onended = () => { URL.revokeObjectURL(url); if (handsFreeRef.current) void startListeningRef.current(); };
-        audio.onerror = () => URL.revokeObjectURL(url);
+        audio.onended = () => { URL.revokeObjectURL(url); if (sequence === speechSequenceRef.current) { playbackRef.current = false; if (handsFreeRef.current) void startListeningRef.current(); } };
+        audio.onerror = () => { URL.revokeObjectURL(url); if (sequence === speechSequenceRef.current) { playbackRef.current = false; if (handsFreeRef.current) void startListeningRef.current(); } };
         await audio.play();
         return;
       }
     } catch { /* Browser speech remains the fallback. */ }
-    if (!voiceOnRef.current) return;
+    if (!voiceOnRef.current || sequence !== speechSequenceRef.current) { playbackRef.current = false; return; }
     speakBrowserReply(message);
   }
   function speakBrowserReply(message: string) {
-    if (!("speechSynthesis" in window)) { setError("Spoken replies are not supported in this browser."); return; }
+    if (!("speechSynthesis" in window)) { playbackRef.current = false; setError("Spoken replies are not supported in this browser."); return; }
     window.speechSynthesis.cancel();
     const speech = new SpeechSynthesisUtterance(message);
     // Prefer a natural British male voice, where installed. Browser voice names differ by OS.
@@ -65,22 +75,23 @@ export function JarvisChat() {
     const british = voices.filter(v => /^en[-_]GB$/i.test(v.lang));
     const maleNames = /ryan|george|daniel|oliver|arthur|alfie|thomas|david|mark|james|male/i;
     const preferred = british.find(v => maleNames.test(v.name)) ?? voices.find(v => /^en[-_]/i.test(v.lang) && maleNames.test(v.name));
-    if (!preferred) { setError("No known male browser voice installed. Configure OPENAI_API_KEY for the neural voice, or install a male English voice in Windows."); if (handsFreeRef.current) { handsFreeRef.current = false; setHandsFree(false); } return; }
+    if (!preferred) { playbackRef.current = false; setError("No known male browser voice installed. Check AI Gateway speech access, or install a male English voice in Windows."); if (handsFreeRef.current) { handsFreeRef.current = false; setHandsFree(false); } return; }
     if (preferred) speech.voice = preferred;
     speech.lang = preferred.lang; speech.rate = 0.94; speech.pitch = 0.95;
-    speech.onend = () => { if (handsFreeRef.current) void startListeningRef.current(); };
-    speech.onerror = () => { setError("Audio playback failed. Check your browser sound output and Windows volume."); if (handsFreeRef.current) void startListeningRef.current(); };
+    speech.onend = () => { playbackRef.current = false; if (handsFreeRef.current) void startListeningRef.current(); };
+    speech.onerror = () => { playbackRef.current = false; setError("Audio playback failed. Check your browser sound output and Windows volume."); if (handsFreeRef.current) void startListeningRef.current(); };
     window.speechSynthesis.speak(speech);
   }
   function setVoice(enabled: boolean) {
     voiceOnRef.current = enabled; setVoiceOn(enabled);
-    if (!enabled) { handsFreeRef.current = false; setHandsFree(false); recognition.current?.stop(); window.speechSynthesis?.cancel(); audioRef.current?.pause(); }
+    if (!enabled) { ++speechSequenceRef.current; playbackRef.current = false; handsFreeRef.current = false; setHandsFree(false); recognition.current?.stop(); window.speechSynthesis?.cancel(); audioRef.current?.pause(); }
   }
   async function send(text?: string) {
     const content = (text ?? draft).trim();
     if (!content || busyRef.current) return;
     busyRef.current = true;
     recognition.current?.stop();
+    listeningRef.current = false;
     const next: Message[] = [...messagesRef.current, { role: "user" as const, content }].slice(-24);
     messagesRef.current = next; setMessages(next); setDraft(""); setBusy(true); setError("");
     try {
@@ -107,14 +118,15 @@ export function JarvisChat() {
     finally { setSavingTask(false); }
   }
   async function startListening() {
-    if (busyRef.current) { setMicStatus("Wait for Jarvis to finish responding"); return; }
-    if (recognition.current && listening) { recognition.current.stop(); setMicStatus("Stopped"); return; }
+    if (busyRef.current || playbackRef.current || startingRef.current || listeningRef.current) return;
+    startingRef.current = true;
     setMicStatus("Checking microphone...");
     const browser = window as SpeechWindow;
     const Constructor = browser.SpeechRecognition ?? browser.webkitSpeechRecognition;
-    if (!Constructor) { setMicStatus("Speech recognition unsupported"); setError("This browser does not support speech recognition. Open Buxme in Chrome or Edge."); return; }
-    if (!navigator.mediaDevices?.getUserMedia) { setMicStatus("Microphone access unavailable"); setError("Microphone access requires HTTPS and a supported browser."); return; }
-    try { const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); stream.getTracks().forEach(track => track.stop()); } catch (e) { handsFreeRef.current = false; setHandsFree(false); setMicStatus("Microphone permission or device blocked"); setError("Browser cannot access your microphone. Allow microphone access for buxme.co in browser site settings and Windows privacy settings. " + (e instanceof Error ? e.message : "")); return; }
+    if (!Constructor) { startingRef.current = false; handsFreeRef.current = false; setHandsFree(false); setMicStatus("Speech recognition unsupported"); setError("This browser does not support speech recognition. Open Buxme in Chrome or Edge."); return; }
+    if (!navigator.mediaDevices?.getUserMedia) { startingRef.current = false; handsFreeRef.current = false; setHandsFree(false); setMicStatus("Microphone access unavailable"); setError("Microphone access requires HTTPS and a supported browser."); return; }
+    try { if (!microphoneReadyRef.current) { const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); stream.getTracks().forEach(track => track.stop()); microphoneReadyRef.current = true; } } catch (e) { startingRef.current = false; handsFreeRef.current = false; setHandsFree(false); setMicStatus("Microphone permission or device blocked"); setError("Browser cannot access your microphone. Allow microphone access for buxme.co in browser site settings and Windows privacy settings. " + (e instanceof Error ? e.message : "")); return; }
+    if (busyRef.current || playbackRef.current || !voiceOnRef.current) { startingRef.current = false; return; }
     window.speechSynthesis?.cancel();
     setVoice(true); setError("");
     const instance = new Constructor();
@@ -125,12 +137,12 @@ export function JarvisChat() {
       if (transcript) { setMicStatus("Heard: " + transcript); void send(transcript); } else setMicStatus("No words recognized");
     };
     instance.onerror = event => { if (event.error !== "no-speech") { handsFreeRef.current = false; setHandsFree(false); } setMicStatus("Speech recognition error: " + event.error); setError(event.error === "not-allowed" ? "Microphone blocked. Click the lock icon beside buxme.co, allow Microphone, and reload." : event.error === "no-speech" ? "No speech detected. Check the selected Windows microphone and try again." : event.error === "audio-capture" ? "No microphone detected. Check Windows Settings > Privacy & security > Microphone." : "Microphone error: " + event.error); setListening(false); };
-    instance.onend = () => { setListening(false); setMicStatus(current => current === "Listening..." ? "Listening ended without a transcript" : current); if (handsFreeRef.current && !busyRef.current) void startListeningRef.current(); };
-    try { instance.start(); setListening(true); setMicStatus("Listening..."); } catch (e) { setMicStatus("Speech recognition failed to start"); setError("Could not start speech recognition: " + (e instanceof Error ? e.message : "unknown error")); setListening(false); }
+    instance.onend = () => { if (recognition.current !== instance) return; listeningRef.current = false; recognition.current = null; setListening(false); setMicStatus(current => current === "Listening..." ? "Listening ended without a transcript" : current); if (handsFreeRef.current && !busyRef.current) void startListeningRef.current(); };
+    try { instance.start(); startingRef.current = false; listeningRef.current = true; setListening(true); setMicStatus("Listening..."); } catch (e) { setMicStatus("Speech recognition failed to start"); setError("Could not start speech recognition: " + (e instanceof Error ? e.message : "unknown error")); setListening(false); }
   }
   startListeningRef.current = startListening;
   async function toggleHandsFree() {
-    if (handsFreeRef.current) { handsFreeRef.current = false; setHandsFree(false); recognition.current?.stop(); audioRef.current?.pause(); window.speechSynthesis?.cancel(); setMicStatus("Hands-free stopped"); return; }
+    if (handsFreeRef.current) { ++speechSequenceRef.current; playbackRef.current = false; handsFreeRef.current = false; setHandsFree(false); recognition.current?.stop(); audioRef.current?.pause(); window.speechSynthesis?.cancel(); setMicStatus("Hands-free stopped"); return; }
     handsFreeRef.current = true; setHandsFree(true); setVoice(true); await startListening();
   }
   return <section className="rounded-2xl border border-white/10 bg-slate-900 p-5">
