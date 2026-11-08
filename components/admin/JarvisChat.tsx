@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import { useEffect, useRef, useState } from "react";
 
 type Message = { role: "user" | "assistant"; content: string };
@@ -38,7 +38,7 @@ export function JarvisChat() {
     if (!content || busyRef.current) return;
     busyRef.current = true;
     recognition.current?.stop();
-    const next: Message[] = [...messagesRef.current, { role: "user", content }].slice(-24);
+    const next: Message[] = [...messagesRef.current, { role: "user" as const, content }].slice(-24);
     messagesRef.current = next; setMessages(next); setDraft(""); setBusy(true); setError("");
     try {
       const response = await fetch("/api/admin/jarvis-chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: next }) });
