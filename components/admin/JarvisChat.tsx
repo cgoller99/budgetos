@@ -51,6 +51,12 @@ export function JarvisChat() {
     audioRef.current = null;
     try {
       const response = await fetch("/api/admin/jarvis-speech", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: message.slice(0, 2400) }) });
+      if (!response.ok) {
+        const details = await response.json().catch(() => null) as { error?: string } | null;
+        setError(details?.error || "Neural voice unavailable. Check Vercel AI Gateway speech access.");
+        playbackRef.current = false;
+        return;
+      }
       if (response.ok) {
         const blob = await response.blob();
         if (!voiceOnRef.current || sequence !== speechSequenceRef.current) return;
@@ -62,7 +68,7 @@ export function JarvisChat() {
         await audio.play();
         return;
       }
-    } catch { /* Browser speech remains the fallback. */ }
+    } catch { setError("Neural voice request failed. Check your connection and Vercel AI Gateway."); playbackRef.current = false; return; }
     if (!voiceOnRef.current || sequence !== speechSequenceRef.current) { playbackRef.current = false; return; }
     speakBrowserReply(message);
   }
