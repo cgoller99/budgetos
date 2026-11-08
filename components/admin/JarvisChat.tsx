@@ -85,9 +85,9 @@ export function JarvisChat() {
       const transcript = Array.from(event.results).map(result => result[0]?.transcript ?? "").join(" ").trim();
       if (transcript) void send(transcript);
     };
-    instance.onerror = event => { setError(event.error === "not-allowed" ? "Microphone permission denied. Allow microphone access in your browser." : "Microphone error: " + event.error); setListening(false); };
+    instance.onerror = event => { setError(event.error === "not-allowed" ? "Microphone blocked. Click the lock icon beside buxme.co, allow Microphone, and reload." : event.error === "no-speech" ? "No speech detected. Check the selected Windows microphone and try again." : event.error === "audio-capture" ? "No microphone detected. Check Windows Settings > Privacy & security > Microphone." : "Microphone error: " + event.error); setListening(false); };
     instance.onend = () => setListening(false);
-    try { instance.start(); setListening(true); } catch { setError("Could not start the microphone."); setListening(false); }
+    try { instance.start(); setListening(true); } catch { setError("Could not start the microphone. Check browser site permissions and Windows microphone access."); setListening(false); }
   }
   return <section className="rounded-2xl border border-white/10 bg-slate-900 p-5">
     <h2 className="text-lg font-semibold">Talk to Jarvis</h2>
@@ -101,8 +101,8 @@ export function JarvisChat() {
     {error && <p role="alert" className="mt-3 text-sm text-amber-300">{error}</p>}
     <form onSubmit={e => { e.preventDefault(); void send(); }} className="mt-4 flex flex-wrap gap-2">
       <input aria-label="Message Jarvis" value={draft} onChange={e => setDraft(e.target.value)} maxLength={3000} placeholder="Message Jarvis..." className="min-w-0 flex-1 rounded-xl border border-white/20 bg-slate-950 px-4 py-3 text-sm text-white" />
-      <button type="button" onClick={startListening} disabled={busy} aria-pressed={listening} className={listening ? "rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold" : "rounded-xl border border-white/20 bg-slate-800 px-4 py-3 text-sm font-semibold"}>{listening ? "Stop listening" : "🎙 Speak"}</button>
-      <button type="button" onClick={() => setVoice(!voiceOn)} aria-pressed={voiceOn} className="rounded-xl border border-white/20 bg-slate-800 px-4 py-3 text-sm">{voiceOn ? "🔊 Voice on" : "🔇 Voice off"}</button>
+      <button type="button" onClick={startListening} disabled={busy} aria-pressed={listening} className={listening ? "rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold" : "rounded-xl border border-white/20 bg-slate-800 px-4 py-3 text-sm font-semibold"}>{listening ? "Stop listening" : "Speak"}</button>
+      <button type="button" onClick={() => setVoice(!voiceOn)} aria-pressed={voiceOn} className="rounded-xl border border-white/20 bg-slate-800 px-4 py-3 text-sm">{voiceOn ? "Voice on" : "Voice off"}</button>
       <button type="button" onClick={() => void saveTask()} disabled={busy || savingTask || !draft.trim()} className="rounded-xl border border-blue-500 px-4 py-3 text-sm font-semibold">Save as task</button>
       <button type="submit" disabled={busy || !draft.trim()} className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold disabled:opacity-50">Send</button>
     </form>
