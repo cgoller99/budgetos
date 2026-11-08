@@ -25,6 +25,7 @@ export function JarvisChat() {
   const [micStatus, setMicStatus] = useState("Ready to check microphone");
   const [voiceOn, setVoiceOn] = useState(false);
   const recognition = useRef<SpeechRecognizer | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const voiceOnRef = useRef(false);
   const busyRef = useRef(false);
   const messagesRef = useRef<Message[]>([]);
@@ -32,7 +33,27 @@ export function JarvisChat() {
     recognition.current?.stop();
     if (typeof window !== "undefined") window.speechSynthesis?.cancel();
   }, []);
-  function speakReply(message: string) {
+  async function speakReply(message: string) {
+    audioRef.current?.pause();
+    audioRef.current = null;
+    try {
+      const response = await fetch("/api/admin/jarvis-speech", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: message.slice(0, 2400) }) });
+      if (response.ok) {
+        const blob = await response.blob();
+        if (!voiceOnRef.current) return;
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        audioRef.current = audio;
+        audio.onended = () => URL.revokeObjectURL(url);
+        audio.onerror = () => URL.revokeObjectURL(url);
+        await audio.play();
+        return;
+      }
+    } catch { /* Browser speech remains the fallback. */ }
+    if (!voiceOnRef.current) return;
+    speakBrowserReply(message);
+  }
+  function speakBrowserReply(message: string) {
     if (!("speechSynthesis" in window)) { setError("Spoken replies are not supported in this browser."); return; }
     window.speechSynthesis.cancel();
     const speech = new SpeechSynthesisUtterance(message);
@@ -48,7 +69,7 @@ export function JarvisChat() {
   }
   function setVoice(enabled: boolean) {
     voiceOnRef.current = enabled; setVoiceOn(enabled);
-    if (!enabled) window.speechSynthesis?.cancel();
+    if (!enabled) { window.speechSynthesis?.cancel(); audioRef.current?.pause(); }
   }
   async function send(text?: string) {
     const content = (text ?? draft).trim();
@@ -63,8 +84,8 @@ export function JarvisChat() {
       if (!response.ok || typeof data.reply !== "string") throw new Error(data.error || "Chat unavailable");
       const updated: Message[] = [...next, { role: "assistant", content: data.reply }];
       messagesRef.current = updated; setMessages(updated);
-      if (voiceOnRef.current) speakReply(data.reply);
-    } catch (e) { const failure = e instanceof Error ? e.message : "Chat unavailable"; setError(failure); if (voiceOnRef.current) speakReply("I cannot connect to my AI service yet. Please check the message on screen."); }
+      if (voiceOnRef.current) void speakReply(data.reply);
+    } catch (e) { const failure = e instanceof Error ? e.message : "Chat unavailable"; setError(failure); if (voiceOnRef.current) void speakReply("I cannot connect to my AI service yet. Please check the message on screen."); }
     finally { busyRef.current = false; setBusy(false); }
   }
   async function saveTask() {
@@ -116,8 +137,8 @@ export function JarvisChat() {
     <form onSubmit={e => { e.preventDefault(); void send(); }} className="mt-4 flex flex-wrap gap-2">
       <input aria-label="Message Jarvis" value={draft} onChange={e => setDraft(e.target.value)} maxLength={3000} placeholder="Message Jarvis..." className="min-w-0 flex-1 rounded-xl border border-white/20 bg-slate-950 px-4 py-3 text-sm text-white" />
       <button type="button" onClick={startListening} disabled={busy} aria-pressed={listening} className={listening ? "rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold" : "rounded-xl border border-white/20 bg-slate-800 px-4 py-3 text-sm font-semibold"}>{listening ? "Stop listening" : "Speak"}</button>
-      <button type="button" onClick={() => { setVoice(!voiceOn); if (!voiceOn) speakReply("Voice is on. I will speak my replies."); }} aria-pressed={voiceOn} className="rounded-xl border border-white/20 bg-slate-800 px-4 py-3 text-sm">{voiceOn ? "Voice on" : "Voice off"}</button>
-      <button type="button" onClick={() => speakReply(messagesRef.current.filter(m => m.role === "assistant").at(-1)?.content || "No Jarvis reply yet.")} className="rounded-xl border border-white/20 bg-slate-800 px-4 py-3 text-sm">Replay reply</button>
+      <button type="button" onClick={() => { setVoice(!voiceOn); if (!voiceOn) void speakReply("Voice is on. I will speak my replies."); }} aria-pressed={voiceOn} className="rounded-xl border border-white/20 bg-slate-800 px-4 py-3 text-sm">{voiceOn ? "Voice on" : "Voice off"}</button>
+      <button type="button" onClick={() => { setVoice(true); void speakReply(messagesRef.current.filter(m => m.role === "assistant").at(-1)?.content || "No Jarvis reply yet."); }} className="rounded-xl border border-white/20 bg-slate-800 px-4 py-3 text-sm">Replay reply</button>
       <button type="button" onClick={() => void saveTask()} disabled={busy || savingTask || !draft.trim()} className="rounded-xl border border-blue-500 px-4 py-3 text-sm font-semibold">Save as task</button>
       <button type="submit" disabled={busy || !draft.trim()} className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold disabled:opacity-50">Send</button>
     </form>
