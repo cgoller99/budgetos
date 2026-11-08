@@ -24,6 +24,9 @@ export function JarvisChat() {
   const [listening, setListening] = useState(false);
   const [micStatus, setMicStatus] = useState("Ready to check microphone");
   const [voiceOn, setVoiceOn] = useState(false);
+  const [handsFree, setHandsFree] = useState(false);
+  const handsFreeRef = useRef(false);
+  const startListeningRef = useRef<() => Promise<void>>(async () => {});
   const recognition = useRef<SpeechRecognizer | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const voiceOnRef = useRef(false);
@@ -44,7 +47,7 @@ export function JarvisChat() {
         const url = URL.createObjectURL(blob);
         const audio = new Audio(url);
         audioRef.current = audio;
-        audio.onended = () => URL.revokeObjectURL(url);
+        audio.onended = () => { URL.revokeObjectURL(url); if (handsFreeRef.current) void startListeningRef.current(); };
         audio.onerror = () => URL.revokeObjectURL(url);
         await audio.play();
         return;
@@ -60,17 +63,18 @@ export function JarvisChat() {
     // Prefer a natural British male voice, where installed. Browser voice names differ by OS.
     const voices = window.speechSynthesis.getVoices();
     const british = voices.filter(v => /^en[-_]GB$/i.test(v.lang));
-    const maleNames = /ryan|george|daniel|oliver|arthur|alfie|thomas|male/i;
+    const maleNames = /ryan|george|daniel|oliver|arthur|alfie|thomas|david|mark|james|male/i;
     const preferred = british.find(v => maleNames.test(v.name)) ?? voices.find(v => /^en[-_]/i.test(v.lang) && maleNames.test(v.name));
-    if (!preferred) { setError("No British male voice is installed. Add a male English voice in Windows speech settings for the intended Jarvis sound."); return; }
+    if (!preferred) { setError("No known male browser voice installed. Configure OPENAI_API_KEY for the neural voice, or install a male English voice in Windows."); if (handsFreeRef.current) { handsFreeRef.current = false; setHandsFree(false); } return; }
     if (preferred) speech.voice = preferred;
     speech.lang = preferred.lang; speech.rate = 0.94; speech.pitch = 0.95;
-    speech.onerror = () => setError("Audio playback failed. Check your browser sound output and Windows volume.");
+    speech.onend = () => { if (handsFreeRef.current) void startListeningRef.current(); };
+    speech.onerror = () => { setError("Audio playback failed. Check your browser sound output and Windows volume."); if (handsFreeRef.current) void startListeningRef.current(); };
     window.speechSynthesis.speak(speech);
   }
   function setVoice(enabled: boolean) {
     voiceOnRef.current = enabled; setVoiceOn(enabled);
-    if (!enabled) { window.speechSynthesis?.cancel(); audioRef.current?.pause(); }
+    if (!enabled) { handsFreeRef.current = false; setHandsFree(false); recognition.current?.stop(); window.speechSynthesis?.cancel(); audioRef.current?.pause(); }
   }
   async function send(text?: string) {
     const content = (text ?? draft).trim();
@@ -87,7 +91,7 @@ export function JarvisChat() {
       messagesRef.current = updated; setMessages(updated);
       if (voiceOnRef.current) void speakReply(data.reply);
     } catch (e) { const failure = e instanceof Error ? e.message : "Chat unavailable"; setError(failure); if (voiceOnRef.current) void speakReply("I cannot connect to my AI service yet. Please check the message on screen."); }
-    finally { busyRef.current = false; setBusy(false); }
+    finally { busyRef.current = false; setBusy(false); if (handsFreeRef.current && !voiceOnRef.current) void startListeningRef.current(); }
   }
   async function saveTask() {
     const goal = draft.trim();
@@ -104,13 +108,13 @@ export function JarvisChat() {
   }
   async function startListening() {
     if (busyRef.current) { setMicStatus("Wait for Jarvis to finish responding"); return; }
-    if (listening) { recognition.current?.stop(); setMicStatus("Stopped"); return; }
+    if (recognition.current && listening) { recognition.current.stop(); setMicStatus("Stopped"); return; }
     setMicStatus("Checking microphone...");
     const browser = window as SpeechWindow;
     const Constructor = browser.SpeechRecognition ?? browser.webkitSpeechRecognition;
     if (!Constructor) { setMicStatus("Speech recognition unsupported"); setError("This browser does not support speech recognition. Open Buxme in Chrome or Edge."); return; }
     if (!navigator.mediaDevices?.getUserMedia) { setMicStatus("Microphone access unavailable"); setError("Microphone access requires HTTPS and a supported browser."); return; }
-    try { const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); stream.getTracks().forEach(track => track.stop()); } catch (e) { setMicStatus("Microphone permission or device blocked"); setError("Browser cannot access your microphone. Allow microphone access for buxme.co in browser site settings and Windows privacy settings. " + (e instanceof Error ? e.message : "")); return; }
+    try { const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); stream.getTracks().forEach(track => track.stop()); } catch (e) { handsFreeRef.current = false; setHandsFree(false); setMicStatus("Microphone permission or device blocked"); setError("Browser cannot access your microphone. Allow microphone access for buxme.co in browser site settings and Windows privacy settings. " + (e instanceof Error ? e.message : "")); return; }
     window.speechSynthesis?.cancel();
     setVoice(true); setError("");
     const instance = new Constructor();
@@ -120,13 +124,18 @@ export function JarvisChat() {
       const transcript = Array.from(event.results).map(result => result[0]?.transcript ?? "").join(" ").trim();
       if (transcript) { setMicStatus("Heard: " + transcript); void send(transcript); } else setMicStatus("No words recognized");
     };
-    instance.onerror = event => { setMicStatus("Speech recognition error: " + event.error); setError(event.error === "not-allowed" ? "Microphone blocked. Click the lock icon beside buxme.co, allow Microphone, and reload." : event.error === "no-speech" ? "No speech detected. Check the selected Windows microphone and try again." : event.error === "audio-capture" ? "No microphone detected. Check Windows Settings > Privacy & security > Microphone." : "Microphone error: " + event.error); setListening(false); };
-    instance.onend = () => { setListening(false); setMicStatus(current => current === "Listening..." ? "Listening ended without a transcript" : current); };
+    instance.onerror = event => { if (event.error !== "no-speech") { handsFreeRef.current = false; setHandsFree(false); } setMicStatus("Speech recognition error: " + event.error); setError(event.error === "not-allowed" ? "Microphone blocked. Click the lock icon beside buxme.co, allow Microphone, and reload." : event.error === "no-speech" ? "No speech detected. Check the selected Windows microphone and try again." : event.error === "audio-capture" ? "No microphone detected. Check Windows Settings > Privacy & security > Microphone." : "Microphone error: " + event.error); setListening(false); };
+    instance.onend = () => { setListening(false); setMicStatus(current => current === "Listening..." ? "Listening ended without a transcript" : current); if (handsFreeRef.current && !busyRef.current) void startListeningRef.current(); };
     try { instance.start(); setListening(true); setMicStatus("Listening..."); } catch (e) { setMicStatus("Speech recognition failed to start"); setError("Could not start speech recognition: " + (e instanceof Error ? e.message : "unknown error")); setListening(false); }
+  }
+  startListeningRef.current = startListening;
+  async function toggleHandsFree() {
+    if (handsFreeRef.current) { handsFreeRef.current = false; setHandsFree(false); recognition.current?.stop(); audioRef.current?.pause(); window.speechSynthesis?.cancel(); setMicStatus("Hands-free stopped"); return; }
+    handsFreeRef.current = true; setHandsFree(true); setVoice(true); await startListening();
   }
   return <section className="rounded-2xl border border-white/10 bg-slate-900 p-5">
     <h2 className="text-lg font-semibold">Talk to Jarvis</h2>
-    <p className="mt-1 text-xs text-slate-400">Private admin conversation. Voice uses your browser microphone and speech playback; Use Save as task to queue a request for review; saving does not execute it.</p>
+    <p className="mt-1 text-xs text-slate-400">Private admin conversation. Start conversation for hands-free back-and-forth; speech recognition requires Chrome or Edge. Voice quality depends on neural voice configuration or installed voices; Use Save as task to queue a request for review; saving does not execute it.</p>
     <div aria-live="polite" className="mt-4 max-h-96 min-h-48 space-y-3 overflow-y-auto rounded-xl bg-slate-950 p-4">
       {messages.length === 0 && <p className="text-sm text-slate-400">Ask Jarvis what to build, investigate, or prioritize for Buxme.</p>}
       {messages.map((m, i) => <div key={i} className={m.role === "user" ? "ml-8 rounded-xl bg-blue-950 p-3 text-sm" : "mr-8 rounded-xl bg-slate-800 p-3 text-sm"}><p className="mb-1 text-xs font-bold text-blue-300">{m.role === "user" ? "You" : "Jarvis"}</p><p className="whitespace-pre-wrap">{m.content}</p></div>)}
@@ -137,6 +146,7 @@ export function JarvisChat() {
     {error && <p role="alert" className="mt-3 text-sm text-amber-300">{error}</p>}
     <form onSubmit={e => { e.preventDefault(); void send(); }} className="mt-4 flex flex-wrap gap-2">
       <input aria-label="Message Jarvis" value={draft} onChange={e => setDraft(e.target.value)} maxLength={3000} placeholder="Message Jarvis..." className="min-w-0 flex-1 rounded-xl border border-white/20 bg-slate-950 px-4 py-3 text-sm text-white" />
+      <button type="button" onClick={() => void toggleHandsFree()} aria-pressed={handsFree} className={handsFree ? "rounded-xl bg-emerald-700 px-4 py-3 text-sm font-semibold" : "rounded-xl border border-emerald-500 px-4 py-3 text-sm font-semibold"}>{handsFree ? "End conversation" : "Start conversation"}</button>
       <button type="button" onClick={startListening} disabled={busy} aria-pressed={listening} className={listening ? "rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold" : "rounded-xl border border-white/20 bg-slate-800 px-4 py-3 text-sm font-semibold"}>{listening ? "Stop listening" : "Speak"}</button>
       <button type="button" onClick={() => { setVoice(!voiceOn); if (!voiceOn) void speakReply("Voice is on. I will speak my replies."); }} aria-pressed={voiceOn} className="rounded-xl border border-white/20 bg-slate-800 px-4 py-3 text-sm">{voiceOn ? "Voice on" : "Voice off"}</button>
       <button type="button" onClick={() => { setVoice(true); void speakReply(messagesRef.current.filter(m => m.role === "assistant").at(-1)?.content || "No Jarvis reply yet."); }} className="rounded-xl border border-white/20 bg-slate-800 px-4 py-3 text-sm">Replay reply</button>
