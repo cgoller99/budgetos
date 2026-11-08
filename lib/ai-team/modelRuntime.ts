@@ -484,20 +484,32 @@ export async function createAiTeamPlan(
           label: `${AGENT_ACTIVITY_LABELS[id]} did not complete`,
           detail: "The specialist runtime stopped before producing a usable result.",
         });
-        specialistAbortController.abort(error);
         throw error;
       }
     });
     let briefEntries: Awaited<(typeof specialistPromises)[number]>[];
+    let failedSpecialistCount = 0;
     try {
-      briefEntries = await Promise.all(specialistPromises);
-    } catch (error) {
-      await Promise.allSettled(specialistPromises);
-      throw error;
+      const settled = await Promise.allSettled(specialistPromises);
+      briefEntries = settled.flatMap((entry) =>
+        entry.status === "fulfilled" ? [entry.value] : [],
+      );
+      failedSpecialistCount = settled.length - briefEntries.length;
+      if (abortSignal?.aborted) throwIfMissionAborted(abortSignal);
+      if (briefEntries.length === 0) {
+        throw new Error("All selected AI Team specialists failed.");
+      }
+      if (failedSpecialistCount > 0) {
+        await emitProgress(onProgress, {
+          phase: "specialist",
+          status: "warning",
+          label: "Partial specialist results",
+          detail: String(briefEntries.length) + " specialist(s) completed; " + String(failedSpecialistCount) + " failed. Continuing with verified results only.",
+        });
+      }
     } finally {
       clearTimeout(specialistTimeout);
     }
-
     const specialistBriefs = Object.fromEntries(
       briefEntries.map(([id, result]) => [id, result.output]),
     ) as Record<
@@ -543,7 +555,7 @@ export async function createAiTeamPlan(
     });
     const critic = criticResult.output;
     const specialistContext = JSON.stringify(
-      { ...specialistBriefs, critic },
+      { ...specialistBriefs, critic, specialistFailures: failedSpecialistCount },
       null,
       2,
     );
