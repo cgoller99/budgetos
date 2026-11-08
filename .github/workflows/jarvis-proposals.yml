@@ -1,0 +1,35 @@
+﻿name: Jarvis proposal worker
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 */6 * * *'
+permissions:
+  contents: read
+jobs:
+  proposals:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate worker and queue
+        run: |
+          node scripts/test-jarvis-priority-worker.mjs
+          node scripts/test-jarvis-task-queue.mjs
+      - name: Rank evidence-backed proposals
+        run: |
+          mkdir -p jarvis-output
+          node scripts/jarvis-priority-worker.mjs data/jarvis-signals.json jarvis-output/priorities.json
+      - name: Produce read-only task snapshot
+        run: |
+          mkdir -p jarvis-output
+          node scripts/jarvis-task-queue.mjs list > jarvis-output/task-queue.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jarvis-proposal-snapshot
+          path: jarvis-output/
+          retention-days: 7
+
+

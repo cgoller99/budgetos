@@ -123,6 +123,12 @@ export type AdminRevenueMetrics = {
   freeUsers: number;
   proUsers: number;
   proPlusUsers: number;
+  appleLinkedUsers: number;
+  stripeLinkedUsers: number;
+  complimentaryUsers: number;
+  pastDueUsers: number;
+  stripeActiveSubscriptions: number;
+  stripePastDueSubscriptions: number;
   churnRate: number;
   newSubscriptions: number;
   cancellations: number;

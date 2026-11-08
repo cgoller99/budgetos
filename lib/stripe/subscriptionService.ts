@@ -475,7 +475,23 @@ export async function syncSubscriptionToProfile(
     return;
   }
 
-  const profile = await loadProfileByCustomerId(customerId);
+  let profile = await loadProfileByCustomerId(customerId);
+
+  // A completed checkout can reach this webhook before the customer ID is
+  // persisted. Stripe's own subscription metadata links the Buxme user.
+  if (!profile && subscription.metadata?.user_id) {
+    const candidate = await loadProfileByUserId(
+      createSupabaseAdminClient(),
+      subscription.metadata.user_id,
+    );
+    if (
+      candidate &&
+      (!candidate.stripe_customer_id || candidate.stripe_customer_id === customerId) &&
+      (!candidate.stripe_subscription_id || candidate.stripe_subscription_id === subscription.id)
+    ) {
+      profile = candidate;
+    }
+  }
 
   if (!profile) {
     console.warn(

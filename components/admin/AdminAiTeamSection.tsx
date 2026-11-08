@@ -142,6 +142,29 @@ const TABS: Array<{ id: TabId; label: string }> = [
 ];
 
 export function AdminAiTeamSection() {
+  const [jarvisTelemetry, setJarvisTelemetry] = useState<{
+    connected: boolean;
+    reason?: string;
+    commits: Array<{ sha: string; message: string; at: string | null; url: string }>;
+    workerOnline: null;
+    queueConnected: boolean;
+  } | null>(null);
+  useEffect(() => {
+    let active = true;
+    const refresh = async () => {
+      try {
+        const response = await fetch("/api/admin/jarvis", { cache: "no-store" });
+        if (!response.ok) throw new Error("Telemetry request failed");
+        const data = await response.json();
+        if (active) setJarvisTelemetry(data);
+      } catch {
+        if (active) setJarvisTelemetry({ connected: false, reason: "Telemetry unavailable.", commits: [], workerOnline: null, queueConnected: false });
+      }
+    };
+    void refresh();
+    const interval = window.setInterval(() => void refresh(), 60000);
+    return () => { active = false; window.clearInterval(interval); };
+  }, []);
   const [activeTab, setActiveTab] = useState<TabId>("command");
   const [agents, setAgents] = useState<AiTeamAgent[]>([]);
   const [runtime, setRuntime] = useState<AiTeamRuntimeInfo | null>(null);
@@ -774,6 +797,53 @@ export function AdminAiTeamSection() {
 
   return (
     <section id="ai-team" className="scroll-mt-28 space-y-5" aria-label="Buxme OS V5.3 Mission Control">
+      <div className="rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-soft)] p-4" aria-label="Jarvis coding worker">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="font-semibold text-[var(--foreground)]">Jarvis - Coding Worker</h3>
+          <Badge variant="warning">Integration in progress</Badge>
+        </div>
+        <p className="mt-2 text-sm text-[var(--text-secondary)]">
+          Jarvis can generate review-only code proposals in an isolated development branch. This dashboard does not yet receive live worker telemetry; do not interpret this card as an online or running indicator.
+        </p>
+        <p className="mt-2 text-xs text-[var(--text-muted)]">Last verified: AI Gateway request succeeded; first patch proposal failed exact-match validation. No code was applied or deployed.</p>
+        <div className="mt-3 flex flex-wrap gap-4 text-sm">
+          <a className="text-[var(--accent-light)] underline underline-offset-2" href="https://github.com/cgoller99/budgetos/tree/jarvis/integrate-20261105" target="_blank" rel="noopener noreferrer">View Jarvis branch</a>
+          <a className="text-[var(--accent-light)] underline underline-offset-2" href="https://github.com/cgoller99/budgetos/commits/jarvis/integrate-20261105" target="_blank" rel="noopener noreferrer">View development activity</a>
+        </div>
+        <div className="mt-3 rounded-xl border border-[var(--surface-border)] p-3 text-sm">
+          <p className="font-medium text-[var(--foreground)]">Development activity</p>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
+            {jarvisTelemetry === null ? "Checking connection…" : jarvisTelemetry.connected ? "GitHub activity connected; local queue and worker heartbeat not connected." : jarvisTelemetry.reason}
+          </p>
+          {jarvisTelemetry?.commits.map((commit) => (
+            <p key={commit.sha} className="mt-2 text-xs text-[var(--text-secondary)]">
+              <a href={commit.url} target="_blank" rel="noopener noreferrer" className="text-[var(--accent-light)] underline">{commit.sha}</a>
+              {" · "}{commit.message}
+              {commit.at ? " · " + new Date(commit.at).toLocaleString() : ""}
+            </p>
+          ))}
+        </div>
+        <div className="mt-4 border-t border-[var(--surface-border)] pt-4" aria-label="Jarvis business headquarters">
+          <h4 className="font-semibold text-[var(--foreground)]">Business headquarters</h4>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">Development preview only. These are planned workstreams, not active autonomous businesses.</p>
+          <div className="mt-3 grid gap-3 md:grid-cols-3">
+            {[
+              { name: "Buxme", focus: "AI Team reliability, engineering and growth", state: "Development" },
+              { name: "Website sales", focus: "Lead research, site previews and proposals", state: "Planned" },
+              { name: "Dropshipping", focus: "Product research, suppliers and margin checks", state: "Planned" },
+            ].map((business) => (
+              <div key={business.name} className="rounded-xl border border-[var(--surface-border)] bg-[var(--surface-subtle)] p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-medium text-[var(--foreground)]">{business.name}</span>
+                  <span className="text-xs text-[var(--text-muted)]">{business.state}</span>
+                </div>
+                <p className="mt-2 text-xs text-[var(--text-secondary)]">{business.focus}</p>
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 text-xs text-[var(--text-muted)]">Advertising: not connected; spending disabled. Customer outreach and phone calls: not connected. Worker heartbeat: not connected. No autonomous execution is active.</p>
+        </div>        <p className="mt-2 text-xs text-[var(--text-muted)]">Payments, authentication, banking, customer data, merges and deployments require approval.</p>
+      </div>
       {error ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200" role="alert">
           <span>{error}</span>

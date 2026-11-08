@@ -31,7 +31,7 @@ export async function getAdminRevenueMetrics(
 ): Promise<AdminRevenueMetrics> {
   const { data: profiles, error } = await adminSupabase
     .from("profiles")
-    .select("subscription_plan, subscription_status");
+    .select("subscription_plan, subscription_status, subscription_provider, apple_original_transaction_id, stripe_subscription_id, admin_founder_granted");
 
   if (error) {
     throw error;
@@ -49,6 +49,11 @@ export async function getAdminRevenueMetrics(
       row.subscription_plan === "pro_plus" &&
       ["active", "trialing", "past_due"].includes(row.subscription_status),
   ).length;
+  const appleLinkedUsers = rows.filter((row) => row.subscription_provider === "apple" || Boolean(row.apple_original_transaction_id)).length;
+  const stripeLinkedUsers = rows.filter((row) => row.subscription_provider === "stripe" || Boolean(row.stripe_subscription_id)).length;
+  const complimentaryUsers = rows.filter((row) => row.admin_founder_granted || (row.subscription_plan !== "free" && !row.stripe_subscription_id && !row.apple_original_transaction_id && row.subscription_provider !== "apple" && row.subscription_provider !== "stripe")).length;
+  const pastDueUsers = rows.filter((row) => row.subscription_status === "past_due").length;
+  const breakdown = { appleLinkedUsers, stripeLinkedUsers, complimentaryUsers, pastDueUsers };
 
   if (!isStripeEnabled()) {
     return {
@@ -58,6 +63,9 @@ export async function getAdminRevenueMetrics(
       freeUsers,
       proUsers,
       proPlusUsers,
+      ...breakdown,
+      stripeActiveSubscriptions: 0,
+      stripePastDueSubscriptions: 0,
       churnRate: 0,
       newSubscriptions: 0,
       cancellations: 0,
@@ -67,6 +75,8 @@ export async function getAdminRevenueMetrics(
 
   const stripe = getStripeClient();
   let mrr = 0;
+  let stripeActiveSubscriptions = 0;
+  let stripePastDueSubscriptions = 0;
   let hasMore = true;
   let startingAfter: string | undefined;
   const thirtyDaysAgo = Math.floor((Date.now() - 30 * 24 * 60 * 60 * 1000) / 1000);
@@ -83,6 +93,8 @@ export async function getAdminRevenueMetrics(
     });
 
     for (const subscription of page.data) {
+      if (subscription.status === "active") stripeActiveSubscriptions += 1;
+      if (subscription.status === "past_due") stripePastDueSubscriptions += 1;
       if (subscription.status === "active" || subscription.status === "trialing") {
         mrr += subscriptionMrrContribution(subscription);
       }
@@ -118,6 +130,9 @@ export async function getAdminRevenueMetrics(
     freeUsers,
     proUsers,
     proPlusUsers,
+    ...breakdown,
+    stripeActiveSubscriptions,
+    stripePastDueSubscriptions,
     churnRate,
     newSubscriptions,
     cancellations,

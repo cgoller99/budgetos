@@ -42,3 +42,15 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Jarvis local operational history (may contain sensitive task descriptions)
+data/jarvis-journal.jsonl
+
+data/jarvis-reviews/
+data/jarvis-queue.json
+data/jarvis-queue.json.lock
+data/jarvis-queue.json.tmp
+data/jarvis-verifications/
+data/jarvis-pr-drafts/
+data/jarvis-context/
+data/jarvis-proposals/
