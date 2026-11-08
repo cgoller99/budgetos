@@ -28,7 +28,16 @@ export async function POST(request: Request) {
       abortSignal: AbortSignal.timeout(25000),
     });
     return NextResponse.json({ reply: result.text }, { headers: { "Cache-Control": "no-store" } });
-  } catch {
-    return NextResponse.json({ error: "Jarvis could not respond. Please try again." }, { status: 502 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const status = typeof error === "object" && error !== null && "statusCode" in error ? Number((error as { statusCode?: unknown }).statusCode) : 0;
+    console.error("Jarvis chat model failure", { name: error instanceof Error ? error.name : "Unknown", status, message: message.slice(0, 250) });
+    const guidance = status === 401 || status === 403 ? "Jarvis AI authentication is not authorized. Configure Vercel AI Gateway." :
+      status === 402 ? "Jarvis AI Gateway billing or spending limit is blocking replies." :
+      status === 404 ? "Jarvis AI model is unavailable. Check the configured model." :
+      status === 429 ? "Jarvis AI request limit reached. Try again shortly." :
+      /timeout|abort/i.test(message) ? "Jarvis AI timed out. Try again." :
+      "Jarvis AI request failed. Check AI Gateway model access and billing in Vercel.";
+    return NextResponse.json({ error: guidance }, { status: 502 });
   }
 }
