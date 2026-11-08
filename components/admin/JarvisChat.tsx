@@ -36,7 +36,13 @@ export function JarvisChat() {
     if (!("speechSynthesis" in window)) { setError("Spoken replies are not supported in this browser."); return; }
     window.speechSynthesis.cancel();
     const speech = new SpeechSynthesisUtterance(message);
-    speech.lang = "en-US"; speech.rate = 1;
+    // Prefer a natural British male voice, where installed. Browser voice names differ by OS.
+    const voices = window.speechSynthesis.getVoices();
+    const british = voices.filter(v => /^en[-_]GB$/i.test(v.lang));
+    const maleNames = /ryan|george|daniel|oliver|arthur|alfie|thomas|male/i;
+    const preferred = british.find(v => maleNames.test(v.name)) ?? british.find(v => /natural|neural|premium/i.test(v.name)) ?? british[0];
+    if (preferred) speech.voice = preferred;
+    speech.lang = "en-GB"; speech.rate = 0.93; speech.pitch = 0.88;
     speech.onerror = () => setError("Audio playback failed. Check your browser sound output and Windows volume.");
     window.speechSynthesis.speak(speech);
   }
@@ -57,12 +63,7 @@ export function JarvisChat() {
       if (!response.ok || typeof data.reply !== "string") throw new Error(data.error || "Chat unavailable");
       const updated: Message[] = [...next, { role: "assistant", content: data.reply }];
       messagesRef.current = updated; setMessages(updated);
-      if (voiceOnRef.current && "speechSynthesis" in window) {
-        window.speechSynthesis.cancel();
-        const speech = new SpeechSynthesisUtterance(data.reply);
-        speech.lang = "en-US"; speech.rate = 1;
-        window.speechSynthesis.speak(speech);
-      }
+      if (voiceOnRef.current) speakReply(data.reply);
     } catch (e) { const failure = e instanceof Error ? e.message : "Chat unavailable"; setError(failure); if (voiceOnRef.current) speakReply("I cannot connect to my AI service yet. Please check the message on screen."); }
     finally { busyRef.current = false; setBusy(false); }
   }
