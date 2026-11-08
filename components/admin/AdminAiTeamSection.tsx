@@ -774,6 +774,21 @@ export function AdminAiTeamSection() {
 
   return (
     <section id="ai-team" className="scroll-mt-28 space-y-5" aria-label="Buxme OS V5.3 Mission Control">
+      <div className="rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-soft)] p-4" aria-label="Jarvis coding worker">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="font-semibold text-[var(--foreground)]">Jarvis · Coding Worker</h3>
+          <Badge variant="warning">Integration in progress</Badge>
+        </div>
+        <p className="mt-2 text-sm text-[var(--text-secondary)]">
+          Jarvis can generate review-only code proposals in an isolated development branch. This dashboard does not yet receive live worker telemetry; do not interpret this card as an online or running indicator.
+        </p>
+        <p className="mt-2 text-xs text-[var(--text-muted)]">Last verified: AI Gateway request succeeded; first patch proposal failed exact-match validation. No code was applied or deployed.</p>
+        <div className="mt-3 flex flex-wrap gap-4 text-sm">
+          <a className="text-[var(--accent-light)] underline underline-offset-2" href="https://github.com/cgoller99/budgetos/tree/jarvis/integrate-20261105" target="_blank" rel="noopener noreferrer">View Jarvis branch</a>
+          <a className="text-[var(--accent-light)] underline underline-offset-2" href="https://github.com/cgoller99/budgetos/commits/jarvis/integrate-20261105" target="_blank" rel="noopener noreferrer">View development activity</a>
+        </div>
+        <p className="mt-2 text-xs text-[var(--text-muted)]">Payments, authentication, banking, customer data, merges and deployments require approval.</p>
+      </div>
       {error ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200" role="alert">
           <span>{error}</span>
