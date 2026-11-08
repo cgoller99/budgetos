@@ -1,4 +1,4 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { generateText } from "ai";
 import { requireAdminApiUser } from "@/lib/admin/apiAuth";
 import { isAiTeamModelRuntimeAvailable } from "@/lib/ai-team/modelRuntime";
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
   if (!isAiTeamModelRuntimeAvailable()) return NextResponse.json({ error: "Jarvis conversation AI is not configured yet. Worker activity is available in the Activity tab." }, { status: 503 });
   try {
     const result = await generateText({
-      model: process.env.JARVIS_CHAT_MODEL?.trim() || "openai/gpt-5.6-sol-fast",
+      model: process.env.JARVIS_CHAT_MODEL?.trim() || "openai/gpt-4o-mini",
       system: "You are Jarvis, the Buxme founder's operational assistant. Speak directly and concisely. You can discuss plans and propose tasks, but this chat cannot execute code, send messages, spend money, modify subscriptions, or access private customer records. Never claim to have performed an action or checked live data unless the user supplied proof. For production, payments, authentication, banking, customer data, and outreach, require explicit approval. Do not reveal secrets. Be transparent about what is not connected.",
       messages: messages as Array<{ role: "user" | "assistant"; content: string }>,
       maxOutputTokens: 650,
