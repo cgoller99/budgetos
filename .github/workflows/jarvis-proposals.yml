@@ -19,7 +19,9 @@ jobs:
           node scripts/test-jarvis-priority-worker.mjs
           node scripts/test-jarvis-task-queue.mjs
       - name: Rank evidence-backed proposals
-        run: node scripts/jarvis-priority-worker.mjs data/jarvis-signals.json jarvis-output/priorities.json
+        run: |
+          mkdir -p jarvis-output
+          node scripts/jarvis-priority-worker.mjs data/jarvis-signals.json jarvis-output/priorities.json
       - name: Produce read-only task snapshot
         run: |
           mkdir -p jarvis-output
@@ -29,4 +31,5 @@ jobs:
           name: jarvis-proposal-snapshot
           path: jarvis-output/
           retention-days: 7
+
 
