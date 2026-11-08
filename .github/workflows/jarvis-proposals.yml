@@ -29,7 +29,7 @@ jobs:
       - name: Publish readable run summary
         shell: bash
         run: |
-          node -e 'const fs=require("fs");const r=JSON.parse(fs.readFileSync("jarvis-output/priorities.json","utf8"));const lines=["## Jarvis proposal report","Mode: proposal-only (no changes executed)","",...r.priorities.map((p,i)=>`${i+1}. **${p.title}** (score ${p.score}) — ${p.proposedAction}`)];fs.writeFileSync("jarvis-output/summary.md",lines.join("\n")+"\n");fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,lines.join("\n")+"\n")'
+          node -e 'const fs=require("fs");const r=JSON.parse(fs.readFileSync("jarvis-output/priorities.json","utf8"));const lines=["## Jarvis proposal report","Mode: proposal-only (no changes executed)","",...r.priorities.map((p,i)=>`${i+1}. **${p.title}** (score ${p.score}) - ${p.proposedAction}`)];fs.writeFileSync("jarvis-output/summary.md",lines.join("\n")+"\n");fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,lines.join("\n")+"\n")'
       - uses: actions/upload-artifact@v4
         with:
           name: jarvis-proposal-snapshot
