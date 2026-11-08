@@ -19,6 +19,8 @@ export function JarvisChat() {
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [taskNotice, setTaskNotice] = useState("");
+  const [savingTask, setSavingTask] = useState(false);
   const [listening, setListening] = useState(false);
   const [voiceOn, setVoiceOn] = useState(false);
   const recognition = useRef<SpeechRecognizer | null>(null);
@@ -55,6 +57,19 @@ export function JarvisChat() {
     } catch (e) { setError(e instanceof Error ? e.message : "Chat unavailable"); }
     finally { busyRef.current = false; setBusy(false); }
   }
+  async function saveTask() {
+    const goal = draft.trim();
+    if (!goal || savingTask) return;
+    setSavingTask(true); setTaskNotice(""); setError("");
+    try {
+      const response = await fetch("/api/admin/jarvis-tasks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ goal }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not save task");
+      setDraft("");
+      setTaskNotice("Task saved for review. Jarvis has not executed it.");
+    } catch (e) { setError(e instanceof Error ? e.message : "Could not save task"); }
+    finally { setSavingTask(false); }
+  }
   function startListening() {
     if (busyRef.current) return;
     if (listening) { recognition.current?.stop(); return; }
@@ -76,17 +91,19 @@ export function JarvisChat() {
   }
   return <section className="rounded-2xl border border-white/10 bg-slate-900 p-5">
     <h2 className="text-lg font-semibold">Talk to Jarvis</h2>
-    <p className="mt-1 text-xs text-slate-400">Private admin conversation. Voice uses your browser microphone and speech playback; no actions are executed from chat.</p>
+    <p className="mt-1 text-xs text-slate-400">Private admin conversation. Voice uses your browser microphone and speech playback; Use Save as task to queue a request for review; saving does not execute it.</p>
     <div aria-live="polite" className="mt-4 max-h-96 min-h-48 space-y-3 overflow-y-auto rounded-xl bg-slate-950 p-4">
       {messages.length === 0 && <p className="text-sm text-slate-400">Ask Jarvis what to build, investigate, or prioritize for Buxme.</p>}
       {messages.map((m, i) => <div key={i} className={m.role === "user" ? "ml-8 rounded-xl bg-blue-950 p-3 text-sm" : "mr-8 rounded-xl bg-slate-800 p-3 text-sm"}><p className="mb-1 text-xs font-bold text-blue-300">{m.role === "user" ? "You" : "Jarvis"}</p><p className="whitespace-pre-wrap">{m.content}</p></div>)}
       {busy && <p className="text-sm text-slate-400">Jarvis is responding...</p>}
     </div>
+    {taskNotice && <p role="status" className="mt-3 text-sm text-emerald-300">{taskNotice}</p>}
     {error && <p role="alert" className="mt-3 text-sm text-amber-300">{error}</p>}
     <form onSubmit={e => { e.preventDefault(); void send(); }} className="mt-4 flex flex-wrap gap-2">
       <input aria-label="Message Jarvis" value={draft} onChange={e => setDraft(e.target.value)} maxLength={3000} placeholder="Message Jarvis..." className="min-w-0 flex-1 rounded-xl border border-white/20 bg-slate-950 px-4 py-3 text-sm text-white" />
       <button type="button" onClick={startListening} disabled={busy} aria-pressed={listening} className={listening ? "rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold" : "rounded-xl border border-white/20 bg-slate-800 px-4 py-3 text-sm font-semibold"}>{listening ? "Stop listening" : "🎙 Speak"}</button>
       <button type="button" onClick={() => setVoice(!voiceOn)} aria-pressed={voiceOn} className="rounded-xl border border-white/20 bg-slate-800 px-4 py-3 text-sm">{voiceOn ? "🔊 Voice on" : "🔇 Voice off"}</button>
+      <button type="button" onClick={() => void saveTask()} disabled={busy || savingTask || !draft.trim()} className="rounded-xl border border-blue-500 px-4 py-3 text-sm font-semibold">Save as task</button>
       <button type="submit" disabled={busy || !draft.trim()} className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold disabled:opacity-50">Send</button>
     </form>
   </section>;
