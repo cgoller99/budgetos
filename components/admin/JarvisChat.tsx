@@ -61,9 +61,10 @@ export function JarvisChat() {
     const voices = window.speechSynthesis.getVoices();
     const british = voices.filter(v => /^en[-_]GB$/i.test(v.lang));
     const maleNames = /ryan|george|daniel|oliver|arthur|alfie|thomas|male/i;
-    const preferred = british.find(v => maleNames.test(v.name)) ?? british.find(v => /natural|neural|premium/i.test(v.name)) ?? british[0];
+    const preferred = british.find(v => maleNames.test(v.name)) ?? voices.find(v => /^en[-_]/i.test(v.lang) && maleNames.test(v.name));
+    if (!preferred) { setError("No British male voice is installed. Add a male English voice in Windows speech settings for the intended Jarvis sound."); return; }
     if (preferred) speech.voice = preferred;
-    speech.lang = "en-GB"; speech.rate = 0.93; speech.pitch = 0.88;
+    speech.lang = preferred.lang; speech.rate = 0.94; speech.pitch = 0.95;
     speech.onerror = () => setError("Audio playback failed. Check your browser sound output and Windows volume.");
     window.speechSynthesis.speak(speech);
   }
