@@ -6,8 +6,8 @@ const taskDescription = taskWords.join(" ").trim();
 if (!/^[a-z][a-z0-9-]{2,39}$/.test(taskId ?? "") || !/^[a-z0-9-]+\/[a-z0-9._-]+$/i.test(model ?? "")) throw Error("Usage: node scripts/jarvis-generate-patch.mjs <task-slug> <gateway-provider/model>");
 if (taskDescription.length < 12 || taskDescription.length > 1000) throw Error("Provide a specific task description (12-1000 characters).");
 if (process.env.JARVIS_CODING_ENABLED !== "true") throw Error("Coding model disabled. Set JARVIS_CODING_ENABLED=true explicitly.");
-const key = process.env.AI_GATEWAY_API_KEY;
-if (!key) throw Error("AI_GATEWAY_API_KEY is required. Do not store credentials in the repository.");
+const key = process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN;
+if (!key) throw Error("AI_GATEWAY_API_KEY or VERCEL_OIDC_TOKEN is required. Do not store credentials in the repository.");
 const root = resolve(process.cwd());
 const context = JSON.parse(await readFile(join(root, "data", "jarvis-context", taskId + ".json"), "utf8"));
 if (context.taskId !== taskId || context.mode !== "read_only" || !Array.isArray(context.files) || !context.files.length || context.files.length > 8) throw Error("Invalid coding context.");
@@ -40,4 +40,5 @@ const output = join(root, "data", "jarvis-proposals", taskId + ".json");
 await mkdir(dirname(output), { recursive: true });
 await writeFile(output, JSON.stringify({ taskId, edits: proposal.edits }, null, 2) + "\n", { mode: 0o600 });
 console.log(JSON.stringify({ taskId, edits: proposal.edits.length, output, mode: "proposal_only", next: "Review proposal before applying it to an isolated worktree." }));
+
 
