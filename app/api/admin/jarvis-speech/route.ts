@@ -1,34 +1,31 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { generateSpeech } from "ai";
+import { gateway } from "@ai-sdk/gateway";
 import { requireAdminApiUser } from "@/lib/admin/apiAuth";
+
 export const dynamic = "force-dynamic";
+
 export async function POST(request: Request) {
   const auth = await requireAdminApiUser();
   if ("response" in auth) return auth.response;
-  const key = process.env.OPENAI_API_KEY?.trim();
-  if (!key) return NextResponse.json({ error: "Neural voice not configured; browser voice available." }, { status: 503 });
   let body: unknown;
   try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid request" }, { status: 400 }); }
   const text = body && typeof body === "object" ? (body as { text?: unknown }).text : null;
   if (typeof text !== "string" || !text.trim() || text.length > 2400) return NextResponse.json({ error: "Invalid speech text" }, { status: 400 });
   try {
-    const response = await fetch("https://api.openai.com/v1/audio/speech", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "gpt-4o-mini-tts",
-        voice: "onyx",
-        input: text,
-        response_format: "mp3",
-        instructions: "A composed, confident British male AI butler. Refined English accent, warm baritone, measured pace, crisp articulation, subtle dry wit. Professional and natural, never cartoonish. Do not imitate a specific actor or character's distinctive voice.",
-      }),
-      signal: AbortSignal.timeout(20000),
+    // Vercel deployment OIDC authenticates AI Gateway without an OpenAI API key.
+    const result = await generateSpeech({
+      model: gateway.speechModel("openai/gpt-4o-mini-tts"),
+      text,
+      voice: "onyx",
+      instructions: "A composed, confident British male AI butler. Warm low baritone, refined English accent, measured pace, crisp articulation, subtle dry wit. Natural conversational delivery. Do not imitate a specific actor or character.",
+      outputFormat: "mp3",
+      abortSignal: AbortSignal.timeout(20000),
+      maxRetries: 0,
     });
-    if (!response.ok) {
-      console.error("Jarvis neural speech failed", response.status);
-      return NextResponse.json({ error: "Neural speech unavailable; using browser voice." }, { status: 502 });
-    }
-    return new Response(response.body, { headers: { "Content-Type": "audio/mpeg", "Cache-Control": "no-store" } });
-  } catch {
-    return NextResponse.json({ error: "Neural speech timed out; using browser voice." }, { status: 502 });
+    return new Response(new Uint8Array(result.audio.uint8Array), { headers: { "Content-Type": result.audio.mediaType || "audio/mpeg", "Cache-Control": "no-store", "X-Jarvis-Voice": "neural-gateway" } });
+  } catch (error) {
+    console.error("Jarvis gateway speech failed", { name: error instanceof Error ? error.name : "unknown", message: error instanceof Error ? error.message.slice(0, 200) : "unknown" });
+    return NextResponse.json({ error: "Neural voice temporarily unavailable; check AI Gateway audio model access and spending controls." }, { status: 502 });
   }
 }
