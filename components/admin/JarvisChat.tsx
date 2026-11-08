@@ -22,6 +22,7 @@ export function JarvisChat() {
   const [taskNotice, setTaskNotice] = useState("");
   const [savingTask, setSavingTask] = useState(false);
   const [listening, setListening] = useState(false);
+  const [micStatus, setMicStatus] = useState("Ready to check microphone");
   const [voiceOn, setVoiceOn] = useState(false);
   const recognition = useRef<SpeechRecognizer | null>(null);
   const voiceOnRef = useRef(false);
@@ -70,12 +71,15 @@ export function JarvisChat() {
     } catch (e) { setError(e instanceof Error ? e.message : "Could not save task"); }
     finally { setSavingTask(false); }
   }
-  function startListening() {
-    if (busyRef.current) return;
-    if (listening) { recognition.current?.stop(); return; }
+  async function startListening() {
+    if (busyRef.current) { setMicStatus("Wait for Jarvis to finish responding"); return; }
+    if (listening) { recognition.current?.stop(); setMicStatus("Stopped"); return; }
+    setMicStatus("Checking microphone...");
     const browser = window as SpeechWindow;
     const Constructor = browser.SpeechRecognition ?? browser.webkitSpeechRecognition;
-    if (!Constructor) { setError("Speech recognition is not supported in this browser. Try Chrome or Edge, or type your message."); return; }
+    if (!Constructor) { setMicStatus("Speech recognition unsupported"); setError("This browser does not support speech recognition. Open Buxme in Chrome or Edge."); return; }
+    if (!navigator.mediaDevices?.getUserMedia) { setMicStatus("Microphone access unavailable"); setError("Microphone access requires HTTPS and a supported browser."); return; }
+    try { const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); stream.getTracks().forEach(track => track.stop()); } catch (e) { setMicStatus("Microphone permission or device blocked"); setError("Browser cannot access your microphone. Allow microphone access for buxme.co in browser site settings and Windows privacy settings. " + (e instanceof Error ? e.message : "")); return; }
     window.speechSynthesis?.cancel();
     setVoice(true); setError("");
     const instance = new Constructor();
@@ -83,11 +87,11 @@ export function JarvisChat() {
     instance.lang = "en-US"; instance.interimResults = false; instance.continuous = false;
     instance.onresult = event => {
       const transcript = Array.from(event.results).map(result => result[0]?.transcript ?? "").join(" ").trim();
-      if (transcript) void send(transcript);
+      if (transcript) { setMicStatus("Heard: " + transcript); void send(transcript); } else setMicStatus("No words recognized");
     };
-    instance.onerror = event => { setError(event.error === "not-allowed" ? "Microphone blocked. Click the lock icon beside buxme.co, allow Microphone, and reload." : event.error === "no-speech" ? "No speech detected. Check the selected Windows microphone and try again." : event.error === "audio-capture" ? "No microphone detected. Check Windows Settings > Privacy & security > Microphone." : "Microphone error: " + event.error); setListening(false); };
-    instance.onend = () => setListening(false);
-    try { instance.start(); setListening(true); } catch { setError("Could not start the microphone. Check browser site permissions and Windows microphone access."); setListening(false); }
+    instance.onerror = event => { setMicStatus("Speech recognition error: " + event.error); setError(event.error === "not-allowed" ? "Microphone blocked. Click the lock icon beside buxme.co, allow Microphone, and reload." : event.error === "no-speech" ? "No speech detected. Check the selected Windows microphone and try again." : event.error === "audio-capture" ? "No microphone detected. Check Windows Settings > Privacy & security > Microphone." : "Microphone error: " + event.error); setListening(false); };
+    instance.onend = () => { setListening(false); setMicStatus(current => current === "Listening..." ? "Listening ended without a transcript" : current); };
+    try { instance.start(); setListening(true); setMicStatus("Listening..."); } catch (e) { setMicStatus("Speech recognition failed to start"); setError("Could not start speech recognition: " + (e instanceof Error ? e.message : "unknown error")); setListening(false); }
   }
   return <section className="rounded-2xl border border-white/10 bg-slate-900 p-5">
     <h2 className="text-lg font-semibold">Talk to Jarvis</h2>
@@ -97,6 +101,7 @@ export function JarvisChat() {
       {messages.map((m, i) => <div key={i} className={m.role === "user" ? "ml-8 rounded-xl bg-blue-950 p-3 text-sm" : "mr-8 rounded-xl bg-slate-800 p-3 text-sm"}><p className="mb-1 text-xs font-bold text-blue-300">{m.role === "user" ? "You" : "Jarvis"}</p><p className="whitespace-pre-wrap">{m.content}</p></div>)}
       {busy && <p className="text-sm text-slate-400">Jarvis is responding...</p>}
     </div>
+    <p role="status" className="mt-3 text-xs text-slate-300">Microphone: {micStatus}</p>
     {taskNotice && <p role="status" className="mt-3 text-sm text-emerald-300">{taskNotice}</p>}
     {error && <p role="alert" className="mt-3 text-sm text-amber-300">{error}</p>}
     <form onSubmit={e => { e.preventDefault(); void send(); }} className="mt-4 flex flex-wrap gap-2">
