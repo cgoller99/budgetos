@@ -1,0 +1,22 @@
+[
+  {
+    "id": "growth-conversion-audit",
+    "title": "Audit Buxme signup-to-paid conversion and identify improvements",
+    "source": "growth",
+    "severity": 3,
+    "affectedUsers": 19,
+    "confidence": 0.7,
+    "evidence": ["Owner-reported 19 total users on November 8; conversion funnel requires verification"],
+    "proposedAction": "Prepare a read-only conversion funnel audit and recommendations for owner review"
+  },
+  {
+    "id": "revenue-dashboard-reconciliation",
+    "title": "Investigate Apple and Stripe revenue dashboard reconciliation",
+    "source": "reliability",
+    "severity": 4,
+    "affectedUsers": 5,
+    "confidence": 0.8,
+    "evidence": ["Owner-reported 3 Apple Pro+ and 2 Stripe subscriptions; dashboard reconciliation unresolved"],
+    "proposedAction": "Prepare a read-only reconciliation report without changing billing or entitlements"
+  }
+]
