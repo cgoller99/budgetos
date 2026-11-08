@@ -438,7 +438,13 @@ export function AdminDashboard() {
           <StatCard label="ARR" value={formatCurrency(revenue?.arr ?? 0)} change="" mutedChange />
           <StatCard label="Free Users" value={String(revenue?.freeUsers ?? 0)} change="" mutedChange />
           <StatCard label="Pro Users" value={String(revenue?.proUsers ?? 0)} change="" mutedChange />
-          <StatCard label="Pro+ Users" value={String(revenue?.proPlusUsers ?? 0)} change="" mutedChange />
+          <StatCard label="Pro+ Users" value={String(revenue?.proPlusUsers ?? 0)} change="Profile entitlements" mutedChange />
+          <StatCard label="Apple-linked Users" value={String(revenue?.appleLinkedUsers ?? 0)} change="Not verified Apple payments" mutedChange />
+          <StatCard label="Stripe-linked Users" value={String(revenue?.stripeLinkedUsers ?? 0)} change="Profile-linked accounts" mutedChange />
+          <StatCard label="Complimentary / Unlinked" value={String(revenue?.complimentaryUsers ?? 0)} change="Review entitlements" mutedChange />
+          <StatCard label="Past-due Profiles" value={String(revenue?.pastDueUsers ?? 0)} change="Profile status" mutedChange />
+          <StatCard label="Active Stripe Subscriptions" value={String(revenue?.stripeActiveSubscriptions ?? 0)} change="Stripe billing" mutedChange />
+          <StatCard label="Past-due Stripe Subscriptions" value={String(revenue?.stripePastDueSubscriptions ?? 0)} change="Stripe billing" mutedChange />
           <StatCard label="Churn Rate" value={`${revenue?.churnRate ?? 0}%`} change="Last 30 days" mutedChange positive={false} />
           <StatCard label="New Subscriptions" value={String(revenue?.newSubscriptions ?? 0)} change="Last 30 days" mutedChange />
           <StatCard label="Cancellations" value={String(revenue?.cancellations ?? 0)} change="Last 30 days" mutedChange positive={false} />
