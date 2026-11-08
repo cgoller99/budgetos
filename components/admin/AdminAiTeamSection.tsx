@@ -823,7 +823,26 @@ export function AdminAiTeamSection() {
             </p>
           ))}
         </div>
-        <p className="mt-2 text-xs text-[var(--text-muted)]">Payments, authentication, banking, customer data, merges and deployments require approval.</p>
+        <div className="mt-4 border-t border-[var(--surface-border)] pt-4" aria-label="Jarvis business headquarters">
+          <h4 className="font-semibold text-[var(--foreground)]">Business headquarters</h4>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">Development preview only. These are planned workstreams, not active autonomous businesses.</p>
+          <div className="mt-3 grid gap-3 md:grid-cols-3">
+            {[
+              { name: "Buxme", focus: "AI Team reliability, engineering and growth", state: "Development" },
+              { name: "Website sales", focus: "Lead research, site previews and proposals", state: "Planned" },
+              { name: "Dropshipping", focus: "Product research, suppliers and margin checks", state: "Planned" },
+            ].map((business) => (
+              <div key={business.name} className="rounded-xl border border-[var(--surface-border)] bg-[var(--surface-subtle)] p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-medium text-[var(--foreground)]">{business.name}</span>
+                  <span className="text-xs text-[var(--text-muted)]">{business.state}</span>
+                </div>
+                <p className="mt-2 text-xs text-[var(--text-secondary)]">{business.focus}</p>
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 text-xs text-[var(--text-muted)]">Advertising: not connected; spending disabled. Customer outreach and phone calls: not connected. Worker heartbeat: not connected. No autonomous execution is active.</p>
+        </div>        <p className="mt-2 text-xs text-[var(--text-muted)]">Payments, authentication, banking, customer data, merges and deployments require approval.</p>
       </div>
       {error ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200" role="alert">
