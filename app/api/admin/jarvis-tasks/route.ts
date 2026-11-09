@@ -1,4 +1,5 @@
-﻿import { NextResponse } from "next/server";
+import { coordinateJarvis } from "@/lib/ai-team/jarvisCoordinator.mjs";
+import { NextResponse } from "next/server";
 import { requireAdminApiUser } from "@/lib/admin/apiAuth";
 export const dynamic = "force-dynamic";
 const noCache = { "Cache-Control": "no-store" };
@@ -7,7 +8,18 @@ export async function GET() {
   if ("response" in auth) return auth.response;
   const { data, error } = await auth.adminSupabase.from("ai_team_runs").select("id,goal,created_at,ai_team_tasks(id,title,objective,status,requires_approval,created_at)").eq("created_by", auth.user.id).eq("source", "fallback").order("created_at", { ascending: false }).limit(30);
   if (error) return NextResponse.json({ error: "Task storage unavailable" }, { status: 503 });
-  return NextResponse.json({ runs: data ?? [] }, { headers: noCache });
+  const runs = data ?? [];
+  const tasks = runs.flatMap(run => (run.ai_team_tasks ?? []).map(task => ({
+    ...task, run_id: run.id, created_at: task.created_at ?? run.created_at,
+  })));
+  const assignments = coordinateJarvis(tasks.map(t => t.title));
+  const agentTasks = tasks.map((task, i) => ({
+    ...task,
+    agent: assignments.tasks[i]?.agent ?? null,
+    risk: assignments.tasks[i]?.risk ?? "review_required",
+    execution: "not_started",
+  }));
+  return NextResponse.json({ runs, agentTasks, workers: assignments.workers, mode: "proposal_only" }, { headers: noCache });
 }
 export async function POST(request: Request) {
   const auth = await requireAdminApiUser();
