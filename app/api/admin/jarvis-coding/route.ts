@@ -8,9 +8,25 @@ export async function POST(request: Request) {
   if ("response" in auth) return auth.response;
   let payload: unknown;
   try { payload = await request.json(); } catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
-  const body = payload && typeof payload === "object" ? payload as { task?: unknown; targetFile?: unknown; approved?: unknown } : {};
+  const body = payload && typeof payload === "object" ? payload as { task?: unknown; taskId?: unknown; targetFile?: unknown; approved?: unknown } : {};
   if (body.approved !== true) return NextResponse.json({ error: "Explicit approval is required." }, { status: 403 });
-  const task = body.task;
+  let task = body.task;
+  if (body.taskId !== undefined) {
+    if (typeof body.taskId !== "string" || !/^[0-9a-f-]{36}$/i.test(body.taskId)) return NextResponse.json({ error: "Invalid task ID." }, { status: 400 });
+    const { data: stored, error: lookupError } = await auth.adminSupabase
+      .from("ai_team_tasks")
+      .select("id,title,objective,status,run_id,ai_team_runs!inner(created_by,source)")
+      .eq("id", body.taskId)
+      .eq("ai_team_runs.created_by", auth.user.id)
+      .eq("ai_team_runs.source", "fallback")
+      .single();
+    if (lookupError || !stored) return NextResponse.json({ error: "Task not found." }, { status: 404 });
+    if (stored.status !== "needs_approval") return NextResponse.json({ error: "Task is not awaiting approval." }, { status: 409 });
+    const { coordinateJarvis } = await import("@/lib/ai-team/jarvisCoordinator.mjs");
+    const assignment = coordinateJarvis([stored.title]).tasks[0];
+    if (assignment.agent !== "developer" || assignment.risk !== "review_required") return NextResponse.json({ error: "This task is not approved for developer execution." }, { status: 403 });
+    task = stored.objective;
+  }
   if (typeof task !== "string" || task.trim().length < 3 || task.trim().length > 500 || /[\r\n]/.test(task)) return NextResponse.json({ error: "Task must be 3–500 characters on one line." }, { status: 400 });
   const targetFile = body.targetFile;
   if (typeof targetFile !== "string" || !/^(components|lib|app)\/[a-zA-Z0-9_./-]+\.(tsx?|jsx?|css)$/.test(targetFile) || targetFile.includes("..") || /(^|\/)(admin|auth|stripe|plaid|supabase|billing|payments|webhooks|account|settings|api|migrations)(\/|$)/i.test(targetFile)) return NextResponse.json({ error: "A single non-sensitive source file is required." }, { status: 400 });
@@ -28,6 +44,6 @@ export async function POST(request: Request) {
       console.error("Jarvis coding dispatch failed", result.status);
       return NextResponse.json({ error: result.status === 401 || result.status === 403 ? "GitHub Actions token permission denied." : "GitHub Actions rejected the coding review." }, { status: 502 });
     }
-    return NextResponse.json({ queued: true, mode: "coding_review_only", codeGenerated: false, deployed: false }, { status: 202, headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json({ queued: true, taskId: body.taskId ?? null, mode: "patch_proposal_only", codeGenerated: false, deployed: false }, { status: 202, headers: { "Cache-Control": "no-store" } });
   } catch { return NextResponse.json({ error: "GitHub Actions connection failed." }, { status: 502 }); }
 }
