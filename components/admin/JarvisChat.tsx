@@ -124,15 +124,15 @@ export function JarvisChat() {
     } catch (e) { setError(e instanceof Error ? e.message : "Could not save task"); }
     finally { setSavingTask(false); }
   }
-  async function dispatchTask() {
-    const goal = draft.trim();
+  async function dispatchTask(taskText?: string) {
+    const goal = (taskText ?? draft).trim();
     if (!goal || dispatching) return;
     setDispatching(true); setTaskNotice(""); setError("");
     try {
       const response = await fetch("/api/admin/jarvis-dispatch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ goal }) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Worker dispatch failed");
-      setDraft("");
+      if (!taskText) setDraft("");
       setTaskNotice("Sent to GitHub Actions for proposal review. No code has been executed.");
     } catch (e) { setError(e instanceof Error ? e.message : "Worker dispatch failed"); }
     finally { setDispatching(false); }
@@ -167,7 +167,7 @@ export function JarvisChat() {
   }
   return <section className="rounded-2xl border border-white/10 bg-slate-900 p-5">
     <h2 className="text-lg font-semibold">Talk to Jarvis</h2>
-    <p className="mt-1 text-xs text-slate-400">Private admin conversation. Start conversation for hands-free back-and-forth; speech recognition requires Chrome or Edge. Voice quality depends on neural voice configuration or installed voices; Use Save as task to queue a request for review; saving does not execute it.</p>
+    <p className="mt-1 text-xs text-slate-400">Private admin conversation. Start conversation for hands-free back-and-forth; speech recognition requires Chrome or Edge. Send last instruction forwards your most recent spoken or typed request to GitHub Actions for proposal review; no code is executed automatically.</p>
     <div aria-live="polite" className="mt-4 max-h-96 min-h-48 space-y-3 overflow-y-auto rounded-xl bg-slate-950 p-4">
       {messages.length === 0 && <p className="text-sm text-slate-400">Ask Jarvis what to build, investigate, or prioritize for Buxme.</p>}
       {messages.map((m, i) => <div key={i} className={m.role === "user" ? "ml-8 rounded-xl bg-blue-950 p-3 text-sm" : "mr-8 rounded-xl bg-slate-800 p-3 text-sm"}><p className="mb-1 text-xs font-bold text-blue-300">{m.role === "user" ? "You" : "Jarvis"}</p><p className="whitespace-pre-wrap">{m.content}</p></div>)}
@@ -183,6 +183,7 @@ export function JarvisChat() {
       <button type="button" onClick={() => { setVoice(!voiceOn); if (!voiceOn) void speakReply("Voice is on. I will speak my replies."); }} aria-pressed={voiceOn} className="rounded-xl border border-white/20 bg-slate-800 px-4 py-3 text-sm">{voiceOn ? "Voice on" : "Voice off"}</button>
       <button type="button" onClick={() => { setVoice(true); void speakReply(messagesRef.current.filter(m => m.role === "assistant").at(-1)?.content || "No Jarvis reply yet."); }} className="rounded-xl border border-white/20 bg-slate-800 px-4 py-3 text-sm">Replay reply</button>
       <button type="button" onClick={() => void saveTask()} disabled={busy || savingTask || !draft.trim()} className="rounded-xl border border-blue-500 px-4 py-3 text-sm font-semibold">Save as task</button>
+      <button type="button" onClick={() => { const last = [...messagesRef.current].reverse().find(m => m.role === "user"); if (last) void dispatchTask(last.content); }} disabled={busy || dispatching || !messages.some(m => m.role === "user")} className="rounded-xl border border-purple-500/60 px-4 py-3 text-sm font-semibold disabled:opacity-50">Send last instruction</button>
       <button type="button" onClick={() => void dispatchTask()} disabled={busy || dispatching || !draft.trim()} className="rounded-xl border border-purple-500 px-4 py-3 text-sm font-semibold disabled:opacity-50">{dispatching ? "Sending..." : "Send to worker"}</button>
       <button type="submit" disabled={busy || !draft.trim()} className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold disabled:opacity-50">Send</button>
     </form>
