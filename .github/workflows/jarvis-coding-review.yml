@@ -1,4 +1,4 @@
-﻿name: Jarvis isolated coding review
+name: Jarvis isolated coding review
 on:
   workflow_dispatch:
     inputs:
@@ -41,6 +41,13 @@ jobs:
           node scripts/test-jarvis-founder-task.mjs
           node scripts/test-jarvis-priority-worker.mjs
           node scripts/test-jarvis-task-queue.mjs
+      - name: Verify no unauthorized repository changes
+        run: |
+          git fetch origin main --depth=1
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Unexpected changes in the isolated validation checkout"
+            exit 1
+          fi
       - name: Publish review artifacts
         if: always()
         uses: actions/upload-artifact@v4
