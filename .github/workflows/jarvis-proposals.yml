@@ -24,6 +24,7 @@ jobs:
           node scripts/test-jarvis-priority-worker.mjs
           node scripts/test-jarvis-task-queue.mjs
           node scripts/test-jarvis-founder-task.mjs
+          node scripts/test-jarvis-coordinate.mjs
       - name: Capture founder task for review
         env:
           FOUNDER_TASK: ${{ inputs.founder_task }}
@@ -34,6 +35,8 @@ jobs:
         run: |
           mkdir -p jarvis-output
           node scripts/jarvis-priority-worker.mjs data/jarvis-signals.json jarvis-output/priorities.json
+      - name: Coordinate specialist agent proposals
+        run: node scripts/jarvis-coordinate.mjs
       - name: Produce read-only task snapshot
         run: |
           mkdir -p jarvis-output

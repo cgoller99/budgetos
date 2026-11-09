@@ -1,0 +1,12 @@
+﻿import assert from "node:assert/strict";
+import { coordinateJarvis } from "../lib/ai-team/jarvisCoordinator.mjs";
+const result = coordinateJarvis(["Fix UI bug", "Draft YouTube content", "Review revenue metrics", "Check Vercel uptime", "Transfer bank funds", "Fix production Stripe billing"]);
+assert.deepEqual(result.tasks.slice(0, 4).map(t => t.agent), ["developer", "marketing", "analytics", "operations"]);
+assert.equal(result.tasks[4].agent, null);
+assert.equal(result.tasks[4].status, "needs_triage");
+assert.equal(result.tasks[5].agent, null);
+assert.equal(result.tasks[5].risk, "restricted");
+assert.equal(result.executed, false);
+assert.ok(result.tasks.every(t => t.execution === "not_started"));
+assert.throws(() => coordinateJarvis(["x"]));
+console.log("Jarvis coordinator tests passed");

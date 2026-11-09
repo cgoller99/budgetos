@@ -1,0 +1,13 @@
+﻿import { coordinateJarvis } from "../lib/ai-team/jarvisCoordinator.mjs";
+import { readFile, mkdir, writeFile } from "node:fs/promises";
+const input = process.env.JARVIS_COORDINATOR_INPUT || "data/jarvis-signals.json";
+const output = process.env.JARVIS_COORDINATOR_OUTPUT || "jarvis-output/agents.json";
+const raw = await readFile(input, "utf8");
+if (raw.length > 1024 * 1024) throw Error("Input too large.");
+const data = JSON.parse(raw);
+if (!Array.isArray(data)) throw Error("Expected task array.");
+const tasks = data.map(x => typeof x === "string" ? x : x?.title).filter(x => typeof x === "string");
+const report = coordinateJarvis(tasks.slice(0, 100));
+await mkdir("jarvis-output", { recursive: true });
+await writeFile(output, JSON.stringify(report, null, 2) + "\n");
+console.log("Jarvis prepared " + report.tasks.length + " multi-agent proposals. No tasks executed.");
