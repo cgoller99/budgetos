@@ -1,4 +1,4 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { requireAdminApiUser } from "@/lib/admin/apiAuth";
 export const dynamic = "force-dynamic";
 export async function GET() {
@@ -21,5 +21,26 @@ export async function GET() {
       checks[0] = { name: "GitHub dispatch credential", state: "unverified", detail: "GitHub connection unavailable" };
     }
   }
-  return NextResponse.json({ checks, canVerifyEndToEnd: false, mode: "review_only" }, { headers: { "Cache-Control": "no-store" } });
+  if (token) {
+    try {
+      const environment = await fetch("https://api.github.com/repos/cgoller99/budgetos/environments/jarvis-coding", {
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" },
+        cache: "no-store", signal: AbortSignal.timeout(8000),
+      });
+      if (environment.ok) {
+        const result = await environment.json() as { protection_rules?: Array<{ type?: string; reviewers?: unknown[] }> };
+        const reviewerRule = result.protection_rules?.find(rule => rule.type === "required_reviewers" && Array.isArray(rule.reviewers) && rule.reviewers.length > 0);
+        checks[2] = {
+          name: "Protected coding environment",
+          state: reviewerRule ? "ready" : "unverified",
+          detail: reviewerRule ? "jarvis-coding environment has required reviewers" : "Environment exists but required reviewers are not verified; configure them before coding runs",
+        };
+      } else {
+        checks[2] = { name: "Protected coding environment", state: "unverified", detail: "Cannot verify jarvis-coding protection (GitHub access or environment configuration)" };
+      }
+    } catch {
+      checks[2] = { name: "Protected coding environment", state: "unverified", detail: "GitHub environment check unavailable" };
+    }
+  }
+  return NextResponse.json({ checks, canVerifyEndToEnd: checks.every(c => c.state === "ready"), mode: "review_only" }, { headers: { "Cache-Control": "no-store" } });
 }
