@@ -1,4 +1,4 @@
-﻿name: Jarvis coding change guard
+name: Jarvis coding change guard
 on:
   pull_request:
     branches: [main]
@@ -17,6 +17,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Test guard behavior
+        run: node scripts/test-jarvis-guard-diff.mjs
       - name: Inspect Jarvis proposed diff
         env:
           JARVIS_BASE_REF: origin/main
