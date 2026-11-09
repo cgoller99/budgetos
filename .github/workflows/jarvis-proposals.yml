@@ -23,6 +23,7 @@ jobs:
         run: |
           node scripts/test-jarvis-priority-worker.mjs
           node scripts/test-jarvis-task-queue.mjs
+          node scripts/test-jarvis-founder-task.mjs
       - name: Capture founder task for review
         env:
           FOUNDER_TASK: ${{ inputs.founder_task }}
