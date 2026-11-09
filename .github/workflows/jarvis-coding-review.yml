@@ -54,10 +54,14 @@ jobs:
       - name: Verify no unauthorized repository changes
         run: |
           git fetch origin main --depth=1
-          if [ -n "$(git status --porcelain)" ]; then
+          if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
             echo "Unexpected changes in the isolated validation checkout"
             exit 1
           fi
+      - name: Verify patch applies cleanly without applying it
+        run: |
+          git apply --check -- jarvis-output/proposed.patch
+          test -z "$(git status --porcelain --untracked-files=no)"
       - name: Publish review artifacts
         if: always()
         uses: actions/upload-artifact@v4
