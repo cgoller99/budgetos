@@ -1,0 +1,23 @@
+﻿name: Jarvis coding change guard
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  guard:
+    if: startsWith(github.head_ref, 'jarvis/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Inspect Jarvis proposed diff
+        env:
+          JARVIS_BASE_REF: origin/main
+        run: node scripts/jarvis-guard-diff.mjs
