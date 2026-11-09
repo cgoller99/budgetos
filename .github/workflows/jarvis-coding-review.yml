@@ -6,6 +6,10 @@ on:
         description: 'Approved coding task, max 500 characters'
         required: true
         type: string
+      target_file:
+        description: 'Single approved non-sensitive source file'
+        required: true
+        type: string
       approved:
         description: 'I approve a review-only coding preparation run'
         required: true
@@ -41,6 +45,12 @@ jobs:
           node scripts/test-jarvis-founder-task.mjs
           node scripts/test-jarvis-priority-worker.mjs
           node scripts/test-jarvis-task-queue.mjs
+      - name: Generate AI patch proposal (no repository writes)
+        env:
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+          FOUNDER_TASK: ${{ inputs.task }}
+          JARVIS_TARGET_FILE: ${{ inputs.target_file }}
+        run: node scripts/jarvis-generate-patch.mjs
       - name: Verify no unauthorized repository changes
         run: |
           git fetch origin main --depth=1

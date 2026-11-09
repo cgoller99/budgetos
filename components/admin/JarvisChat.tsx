@@ -23,6 +23,7 @@ export function JarvisChat() {
   const [savingTask, setSavingTask] = useState(false);
   const [dispatching, setDispatching] = useState(false);
   const [codingApproved, setCodingApproved] = useState(false);
+  const [codingFile, setCodingFile] = useState("");
   const [listening, setListening] = useState(false);
   const [micStatus, setMicStatus] = useState("Ready to check microphone");
   const [voiceOn, setVoiceOn] = useState(false);
@@ -143,11 +144,11 @@ export function JarvisChat() {
     if (!task || !codingApproved || dispatching) return;
     setDispatching(true); setError(""); setTaskNotice("");
     try {
-      const response = await fetch("/api/admin/jarvis-coding", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ task, approved: true }) });
+      const response = await fetch("/api/admin/jarvis-coding", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ task, targetFile: codingFile.trim(), approved: true }) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Could not start coding review");
       setCodingApproved(false); setDraft("");
-      setTaskNotice("Approved isolated coding validation queued. No AI code generation, merge, or deployment.");
+      setTaskNotice("Approved isolated AI patch proposal queued. The proposed patch will not be applied or deployed.");
     } catch (e) { setError(e instanceof Error ? e.message : "Could not start coding review"); }
     finally { setDispatching(false); }
   }
@@ -199,8 +200,9 @@ export function JarvisChat() {
       <button type="button" onClick={() => void saveTask()} disabled={busy || savingTask || !draft.trim()} className="rounded-xl border border-blue-500 px-4 py-3 text-sm font-semibold">Save as task</button>
       <button type="button" onClick={() => { const last = [...messagesRef.current].reverse().find(m => m.role === "user"); if (last) void dispatchTask(last.content); }} disabled={busy || dispatching || !messages.some(m => m.role === "user")} className="rounded-xl border border-purple-500/60 px-4 py-3 text-sm font-semibold disabled:opacity-50">Send last instruction</button>
       <button type="button" onClick={() => void dispatchTask()} disabled={busy || dispatching || !draft.trim()} className="rounded-xl border border-purple-500 px-4 py-3 text-sm font-semibold disabled:opacity-50">{dispatching ? "Sending..." : "Send to worker"}</button>
+      <input aria-label="Approved source file" value={codingFile} onChange={e => setCodingFile(e.target.value)} placeholder="components/example.tsx" className="min-w-0 flex-1 rounded-xl border border-white/20 bg-slate-950 px-4 py-3 text-sm text-white" />
       <label className="flex items-center gap-2 text-xs text-slate-300"><input type="checkbox" checked={codingApproved} onChange={e => setCodingApproved(e.target.checked)} />Approve isolated coding validation</label>
-      <button type="button" onClick={() => void requestCodingReview()} disabled={busy || dispatching || !codingApproved || !draft.trim()} className="rounded-xl border border-amber-500 px-4 py-3 text-sm font-semibold disabled:opacity-50">Run approved validation</button>
+      <button type="button" onClick={() => void requestCodingReview()} disabled={busy || dispatching || !codingApproved || !codingFile.trim() || !draft.trim()} className="rounded-xl border border-amber-500 px-4 py-3 text-sm font-semibold disabled:opacity-50">Run approved validation</button>
       <button type="submit" disabled={busy || !draft.trim()} className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold disabled:opacity-50">Send</button>
     </form>
   </section>;

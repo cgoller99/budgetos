@@ -1,4 +1,4 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { requireAdminApiUser } from "@/lib/admin/apiAuth";
 export const dynamic = "force-dynamic";
 
@@ -8,17 +8,19 @@ export async function POST(request: Request) {
   if ("response" in auth) return auth.response;
   let payload: unknown;
   try { payload = await request.json(); } catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
-  const body = payload && typeof payload === "object" ? payload as { task?: unknown; approved?: unknown } : {};
+  const body = payload && typeof payload === "object" ? payload as { task?: unknown; targetFile?: unknown; approved?: unknown } : {};
   if (body.approved !== true) return NextResponse.json({ error: "Explicit approval is required." }, { status: 403 });
   const task = body.task;
   if (typeof task !== "string" || task.trim().length < 3 || task.trim().length > 500 || /[\r\n]/.test(task)) return NextResponse.json({ error: "Task must be 3–500 characters on one line." }, { status: 400 });
+  const targetFile = body.targetFile;
+  if (typeof targetFile !== "string" || !/^(components|lib|app)\/[a-zA-Z0-9_./-]+\.(tsx?|jsx?|css)$/.test(targetFile) || targetFile.includes("..") || /(^|\/)(admin|auth|stripe|plaid|supabase|billing|payments|webhooks|account|settings|api|migrations)(\/|$)/i.test(targetFile)) return NextResponse.json({ error: "A single non-sensitive source file is required." }, { status: 400 });
   const token = process.env.JARVIS_GITHUB_DISPATCH_TOKEN?.trim();
   if (!token) return NextResponse.json({ error: "GitHub dispatch credential is not configured." }, { status: 503 });
   try {
     const result = await fetch("https://api.github.com/repos/cgoller99/budgetos/actions/workflows/jarvis-coding-review.yml/dispatches", {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", "Content-Type": "application/json" },
-      body: JSON.stringify({ ref: "main", inputs: { task: task.trim(), approved: "true" } }),
+      body: JSON.stringify({ ref: "main", inputs: { task: task.trim(), target_file: targetFile, approved: "true" } }),
       cache: "no-store",
       signal: AbortSignal.timeout(12000),
     });
