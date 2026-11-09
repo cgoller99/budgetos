@@ -1,0 +1,50 @@
+﻿name: Jarvis isolated coding review
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: 'Approved coding task, max 500 characters'
+        required: true
+        type: string
+      approved:
+        description: 'I approve a review-only coding preparation run'
+        required: true
+        type: boolean
+permissions:
+  contents: read
+jobs:
+  review:
+    if: inputs.approved == true
+    runs-on: ubuntu-latest
+    environment: jarvis-coding
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Validate task and isolation
+        env:
+          FOUNDER_TASK: ${{ inputs.task }}
+        run: |
+          test -n "$FOUNDER_TASK"
+          test "${#FOUNDER_TASK}" -le 500
+          node scripts/jarvis-capture-founder-task.mjs
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+      - name: Validate repository
+        run: |
+          npx tsc --noEmit
+          node scripts/test-jarvis-founder-task.mjs
+          node scripts/test-jarvis-priority-worker.mjs
+          node scripts/test-jarvis-task-queue.mjs
+      - name: Publish review artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jarvis-coding-review
+          path: jarvis-output/
+          retention-days: 7
