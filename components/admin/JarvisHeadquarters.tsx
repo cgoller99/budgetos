@@ -3,7 +3,8 @@ import { useEffect, useState } from "react";
 import { JarvisChat } from "./JarvisChat";
 import { JarvisTasks } from "./JarvisTasks";
 import { JarvisAgents } from "./JarvisAgents";
-const sections = ["Overview", "Agents", "Chat", "Work queue", "Businesses", "Approvals", "Activity"] as const;
+import { JarvisSetup } from "./JarvisSetup";
+const sections = ["Overview", "Agents", "Setup", "Chat", "Work queue", "Businesses", "Approvals", "Activity"] as const;
 const businesses = [
   { name: "Buxme", description: "Engineering, subscriber reporting and growth", status: "Development" },
 ];
@@ -17,6 +18,7 @@ export function JarvisHeadquarters() {
     <div className="mb-6 rounded-xl border border-blue-500/20 bg-blue-950/30 p-4 text-sm text-blue-100">This dashboard is a foundation, not a live autonomous operator. No automated customer outreach, ad spending, or production changes are enabled.</div>
     {section === "Overview" && <><div className="grid gap-4 md:grid-cols-3">{[["Businesses", "1", "Buxme operations only"],["Autonomous worker", worker === null ? "Checking" : worker.connected ? (worker.runs[0]?.conclusion ?? worker.runs[0]?.status ?? "No runs") : "Unavailable", "GitHub workflow status"],["Approval controls", "Required", "Sensitive actions remain gated"]].map(([label,value,detail]) => <article key={label} className="rounded-2xl border border-white/10 bg-slate-900/80 p-6"><h2 className="text-sm text-slate-400">{label}</h2><p className="my-3 text-2xl font-bold">{value}</p><p className="text-xs text-slate-400">{detail}</p></article>)}</div><div className="mt-5 grid gap-4 md:grid-cols-2"><article className="rounded-2xl border border-white/10 bg-slate-900/80 p-6"><h2 className="mb-4 text-lg font-semibold">Business priorities</h2>{businesses.map(b => <div key={b.name} className="border-b border-white/10 py-3 last:border-0"><p className="font-medium">{b.name}</p><p className="text-sm text-slate-400">{b.description}</p></div>)}</article><article className="rounded-2xl border border-white/10 bg-slate-900/80 p-6"><h2 className="mb-4 text-lg font-semibold">How Jarvis will operate</h2><p className="text-sm leading-7 text-slate-300">Jarvis will research, draft, build previews and track work. Decisions involving spending, customer contact, payments, authentication, banking or customer data will require configured controls and appropriate approval.</p></article></div></>}
     {section === "Agents" && <JarvisAgents />}
+    {section === "Setup" && <JarvisSetup />}
     {section === "Chat" && <JarvisChat />}
     {section === "Businesses" && <div className="grid gap-4 md:grid-cols-3">{businesses.map(b => <article key={b.name} className="rounded-2xl border border-white/10 bg-slate-900 p-6"><h2 className="text-xl font-semibold">{b.name}</h2><p className="my-4 text-sm text-slate-400">{b.description}</p><span className="rounded-lg bg-blue-950 px-3 py-2 text-xs text-blue-200">{b.status}</span></article>)}</div>}
     {section === "Work queue" && <JarvisTasks />}
