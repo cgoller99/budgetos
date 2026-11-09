@@ -21,6 +21,7 @@ export function JarvisChat() {
   const [error, setError] = useState("");
   const [taskNotice, setTaskNotice] = useState("");
   const [savingTask, setSavingTask] = useState(false);
+  const [dispatching, setDispatching] = useState(false);
   const [listening, setListening] = useState(false);
   const [micStatus, setMicStatus] = useState("Ready to check microphone");
   const [voiceOn, setVoiceOn] = useState(false);
@@ -123,6 +124,19 @@ export function JarvisChat() {
     } catch (e) { setError(e instanceof Error ? e.message : "Could not save task"); }
     finally { setSavingTask(false); }
   }
+  async function dispatchTask() {
+    const goal = draft.trim();
+    if (!goal || dispatching) return;
+    setDispatching(true); setTaskNotice(""); setError("");
+    try {
+      const response = await fetch("/api/admin/jarvis-dispatch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ goal }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Worker dispatch failed");
+      setDraft("");
+      setTaskNotice("Sent to GitHub Actions for proposal review. No code has been executed.");
+    } catch (e) { setError(e instanceof Error ? e.message : "Worker dispatch failed"); }
+    finally { setDispatching(false); }
+  }
   async function startListening() {
     if (busyRef.current || playbackRef.current || startingRef.current || listeningRef.current) return;
     startingRef.current = true;
@@ -169,6 +183,7 @@ export function JarvisChat() {
       <button type="button" onClick={() => { setVoice(!voiceOn); if (!voiceOn) void speakReply("Voice is on. I will speak my replies."); }} aria-pressed={voiceOn} className="rounded-xl border border-white/20 bg-slate-800 px-4 py-3 text-sm">{voiceOn ? "Voice on" : "Voice off"}</button>
       <button type="button" onClick={() => { setVoice(true); void speakReply(messagesRef.current.filter(m => m.role === "assistant").at(-1)?.content || "No Jarvis reply yet."); }} className="rounded-xl border border-white/20 bg-slate-800 px-4 py-3 text-sm">Replay reply</button>
       <button type="button" onClick={() => void saveTask()} disabled={busy || savingTask || !draft.trim()} className="rounded-xl border border-blue-500 px-4 py-3 text-sm font-semibold">Save as task</button>
+      <button type="button" onClick={() => void dispatchTask()} disabled={busy || dispatching || !draft.trim()} className="rounded-xl border border-purple-500 px-4 py-3 text-sm font-semibold disabled:opacity-50">{dispatching ? "Sending..." : "Send to worker"}</button>
       <button type="submit" disabled={busy || !draft.trim()} className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold disabled:opacity-50">Send</button>
     </form>
   </section>;
