@@ -20,7 +20,7 @@ for (let page = 1; page <= 20; page++) {
   if (page === 20) throw Error("Issue ledger exceeds scan limit; fail closed");
 }
 const task = manifest.find(x => x.status === "approved" && !completed.has(x.id));
-if (!task) { console.log("No new approved tasks; no execution."); process.exit(0); }
+if (!task) { console.log("No new approved tasks; no execution."); } else {
 const queuePath = process.env.JARVIS_QUEUE_PATH;
 if (!queuePath) throw Error("Isolated queue path required");
 await mkdir(dirname(queuePath), { recursive: true });
@@ -32,3 +32,4 @@ const updated = JSON.parse(await readFile(queuePath, "utf8"))[0];
 if (updated.status !== "completed") throw Error("Task was not completed");
 await api("/issues", { method: "POST", body: JSON.stringify({ title: "Jarvis execution: " + task.id, body: "Read-only Jarvis execution completed.\n\nAgent: " + updated.agent + "\nAction: " + updated.action + "\nCompleted: " + updated.completedAt + "\nExecution ID: " + updated.executionId + "\nWorkflow: " + process.env.GITHUB_RUN_ID + "\n\nSee workflow artifact for evidence." }) });
 console.log("Durable execution ledger created for " + task.id);
+}
