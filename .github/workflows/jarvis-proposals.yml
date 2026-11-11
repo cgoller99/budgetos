@@ -10,6 +10,7 @@ on:
     - cron: '*/15 * * * *'
 permissions:
   contents: read
+  issues: write
 jobs:
   proposals:
     runs-on: ubuntu-latest
