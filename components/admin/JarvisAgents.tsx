@@ -41,7 +41,7 @@ export function JarvisAgents({ approvalsOnly = false }: { approvalsOnly?: boolea
     finally { setDispatchingTask(null); }
   }
   const tasks = data?.agentTasks ?? [];
-  const awaiting = tasks.filter(t => t.requires_approval || t.status === "needs_approval");
+  const awaiting = tasks.filter(t => !["completed", "done", "cancelled", "canceled", "rejected", "failed"].includes(t.status) && (t.requires_approval || t.status === "needs_approval"));
   return <div className="space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div><h2 className="text-lg font-semibold">{approvalsOnly ? "Approval inbox" : "Specialist agents"}</h2><p className="mt-1 text-sm text-slate-400">Shared Supabase task records · review only · no automatic execution</p></div>
@@ -73,7 +73,7 @@ export function JarvisAgents({ approvalsOnly = false }: { approvalsOnly?: boolea
           </div>}
           <p className="mt-2 text-xs text-slate-400">{t.status.replaceAll("_", " ")} · {t.risk.replaceAll("_", " ")} · {new Date(t.created_at).toLocaleString()}</p>
         </div>)}
-        {!loading && (approvalsOnly ? awaiting : tasks).length === 0 && <p className="text-sm text-slate-400">No tasks yet. Save a task from Jarvis Chat to populate this view.</p>}
+        {!loading && (approvalsOnly ? awaiting : tasks).length === 0 && <p className="text-sm text-slate-400">{approvalsOnly ? "Nothing is waiting for your approval." : "No tasks yet. Save a task from Jarvis Chat to get started."}</p>}
       </div>
     </article>
   </div>;
