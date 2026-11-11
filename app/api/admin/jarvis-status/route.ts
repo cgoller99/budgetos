@@ -5,7 +5,7 @@ const repo = "cgoller99/budgetos";
 export async function GET() {
   const auth = await requireAdminApiUser();
   if ("response" in auth) return auth.response;
-  const token = process.env.JARVIS_GITHUB_READ_TOKEN;
+  const token = process.env.JARVIS_GITHUB_READ_TOKEN || process.env.JARVIS_GITHUB_DISPATCH_TOKEN;
 
   try {
     const res = await fetch(`https://api.github.com/repos/${repo}/actions/workflows/jarvis-proposals.yml/runs?per_page=5`, {
@@ -26,7 +26,7 @@ export async function GET() {
     }).catch(() => null);
     const issuesData = issuesResponse?.ok ? await issuesResponse.json() as Array<{ number: number; title: string; state: string; html_url: string; body: string | null; pull_request?: unknown }> : [];
     const autonomousTasks = issuesData.filter(issue => !issue.pull_request && issue.body?.includes("<!-- jarvis-signal:")).map(issue => ({
-      number: issue.number, title: issue.title.replace(/^\[Jarvis\]\s*/, ""), status: issue.state === "closed" ? "completed" : "awaiting_review", url: issue.html_url,
+      number: issue.number, title: issue.title.replace(/^\[Jarvis\]\s*/, ""), status: issue.state === "closed" ? "completed" : "awaiting_review", agent: issue.body?.match(/Assigned agent: (developer|marketing|analytics|operations)/)?.[1] ?? "unassigned", url: issue.html_url,
     }));
     return NextResponse.json({
       autonomousTasks, autonomousQueueAvailable: Boolean(issuesResponse?.ok),

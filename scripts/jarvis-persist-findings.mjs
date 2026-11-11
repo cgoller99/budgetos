@@ -1,4 +1,4 @@
-﻿/** GitHub Issues is the durable, deduplicated queue for autonomous read-only findings. */
+/** GitHub Issues is the durable, deduplicated queue for autonomous read-only findings. */
 import { readFile, writeFile } from "node:fs/promises";
 const repo = process.env.GITHUB_REPOSITORY || "cgoller99/budgetos";
 const token = process.env.GITHUB_TOKEN;
@@ -12,7 +12,13 @@ async function api(path, method = "GET", body) {
   return response.json();
 }
 const report = JSON.parse(await readFile("jarvis-output/priorities.json", "utf8"));
-const existing = await api("/issues?state=all&per_page=100");
+const existing = [];
+for (let page = 1; page <= 10; page++) {
+  const batch = await api(`/issues?state=all&per_page=100&page=${page}`);
+  existing.push(...batch);
+  if (batch.length < 100) break;
+}
+const { coordinateJarvis } = await import("../lib/ai-team/jarvisCoordinator.mjs");
 const findings = report.priorities.filter(p => typeof p.id === "string" && typeof p.title === "string").slice(0, 15);
 const results = [];
 for (const finding of findings) {
@@ -22,9 +28,11 @@ for (const finding of findings) {
     results.push({ id: finding.id, issue: match.number, status: match.state === "closed" ? "completed" : "existing", url: match.html_url });
     continue;
   }
+  const assignment = coordinateJarvis([finding.title]).tasks[0];
+  const agent = assignment.agent ?? (finding.source === "growth" ? "marketing" : finding.source === "revenue" ? "analytics" : "operations");
   const body = [
     marker, "## Autonomous Jarvis finding", "",
-    "Status: discovered / awaiting review", "Execution: not started", "",
+    "Status: discovered / awaiting review", "Execution: not started", `Assigned agent: ${agent}`, `Risk: ${assignment.risk}`, "",
     `Priority score: ${finding.score ?? "unknown"}`, "",
     `Proposed action: ${finding.proposedAction ?? "Review evidence"}`, "",
     "Evidence:", ...(Array.isArray(finding.evidence) ? finding.evidence.slice(0, 5).map(e => `- ${String(e).slice(0, 300)}`) : ["- See worker artifact"]),

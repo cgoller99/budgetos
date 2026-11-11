@@ -10,7 +10,7 @@ const businesses = [
 ];
 export function JarvisHeadquarters() {
   const [section, setSection] = useState<(typeof sections)[number]>("Overview");
-  const [worker, setWorker] = useState<{ connected: boolean; reason?: string; runs: Array<{ id: number; status: string; conclusion: string | null; createdAt: string; url: string }>; codingRuns?: Array<{ id: number; status: string; conclusion: string | null; createdAt: string; url: string }>; codingStatusAvailable?: boolean; autonomousQueueAvailable?: boolean; autonomousTasks?: Array<{ number: number; title: string; status: string; url: string }> } | null>(null);
+  const [worker, setWorker] = useState<{ connected: boolean; reason?: string; runs: Array<{ id: number; status: string; conclusion: string | null; createdAt: string; url: string }>; codingRuns?: Array<{ id: number; status: string; conclusion: string | null; createdAt: string; url: string }>; codingStatusAvailable?: boolean; autonomousQueueAvailable?: boolean; autonomousTasks?: Array<{ number: number; title: string; status: string; agent?: string; url: string }> } | null>(null);
   useEffect(() => { let alive = true; fetch("/api/admin/jarvis-status", { cache: "no-store" }).then(r => r.ok ? r.json() : Promise.reject()).then(data => { if (alive) setWorker(data); }).catch(() => { if (alive) setWorker({ connected: false, reason: "Unable to load worker status", runs: [] }); }); return () => { alive = false; }; }, []);
   return <div className="mx-auto max-w-7xl px-5 py-9 text-white">
     <div className="mb-8 flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[.25em] text-blue-400">Jarvis / Business operations</p><h1 className="mt-2 text-3xl font-bold">{section === "Overview" ? "Your command center" : section}</h1><p className="mt-2 text-sm text-slate-400">One place to see priorities, decisions and business activity.</p></div><span className="rounded-full border border-blue-500/40 bg-blue-500/10 px-4 py-2 text-xs text-blue-200">Worker: {worker === null ? "Checking" : worker.connected ? (worker.runs[0]?.conclusion ?? worker.runs[0]?.status ?? "No runs") : "Unavailable"}</span></div>
@@ -22,7 +22,7 @@ export function JarvisHeadquarters() {
       <p className="mt-1 text-xs text-slate-400">Deduplicated GitHub issue queue. Closing an issue marks it completed; Jarvis will not recreate it.</p>
       {!worker?.autonomousQueueAvailable && <p className="mt-3 text-sm text-amber-300">GitHub issue queue unavailable; configure GitHub read access to see private repository findings.</p>}
       {worker?.autonomousQueueAvailable && !worker.autonomousTasks?.length && <p className="mt-3 text-sm text-slate-400">No autonomous findings persisted yet.</p>}
-      {worker?.autonomousTasks?.map(t => <a key={t.number} href={t.url} target="_blank" rel="noopener noreferrer" className="mt-3 block text-sm text-blue-300 underline">#{t.number} {t.title} — {t.status.replaceAll("_", " ")}</a>)}
+      {worker?.autonomousTasks?.map(t => <a key={t.number} href={t.url} target="_blank" rel="noopener noreferrer" className="mt-3 block text-sm text-blue-300 underline">#{t.number} {t.title} — {t.agent ?? "unassigned"} — {t.status.replaceAll("_", " ")}</a>)}
     </article><JarvisAgents /></>}
     {section === "Setup" && <JarvisSetup />}
     {section === "Chat" && <JarvisChat />}
