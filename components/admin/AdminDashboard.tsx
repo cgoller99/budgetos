@@ -430,19 +430,21 @@ export function AdminDashboard() {
       <Section
         id="revenue"
         title="Revenue"
-        description="Subscription metrics from Stripe and Buxme profiles."
+        description="Stripe gross recurring run rate excludes trials, discounts, non-USD prices, and Apple. Apple records are cached entitlements, not verified payments or App Store proceeds."
         loadError={sectionErrors.revenue}
       >
         <MetricGrid>
-          <StatCard label="MRR" value={formatCurrency(revenue?.mrr ?? 0)} change={revenue?.available ? "Stripe live" : "Stripe unavailable"} mutedChange />
-          <StatCard label="ARR" value={formatCurrency(revenue?.arr ?? 0)} change="" mutedChange />
+          <StatCard label="Stripe MRR (USD)" value={revenue?.available ? formatCurrency(revenue.mrr) : "—"} change={revenue?.available ? "Stripe live" : "Stripe unavailable"} mutedChange />
+          <StatCard label="Stripe ARR (USD)" value={revenue?.available ? formatCurrency(revenue.arr) : "—"} change="" mutedChange />
           <StatCard label="Free Users" value={String(revenue?.freeUsers ?? 0)} change="" mutedChange />
-          <StatCard label="Pro Users" value={String(revenue?.proUsers ?? 0)} change="" mutedChange />
-          <StatCard label="Pro+ Users" value={String(revenue?.proPlusUsers ?? 0)} change="" mutedChange />
-          <StatCard label="Churn Rate" value={`${revenue?.churnRate ?? 0}%`} change="Last 30 days" mutedChange positive={false} />
-          <StatCard label="New Subscriptions" value={String(revenue?.newSubscriptions ?? 0)} change="Last 30 days" mutedChange />
-          <StatCard label="Cancellations" value={String(revenue?.cancellations ?? 0)} change="Last 30 days" mutedChange positive={false} />
-          <StatCard label="Failed Payments" value={String(revenue?.failedPayments ?? 0)} change="Open invoices" mutedChange positive={false} />
+          <StatCard label="Stripe Pro" value={revenue?.available ? String(revenue.proUsers) : "—"} change="" mutedChange />
+          <StatCard label="Stripe Pro+" value={revenue?.available ? String(revenue.proPlusUsers) : "—"} change="" mutedChange />
+          <StatCard label="Apple current records" value={String(revenue?.appleCurrentRecords ?? 0)} change="Production; stored expiry in future" mutedChange />
+          <StatCard label="Apple needs reconciliation" value={String(revenue?.appleNeedsReconciliation ?? 0)} change="Active flags with missing or expired dates" mutedChange />
+          <StatCard label="Stripe Churn Rate" value={`${revenue?.churnRate ?? 0}%`} change="Last 30 days" mutedChange positive={false} />
+          <StatCard label="Stripe New Subscriptions" value={String(revenue?.newSubscriptions ?? 0)} change="Last 30 days" mutedChange />
+          <StatCard label="Stripe Cancellations" value={String(revenue?.cancellations ?? 0)} change="Last 30 days" mutedChange positive={false} />
+          <StatCard label="Stripe Open Invoices" value={String(revenue?.failedPayments ?? 0)} change="Open invoices" mutedChange positive={false} />
         </MetricGrid>
       </Section>
 
@@ -718,7 +720,7 @@ export function AdminDashboard() {
           <AdminChart title="Daily Signups" points={analytics?.dailySignups ?? []} />
           <AdminChart title="Daily Active Users" points={analytics?.dailyActiveUsers ?? []} />
           <AdminChart title="Subscription Growth" points={analytics?.subscriptionGrowth ?? []} />
-          <AdminChart title="Revenue" points={analytics?.revenue ?? []} valuePrefix="$" />
+          <AdminChart title="Stripe gross charges (USD)" points={analytics?.revenue ?? []} valuePrefix="$" />
           <AdminChart title="Goal Creation" points={analytics?.goalCreation ?? []} />
           <AdminChart title="Bill Creation" points={analytics?.billCreation ?? []} />
           <AdminChart title="Household Growth" points={analytics?.householdGrowth ?? []} className="lg:col-span-2" />

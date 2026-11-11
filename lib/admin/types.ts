@@ -117,6 +117,8 @@ export type AdminAnalyticsMetrics = {
 };
 
 export type AdminRevenueMetrics = {
+  appleCurrentRecords?: number;
+  appleNeedsReconciliation?: number;
   available: boolean;
   mrr: number;
   arr: number;

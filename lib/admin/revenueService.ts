@@ -1,37 +1,21 @@
 import "server-only";
 
-import type Stripe from "stripe";
 import { getStripeClient } from "@/lib/stripe/stripeClient";
-import { isStripeEnabled } from "@/lib/stripe/config";
+import { isStripeEnabled, resolvePlanFromPriceId } from "@/lib/stripe/config";
 import type { BuxmeSupabaseClient } from "@/lib/supabase/client";
 
 import type { AdminRevenueMetrics } from "@/lib/admin/types";
 
 export type { AdminRevenueMetrics } from "@/lib/admin/types";
 
-function subscriptionMrrContribution(subscription: Stripe.Subscription): number {
-  let total = 0;
-
-  for (const item of subscription.items.data) {
-    const amount = (item.price.unit_amount ?? 0) / 100;
-    const interval = item.price.recurring?.interval;
-
-    if (interval === "year") {
-      total += amount / 12;
-    } else {
-      total += amount;
-    }
-  }
-
-  return total;
-}
+import { subscriptionMrrContribution, summarizeAppleRecords } from "@/lib/admin/revenueCalculations";
 
 export async function getAdminRevenueMetrics(
   adminSupabase: BuxmeSupabaseClient,
 ): Promise<AdminRevenueMetrics> {
   const { data: profiles, error } = await adminSupabase
     .from("profiles")
-    .select("subscription_plan, subscription_status");
+    .select("subscription_plan, subscription_status, subscription_provider, subscription_current_period_end, apple_environment");
 
   if (error) {
     throw error;
@@ -39,19 +23,14 @@ export async function getAdminRevenueMetrics(
 
   const rows = profiles ?? [];
   const freeUsers = rows.filter((row) => row.subscription_plan === "free").length;
-  const proUsers = rows.filter(
-    (row) =>
-      row.subscription_plan === "pro" &&
-      ["active", "trialing", "past_due"].includes(row.subscription_status),
-  ).length;
-  const proPlusUsers = rows.filter(
-    (row) =>
-      row.subscription_plan === "pro_plus" &&
-      ["active", "trialing", "past_due"].includes(row.subscription_status),
-  ).length;
+  // Paid Stripe counts come from Stripe, never cached profile flags.
+  let proUsers = 0;
+  let proPlusUsers = 0;
+  const apple = summarizeAppleRecords(rows);
 
   if (!isStripeEnabled()) {
     return {
+      ...apple,
       available: false,
       mrr: 0,
       arr: 0,
@@ -67,6 +46,7 @@ export async function getAdminRevenueMetrics(
 
   const stripe = getStripeClient();
   let mrr = 0;
+  let activeSubscriptions = 0;
   let hasMore = true;
   let startingAfter: string | undefined;
   const thirtyDaysAgo = Math.floor((Date.now() - 30 * 24 * 60 * 60 * 1000) / 1000);
@@ -83,8 +63,13 @@ export async function getAdminRevenueMetrics(
     });
 
     for (const subscription of page.data) {
-      if (subscription.status === "active" || subscription.status === "trialing") {
+      if (subscription.status === "active") {
+        activeSubscriptions += 1;
         mrr += subscriptionMrrContribution(subscription);
+        const plans = subscription.items.data.map((item) => resolvePlanFromPriceId(item.price.id));
+        const plan = plans.includes("pro_plus") ? "pro_plus" : plans.includes("pro") ? "pro" : subscription.metadata.plan;
+        if (plan === "pro") proUsers += 1;
+        if (plan === "pro_plus") proPlusUsers += 1;
       }
 
       if (subscription.created >= thirtyDaysAgo && subscription.status !== "canceled") {
@@ -108,10 +93,11 @@ export async function getAdminRevenueMetrics(
     limit: 100,
   });
 
-  const activeBase = Math.max(proUsers + proPlusUsers + cancellations, 1);
+  const activeBase = Math.max(activeSubscriptions + cancellations, 1);
   const churnRate = Number(((cancellations / activeBase) * 100).toFixed(1));
 
   return {
+    ...apple,
     available: true,
     mrr: Number(mrr.toFixed(2)),
     arr: Number((mrr * 12).toFixed(2)),
@@ -146,7 +132,7 @@ export async function getAdminDailyRevenueSeries(): Promise<Array<{ date: string
   }
 
   for (const charge of charges.data) {
-    if (!charge.paid || charge.status !== "succeeded") {
+    if (!charge.paid || charge.status !== "succeeded" || charge.currency !== "usd") {
       continue;
     }
 

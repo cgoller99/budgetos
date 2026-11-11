@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import { subscriptionMrrContribution, summarizeAppleRecords } from '../lib/admin/revenueCalculations.ts';
+const item = (amount, interval, count = 1, quantity = 1, currency = 'usd') => ({price: {unit_amount: amount, currency, recurring: {interval, interval_count: count}}, quantity});
+const mrr = (...data) => subscriptionMrrContribution({items: {data}});
+assert.equal(mrr(item(12000, 'year', 1, 2)), 20);
+assert.equal(mrr(item(3000, 'month', 3)), 10);
+assert.equal(mrr(item(1499, 'month'), item(2000, 'month', 1, 1, 'eur')), 14.99);
+assert.ok(Math.abs(mrr(item(100, 'week')) - 52 / 12) < 1e-10);
+assert.ok(Math.abs(mrr(item(100, 'day')) - 365.25 / 12) < 1e-10);
+const base = {subscription_provider: 'apple', subscription_status: 'active', apple_environment: 'Production'};
+const rows = ['2026-12-01', '2026-10-01', null, 'invalid'].map(subscription_current_period_end => ({...base, subscription_current_period_end}));
+rows.push({...rows[0], apple_environment: 'Sandbox'}, {...rows[0], subscription_status: 'canceled'}, {...rows[0], subscription_provider: 'none'});
+assert.deepEqual(summarizeAppleRecords(rows, Date.parse('2026-11-11')), {appleCurrentRecords: 1, appleNeedsReconciliation: 3});
+console.log('Admin revenue calculations passed');
