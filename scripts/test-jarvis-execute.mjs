@@ -26,5 +26,22 @@ try {
   assert.equal(run().status, 0);
   assert.equal((await readdir(results)).length, 1);
   assert.equal(JSON.parse(await readFile(queue, "utf8"))[2].attempts, 1);
+  // Crash after writing the result but before updating queue: reconcile, don't rerun.
+  const previous = tasks[2];
+  tasks[2] = { ...previous, status: "running", completedAt: undefined, resultPath: undefined };
+  await writeFile(queue, JSON.stringify(tasks));
+  assert.equal(run().status, 0);
+  tasks = JSON.parse(await readFile(queue, "utf8"));
+  assert.equal(tasks[2].status, "completed");
+  assert.equal(tasks[2].attempts, 1);
+  assert.equal((await readdir(results)).length, 1);
+  // Stale lease with no result is safely retried, up to the cap.
+  tasks.push({ id: "ci-workflow-audit", status: "running", attempts: 1, executionId: "missing", startedAt: "2020-01-01T00:00:00.000Z" });
+  await writeFile(queue, JSON.stringify(tasks));
+  assert.equal(run().status, 0);
+  tasks = JSON.parse(await readFile(queue, "utf8"));
+  assert.equal(tasks[3].status, "completed");
+  assert.equal(tasks[3].attempts, 2);
+  assert.equal(tasks[3].agent, "operations");
   console.log("Jarvis execution tests passed: allowlist, approvals, results, timestamps, idempotency.");
 } finally { await rm(dir, { recursive: true, force: true }); }

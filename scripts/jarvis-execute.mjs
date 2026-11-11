@@ -59,6 +59,24 @@ async function locked(fn) {
 }
 const now = () => new Date().toISOString();
 const MAX_ATTEMPTS = 3;
+// Reconcile interrupted runs before claiming another task.
+const leaseMs = 10 * 60 * 1000;
+await locked(async tasks => {
+  for (const t of tasks.filter(t => t.status === "running" && allowed[t.id])) {
+    const recordPath = join(resultDir, String(t.executionId) + ".json");
+    let record;
+    try { record = JSON.parse(await readFile(recordPath, "utf8")); }
+    catch (e) { if (e.code !== "ENOENT") throw e; }
+    if (record?.taskId === t.id && record?.executionId === t.executionId && record?.status === "completed") {
+      t.status = "completed"; t.completedAt = record.completedAt;
+      t.resultPath = relative(root, recordPath).replaceAll("\\", "/");
+    } else if (Date.now() - Date.parse(t.startedAt || "") > leaseMs) {
+      t.status = (t.attempts || 0) < MAX_ATTEMPTS ? "approved" : "failed";
+      t.lastError = "Execution lease expired before result persistence";
+      t.failedAt = now();
+    }
+  }
+});
 const claimed = await locked(tasks => {
   const t = tasks.find(t => t.status === "approved" && allowed[t.id] && (t.attempts || 0) < MAX_ATTEMPTS);
   if (!t) return null;
