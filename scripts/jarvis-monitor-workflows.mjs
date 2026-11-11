@@ -1,4 +1,4 @@
-﻿/** Read-only GitHub workflow monitor. It creates signals, never dispatches workflows. */
+/** Read-only GitHub workflow monitor. It creates signals, never dispatches workflows. */
 import { writeFile, mkdir } from "node:fs/promises";
 const repo = process.env.GITHUB_REPOSITORY || "cgoller99/budgetos";
 const token = process.env.GITHUB_TOKEN;
@@ -11,7 +11,7 @@ for (const workflow of workflows) {
     if (!res.ok) throw Error(`HTTP ${res.status}`);
     const data = await res.json();
     const runs = data.workflow_runs || [];
-    const failed = runs.filter(r => r.conclusion === "failure" || r.conclusion === "timed_out");
+    const failed = runs.filter(r => (r.conclusion === "failure" || r.conclusion === "timed_out") && Date.now() - Date.parse(r.created_at) < 24 * 60 * 60 * 1000);
     if (failed.length) {
       const latest = failed[0];
       signals.push({
@@ -20,6 +20,15 @@ for (const workflow of workflows) {
         source: "reliability", severity: 4, affectedUsers: 0, confidence: 1,
         evidence: [`GitHub Actions run ${latest.id}: ${latest.html_url}`],
         proposedAction: "Review failed workflow logs and prepare a non-sensitive fix proposal for founder review"
+      });
+    }
+    if (workflow === "jarvis-proposals.yml" && runs.length && !runs.some(r => r.event === "schedule" && Date.now() - Date.parse(r.created_at) < 60 * 60 * 1000)) {
+      signals.push({
+        id: "github-stale-jarvis-schedule",
+        title: "Jarvis scheduled worker has not run within the last hour",
+        source: "reliability", severity: 4, affectedUsers: 0, confidence: 1,
+        evidence: [`Latest workflow run: ${runs[0].html_url} at ${runs[0].created_at}`],
+        proposedAction: "Inspect GitHub Actions schedule status and default branch configuration; prepare a review-only fix"
       });
     }
     if (!runs.length) signals.push({
