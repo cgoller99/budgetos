@@ -8,6 +8,12 @@ if (inputPath === outputPath) throw new Error("Input and output paths must diffe
 const raw = await readFile(inputPath, "utf8");
 if (raw.length > 1024 * 1024) throw new Error("Signal file exceeds 1 MB.");
 const signals = JSON.parse(raw);
+if (process.env.JARVIS_LIVE_SIGNALS === "1") {
+  try {
+    const live = JSON.parse(await readFile(resolve("jarvis-output/live-signals.json"), "utf8"));
+    if (Array.isArray(live)) signals.push(...live);
+  } catch { console.warn("Live signals missing; continuing with baseline signals."); }
+}
 if (!Array.isArray(signals) || signals.length > 1000) throw new Error("Expected an array of at most 1000 signals.");
 const priorities = prioritizeAutonomousSignals(signals);
 const report = { generatedAt: new Date().toISOString(), mode: "proposal_only", inputCount: signals.length, priorities };

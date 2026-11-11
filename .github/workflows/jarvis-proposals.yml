@@ -7,7 +7,7 @@ on:
         required: false
         type: string
   schedule:
-    - cron: '17 */6 * * *'
+    - cron: '*/15 * * * *'
 permissions:
   contents: read
 jobs:
@@ -31,7 +31,13 @@ jobs:
         run: |
           mkdir -p jarvis-output
           node scripts/jarvis-capture-founder-task.mjs
+      - name: Observe current GitHub workflow health
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/jarvis-monitor-workflows.mjs
       - name: Rank evidence-backed proposals
+        env:
+          JARVIS_LIVE_SIGNALS: "1"
         run: |
           mkdir -p jarvis-output
           node scripts/jarvis-priority-worker.mjs data/jarvis-signals.json jarvis-output/priorities.json
