@@ -28,11 +28,14 @@ export function JarvisChat() {
   const [micStatus, setMicStatus] = useState("Ready to check microphone");
   const [voiceOn, setVoiceOn] = useState(false);
   const [handsFree, setHandsFree] = useState(false);
+  const [voiceFallback, setVoiceFallback] = useState(false);
   const handsFreeRef = useRef(false);
   const startListeningRef = useRef<() => Promise<void>>(async () => {});
   const recognition = useRef<SpeechRecognizer | null>(null);
   const listeningRef = useRef(false);
   const startingRef = useRef(false);
+  const recognizedRef = useRef(false);
+  const recognitionGenerationRef = useRef(0);
   const microphoneReadyRef = useRef(false);
   const playbackRef = useRef(false);
   const speechSequenceRef = useRef(0);
@@ -46,6 +49,11 @@ export function JarvisChat() {
     audioRef.current?.pause();
     if (typeof window !== "undefined") window.speechSynthesis?.cancel();
   }, []);
+  function finishPlayback(sequence: number) {
+    if (sequence !== speechSequenceRef.current) return;
+    playbackRef.current = false;
+    if (handsFreeRef.current) void startListeningRef.current();
+  }
   async function speakReply(message: string) {
     const sequence = ++speechSequenceRef.current;
     playbackRef.current = true;
@@ -57,7 +65,8 @@ export function JarvisChat() {
       if (!response.ok) {
         const details = await response.json().catch(() => null) as { error?: string } | null;
         setError(details?.error || "Neural voice unavailable. Check Vercel AI Gateway speech access.");
-        playbackRef.current = false;
+        setVoiceFallback(true);
+        if (voiceOnRef.current && sequence === speechSequenceRef.current) speakBrowserReply(message);
         return;
       }
       if (response.ok) {
@@ -66,12 +75,12 @@ export function JarvisChat() {
         const url = URL.createObjectURL(blob);
         const audio = new Audio(url);
         audioRef.current = audio;
-        audio.onended = () => { URL.revokeObjectURL(url); if (sequence === speechSequenceRef.current) { playbackRef.current = false; if (handsFreeRef.current) void startListeningRef.current(); } };
-        audio.onerror = () => { URL.revokeObjectURL(url); if (sequence === speechSequenceRef.current) { playbackRef.current = false; if (handsFreeRef.current) void startListeningRef.current(); } };
+        audio.onended = () => { URL.revokeObjectURL(url); finishPlayback(sequence); };
+        audio.onerror = () => { URL.revokeObjectURL(url); if (voiceOnRef.current && sequence === speechSequenceRef.current) speakBrowserReply(message); };
         await audio.play();
         return;
       }
-    } catch { setError("Neural voice request failed. Check your connection and Vercel AI Gateway."); playbackRef.current = false; return; }
+    } catch { setVoiceFallback(true); if (voiceOnRef.current && sequence === speechSequenceRef.current) speakBrowserReply(message); return; }
     if (!voiceOnRef.current || sequence !== speechSequenceRef.current) { playbackRef.current = false; return; }
     speakBrowserReply(message);
   }
@@ -84,11 +93,12 @@ export function JarvisChat() {
     const british = voices.filter(v => /^en[-_]GB$/i.test(v.lang));
     const maleNames = /ryan|george|daniel|oliver|arthur|alfie|thomas|david|mark|james|male/i;
     const preferred = british.find(v => maleNames.test(v.name)) ?? voices.find(v => /^en[-_]/i.test(v.lang) && maleNames.test(v.name));
-    if (!preferred) { playbackRef.current = false; setError("No known male browser voice installed. Check AI Gateway speech access, or install a male English voice in Windows."); if (handsFreeRef.current) { handsFreeRef.current = false; setHandsFree(false); } return; }
+    if (!voices.length) { setMicStatus("Browser voice loading; retrying with default voice"); }
     if (preferred) speech.voice = preferred;
-    speech.lang = preferred.lang; speech.rate = 0.94; speech.pitch = 0.95;
-    speech.onend = () => { playbackRef.current = false; if (handsFreeRef.current) void startListeningRef.current(); };
-    speech.onerror = () => { playbackRef.current = false; setError("Audio playback failed. Check your browser sound output and Windows volume."); if (handsFreeRef.current) void startListeningRef.current(); };
+    speech.lang = preferred?.lang || "en-GB"; speech.rate = 0.94; speech.pitch = 0.95;
+    const sequence = speechSequenceRef.current;
+    speech.onend = () => finishPlayback(sequence);
+    speech.onerror = () => { setError("Browser speech playback failed. Check sound output."); finishPlayback(sequence); };
     window.speechSynthesis.speak(speech);
   }
   function setVoice(enabled: boolean) {
@@ -165,17 +175,19 @@ export function JarvisChat() {
     window.speechSynthesis?.cancel();
     setVoice(true); setError("");
     const instance = new Constructor();
+    const generation = ++recognitionGenerationRef.current;
+    recognizedRef.current = false;
     recognition.current = instance;
     instance.lang = "en-US"; instance.interimResults = false; instance.continuous = false;
     instance.onresult = event => {
       const transcript = Array.from(event.results).map(result => result[0]?.transcript ?? "").join(" ").trim();
-      if (transcript) { setMicStatus("Heard: " + transcript); void send(transcript); } else setMicStatus("No words recognized");
+      if (transcript && !recognizedRef.current) { recognizedRef.current = true; setMicStatus("Heard: " + transcript); void send(transcript); } else setMicStatus("No words recognized");
     };
-    instance.onerror = event => { if (event.error !== "no-speech") { handsFreeRef.current = false; setHandsFree(false); } setMicStatus("Speech recognition error: " + event.error); setError(event.error === "not-allowed" ? "Microphone blocked. Click the lock icon beside buxme.co, allow Microphone, and reload." : event.error === "no-speech" ? "No speech detected. Check the selected Windows microphone and try again." : event.error === "audio-capture" ? "No microphone detected. Check Windows Settings > Privacy & security > Microphone." : "Microphone error: " + event.error); setListening(false); };
-    instance.onend = () => { if (recognition.current !== instance) return; listeningRef.current = false; recognition.current = null; setListening(false); setMicStatus(current => current === "Listening..." ? "Listening ended without a transcript" : current); if (handsFreeRef.current && !busyRef.current) void startListeningRef.current(); };
+    instance.onerror = event => { if (generation !== recognitionGenerationRef.current) return; if (event.error === "not-allowed" || event.error === "audio-capture") { handsFreeRef.current = false; setHandsFree(false); } setMicStatus("Speech recognition error: " + event.error); setError(event.error === "not-allowed" ? "Microphone blocked. Click the lock icon beside buxme.co, allow Microphone, and reload." : event.error === "no-speech" ? "No speech detected. Check the selected Windows microphone and try again." : event.error === "audio-capture" ? "No microphone detected. Check Windows Settings > Privacy & security > Microphone." : "Microphone error: " + event.error); setListening(false); };
+    instance.onend = () => { if (recognition.current !== instance) return; listeningRef.current = false; recognition.current = null; setListening(false); setMicStatus(current => current === "Listening..." ? "Listening ended without a transcript" : current); if (handsFreeRef.current && !busyRef.current && !playbackRef.current && !recognizedRef.current) void startListeningRef.current(); };
     try { instance.start(); startingRef.current = false; listeningRef.current = true; setListening(true); setMicStatus("Listening..."); } catch (e) { setMicStatus("Speech recognition failed to start"); setError("Could not start speech recognition: " + (e instanceof Error ? e.message : "unknown error")); setListening(false); }
   }
-  startListeningRef.current = startListening;
+  useEffect(() => { startListeningRef.current = startListening; });
   async function toggleHandsFree() {
     if (handsFreeRef.current) { ++speechSequenceRef.current; playbackRef.current = false; handsFreeRef.current = false; setHandsFree(false); recognition.current?.stop(); audioRef.current?.pause(); window.speechSynthesis?.cancel(); setMicStatus("Hands-free stopped"); return; }
     handsFreeRef.current = true; setHandsFree(true); setVoice(true); await startListening();
@@ -188,7 +200,8 @@ export function JarvisChat() {
       {messages.map((m, i) => <div key={i} className={m.role === "user" ? "ml-8 rounded-xl bg-blue-950 p-3 text-sm" : "mr-8 rounded-xl bg-slate-800 p-3 text-sm"}><p className="mb-1 text-xs font-bold text-blue-300">{m.role === "user" ? "You" : "Jarvis"}</p><p className="whitespace-pre-wrap">{m.content}</p></div>)}
       {busy && <p className="text-sm text-slate-400">Jarvis is responding...</p>}
     </div>
-    <p role="status" className="mt-3 text-xs text-slate-300">Microphone: {micStatus}</p>
+    <p role="status" className="mt-3 text-xs text-slate-300">Microphone: {micStatus} {handsFree ? "· Hands-free conversation active" : ""}</p>
+    {voiceFallback && <p role="status" className="mt-1 text-xs text-amber-300">Neural voice unavailable; using your browser voice automatically.</p>}
     {taskNotice && <p role="status" className="mt-3 text-sm text-emerald-300">{taskNotice}</p>}
     {error && <p role="alert" className="mt-3 text-sm text-amber-300">{error}</p>}
     <form onSubmit={e => { e.preventDefault(); void send(); }} className="mt-4 flex flex-wrap gap-2">
