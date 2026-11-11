@@ -20,7 +20,16 @@ export async function GET() {
     const codingData = codingResponse?.ok ? await codingResponse.json() as { workflow_runs?: Array<{ id: number; status: string; conclusion: string | null; created_at: string; html_url: string; event: string }> } : null;
     const normalize = (r: { id: number; status: string; conclusion: string | null; created_at: string; html_url: string; event: string }) =>
       ({ id: r.id, status: r.status, conclusion: r.conclusion, createdAt: r.created_at, url: r.html_url, event: r.event });
+    const issuesResponse = await fetch(`https://api.github.com/repos/${repo}/issues?state=all&per_page=100`, {
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" },
+      cache: "no-store", signal: AbortSignal.timeout(8000),
+    }).catch(() => null);
+    const issuesData = issuesResponse?.ok ? await issuesResponse.json() as Array<{ number: number; title: string; state: string; html_url: string; body: string | null; pull_request?: unknown }> : [];
+    const autonomousTasks = issuesData.filter(issue => !issue.pull_request && issue.body?.includes("<!-- jarvis-signal:")).map(issue => ({
+      number: issue.number, title: issue.title.replace(/^\[Jarvis\]\s*/, ""), status: issue.state === "closed" ? "completed" : "awaiting_review", url: issue.html_url,
+    }));
     return NextResponse.json({
+      autonomousTasks, autonomousQueueAvailable: Boolean(issuesResponse?.ok),
       connected: true,
       runs: (data.workflow_runs ?? []).map(normalize),
       codingRuns: (codingData?.workflow_runs ?? []).map(normalize),
