@@ -197,3 +197,27 @@ export async function verifyAndDecodeSignedRenewalInfo(
   const verifier = createVerifier(config, environment);
   return verifier.verifyAndDecodeRenewalInfo(signedRenewalInfo);
 }
+
+/** Admin diagnostic: no profile writes and no credential material returned. */
+export function createAppleDiagnosticClient(environment: Environment) {
+  return createApiClient(assertAppleIapConfigured(), environment);
+}
+
+export async function getVerifiedProductionSubscriptionStatus(originalTransactionId: string) {
+  const config = assertAppleIapConfigured();
+  const client = createApiClient(config, Environment.PRODUCTION);
+  const response = await client.getAllSubscriptionStatuses(originalTransactionId);
+  if (response.bundleId !== config.bundleId || response.environment !== Environment.PRODUCTION) {
+    throw new Error("Apple status response identity mismatch.");
+  }
+  const entries = (response.data ?? []).flatMap((group) => group.lastTransactions ?? [])
+    .filter((entry) => entry.originalTransactionId === originalTransactionId);
+  // Do not choose a guessed or unrelated lineage when Apple returns ambiguity.
+  if (entries.length !== 1 || !entries[0].signedTransactionInfo) {
+    throw new Error("Apple subscription lineage unavailable or ambiguous.");
+  }
+  const transaction = await createVerifier(config, Environment.PRODUCTION)
+    .verifyAndDecodeTransaction(entries[0].signedTransactionInfo);
+  const { summarizeVerifiedAppleStatus } = await import("@/lib/iap/appleDiagnosticsPolicy");
+  return summarizeVerifiedAppleStatus(transaction, entries[0].status, originalTransactionId);
+}

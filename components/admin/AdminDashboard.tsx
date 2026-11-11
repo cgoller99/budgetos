@@ -13,6 +13,7 @@ import {
   StatCard,
 } from "@/components/ui";
 import { cn } from "@/components/ui/cn";
+import { AppleDiagnostics } from "./AppleDiagnostics";
 import { AdminChart } from "./AdminChart";
 import { ConfirmActionModal } from "./ConfirmActionModal";
 import { scheduleAdminHashScroll } from "./adminHashScroll";
@@ -446,6 +447,7 @@ export function AdminDashboard() {
           <StatCard label="Stripe Cancellations" value={String(revenue?.cancellations ?? 0)} change="Last 30 days" mutedChange positive={false} />
           <StatCard label="Stripe Open Invoices" value={String(revenue?.failedPayments ?? 0)} change="Open invoices" mutedChange positive={false} />
         </MetricGrid>
+        <AppleDiagnostics />
       </Section>
 
       {plaid?.available || sectionErrors.plaid ? (
