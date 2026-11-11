@@ -41,6 +41,10 @@ jobs:
         run: |
           mkdir -p jarvis-output
           node scripts/jarvis-priority-worker.mjs data/jarvis-signals.json jarvis-output/priorities.json
+      - name: Persist deduplicated findings to GitHub Issues
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/jarvis-persist-findings.mjs
       - name: Coordinate specialist agent proposals
         run: node scripts/jarvis-coordinate.mjs
       - name: Produce read-only task snapshot
