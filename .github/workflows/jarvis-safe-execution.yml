@@ -1,0 +1,35 @@
+name: Jarvis approved read-only executor
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '7,22,37,52 * * * *'
+permissions:
+  contents: read
+  issues: write
+concurrency:
+  group: jarvis-safe-executor
+  cancel-in-progress: false
+jobs:
+  execute:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Execute one approved task with durable GitHub issue ledger
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          JARVIS_QUEUE_PATH: ${{ runner.temp }}/jarvis-approved-queue.json
+          JARVIS_RESULTS_DIR: ${{ runner.temp }}/jarvis-results
+        run: node scripts/jarvis-github-execute.mjs
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jarvis-execution-${{ github.run_id }}
+          path: ${{ runner.temp }}/jarvis-results/
+          if-no-files-found: ignore
+          retention-days: 30

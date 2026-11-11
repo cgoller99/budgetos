@@ -1,0 +1,20 @@
+[
+  {
+    "id": "revenue-funnel-audit",
+    "title": "Analytics: audit conversion tracking",
+    "status": "approved",
+    "attempts": 0
+  },
+  {
+    "id": "upgrade-conversion-review",
+    "title": "Developer: review upgrade funnel",
+    "status": "approved",
+    "attempts": 0
+  },
+  {
+    "id": "organic-marketing-campaign",
+    "title": "Marketing: inspect attribution tracking",
+    "status": "approved",
+    "attempts": 0
+  }
+]
