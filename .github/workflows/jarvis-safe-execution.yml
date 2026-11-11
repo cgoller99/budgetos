@@ -18,7 +18,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Validate safe executor\n        run: |\n          node scripts/test-jarvis-execute.mjs\n          node scripts/test-jarvis-task-queue.mjs\n      - name: Execute one approved task with durable GitHub issue ledger
+      - name: Validate safe executor
+        run: |
+          node scripts/test-jarvis-execute.mjs
+          node scripts/test-jarvis-task-queue.mjs
+      - name: Execute one approved task with durable GitHub issue ledger
         env:
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
