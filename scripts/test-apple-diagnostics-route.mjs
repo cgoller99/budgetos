@@ -9,6 +9,7 @@ const denied={status:403,body:{error:'Forbidden'}};
 const next={NextResponse:{json:(body,options={})=>({body,status:options.status??200,headers:options.headers})}};
 const query={select(){return this;},eq(){return this;},not(){return this;},order(){return this;},limit(){return Promise.resolve({data:[{id:'user',full_name:'Example',subscription_status:'active',apple_original_transaction_id:'private-id'}],error:null});}};
 const deps={
+ '@/lib/iap/appleReconcile':{reconcileActiveAppleSubscription:async()=>({synced:true})},
  'next/server':next,
  '@apple/app-store-server-library':{Environment:{SANDBOX:'Sandbox',PRODUCTION:'Production'}},
  '@/lib/admin/apiAuth':{requireAdminApiUser:async()=>allowed?{adminSupabase:{from:()=>query}}:{response:denied}},

@@ -37,6 +37,22 @@ export function AppleDiagnostics() {
     } finally { setBusy(false); }
   }
 
+  async function reconcile(userId: string) {
+    setBusy(true);
+    setMessage("");
+    try {
+      const response = await fetch("/api/admin/apple-diagnostics", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reconcile_active", userId }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? "Reconciliation failed.");
+      setMessage("Verified Apple subscription synced. Refresh the dashboard for updated totals.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Reconciliation failed.");
+    } finally { setBusy(false); }
+  }
+
   async function audit() {
     setBusy(true);
     setMessage("");
@@ -55,7 +71,7 @@ export function AppleDiagnostics() {
   return (
     <div className="mt-4 space-y-3 rounded-xl border border-white/10 p-4">
       <h3 className="font-semibold">Apple subscription checks</h3>
-      <p className="text-sm text-white/60">Test notification delivery or compare stored accounts with Apple. These checks never change billing or account access.</p>
+      <p className="text-sm text-white/60">Test notification delivery or compare stored accounts with Apple. Delivery tests and verification are read-only. Sync applies only an active subscription freshly verified with Apple; it never charges or cancels billing.</p>
       <div className="flex flex-wrap gap-2">
         {(["Sandbox", "Production"] as const).map((environment) => (
           <div key={environment} className="flex gap-2">
@@ -69,6 +85,7 @@ export function AppleDiagnostics() {
       {records.length > 0 && <ul className="space-y-2 text-sm">
         {records.map((record) => <li key={record.userId}>
           {record.name || "Unnamed account"}: {record.verified ? `${record.appleStatus}${record.expiresAt ? `; period ends ${new Date(record.expiresAt).toLocaleDateString()}` : ""}` : "Could not verify; account unchanged"}
+          {record.verified && record.appleStatus === "active" && <Button disabled={busy} onClick={() => void reconcile(record.userId)}>Sync {record.name || "account"} subscription</Button>}
         </li>)}
       </ul>}
     </div>

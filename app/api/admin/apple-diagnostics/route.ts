@@ -3,6 +3,8 @@ import { Environment } from "@apple/app-store-server-library";
 import { requireAdminApiUser } from "@/lib/admin/apiAuth";
 import { createAppleDiagnosticClient, getVerifiedProductionSubscriptionStatus } from "@/lib/iap/appleServerClient";
 
+import { reconcileActiveAppleSubscription } from "@/lib/iap/appleReconcile";
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -38,6 +40,16 @@ export async function POST(request: Request) {
   }
   let body;
   try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid request." }, { status: 400, headers }); }
+  if (body?.action === "reconcile_active") {
+    if (typeof body.userId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.userId)) {
+      return NextResponse.json({ error: "A valid account ID is required." }, { status: 400, headers });
+    }
+    try {
+      return NextResponse.json(await reconcileActiveAppleSubscription(auth.adminSupabase, body.userId), { headers });
+    } catch {
+      return NextResponse.json({ error: "Subscription could not be safely reconciled. No unverified status was applied." }, { status: 409, headers });
+    }
+  }
   if (!body || (body.environment !== "Sandbox" && body.environment !== "Production") || !["send_test", "check_test"].includes(body.action)) {
     return NextResponse.json({ error: "Invalid diagnostic action." }, { status: 400, headers });
   }
