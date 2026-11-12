@@ -19,7 +19,10 @@ for (let page = 1; page <= 20; page++) {
   if (issues.length < 100) break;
   if (page === 20) throw Error("Issue ledger exceeds scan limit; fail closed");
 }
-const task = manifest.find(x => x.status === "approved" && !completed.has(x.id));
+const requestedTaskId = process.env.JARVIS_APPROVED_TASK_ID?.trim() || null;
+if (requestedTaskId && !/^[a-z0-9][a-z0-9-]{2,79}$/.test(requestedTaskId)) throw Error("Invalid approved task identifier");
+const task = manifest.find(x => x.status === "approved" && !completed.has(x.id) && (!requestedTaskId || x.id === requestedTaskId));
+if (requestedTaskId && !task) console.log("Requested task is not approved, already completed, or absent; no execution.");
 if (!task) { console.log("No new approved tasks; no execution."); } else {
 const queuePath = process.env.JARVIS_QUEUE_PATH;
 if (!queuePath) throw Error("Isolated queue path required");

@@ -1,6 +1,11 @@
 name: Jarvis approved read-only executor
 on:
   workflow_dispatch:
+    inputs:
+      approved_task_id:
+        description: "Optional exact allowlisted task ID (must already be approved in repository manifest)"
+        required: false
+        type: string
   schedule:
     - cron: '7,22,37,52 * * * *'
 permissions:
@@ -12,6 +17,7 @@ concurrency:
 jobs:
   execute:
     runs-on: ubuntu-latest
+    environment: jarvis-coding
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
@@ -27,6 +33,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
+          JARVIS_APPROVED_TASK_ID: ${{ inputs.approved_task_id }}
           JARVIS_QUEUE_PATH: ${{ runner.temp }}/jarvis-approved-queue.json
           JARVIS_RESULTS_DIR: ${{ runner.temp }}/jarvis-results
         run: node scripts/jarvis-github-execute.mjs
