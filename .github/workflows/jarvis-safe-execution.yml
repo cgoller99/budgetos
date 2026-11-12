@@ -27,6 +27,7 @@ jobs:
           node scripts/test-jarvis-execute.mjs
           node scripts/test-jarvis-github-execute.mjs
           node scripts/test-jarvis-task-queue.mjs
+          node scripts/test-jarvis-workflow-policy.mjs
       - name: Execute one approved task with durable GitHub issue ledger
         env:
           GITHUB_TOKEN: ${{ github.token }}
