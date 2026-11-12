@@ -82,7 +82,7 @@ export function buildMoneyPlan(
   referenceDate = new Date(),
   budgets: MoneyPlanBudgetLimit[] = [],
 ): MoneyPlan {
-  const flow = calculateMoneyFlow(normalizeRecurringFinanceData(data, referenceDate));
+  const flow = calculateMoneyFlow(normalizeRecurringFinanceData(data, referenceDate), referenceDate);
   const month = getCurrentYearMonth(referenceDate);
   const plan = filterPersonalIncomePlan(data.incomePlan, data.viewerUserId ?? null);
 
