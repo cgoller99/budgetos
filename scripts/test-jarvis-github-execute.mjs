@@ -42,6 +42,11 @@ try {
   process.env.JARVIS_APPROVED_TASK_ID = "not-allowlisted";
   await import("./jarvis-github-execute.mjs?test=5");
   assert.equal(posts, 3);
+  delete process.env.JARVIS_APPROVED_TASK_ID;
+  await assert.rejects(() => import("./jarvis-github-execute.mjs?test=missing"), /Explicit approved task ID required/);
+  process.env.JARVIS_APPROVED_TASK_ID = "BAD ID";
+  await assert.rejects(() => import("./jarvis-github-execute.mjs?test=invalid"), /Invalid approved task identifier/);
+  assert.equal(posts, 3);
   console.log("Jarvis GitHub runner integration passed: 3 executions, durable ledger, no duplicate run.");
 } finally {
   for (const key of ["GITHUB_TOKEN", "GITHUB_REPOSITORY", "GITHUB_RUN_ID", "JARVIS_QUEUE_PATH", "JARVIS_RESULTS_DIR", "JARVIS_APPROVED_TASK_ID"]) {
