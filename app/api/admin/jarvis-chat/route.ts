@@ -1,3 +1,4 @@
+import { dispatchJarvisProposal } from "@/lib/jarvis/dispatchProposal";
 import { NextResponse } from "next/server";
 import { generateText, tool, stepCountIs } from "ai";
 import { z } from "zod";
@@ -50,19 +51,7 @@ export async function POST(request: Request) {
               await auth.adminSupabase.from("ai_team_runs").delete().eq("id", run.id);
               return { saved: false, error: "Task storage unavailable" };
             }
-            let proposalDispatched = false;
-            const token = process.env.JARVIS_GITHUB_DISPATCH_TOKEN?.trim();
-            if (token && !/[\r\n]/.test(goal)) {
-              try {
-                const response = await fetch("https://api.github.com/repos/cgoller99/budgetos/actions/workflows/jarvis-proposals.yml/dispatches", {
-                  method: "POST",
-                  headers: { Authorization: "Bearer " + token, Accept: "application/vnd.github+json", "Content-Type": "application/json", "X-GitHub-Api-Version": "2022-11-28" },
-                  body: JSON.stringify({ ref: "main", inputs: { founder_task: goal } }),
-                  signal: AbortSignal.timeout(12000), cache: "no-store",
-                });
-                proposalDispatched = response.status === 204;
-              } catch { /* task remains durably saved; no execution is claimed */ }
-            }
+            const proposalDispatched = await dispatchJarvisProposal(goal);
             return { saved: true, taskId: task.id, status: task.status, proposalDispatched, execution: "not_started" };
           },
         }),
