@@ -434,11 +434,12 @@ export function AdminDashboard() {
         loadError={sectionErrors.revenue}
       >
         <MetricGrid>
-          <StatCard label="MRR" value={formatCurrency(revenue?.mrr ?? 0)} change={revenue?.available ? "Stripe live" : "Stripe unavailable"} mutedChange />
+          <StatCard label="Apple MRR estimate (not verified proceeds)" value={formatCurrency(revenue?.appleEstimatedMrr ?? 0)} change="Active production profiles at listed prices" mutedChange />
+          <StatCard label="Stripe MRR (Apple excluded)" value={formatCurrency(revenue?.mrr ?? 0)} change={revenue?.available ? "Stripe live" : "Stripe unavailable"} mutedChange />
           <StatCard label="ARR" value={formatCurrency(revenue?.arr ?? 0)} change="" mutedChange />
           <StatCard label="Free Users" value={String(revenue?.freeUsers ?? 0)} change="" mutedChange />
           <StatCard label="Pro Users" value={String(revenue?.proUsers ?? 0)} change="" mutedChange />
-          <StatCard label="Pro+ Users" value={String(revenue?.proPlusUsers ?? 0)} change="" mutedChange />
+          <StatCard label="Pro+ profiles (not confirmed paid)" value={String(revenue?.proPlusUsers ?? 0)} change="" mutedChange />
           <StatCard label="Churn Rate" value={`${revenue?.churnRate ?? 0}%`} change="Last 30 days" mutedChange positive={false} />
           <StatCard label="New Subscriptions" value={String(revenue?.newSubscriptions ?? 0)} change="Last 30 days" mutedChange />
           <StatCard label="Cancellations" value={String(revenue?.cancellations ?? 0)} change="Last 30 days" mutedChange positive={false} />

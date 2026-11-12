@@ -1,0 +1,35 @@
+name: Jarvis safe executor CI
+on:
+  pull_request:
+    paths:
+      - 'scripts/jarvis-execute.mjs'
+      - 'scripts/jarvis-github-execute.mjs'
+      - 'scripts/test-jarvis-execute.mjs'
+      - 'scripts/test-jarvis-github-execute.mjs'
+      - 'scripts/test-jarvis-task-queue.mjs'
+      - 'data/jarvis-approved-tasks.json'
+      - '.github/workflows/jarvis-safe-execution*.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check syntax
+        run: |
+          node --check scripts/jarvis-execute.mjs
+          node --check scripts/jarvis-github-execute.mjs
+          node --check scripts/test-jarvis-github-execute.mjs
+      - name: Test executor and GitHub ledger without credentials
+        run: |
+          node scripts/test-jarvis-execute.mjs
+          node scripts/test-jarvis-github-execute.mjs
+          node scripts/test-jarvis-task-queue.mjs
+          node scripts/test-jarvis-priority-worker.mjs
+          node scripts/test-jarvis-coordinate.mjs

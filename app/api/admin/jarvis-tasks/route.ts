@@ -1,3 +1,4 @@
+import { dispatchJarvisProposal } from "@/lib/jarvis/dispatchProposal";
 import { coordinateJarvis } from "@/lib/ai-team/jarvisCoordinator.mjs";
 import { NextResponse } from "next/server";
 import { requireAdminApiUser } from "@/lib/admin/apiAuth";
@@ -40,5 +41,6 @@ export async function POST(request: Request) {
     await auth.adminSupabase.from("ai_team_runs").delete().eq("id", run.id);
     return NextResponse.json({ error: "Could not save task" }, { status: 503 });
   }
-  return NextResponse.json({ task }, { status: 201, headers: noCache });
+  const proposalDispatched = await dispatchJarvisProposal(goal.trim());
+  return NextResponse.json({ task, proposalDispatched, execution: "not_started" }, { status: 201, headers: noCache });
 }

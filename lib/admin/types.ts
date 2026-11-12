@@ -117,6 +117,10 @@ export type AdminAnalyticsMetrics = {
 };
 
 export type AdminRevenueMetrics = {
+  appleEstimatedMrr: number;
+  appleProCount: number;
+  appleProPlusCount: number;
+  appleEstimateSource: "profile_active_production_price_estimate";
   available: boolean;
   mrr: number;
   arr: number;

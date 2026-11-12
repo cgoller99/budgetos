@@ -132,7 +132,7 @@ export function JarvisChat() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Could not save task");
       setDraft("");
-      setTaskNotice("Task saved for review. Jarvis has not executed it.");
+      setTaskNotice(data.proposalDispatched ? "Task saved and GitHub proposal review requested. No execution started." : "Task saved for review, but GitHub dispatch is not connected or failed. No execution started.");
     } catch (e) { setError(e instanceof Error ? e.message : "Could not save task"); }
     finally { setSavingTask(false); }
   }
