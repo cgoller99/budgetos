@@ -32,6 +32,7 @@ import { calculateMoneyFlow } from "../lib/finance/moneyFlow.ts";
 import { getSafeToSpend } from "../lib/finance/safeToSpend.ts";
 import { findBudgetOverspending } from "../lib/automation/financialInsights.ts";
 import { buildMoneyPlan } from "../lib/plan/moneyPlan.ts";
+import { normalizeRecurringFinanceData } from "../lib/recurring/normalize.ts";
 import { sanitizeMoneyPlanBudgets } from "../lib/plan/moneyPlanAccess.ts";
 
 const root = path.resolve(import.meta.dirname, "..");
@@ -286,8 +287,10 @@ const monthlyTotal =
   Math.round(
     (650 + 216.67 + Math.round(((80 * 52) / 12) * 100) / 100 + 200) * 100,
   ) / 100;
-assert.equal(plan.safeToSpend, activeSpend);
-assert.equal(plan.safeToSpend, calculateMoneyFlow(activity, reference).safeToSpend);
+// Money Plan normalizes recurring schedules before computing the cash-flow waterfall.
+// The unnormalized fixture is not equivalent to the normalized plan input.
+const normalizedFlow = calculateMoneyFlow(normalizeRecurringFinanceData(activity, reference), reference);
+assert.equal(plan.safeToSpend, normalizedFlow.safeToSpend);
 assert.equal(plan.monthlyBudgetTotal, monthlyTotal);
 assert.ok(quietSpend - activeSpend > 35);
 assert.notEqual(
