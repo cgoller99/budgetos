@@ -4,10 +4,8 @@ on:
     inputs:
       approved_task_id:
         description: "Optional exact allowlisted task ID (must already be approved in repository manifest)"
-        required: false
+        required: true
         type: string
-  schedule:
-    - cron: '7,22,37,52 * * * *'
 permissions:
   contents: read
   issues: write
