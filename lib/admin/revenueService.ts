@@ -1,6 +1,7 @@
 import "server-only";
 
 import type Stripe from "stripe";
+import { IAP_PRODUCTS } from "@/lib/iap/products";
 import { getStripeClient } from "@/lib/stripe/stripeClient";
 import { isStripeEnabled } from "@/lib/stripe/config";
 import type { BuxmeSupabaseClient } from "@/lib/supabase/client";
@@ -31,7 +32,7 @@ export async function getAdminRevenueMetrics(
 ): Promise<AdminRevenueMetrics> {
   const { data: profiles, error } = await adminSupabase
     .from("profiles")
-    .select("subscription_plan, subscription_status");
+    .select("subscription_plan, subscription_status, subscription_provider, apple_product_id, apple_environment, subscription_current_period_end");
 
   if (error) {
     throw error;
@@ -50,8 +51,22 @@ export async function getAdminRevenueMetrics(
       ["active", "trialing", "past_due"].includes(row.subscription_status),
   ).length;
 
+  // Profile-derived Apple estimate, NOT Apple financial reporting or verified proceeds.
+  // Exclude sandbox, trials, expired, past-due, and unknown products.
+  const appleRows = rows.filter((row) =>
+    row.subscription_provider === "apple" &&
+    row.apple_environment === "Production" &&
+    row.subscription_status === "active" &&
+    row.subscription_current_period_end != null &&
+    Date.parse(row.subscription_current_period_end) > Date.now()
+  );
+  const appleProCount = appleRows.filter((row) => row.apple_product_id === IAP_PRODUCTS.pro.productId).length;
+  const appleProPlusCount = appleRows.filter((row) => row.apple_product_id === IAP_PRODUCTS.pro_plus.productId).length;
+  const appleEstimatedMrr = Number((appleProCount * 7.99 + appleProPlusCount * 14.99).toFixed(2));
+  const appleEstimate = { appleEstimatedMrr, appleProCount, appleProPlusCount, appleEstimateSource: "profile_active_production_price_estimate" as const };
   if (!isStripeEnabled()) {
     return {
+      ...appleEstimate,
       available: false,
       mrr: 0,
       arr: 0,
@@ -112,6 +127,7 @@ export async function getAdminRevenueMetrics(
   const churnRate = Number(((cancellations / activeBase) * 100).toFixed(1));
 
   return {
+    ...appleEstimate,
     available: true,
     mrr: Number(mrr.toFixed(2)),
     arr: Number((mrr * 12).toFixed(2)),

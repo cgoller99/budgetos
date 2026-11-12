@@ -64,7 +64,7 @@ export async function POST(request: Request) {
               try { result.growth = await getAdminOverviewMetrics(auth.adminSupabase); } catch { result.growthError = "Growth metrics unavailable"; }
             }
             if (area !== "growth") {
-              try { result.revenue = await getAdminRevenueMetrics(auth.adminSupabase); result.revenueCaveat = "Stripe-only MRR; Apple App Store proceeds and subscriptions are not reconciled here. Profile subscription status can be stale."; } catch { result.revenueError = "Revenue metrics unavailable"; }
+              try { result.revenue = await getAdminRevenueMetrics(auth.adminSupabase); result.revenueCaveat = "mrr is Stripe-only. appleEstimatedMrr is an unverified gross estimate from active, unexpired Production Apple profiles at listed US prices, not Apple payouts or confirmed billed MRR. Never present their sum as verified total MRR. Profiles may be stale."; } catch { result.revenueError = "Revenue metrics unavailable"; }
             }
             return result;
           },

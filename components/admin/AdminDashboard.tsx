@@ -434,6 +434,7 @@ export function AdminDashboard() {
         loadError={sectionErrors.revenue}
       >
         <MetricGrid>
+          <StatCard label="Apple MRR estimate (not verified proceeds)" value={formatCurrency(revenue?.appleEstimatedMrr ?? 0)} change="Active production profiles at listed prices" mutedChange />
           <StatCard label="Stripe MRR (Apple excluded)" value={formatCurrency(revenue?.mrr ?? 0)} change={revenue?.available ? "Stripe live" : "Stripe unavailable"} mutedChange />
           <StatCard label="ARR" value={formatCurrency(revenue?.arr ?? 0)} change="" mutedChange />
           <StatCard label="Free Users" value={String(revenue?.freeUsers ?? 0)} change="" mutedChange />
