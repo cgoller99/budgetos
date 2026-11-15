@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 
 const dir = await mkdtemp(join(tmpdir(), "jarvis-scheduled-worker-"));
 const queue = join(dir, "queue.json");
@@ -13,6 +13,8 @@ const baseEnv = {
   JARVIS_RESULTS_DIR: results,
   JARVIS_ACTOR: "schedule-test",
   JARVIS_RESEARCH_MODEL: "anthropic/claude-sonnet-4",
+  JARVIS_TRIGGER_MAX_RETRIES: "3",
+  JARVIS_TRIGGER_RETRY_DELAY_MS: "10",
 };
 const task = {
   id: "scheduled-review",
@@ -36,9 +38,28 @@ const run = () => spawnSync(process.execPath, ["scripts/jarvis-scheduled-worker.
   encoding: "utf8",
   env: baseEnv,
 });
+const runAfterContention = () => new Promise(resolve => {
+  const lock = `${queue}.lock`;
+  const child = spawn(process.execPath, ["scripts/jarvis-scheduled-worker.mjs"], {
+    cwd: process.cwd(),
+    encoding: "utf8",
+    env: baseEnv,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  let stderr = "";
+  child.stderr.on("data", chunk => {
+    stderr += chunk;
+  });
+  setTimeout(() => rm(lock, { force: true }).catch(() => {}), 250);
+  child.on("close", code => resolve({ code, stderr }));
+});
 
 try {
   await writeFile(queue, JSON.stringify([task]));
+  await writeFile(`${queue}.lock`, "transient test contention");
+  const contentionRun = runAfterContention();
+  const contention = await contentionRun;
+  assert.equal(contention.code, 0, contention.stderr);
   const futureRun = run();
   assert.equal(futureRun.status, 0, futureRun.stderr);
   let tasks = JSON.parse(await readFile(queue, "utf8"));
