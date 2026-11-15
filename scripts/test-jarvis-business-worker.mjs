@@ -56,6 +56,7 @@ try {
   const record = JSON.parse(await readFile(join(results, `${completed.executionId}.json`), "utf8"));
   assert.equal(record.business, "buxme");
   assert.equal(record.result.handler, "buxme.research.inventory");
+  assert.deepEqual(record.result.scope, ["app", "components", "lib"]);
   assert.ok(Array.isArray(record.result.evidence));
   assert.equal(run().status, 0);
   assert.equal(run().status, 0);
@@ -86,6 +87,13 @@ try {
   assert.equal(tasks[0].status, "completed");
   assert.equal(tasks[0].attempts, 2);
   assert.deepEqual(tasks[0].audit.map(item => item.type), ["proposed", "claimed", "failed", "claimed", "completed"]);
+
+  await writeFile(queue, JSON.stringify([task("exhausted-retry-task", { attempts: 2 })]));
+  assert.notEqual(run({ JARVIS_TEST_FAIL_ONCE: "exhausted-retry-task:3" }).status, 0);
+  tasks = JSON.parse(await readFile(queue, "utf8"));
+  assert.equal(tasks[0].status, "failed");
+  assert.equal(tasks[0].attempts, 3);
+  assert.equal(tasks[0].audit.at(-1).type, "failed");
 
   const reconciled = task("reconciled-task", { attempts: 1, status: "running", startedAt: "2020-01-01T00:00:00.000Z" });
   reconciled.executionId = createHash("sha256").update("reconciled-task:1").digest("hex").slice(0, 20);
