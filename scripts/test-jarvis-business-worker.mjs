@@ -84,6 +84,7 @@ try {
     const events = tasks.find(item => item.id === id).audit.map(item => item.type);
     assert.deepEqual(events.slice(0, 3), ["proposed", "approved", "claimed"]);
     assert.ok(["completed", "reconciled"].includes(events.at(-1)));
+    assert.ok(tasks.find(item => item.id === id).audit.slice(2).every(item => item.event === item.type));
   }
 
   const completed = tasks.find(item => item.id === "one");
@@ -95,6 +96,7 @@ try {
   assert.equal(record.model, "anthropic/claude-sonnet-4");
   assert.equal(record.claimId, completed.claimId);
   assert.ok(record.audit.some(event => event.type === "claimed"));
+  assert.ok(record.audit.slice(2).every(event => event.event === event.type));
   assert.equal(record.audit.at(-1).type, "completed");
   assert.deepEqual(record.result.sideEffects, []);
   assert.ok(Array.isArray(record.result.evidence));

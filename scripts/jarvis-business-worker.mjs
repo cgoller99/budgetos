@@ -16,7 +16,7 @@ const actor = process.env.JARVIS_ACTOR?.trim() || "jarvis-business-worker";
 const now = () => new Date().toISOString();
 
 function audit(task, type, details = {}) {
-  (task.audit ??= []).push({ type, actor, at: now(), ...details });
+  (task.audit ??= []).push({ event: type, type, actor, at: now(), ...details });
   if (task.audit.length > MAX_AUDIT_ENTRIES) task.audit = task.audit.slice(-MAX_AUDIT_ENTRIES);
 }
 
@@ -218,7 +218,7 @@ try {
     completedAt,
     audit: [
       ...claimed.audit,
-      { type: "completed", actor, at: completedAt, executionId: claimed.executionId, claimId: claimed.claimId },
+      { event: "completed", type: "completed", actor, at: completedAt, executionId: claimed.executionId, claimId: claimed.claimId },
     ],
     result,
   };
