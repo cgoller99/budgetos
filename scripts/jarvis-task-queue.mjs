@@ -23,6 +23,11 @@ async function locked(operation) {
     return result;
   } finally { await lock.close(); const { unlink } = await import("node:fs/promises"); await unlink(lockPath); }
 }
+const audit = (task, event, details = {}) => {
+  if (!Array.isArray(task.audit)) task.audit = [];
+  task.audit.push({ event, at: new Date().toISOString(), ...details });
+  if (task.audit.length > 50) task.audit = task.audit.slice(-50);
+};
 if (command === "list") console.log(JSON.stringify(await load(), null, 2));
 else if (command === "add") {
   const [id, ...words] = args;
@@ -31,7 +36,12 @@ else if (command === "add") {
   await locked(tasks => {
     if (tasks.some(t => t.id === id)) throw Error("Task already exists.");
     if (tasks.length >= 200) throw Error("Queue capacity reached.");
-    tasks.push({ id, title, status: "proposed", attempts: 0, createdAt: new Date().toISOString() });
+    const task = {
+      id, title, status: "proposed", attempts: 0, priority: 0,
+      createdAt: new Date().toISOString(), audit: []
+    };
+    audit(task, "created", { status: task.status });
+    tasks.push(task);
   });
   console.log("Task proposed.");
 } else if (command === "review") {
@@ -41,6 +51,7 @@ else if (command === "add") {
     const task = tasks.find(t => t.id === id);
     if (!task || task.status !== "proposed") throw Error("Task must be proposed.");
     task.status = decision; task.reviewedAt = new Date().toISOString();
+    audit(task, "reviewed", { status: decision });
   });
   console.log("Task review recorded. No execution performed.");
 } else throw Error("Usage: jarvis-task-queue.mjs <list|add|review>");
