@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -64,6 +65,8 @@ try {
     business: "drivenest",
     businessName: "Buxme",
     model: { kind: "business", model: "openai/gpt-4o-mini" },
+  }), task("invalid-route", {
+    model: { kind: "research", model: "not a valid model id" },
   })]));
 
   const codes = await Promise.all([runAsync(), runAsync(), runAsync()]);
@@ -73,6 +76,8 @@ try {
   assert.equal(tasks.find(item => item.id === "unsafe").status, "blocked");
   assert.equal(tasks.find(item => item.id === "unsupported").status, "blocked");
   assert.equal(tasks.find(item => item.id === "mismatch").status, "blocked");
+  assert.equal(tasks.find(item => item.id === "invalid-route").status, "blocked");
+  assert.match(tasks.find(item => item.id === "invalid-route").audit.at(-1).reason, /route/i);
   assert.equal(tasks.find(item => item.id === "future").status, "approved");
   assert.equal(tasks.find(item => item.id === "unreviewed").status, "proposed");
   for (const id of ["one", "two"]) {
@@ -112,6 +117,22 @@ try {
   tasks = JSON.parse(await readFile(queue, "utf8"));
   assert.equal(tasks[0].status, "failed");
   assert.equal(tasks[0].attempts, 3);
+
+  const staleExecutionId = createHash("sha256").update("stale:1").digest("hex").slice(0, 20);
+  await writeFile(queue, JSON.stringify([task("stale", {
+    status: "running",
+    attempts: 1,
+    executionId: staleExecutionId,
+    claimId: "old-claim",
+    startedAt: new Date(Date.now() - 11 * 60 * 1000).toISOString(),
+    claimExpiresAt: new Date(Date.now() - 60 * 1000).toISOString(),
+    audit: [{ type: "proposed" }, { type: "approved" }, { type: "claimed", claimId: "old-claim" }],
+  })]));
+  assert.equal(run().status, 0);
+  tasks = JSON.parse(await readFile(queue, "utf8"));
+  assert.equal(tasks[0].status, "completed");
+  assert.equal(tasks[0].attempts, 2);
+  assert.ok(tasks[0].audit.some(item => item.type === "retry_scheduled"));
 
   console.log("Jarvis business worker tests passed: atomic claims, isolation, approval/safety gates, results, audit, retries.");
 } finally {
