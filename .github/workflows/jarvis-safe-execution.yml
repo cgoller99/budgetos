@@ -6,6 +6,8 @@ on:
         description: "Required exact allowlisted task ID (must already be approved in repository manifest)"
         required: true
         type: string
+  schedule:
+    - cron: '12,42 * * * *'
 permissions:
   contents: read
   issues: write
@@ -27,12 +29,30 @@ jobs:
           node scripts/test-jarvis-execute.mjs
           node scripts/test-jarvis-github-execute.mjs
           node scripts/test-jarvis-task-queue.mjs
+          node scripts/test-jarvis-select-approved-task.mjs
           node scripts/test-jarvis-workflow-policy.mjs
+      - name: Select one approved task for this run
+        id: select
+        env:
+          MANUAL_TASK_ID: ${{ inputs.approved_task_id }}
+        run: |
+          task_id="$MANUAL_TASK_ID"
+          if [ -z "$task_id" ]; then
+            task_id="$(node scripts/jarvis-select-approved-task.mjs)"
+          fi
+          if [ "$task_id" = "none" ]; then
+            echo "No approved task is waiting for execution."
+            echo "task_id=" >> "$GITHUB_OUTPUT"
+          else
+            echo "Selected one approved task."
+            echo "task_id=$task_id" >> "$GITHUB_OUTPUT"
+          fi
       - name: Execute one approved task with durable GitHub issue ledger
+        if: steps.select.outputs.task_id != ''
         env:
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          JARVIS_APPROVED_TASK_ID: ${{ inputs.approved_task_id }}
+          JARVIS_APPROVED_TASK_ID: ${{ steps.select.outputs.task_id }}
           JARVIS_QUEUE_PATH: ${{ runner.temp }}/jarvis-approved-queue.json
           JARVIS_RESULTS_DIR: ${{ runner.temp }}/jarvis-results
         run: node scripts/jarvis-github-execute.mjs
