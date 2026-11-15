@@ -29,6 +29,9 @@ try {
   assert.equal(tasks[0].audit[1].actor, "test-founder");
   assert.equal(tasks[2].status, "proposed");
   assert.equal(tasks[2].audit.at(-1).type, "scheduled");
+  assert.equal(run("add", "bounded-review", "buxme", "Review bounded schedule").status, 0);
+  const tooFar = new Date(Date.now() + 91 * 24 * 60 * 60 * 1000).toISOString();
+  assert.notEqual(run("schedule", "bounded-review", tooFar).status, 0);
   console.log("Jarvis business queue tests passed: scope, routing, scheduling, audit, approval gate.");
 } finally {
   await rm(dir, { recursive: true, force: true });

@@ -2,6 +2,7 @@
 import { mkdir, readFile, writeFile, rename, open, unlink } from "node:fs/promises";
 import { resolve, dirname } from "node:path";
 import { BUSINESSES, classifyTask, routeModel, riskFor, isDue } from "../lib/jarvis/queuePolicy.mjs";
+import { isScheduleWithinBound, MAX_FUTURE_SCHEDULED_TASKS } from "../lib/jarvis/scheduledDispatch.mjs";
 const path = resolve(process.env.JARVIS_QUEUE_PATH ?? "data/jarvis-queue.json");
 const lockPath = path + ".lock";
 const [command, ...args] = process.argv.slice(2);
@@ -48,9 +49,14 @@ else if (command === "add") {
 } else if (command === "schedule") {
   const [id, when] = args;
   if (!idPattern.test(id ?? "") || !when || Number.isNaN(Date.parse(when))) throw Error("Usage: schedule <safe-slug> <ISO timestamp>");
+  if (!isScheduleWithinBound(when)) throw Error("Schedule must be within 90 days.");
   await locked(tasks => {
     const task = tasks.find(t => t.id === id);
     if (!task || task.status !== "proposed") throw Error("Only proposed tasks can be scheduled.");
+    const futureCount = tasks.filter(item =>
+      item.scheduledAt && !isDue(item) && ["proposed", "approved"].includes(item.status),
+    ).length;
+    if (futureCount >= MAX_FUTURE_SCHEDULED_TASKS) throw Error("Future schedule capacity reached.");
     task.scheduledAt = iso(when);
     (task.audit ??= []).push(event("scheduled", { scheduledAt: task.scheduledAt }));
   });
