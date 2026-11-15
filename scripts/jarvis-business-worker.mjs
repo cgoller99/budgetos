@@ -1,5 +1,5 @@
 /** One bounded, approval-gated, read-only execution per invocation. */
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdir, open, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import { isDue } from "../lib/jarvis/queuePolicy.mjs";
@@ -62,6 +62,14 @@ function executionId(task) {
   return createHash("sha256").update(`${task.id}:${task.attempts}`).digest("hex").slice(0, 20);
 }
 
+function safePlan(task) {
+  try {
+    return dispatchPlan(task);
+  } catch {
+    return null;
+  }
+}
+
 function retryDelay() {
   const configured = Number(process.env.JARVIS_RETRY_DELAY_MS ?? 1000);
   return Number.isFinite(configured) && configured >= 0
@@ -81,7 +89,10 @@ async function reconcile() {
       const resultPath = join(resultDir, `${task.executionId}.json`);
       try {
         const record = JSON.parse(await readFile(resultPath, "utf8"));
-        if (record.taskId === task.id && record.executionId === task.executionId && record.status === "completed") {
+        if (record.taskId === task.id &&
+          record.executionId === task.executionId &&
+          record.claimId === task.claimId &&
+          record.status === "completed") {
           task.status = "completed";
           task.completedAt = record.completedAt;
           task.resultPath = relative(root, resultPath).replaceAll("\\", "/");
@@ -91,7 +102,7 @@ async function reconcile() {
       } catch (error) {
         if (error.code !== "ENOENT") throw error;
       }
-      const started = Date.parse(task.startedAt ?? "");
+      const started = Date.parse(task.claimExpiresAt ?? task.startedAt ?? "") - LEASE_MS;
       if (!Number.isFinite(started) || Date.now() - started <= LEASE_MS) continue;
       const retry = (task.attempts ?? 0) < MAX_ATTEMPTS;
       task.status = retry ? "approved" : "failed";
@@ -147,17 +158,29 @@ async function claim() {
     task.startedAt = now();
     task.attempts = (task.attempts ?? 0) + 1;
     task.executionId = executionId(task);
+    task.claimId = randomUUID();
+    task.claimExpiresAt = new Date(Date.now() + LEASE_MS).toISOString();
     task.nextAttemptAt = undefined;
-    const { model } = dispatchPlan(task);
-    audit(task, "claimed", { executionId: task.executionId, attempt: task.attempts, model });
-    return { ...task };
+    const plan = safePlan(task);
+    if (!plan) return null;
+    audit(task, "claimed", {
+      executionId: task.executionId,
+      claimId: task.claimId,
+      claimExpiresAt: task.claimExpiresAt,
+      attempt: task.attempts,
+      model: plan.model,
+    });
+    return { ...task, plan };
   });
 }
 
 async function markFailure(claimed, error) {
   await locked(tasks => {
     const task = tasks.find(item => item.id === claimed.id);
-    if (!task || task.status !== "running" || task.executionId !== claimed.executionId) throw new Error("Execution claim changed");
+    if (!task || task.status !== "running" ||
+      task.executionId !== claimed.executionId || task.claimId !== claimed.claimId) {
+      throw new Error("Execution claim changed");
+    }
     const retry = task.attempts < MAX_ATTEMPTS;
     task.status = retry ? "approved" : "failed";
     task.nextAttemptAt = retry ? new Date(Date.now() + retryDelay()).toISOString() : undefined;
@@ -169,6 +192,16 @@ async function markFailure(claimed, error) {
 
 async function persistResult(record, resultPath) {
   await mkdir(dirname(resultPath), { recursive: true });
+  try {
+    const existing = JSON.parse(await readFile(resultPath, "utf8"));
+    if (existing.taskId === record.taskId &&
+      existing.executionId === record.executionId &&
+      existing.claimId === record.claimId &&
+      existing.status === "completed") return;
+    throw new Error("Execution result already exists with different claim");
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
   const temporary = `${resultPath}.${process.pid}.tmp`;
   await writeFile(temporary, `${JSON.stringify(record, null, 2)}\n`, { mode: 0o600 });
   await rename(temporary, resultPath);
@@ -184,26 +217,34 @@ if (!claimed) {
 
 try {
   if (process.env.JARVIS_TEST_FAIL_ONCE === `${claimed.id}:${claimed.attempts}`) throw new Error("Injected handler failure");
-  const { model, handler } = dispatchPlan(claimed);
+  if (!claimed.plan) throw new Error("Execution route is no longer available");
+  const { model, handler } = claimed.plan;
   const result = await handler({ root, task: claimed, model });
+  if (!result || result.sideEffects?.length) throw new Error("Business handler returned unsafe side effects");
   const resultPath = join(resultDir, `${claimed.executionId}.json`);
+  const completedAt = now();
   const record = {
     taskId: claimed.id,
     executionId: claimed.executionId,
     business: claimed.business,
     businessName: claimed.businessName,
     kind: claimed.model.kind,
+    claimId: claimed.claimId,
     title: claimed.title,
     model,
     status: "completed",
     startedAt: claimed.startedAt,
-    completedAt: now(),
+    completedAt,
+    audit: [
+      ...claimed.audit,
+      { type: "completed", actor, at: completedAt, executionId: claimed.executionId, claimId: claimed.claimId },
+    ],
     result,
   };
   await persistResult(record, resultPath);
   await locked(tasks => {
     const task = tasks.find(item => item.id === claimed.id);
-    if (!task || task.executionId !== claimed.executionId) throw new Error("Execution claim changed");
+    if (!task || task.executionId !== claimed.executionId || task.claimId !== claimed.claimId) throw new Error("Execution claim changed");
     if (task.status === "completed") return;
     if (task.status !== "running") throw new Error("Execution claim changed");
     task.status = "completed";
