@@ -13,10 +13,22 @@ try {
   assert.notEqual(run("add", "../escape", "Invalid").status, 0);
   let tasks = JSON.parse(run("list").stdout);
   assert.equal(tasks[0].status, "proposed");
-  assert.equal(run("review", "fix-sync", "approved").status, 0);
-  assert.notEqual(run("review", "fix-sync", "approved").status, 0);
+  const validSchedule = new Date(Date.now() + 60_000).toISOString();
+  assert.equal(run("schedule", "fix-sync", validSchedule).status, 0);
   tasks = JSON.parse(run("list").stdout);
-  assert.equal(tasks[0].status, "approved");
-  assert.equal(tasks[0].attempts, 0);
+  assert.equal(tasks[0].scheduledAt, validSchedule);
+  assert.equal(tasks[0].audit.at(-1).type, "scheduled");
+  assert.notEqual(run("schedule", "fix-sync", new Date(Date.now() + 120_000).toISOString()).status, 0);
+  assert.equal(run("add", "past-task", "Review a schedule").status, 0);
+  assert.notEqual(run("schedule", "past-task", new Date(Date.now() - 1_000).toISOString()).status, 0);
+  assert.equal(run("add", "far-task", "Review a distant schedule").status, 0);
+  assert.notEqual(run("schedule", "far-task", new Date(Date.now() + 32 * 24 * 60 * 60 * 1000).toISOString()).status, 0);
+  assert.notEqual(run("review", "fix-sync", "approved").status, 0);
+  assert.equal(run("add", "approve-now", "Review an immediate task").status, 0);
+  assert.equal(run("review", "approve-now", "approved").status, 0);
+  assert.notEqual(run("review", "approve-now", "approved").status, 0);
+  tasks = JSON.parse(run("list").stdout);
+  assert.equal(tasks.find(task => task.id === "approve-now").status, "approved");
+  assert.equal(tasks.find(task => task.id === "approve-now").attempts, 0);
   console.log("Jarvis task queue tests passed.");
 } finally { await rm(dir, { recursive: true, force: true }); }

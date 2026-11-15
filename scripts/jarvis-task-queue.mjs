@@ -1,12 +1,11 @@
 /** Local, durable proposal queue. Queue transitions are audited; approval never executes work. */
 import { mkdir, readFile, writeFile, rename, open, unlink } from "node:fs/promises";
 import { resolve, dirname } from "node:path";
-import { BUSINESSES, classifyTask, routeModel, riskFor, isDue } from "../lib/jarvis/queuePolicy.mjs";
+import { BUSINESSES, classifyTask, routeModel, riskFor, isDue, validateScheduleTime } from "../lib/jarvis/queuePolicy.mjs";
 const path = resolve(process.env.JARVIS_QUEUE_PATH ?? "data/jarvis-queue.json");
 const lockPath = path + ".lock";
 const [command, ...args] = process.argv.slice(2);
 const idPattern = /^[a-z][a-z0-9-]{2,39}$/;
-const iso = value => new Date(value).toISOString();
 const actor = process.env.JARVIS_ACTOR?.trim() || "jarvis-cli";
 async function load() {
   try { const data = JSON.parse(await readFile(path, "utf8")); if (!Array.isArray(data)) throw Error("Invalid queue"); return data; }
@@ -47,11 +46,12 @@ else if (command === "add") {
   console.log("Task proposed.");
 } else if (command === "schedule") {
   const [id, when] = args;
-  if (!idPattern.test(id ?? "") || !when || Number.isNaN(Date.parse(when))) throw Error("Usage: schedule <safe-slug> <ISO timestamp>");
+  if (!idPattern.test(id ?? "") || !when) throw Error("Usage: schedule <safe-slug> <future ISO timestamp within 31 days>");
   await locked(tasks => {
     const task = tasks.find(t => t.id === id);
     if (!task || task.status !== "proposed") throw Error("Only proposed tasks can be scheduled.");
-    task.scheduledAt = iso(when);
+    if (task.scheduledAt) throw Error("Task is already scheduled.");
+    task.scheduledAt = validateScheduleTime(when);
     (task.audit ??= []).push(event("scheduled", { scheduledAt: task.scheduledAt }));
   });
   console.log("Task scheduled.");
@@ -66,4 +66,4 @@ else if (command === "add") {
     (task.audit ??= []).push(event(decision, { risk: task.risk, business: task.business }));
   });
   console.log("Task review recorded. No execution performed.");
-} else throw Error("Usage: jarvis-task-queue.mjs <list|add|review>");
+} else throw Error("Usage: jarvis-task-queue.mjs <list|add|schedule|review>");
