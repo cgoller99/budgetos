@@ -2,7 +2,7 @@
 import { createHash } from "node:crypto";
 import { mkdir, open, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
-import { isDue } from "../lib/jarvis/queuePolicy.mjs";
+import { isDue, routeModel } from "../lib/jarvis/queuePolicy.mjs";
 import { handlerFor } from "../lib/jarvis/businessHandlers.mjs";
 
 export const MAX_ATTEMPTS = 3;
@@ -70,6 +70,15 @@ function approvedByHuman(task) {
     task.audit?.some(event => event.type === "approved");
 }
 
+function executionRouting(task) {
+  if (!task?.model?.kind) return null;
+  try {
+    return routeModel(task.model.kind);
+  } catch {
+    return null;
+  }
+}
+
 async function reconcile() {
   await locked(async tasks => {
     for (const task of tasks.filter(item => item.status === "running")) {
@@ -120,6 +129,7 @@ async function claim() {
       isDue(item) &&
       (!item.nextAttemptAt || Date.parse(item.nextAttemptAt) <= Date.now()) &&
       (item.attempts ?? 0) < MAX_ATTEMPTS &&
+      executionRouting(item) &&
       handlerFor(item.business, item.model?.kind, item),
     );
     if (!task) return null;
@@ -128,6 +138,9 @@ async function claim() {
     task.attempts = (task.attempts ?? 0) + 1;
     task.executionId = executionId(task);
     task.nextAttemptAt = undefined;
+    const routing = executionRouting(task);
+    task.model = { ...task.model, model: routing.model };
+    audit(task, "model_routed", { kind: routing.kind, model: routing.model, configured: routing.configured });
     audit(task, "claimed", { executionId: task.executionId, attempt: task.attempts });
     return { ...task };
   });
@@ -164,7 +177,7 @@ if (!claimed) {
 try {
   if (process.env.JARVIS_TEST_FAIL_ONCE === `${claimed.id}:${claimed.attempts}`) throw new Error("Injected handler failure");
   const handler = handlerFor(claimed.business, claimed.model.kind, claimed);
-  const result = await handler({ root, task: claimed });
+  const result = await handler({ root, task: claimed, model: claimed.model });
   const resultPath = join(resultDir, `${claimed.executionId}.json`);
   const record = {
     taskId: claimed.id,
@@ -172,6 +185,7 @@ try {
     business: claimed.business,
     businessName: claimed.businessName,
     kind: claimed.model.kind,
+    model: claimed.model.model,
     title: claimed.title,
     status: "completed",
     startedAt: claimed.startedAt,

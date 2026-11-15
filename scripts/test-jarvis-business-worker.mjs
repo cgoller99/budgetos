@@ -76,7 +76,7 @@ try {
   assert.equal(tasks.find(item => item.id === "unreviewed").status, "proposed");
   for (const id of ["one", "two"]) {
     const events = tasks.find(item => item.id === id).audit.map(item => item.type);
-    assert.deepEqual(events.slice(0, 3), ["proposed", "approved", "claimed"]);
+    assert.deepEqual(events.slice(0, 4), ["proposed", "approved", "model_routed", "claimed"]);
     assert.ok(["completed", "reconciled"].includes(events.at(-1)));
   }
 
