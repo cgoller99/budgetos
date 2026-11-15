@@ -12,7 +12,7 @@ async function load() {
   try { const data = JSON.parse(await readFile(path, "utf8")); if (!Array.isArray(data)) throw Error("Invalid queue"); return data; }
   catch (error) { if (error.code === "ENOENT") return []; throw error; }
 }
-function event(type, details = {}) { return { type, actor, at: new Date().toISOString(), ...details }; }
+function event(type, details = {}) { return { event: type, type, actor, at: new Date().toISOString(), ...details }; }
 async function locked(operation) {
   await mkdir(dirname(path), { recursive: true });
   let lock;
