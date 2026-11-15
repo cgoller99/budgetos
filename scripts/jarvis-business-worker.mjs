@@ -71,6 +71,27 @@ function safeTask(task) {
     (!task.nextAttemptAt || Date.parse(task.nextAttemptAt) <= Date.now());
 }
 
+async function blockUnsafeTasks() {
+  await locked(tasks => {
+    for (const task of tasks) {
+      if (!approved(task)) continue;
+      const identityValid = BUSINESSES[task.business]?.name === task.businessName;
+      const highRisk = riskFor(task.title ?? "") === "high";
+      const handlerAvailable = Boolean(getBusinessHandler(task.business));
+      if (identityValid && !highRisk && handlerAvailable) continue;
+      task.status = "blocked";
+      task.blockedAt = now();
+      audit(task, "blocked", {
+        reason: !identityValid
+          ? "Business identity does not match the registered business scope"
+          : highRisk
+            ? "High-risk work requires a separate reviewed flow"
+            : "No handler is registered for this business",
+      });
+    }
+  });
+}
+
 function executionId(task) {
   return createHash("sha256")
     .update(`${task.id}:${task.business}:${task.attempts}`)
@@ -158,6 +179,7 @@ async function fail(claimed, error) {
   });
 }
 
+await blockUnsafeTasks();
 await locked(reconcile);
 const claimed = await locked(tasks => {
   const task = tasks.find(safeTask);
