@@ -1,6 +1,7 @@
 /** Local, proposal-only durable task queue. Never executes code or external actions. */
 import { mkdir, readFile, writeFile, rename, open } from "node:fs/promises";
 import { resolve, dirname } from "node:path";
+import { createBusinessTask, reviewBusinessTask } from "../lib/jarvis/autonomousSlice.mjs";
 const path = resolve(process.env.JARVIS_QUEUE_PATH ?? "data/jarvis-queue.json");
 const lockPath = path + ".lock";
 const [command, ...args] = process.argv.slice(2);
@@ -26,21 +27,33 @@ async function locked(operation) {
 if (command === "list") console.log(JSON.stringify(await load(), null, 2));
 else if (command === "add") {
   const [id, ...words] = args;
-  const title = words.join(" ").trim();
+  const options = Object.fromEntries(words.filter(word => word.startsWith("--")).map(word => {
+    const [key, ...value] = word.slice(2).split("=");
+    return [key, value.join("=")];
+  }));
+  const title = words.filter(word => !word.startsWith("--")).join(" ").trim();
   if (!idPattern.test(id ?? "") || !title || title.length > 180 || /[\r\n]/.test(title)) throw Error("Usage: add <safe-slug> <title max 180 chars>");
   await locked(tasks => {
     if (tasks.some(t => t.id === id)) throw Error("Task already exists.");
     if (tasks.length >= 200) throw Error("Queue capacity reached.");
-    tasks.push({ id, title, status: "proposed", attempts: 0, createdAt: new Date().toISOString() });
+    tasks.push(createBusinessTask({
+      id,
+      title,
+      businessId: options.business ?? "buxme",
+      taskKind: options.kind ?? "business",
+      scheduledFor: options.at ?? null,
+    }));
   });
-  console.log("Task proposed.");
+  console.log("Task proposed; approval is required before execution.");
 } else if (command === "review") {
   const [id, decision] = args;
   if (!idPattern.test(id ?? "") || !["approved", "rejected"].includes(decision)) throw Error("Usage: review <safe-slug> <approved|rejected>");
   await locked(tasks => {
     const task = tasks.find(t => t.id === id);
     if (!task || task.status !== "proposed") throw Error("Task must be proposed.");
-    task.status = decision; task.reviewedAt = new Date().toISOString();
+    task.approvalStatus ??= "pending";
+    task.audit ??= [];
+    reviewBusinessTask(task, decision);
   });
-  console.log("Task review recorded. No execution performed.");
+  console.log("Task approval recorded. No execution performed.");
 } else throw Error("Usage: jarvis-task-queue.mjs <list|add|review>");
