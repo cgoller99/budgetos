@@ -1,0 +1,43 @@
+name: Jarvis scheduled business executor
+
+on:
+  schedule:
+    - cron: '7,22,37,52 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jarvis-scheduled-business-executor
+  cancel-in-progress: false
+
+jobs:
+  execute:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate bounded business executor
+        run: |
+          node scripts/test-jarvis-task-queue.mjs
+          node scripts/test-jarvis-business-worker.mjs
+          node scripts/test-jarvis-scheduled-worker.mjs
+          node scripts/test-jarvis-scheduled-business-execution.mjs
+      - name: Execute one approved due task
+        env:
+          JARVIS_ACTOR: jarvis-scheduled-business-executor
+          JARVIS_QUEUE_PATH: ${{ runner.temp }}/jarvis-queue.json
+          JARVIS_RESULTS_DIR: ${{ runner.temp }}/jarvis-business-executions
+        run: node scripts/jarvis-scheduled-worker.mjs
+      - name: Upload execution audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jarvis-business-execution-${{ github.run_id }}
+          path: ${{ runner.temp }}/jarvis-business-executions/
+          if-no-files-found: ignore
+          retention-days: 30

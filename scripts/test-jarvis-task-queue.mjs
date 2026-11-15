@@ -11,6 +11,8 @@ try {
   assert.equal(run("add", "fix-sync", "Investigate bank sync failures").status, 0);
   assert.notEqual(run("add", "fix-sync", "Duplicate").status, 0);
   assert.notEqual(run("add", "../escape", "Invalid").status, 0);
+  assert.notEqual(run("schedule", "fix-sync", new Date(Date.now() + 91 * 24 * 60 * 60 * 1000).toISOString()).status, 0);
+  assert.equal(run("schedule", "fix-sync", new Date(Date.now() - 1_000).toISOString()).status, 0);
   let tasks = JSON.parse(run("list").stdout);
   assert.equal(tasks[0].status, "proposed");
   assert.equal(run("review", "fix-sync", "approved").status, 0);

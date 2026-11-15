@@ -134,8 +134,10 @@
     "test:goal-account-link": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-goal-account-link.mjs",
     "test:notification-read-dismiss": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-notification-read-dismiss.mjs",
     "test:jarvis-business-queue": "node scripts/test-jarvis-business-queue.mjs",
+    "test:jarvis-task-queue": "node scripts/test-jarvis-task-queue.mjs",
     "test:jarvis-business-worker": "node scripts/test-jarvis-business-worker.mjs",
     "test:jarvis-scheduled-worker": "node scripts/test-jarvis-scheduled-worker.mjs",
+    "test:jarvis-scheduled-business-execution": "node scripts/test-jarvis-scheduled-business-execution.mjs",
     "jarvis:business-worker": "node scripts/jarvis-business-worker.mjs",
     "jarvis:scheduled-worker": "node scripts/jarvis-scheduled-worker.mjs"
   },
