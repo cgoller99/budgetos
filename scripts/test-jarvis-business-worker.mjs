@@ -29,7 +29,10 @@ const task = (id, overrides = {}) => ({
   attempts: 0,
   risk: "low",
   model: { kind: "research", model: "openai/gpt-4o-mini" },
-  audit: [{ type: "proposed", actor: "test-founder", at: new Date().toISOString() }],
+  audit: [
+    { type: "proposed", actor: "test-founder", at: new Date().toISOString() },
+    { type: "approved", actor: "human-reviewer", at: new Date().toISOString() },
+  ],
   ...overrides,
 });
 const businessTask = (id, business, kind, title) => task(id, {
@@ -46,13 +49,14 @@ try {
     businessTask("drivenest-business", "drivenest", "business", "Review customer booking"),
     task("future-task", { scheduledAt: new Date(Date.now() + 60_000).toISOString() }),
     task("unreviewed-task", { status: "proposed", reviewedAt: undefined }),
+    task("forged-approval-task", { audit: [{ type: "proposed" }] }),
     task("unsafe-task", { risk: "high", title: "Send customer payment email" }),
   ]));
   assert.equal(run().status, 0);
   let tasks = JSON.parse(await readFile(queue, "utf8"));
   const completed = tasks.find(item => item.id === "buxme-research");
   assert.equal(completed.status, "completed");
-  assert.deepEqual(completed.audit.map(item => item.type), ["proposed", "claimed", "completed"]);
+  assert.deepEqual(completed.audit.map(item => item.type), ["proposed", "approved", "claimed", "completed"]);
   const record = JSON.parse(await readFile(join(results, `${completed.executionId}.json`), "utf8"));
   assert.equal(record.business, "buxme");
   assert.equal(record.result.handler, "buxme.research.inventory");
@@ -73,6 +77,7 @@ try {
   ]);
   assert.equal(tasks.find(item => item.id === "future-task").status, "approved");
   assert.equal(tasks.find(item => item.id === "unreviewed-task").status, "proposed");
+  assert.equal(tasks.find(item => item.id === "forged-approval-task").status, "approved");
   assert.equal(tasks.find(item => item.id === "unsafe-task").status, "approved");
   assert.equal(await readdir(results).then(items => items.length), 3);
 
@@ -86,7 +91,7 @@ try {
   tasks = JSON.parse(await readFile(queue, "utf8"));
   assert.equal(tasks[0].status, "completed");
   assert.equal(tasks[0].attempts, 2);
-  assert.deepEqual(tasks[0].audit.map(item => item.type), ["proposed", "claimed", "failed", "claimed", "completed"]);
+  assert.deepEqual(tasks[0].audit.map(item => item.type), ["proposed", "approved", "claimed", "failed", "claimed", "completed"]);
 
   await writeFile(queue, JSON.stringify([task("exhausted-retry-task", { attempts: 2 })]));
   assert.notEqual(run({ JARVIS_TEST_FAIL_ONCE: "exhausted-retry-task:3" }).status, 0);
@@ -100,7 +105,9 @@ try {
   await writeFile(join(results, `${reconciled.executionId}.json`), JSON.stringify({
     taskId: reconciled.id,
     executionId: reconciled.executionId,
+    business: reconciled.business,
     status: "completed",
+    result: { business: reconciled.business },
     completedAt: new Date().toISOString(),
   }));
   await writeFile(queue, JSON.stringify([reconciled]));
@@ -116,6 +123,26 @@ try {
   tasks = JSON.parse(await readFile(queue, "utf8"));
   assert.equal(tasks[0].status, "failed");
   assert.equal(tasks[0].audit.at(-1).type, "lease_expired");
+
+  const rejected = task("wrong-business-result", {
+    status: "running",
+    attempts: 3,
+    startedAt: new Date().toISOString(),
+    executionId: createHash("sha256").update("wrong-business-result:3").digest("hex").slice(0, 20),
+  });
+  await writeFile(join(results, `${rejected.executionId}.json`), JSON.stringify({
+    taskId: rejected.id,
+    executionId: rejected.executionId,
+    business: "drivenest",
+    status: "completed",
+    result: { business: "drivenest" },
+    completedAt: new Date().toISOString(),
+  }));
+  await writeFile(queue, JSON.stringify([rejected]));
+  assert.equal(run().status, 0);
+  tasks = JSON.parse(await readFile(queue, "utf8"));
+  assert.equal(tasks[0].status, "failed");
+  assert.equal(tasks[0].audit.at(-1).type, "result_rejected");
   console.log("Jarvis business worker tests passed: due/approval/safety gates, isolation, results, audit, retries, reconciliation.");
 } finally {
   await rm(dir, { recursive: true, force: true });
