@@ -1,0 +1,45 @@
+name: Jarvis unattended approved execution
+
+on:
+  schedule:
+    - cron: "12,27,42,57 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: jarvis-unattended-execution
+  cancel-in-progress: false
+
+jobs:
+  execute:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate unattended dispatch
+        run: node scripts/test-jarvis-scheduled-dispatch.mjs
+      - name: Execute one approved read-only task
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          JARVIS_QUEUE_PATH: ${{ runner.temp }}/jarvis-approved-queue.json
+          JARVIS_RESULTS_DIR: ${{ runner.temp }}/jarvis-results
+          JARVIS_ACTOR: jarvis-scheduled-dispatch
+        run: node scripts/jarvis-scheduled-dispatch.mjs
+      - name: Upload execution evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jarvis-unattended-execution-${{ github.run_id }}
+          path: ${{ runner.temp }}/jarvis-results/
+          if-no-files-found: ignore
+          retention-days: 30
