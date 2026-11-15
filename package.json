@@ -135,6 +135,7 @@
     "test:notification-read-dismiss": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-notification-read-dismiss.mjs",
     "test:jarvis-business-queue": "node scripts/test-jarvis-business-queue.mjs",
     "test:jarvis-business-worker": "node scripts/test-jarvis-business-worker.mjs",
+    "test:jarvis-execution-router": "node scripts/test-jarvis-execution-router.mjs",
     "jarvis:business-worker": "node scripts/jarvis-business-worker.mjs"
   },
   "dependencies": {
