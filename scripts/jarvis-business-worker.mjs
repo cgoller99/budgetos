@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { mkdir, open, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import { isDue } from "../lib/jarvis/queuePolicy.mjs";
-import { handlerFor } from "../lib/jarvis/businessHandlers.mjs";
+import { dispatchPlan } from "../lib/jarvis/executionRouter.mjs";
 
 export const MAX_ATTEMPTS = 3;
 export const LEASE_MS = 10 * 60 * 1000;
@@ -101,9 +101,17 @@ async function blockUnsafe() {
   await locked(tasks => {
     for (const task of tasks) {
       if (!approvedByHuman(task)) continue;
+      let routeError = null;
+      if (task.risk !== "high") {
+        try {
+          dispatchPlan(task);
+        } catch (error) {
+          routeError = error.message;
+        }
+      }
       const reason = task.risk === "high"
         ? "High-risk work requires a separate reviewed flow"
-        : !handlerFor(task.business, task.model?.kind, task) ? "No business handler registered" : null;
+        : routeError;
       if (!reason) continue;
       task.status = "blocked";
       task.blockedAt = now();
@@ -120,7 +128,14 @@ async function claim() {
       isDue(item) &&
       (!item.nextAttemptAt || Date.parse(item.nextAttemptAt) <= Date.now()) &&
       (item.attempts ?? 0) < MAX_ATTEMPTS &&
-      handlerFor(item.business, item.model?.kind, item),
+      (() => {
+        try {
+          dispatchPlan(item);
+          return true;
+        } catch {
+          return false;
+        }
+      })(),
     );
     if (!task) return null;
     task.status = "running";
@@ -128,7 +143,8 @@ async function claim() {
     task.attempts = (task.attempts ?? 0) + 1;
     task.executionId = executionId(task);
     task.nextAttemptAt = undefined;
-    audit(task, "claimed", { executionId: task.executionId, attempt: task.attempts });
+    const { model } = dispatchPlan(task);
+    audit(task, "claimed", { executionId: task.executionId, attempt: task.attempts, model });
     return { ...task };
   });
 }
@@ -163,8 +179,8 @@ if (!claimed) {
 
 try {
   if (process.env.JARVIS_TEST_FAIL_ONCE === `${claimed.id}:${claimed.attempts}`) throw new Error("Injected handler failure");
-  const handler = handlerFor(claimed.business, claimed.model.kind, claimed);
-  const result = await handler({ root, task: claimed });
+  const { model, handler } = dispatchPlan(claimed);
+  const result = await handler({ root, task: claimed, model });
   const resultPath = join(resultDir, `${claimed.executionId}.json`);
   const record = {
     taskId: claimed.id,
@@ -173,6 +189,7 @@ try {
     businessName: claimed.businessName,
     kind: claimed.model.kind,
     title: claimed.title,
+    model,
     status: "completed",
     startedAt: claimed.startedAt,
     completedAt: now(),
