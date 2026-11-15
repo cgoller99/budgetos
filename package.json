@@ -135,7 +135,9 @@
     "test:notification-read-dismiss": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-notification-read-dismiss.mjs",
     "test:jarvis-business-queue": "node scripts/test-jarvis-business-queue.mjs",
     "test:jarvis-business-worker": "node scripts/test-jarvis-business-worker.mjs",
-    "jarvis:business-worker": "node scripts/jarvis-business-worker.mjs"
+    "test:jarvis-scheduled-worker": "node scripts/test-jarvis-scheduled-worker.mjs",
+    "jarvis:business-worker": "node scripts/jarvis-business-worker.mjs",
+    "jarvis:scheduled-worker": "node scripts/jarvis-scheduled-worker.mjs"
   },
   "dependencies": {
     "@apple/app-store-server-library": "^3.1.0",
