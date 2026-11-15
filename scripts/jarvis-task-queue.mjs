@@ -29,7 +29,7 @@ async function locked(operation) {
 }
 const audit = (task, event, details = {}) => {
   if (!Array.isArray(task.audit)) task.audit = [];
-  task.audit.push({ event, at: new Date().toISOString(), ...details });
+  task.audit.push({ event, actor, at: new Date().toISOString(), ...details });
   if (task.audit.length > 50) task.audit = task.audit.slice(-50);
 };
 if (command === "list") console.log(JSON.stringify(await load(), null, 2));
