@@ -43,6 +43,7 @@ const businessTask = (id, business, kind, title) => task(id, {
 });
 
 try {
+<<<<<<< HEAD
   await writeFile(queue, JSON.stringify([
     task("buxme-research"),
     businessTask("agency-coding", "website-agency", "coding", "Build a landing page"),
@@ -57,11 +58,50 @@ try {
   const completed = tasks.find(item => item.id === "buxme-research");
   assert.equal(completed.status, "completed");
   assert.deepEqual(completed.audit.map(item => item.type), ["proposed", "approved", "claimed", "completed"]);
+=======
+  await writeFile(queue, JSON.stringify([task("one"), task("two", {
+    business: "website-agency",
+    businessName: "Website-building agency",
+    title: "Build a landing page",
+    model: { kind: "coding", model: "openai/gpt-4o-mini" },
+  }), task("three", {
+    business: "drivenest",
+    businessName: "DriveNest Auto Care",
+    title: "Review customer booking",
+    model: { kind: "business", model: "openai/gpt-4o-mini" },
+  }), task("unsafe", { risk: "high", title: "Send customer payment email" }), task("future", {
+    scheduledAt: new Date(Date.now() + 60_000).toISOString(),
+  }), task("unreviewed", { status: "proposed", reviewedAt: undefined, audit: [{ type: "proposed" }] }),
+  task("unsupported", { business: "unknown-business", model: { kind: "business" } }),
+  task("mismatch", {
+    business: "drivenest",
+    businessName: "Buxme",
+    model: { kind: "business", model: "openai/gpt-4o-mini" },
+  })]));
+
+  const codes = await Promise.all([runAsync(), runAsync(), runAsync()]);
+  assert.ok(codes.every(code => code === 0), codes);
+  let tasks = JSON.parse(await readFile(queue, "utf8"));
+  assert.equal(tasks.filter(item => item.status === "completed").length, 3);
+  assert.equal(tasks.find(item => item.id === "unsafe").status, "blocked");
+  assert.equal(tasks.find(item => item.id === "unsupported").status, "blocked");
+  assert.equal(tasks.find(item => item.id === "mismatch").status, "blocked");
+  assert.equal(tasks.find(item => item.id === "future").status, "approved");
+  assert.equal(tasks.find(item => item.id === "unreviewed").status, "proposed");
+  for (const id of ["one", "two"]) {
+    const events = tasks.find(item => item.id === id).audit.map(item => item.type);
+    assert.deepEqual(events.slice(0, 3), ["proposed", "approved", "claimed"]);
+    assert.ok(["completed", "reconciled"].includes(events.at(-1)));
+  }
+
+  const completed = tasks.find(item => item.id === "one");
+>>>>>>> 331d4e2 (Harden scoped Jarvis business worker)
   const record = JSON.parse(await readFile(join(results, `${completed.executionId}.json`), "utf8"));
   assert.equal(record.business, "buxme");
   assert.equal(record.result.handler, "buxme.research.inventory");
   assert.deepEqual(record.result.scope, ["app", "components", "lib"]);
   assert.ok(Array.isArray(record.result.evidence));
+<<<<<<< HEAD
   assert.equal(run().status, 0);
   assert.equal(run().status, 0);
   tasks = JSON.parse(await readFile(queue, "utf8"));
@@ -79,6 +119,9 @@ try {
   assert.equal(tasks.find(item => item.id === "unreviewed-task").status, "proposed");
   assert.equal(tasks.find(item => item.id === "forged-approval-task").status, "approved");
   assert.equal(tasks.find(item => item.id === "unsafe-task").status, "approved");
+=======
+  assert.equal(JSON.parse(await readFile(join(results, `${tasks.find(item => item.id === "three").executionId}.json`), "utf8")).result.handler, "drivenest.business.inventory");
+>>>>>>> 331d4e2 (Harden scoped Jarvis business worker)
   assert.equal(await readdir(results).then(items => items.length), 3);
 
   await writeFile(queue, JSON.stringify([task("retry-task")]));
