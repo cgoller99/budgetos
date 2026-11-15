@@ -2,7 +2,14 @@
 import { readFile, writeFile, rename, mkdir, open, unlink } from "node:fs/promises";
 import { resolve, dirname, join, relative } from "node:path";
 import { createHash } from "node:crypto";
-import { handlerFor, dispatchTask, isLeaseExpired, MAX_ATTEMPTS } from "../lib/jarvis/businessWorker.mjs";
+import {
+  handlerFor,
+  dispatchTask,
+  isLeaseExpired,
+  validateClaimable,
+  MAX_ATTEMPTS,
+  RETRY_BASE_MS,
+} from "../lib/jarvis/businessWorker.mjs";
 
 const queuePath = resolve(process.env.JARVIS_QUEUE_PATH ?? "data/jarvis-queue.json");
 const resultDir = resolve(process.env.JARVIS_RESULTS_DIR ?? "jarvis-output/business-results");
@@ -51,6 +58,35 @@ function executionId(task) {
   return createHash("sha256").update(`${task.id}:${task.attempts}`).digest("hex").slice(0, 20);
 }
 
+function retryAt(attempts) {
+  const delay = Math.min(15 * 60 * 1000, RETRY_BASE_MS * 2 ** Math.max(0, attempts - 1));
+  return new Date(Date.now() + delay).toISOString();
+}
+
+async function reconcileCompleted() {
+  return locked(async tasks => {
+    for (const task of tasks.filter(candidate => candidate.status === "running" && candidate.executionId)) {
+      const resultPath = join(resultDir, `${task.executionId}.json`);
+      let record;
+      try {
+        record = JSON.parse(await readFile(resultPath, "utf8"));
+      } catch (error) {
+        if (error.code === "ENOENT") continue;
+        throw error;
+      }
+      if (record.taskId !== task.id || record.executionId !== task.executionId || record.status !== "completed") continue;
+      task.status = "completed";
+      task.completedAt = record.completedAt;
+      task.resultPath = relative(process.cwd(), resultPath).replaceAll("\\", "/");
+      (task.audit ??= []).push(audit("reconciled_completed", {
+        business: task.business,
+        executionId: task.executionId,
+        resultPath: task.resultPath,
+      }));
+    }
+  });
+}
+
 async function reconcileExpired() {
   return locked(tasks => {
     for (const task of tasks) {
@@ -59,9 +95,11 @@ async function reconcileExpired() {
       task.status = retry ? "approved" : "failed";
       task.lastError = "Execution lease expired before result persistence";
       task.failedAt = now();
+      if (retry) task.nextAttemptAt = retryAt(task.attempts || 0);
       (task.audit ??= []).push(audit(retry ? "retry_scheduled" : "failed", {
         reason: task.lastError,
         attempts: task.attempts || 0,
+        nextAttemptAt: task.nextAttemptAt,
       }));
     }
   });
@@ -69,11 +107,7 @@ async function reconcileExpired() {
 
 async function claim() {
   return locked(tasks => {
-    const task = tasks.find(candidate => {
-      if (candidate.status !== "approved" || !candidate.reviewedAt) return false;
-      if (candidate.risk === "high" || typeof handlerFor(candidate) !== "function") return false;
-      return (candidate.attempts || 0) < MAX_ATTEMPTS && (!candidate.scheduledAt || Date.parse(candidate.scheduledAt) <= Date.now());
-    });
+    const task = tasks.find(candidate => validateClaimable(candidate));
     if (!task) return null;
     task.status = "running";
     task.startedAt = now();
@@ -98,9 +132,11 @@ async function recordFailure(claimed, error) {
     task.status = retry ? "approved" : "failed";
     task.lastError = String(error.message || error).slice(0, 500);
     task.failedAt = now();
+    if (retry) task.nextAttemptAt = retryAt(task.attempts);
     (task.audit ??= []).push(audit(retry ? "retry_scheduled" : "failed", {
       error: task.lastError,
       attempt: task.attempts,
+      nextAttemptAt: task.nextAttemptAt,
     }));
   });
 }
@@ -121,6 +157,7 @@ async function blockUnsafe() {
 }
 
 await blockUnsafe();
+await reconcileCompleted();
 await reconcileExpired();
 const claimed = await claim();
 if (!claimed) {
