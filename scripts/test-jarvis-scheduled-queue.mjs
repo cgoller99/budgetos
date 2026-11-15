@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 const workflow = await readFile(".github/workflows/jarvis-proposals.yml", "utf8");
 assert.match(workflow, /^  issues: write$/m, "Autonomous queue requires issues: write");
-assert.match(workflow, /cron: '\*\/15 \* \* \* \*'/, "15-minute schedule required");
+assert.match(workflow, /cron: ['"]7,22,37,52 \* \* \* \*['"]/, "staggered 15-minute schedule required");
 assert.match(workflow, /node scripts\/jarvis-persist-findings\.mjs/, "Queue persistence must run");
 const script = await readFile("scripts/jarvis-persist-findings.mjs", "utf8");
 assert.match(script, /jarvis-signal:/, "Stable deduplication marker required");
