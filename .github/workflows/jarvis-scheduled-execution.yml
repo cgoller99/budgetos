@@ -1,0 +1,39 @@
+name: Jarvis scheduled read-only executor
+on:
+  schedule:
+    - cron: '12,27,42,57 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: jarvis-scheduled-executor
+  cancel-in-progress: false
+jobs:
+  execute:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate scheduling and execution safety
+        run: |
+          node scripts/test-jarvis-scheduled-execution-workflow.mjs
+          node scripts/test-jarvis-task-queue.mjs
+          node scripts/test-jarvis-business-worker.mjs
+          node scripts/test-jarvis-scheduled-worker.mjs
+      - name: Execute one due approved task
+        env:
+          JARVIS_QUEUE_PATH: ${{ runner.temp }}/jarvis-approved-queue.json
+          JARVIS_RESULTS_DIR: ${{ runner.temp }}/jarvis-results
+          JARVIS_ACTOR: jarvis-github-scheduled-worker
+        run: node scripts/jarvis-scheduled-worker.mjs
+      - name: Upload read-only evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jarvis-scheduled-execution-${{ github.run_id }}
+          path: ${{ runner.temp }}/jarvis-results/
+          if-no-files-found: ignore
+          retention-days: 30
