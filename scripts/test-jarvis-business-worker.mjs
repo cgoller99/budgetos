@@ -63,6 +63,8 @@ try {
     business: "drivenest",
     businessName: "Buxme",
     model: { kind: "business", model: "openai/gpt-4o-mini" },
+  }), task("invalid-route", {
+    model: { kind: "research", model: "not a model" },
   })]));
 
   const codes = await Promise.all([runAsync(), runAsync(), runAsync()]);
@@ -72,18 +74,21 @@ try {
   assert.equal(tasks.find(item => item.id === "unsafe").status, "blocked");
   assert.equal(tasks.find(item => item.id === "unsupported").status, "blocked");
   assert.equal(tasks.find(item => item.id === "mismatch").status, "blocked");
+  assert.equal(tasks.find(item => item.id === "invalid-route").status, "blocked");
   assert.equal(tasks.find(item => item.id === "future").status, "approved");
   assert.equal(tasks.find(item => item.id === "unreviewed").status, "proposed");
   for (const id of ["one", "two"]) {
     const events = tasks.find(item => item.id === id).audit.map(item => item.type);
     assert.deepEqual(events.slice(0, 3), ["proposed", "approved", "claimed"]);
     assert.ok(["completed", "reconciled"].includes(events.at(-1)));
+    assert.equal(tasks.find(item => item.id === id).audit[2].model.kind, id === "one" ? "research" : "coding");
   }
 
   const completed = tasks.find(item => item.id === "one");
   const record = JSON.parse(await readFile(join(results, `${completed.executionId}.json`), "utf8"));
   assert.equal(record.result.business, "buxme");
   assert.equal(record.result.taskId, "one");
+  assert.deepEqual(record.model, { kind: "research", model: "openai/gpt-4o-mini", configured: false });
   assert.deepEqual(record.result.sideEffects, []);
   assert.ok(Array.isArray(record.result.evidence));
   assert.equal(JSON.parse(await readFile(join(results, `${tasks.find(item => item.id === "three").executionId}.json`), "utf8")).result.handler, "drivenest.business.inventory");
