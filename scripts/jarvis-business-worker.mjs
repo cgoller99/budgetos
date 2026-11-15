@@ -13,6 +13,8 @@ const maxAttempts = 3;
 const leaseMs = 10 * 60 * 1000;
 const now = () => new Date().toISOString();
 const actor = process.env.JARVIS_ACTOR?.trim() || "jarvis-business-worker";
+const hasApprovalAudit = task => Array.isArray(task.audit) &&
+  task.audit.some(entry => entry?.type === "approved");
 
 function audit(task, type, details = {}) {
   if (!Array.isArray(task.audit)) task.audit = [];
@@ -73,11 +75,18 @@ async function reconcile() {
       } catch (error) {
         if (error.code !== "ENOENT") throw error;
       }
-      if (record?.status === "completed" && record.taskId === task.id && record.executionId === task.executionId) {
+      if (record?.status === "completed" && record.taskId === task.id && record.executionId === task.executionId &&
+        record.business === task.business && record.result?.business === task.business) {
         task.status = "completed";
         task.completedAt = record.completedAt;
         task.resultPath = relative(root, resultPath).replaceAll("\\", "/");
         audit(task, "reconciled_completed", { executionId: task.executionId });
+      } else if (record?.status === "completed" && record.taskId === task.id && record.executionId === task.executionId &&
+        (record.business !== task.business || record.result?.business !== task.business)) {
+        task.status = (task.attempts ?? 0) < maxAttempts ? "approved" : "failed";
+        task.lastError = "Execution result failed business isolation validation";
+        task.failedAt = now();
+        audit(task, "result_rejected", { attempts: task.attempts ?? 0, status: task.status });
       } else if (Date.now() - Date.parse(task.startedAt ?? "") > leaseMs) {
         task.status = (task.attempts ?? 0) < maxAttempts ? "approved" : "failed";
         task.lastError = "Execution lease expired before result persistence";
@@ -93,6 +102,7 @@ async function claim() {
     const task = tasks.find(item =>
       item.status === "approved" &&
       item.reviewedAt &&
+      hasApprovalAudit(item) &&
       item.risk !== "high" &&
       isDue(item) &&
       (!item.nextAttemptAt || Date.parse(item.nextAttemptAt) <= Date.now()) &&
@@ -151,7 +161,18 @@ try {
   }
   const handler = getBusinessHandler(claimed.business, claimed.model.kind);
   if (!handler) throw Error("No handler registered for business and task kind");
-  const result = await handler({ root, task: claimed });
+  const isolatedTask = Object.freeze({
+    id: claimed.id,
+    title: claimed.title,
+    business: claimed.business,
+    businessName: claimed.businessName,
+    risk: claimed.risk,
+    model: claimed.model,
+  });
+  const result = await handler({ root, task: isolatedTask });
+  if (!result || result.business !== claimed.business || result.kind !== claimed.model.kind) {
+    throw Error("Handler returned a cross-business or invalid result");
+  }
   const record = {
     taskId: claimed.id,
     executionId: claimed.executionId,
