@@ -136,6 +136,7 @@
     "test:jarvis-business-queue": "node scripts/test-jarvis-business-queue.mjs",
     "test:jarvis-business-worker": "node scripts/test-jarvis-business-worker.mjs",
     "test:jarvis-scheduled-worker": "node scripts/test-jarvis-scheduled-worker.mjs",
+    "test:jarvis-scheduled-trigger": "node scripts/test-jarvis-scheduled-trigger.mjs",
     "jarvis:business-worker": "node scripts/jarvis-business-worker.mjs",
     "jarvis:scheduled-worker": "node scripts/jarvis-scheduled-worker.mjs"
   },
