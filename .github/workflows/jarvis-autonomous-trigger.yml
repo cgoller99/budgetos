@@ -1,0 +1,43 @@
+name: Jarvis bounded autonomous trigger
+
+on:
+  schedule:
+    - cron: '12,27,42,57 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: jarvis-autonomous-trigger
+  cancel-in-progress: false
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate trigger safety
+        run: |
+          node scripts/test-jarvis-autonomous-trigger.mjs
+          node scripts/test-jarvis-scheduled-worker.mjs
+          node scripts/test-jarvis-business-worker.mjs
+      - name: Run bounded approved read-only worker
+        env:
+          JARVIS_QUEUE_PATH: ${{ runner.temp }}/jarvis-queue.json
+          JARVIS_RESULTS_DIR: ${{ runner.temp }}/jarvis-results
+          JARVIS_RUN_AUDIT_PATH: ${{ runner.temp }}/jarvis-scheduler-runs.jsonl
+          JARVIS_ACTOR: github-actions-jarvis-autonomous-trigger
+          JARVIS_MAX_TASKS: '1'
+        run: node scripts/jarvis-autonomous-trigger.mjs
+      - name: Upload execution audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jarvis-autonomous-trigger-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/jarvis-results/
+            ${{ runner.temp }}/jarvis-scheduler-runs.jsonl
+          if-no-files-found: ignore
+          retention-days: 30
