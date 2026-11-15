@@ -1,7 +1,7 @@
 /** Local, durable proposal queue. Queue transitions are audited; approval never executes work. */
 import { mkdir, readFile, writeFile, rename, open, unlink } from "node:fs/promises";
 import { resolve, dirname } from "node:path";
-import { BUSINESSES, classifyTask, routeModel, riskFor, isDue } from "../lib/jarvis/queuePolicy.mjs";
+import { BUSINESSES, classifyTask, routeModel, riskFor } from "../lib/jarvis/queuePolicy.mjs";
 const path = resolve(process.env.JARVIS_QUEUE_PATH ?? "data/jarvis-queue.json");
 const lockPath = path + ".lock";
 const [command, ...args] = process.argv.slice(2);
@@ -66,7 +66,6 @@ else if (command === "add") {
   await locked(tasks => {
     const task = tasks.find(t => t.id === id);
     if (!task || task.status !== "proposed") throw Error("Task must be proposed.");
-    if (!isDue(task)) throw Error("Task is scheduled for a future time.");
     task.status = decision; task.reviewedAt = new Date().toISOString();
     audit(task, "reviewed", { type: decision, risk: task.risk, business: task.business });
   });
