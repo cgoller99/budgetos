@@ -19,6 +19,7 @@ try {
   assert.equal(tasks[2].status, "completed");
   assert.equal(tasks[2].agent, "marketing");
   assert.equal(tasks[2].attempts, 1);
+  assert.deepEqual(tasks[2].audit.map(entry => entry.event), ["claimed", "completed"]);
   const record = JSON.parse(await readFile(join(results, tasks[2].executionId + ".json"), "utf8"));
   assert.equal(record.status, "completed");
   assert.equal(record.result.action, "attribution-inventory");
@@ -43,5 +44,6 @@ try {
   assert.equal(tasks[3].status, "completed");
   assert.equal(tasks[3].attempts, 2);
   assert.equal(tasks[3].agent, "operations");
+  assert.deepEqual(tasks[3].audit.map(entry => entry.event), ["lease_expired", "claimed", "completed"]);
   console.log("Jarvis execution tests passed: allowlist, approvals, results, timestamps, idempotency.");
 } finally { await rm(dir, { recursive: true, force: true }); }
