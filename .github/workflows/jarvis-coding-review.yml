@@ -47,7 +47,7 @@ jobs:
           node scripts/test-jarvis-task-queue.mjs
       - name: Generate AI patch proposal (no repository writes)
         env:
-          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+          AI_GATEWAY_API_KEY: ${{ secrets.YEAH }}
           JARVIS_CODING_MODEL: ${{ vars.JARVIS_CODING_MODEL }}
           JARVIS_CHAT_MODEL: ${{ vars.JARVIS_CHAT_MODEL }}
           FOUNDER_TASK: ${{ inputs.task }}
