@@ -17,7 +17,7 @@ Updated: 2026-11-15
 
 The scheduled worker is periodic, not a 24/7 process. It observes signals, ranks proposals, persists review issues, and uploads a run report. A human must approve a coding task before the protected coding workflow can run, and a human must approve any generated patch before it can enter the repository.
 
-The read-only executor is intentionally manual-only and uses the protected `jarvis-coding` environment. Do not add automatic triggers or broader GitHub token permissions without an explicit security review.
+The read-only executor is intentionally manual-only and uses the protected `jarvis-coding` environment. The scheduled executor workflow is present but remains disabled unless `JARVIS_AUTONOMOUS_EXECUTION_ENABLED` is explicitly set to `true`; its checkout-local queue is ephemeral, so it must not be enabled for unattended business execution until a durable approved-task ledger is connected. Do not add automatic triggers or broader GitHub token permissions without an explicit security review.
 
 ## Remaining operator actions
 
@@ -26,6 +26,7 @@ The read-only executor is intentionally manual-only and uses the protected `jarv
 3. Review proposal issues and dispatch the protected coding workflow with a single approved target file when appropriate.
 4. Inspect the generated patch and CI before manually applying or merging any change.
 5. Keep workflow run `43678769123` paused for its required protected-environment reviewer approval; do not bypass it.
+6. Treat scheduled execution as validation-only until its durable queue integration is completed; use the manual protected workflow for approved execution.
 
 ## Validation
 

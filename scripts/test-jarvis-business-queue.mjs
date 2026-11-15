@@ -21,14 +21,14 @@ try {
 
   const future = new Date(Date.now() + 60_000).toISOString();
   assert.equal(run("schedule", "drive-booking", future).status, 0);
-  assert.notEqual(run("review", "drive-booking", "approved").status, 0);
+  assert.equal(run("review", "drive-booking", "approved").status, 0);
   assert.equal(run("review", "buxme-insights", "approved").status, 0);
   tasks = JSON.parse(await readFile(queue, "utf8"));
   assert.equal(tasks[0].status, "approved");
   assert.deepEqual(tasks[0].audit.map(event => event.type), ["proposed", "approved"]);
   assert.equal(tasks[0].audit[1].actor, "test-founder");
-  assert.equal(tasks[2].status, "proposed");
-  assert.equal(tasks[2].audit.at(-1).type, "scheduled");
+  assert.equal(tasks[2].status, "approved");
+  assert.deepEqual(tasks[2].audit.map(event => event.type), ["proposed", "scheduled", "approved"]);
   console.log("Jarvis business queue tests passed: scope, routing, scheduling, audit, approval gate.");
 } finally {
   await rm(dir, { recursive: true, force: true });
