@@ -11,12 +11,22 @@ try {
   assert.equal(run("add", "fix-sync", "Investigate bank sync failures").status, 0);
   assert.notEqual(run("add", "fix-sync", "Duplicate").status, 0);
   assert.notEqual(run("add", "../escape", "Invalid").status, 0);
+  assert.equal(run("add", "agency-site", "Build an agency landing page", "--business=website-agency", "--kind=coding", "--run-at=2020-01-01T00:00:00Z").status, 0);
+  assert.equal(run("add", "drivenest-booking", "Review service booking follow-up", "--business=drivenest", "--kind=business").status, 0);
+  assert.notEqual(run("add", "bad-scope", "Unsafe scope", "--business=unknown").status, 0);
   let tasks = JSON.parse(run("list").stdout);
   assert.equal(tasks[0].status, "proposed");
+  assert.equal(tasks[0].business, "buxme");
+  assert.equal(tasks[0].approvalRequired, true);
+  assert.equal(tasks[0].audit[0].event, "created");
   assert.equal(run("review", "fix-sync", "approved").status, 0);
+  assert.equal(run("review", "agency-site", "approved").status, 0);
   assert.notEqual(run("review", "fix-sync", "approved").status, 0);
   tasks = JSON.parse(run("list").stdout);
   assert.equal(tasks[0].status, "approved");
+  assert.equal(tasks[0].audit.at(-1).approvalGate, "human-review");
   assert.equal(tasks[0].attempts, 0);
+  const due = JSON.parse(run("due").stdout);
+  assert.deepEqual(due.map(task => task.id), ["fix-sync", "agency-site"]);
   console.log("Jarvis task queue tests passed.");
 } finally { await rm(dir, { recursive: true, force: true }); }
