@@ -36,6 +36,7 @@ try {
     }),
     { ...task("unapproved-task", "drivenest", "Never run"), status: "proposed", audit: [] },
     task("wrong-business-name", "buxme", "Wrong isolation", { businessName: "DriveNest Auto Care" }),
+    task("high-risk-task", "drivenest", "Email customer about payment"),
     task("retry-task", "drivenest", "Retry operations inventory", {
       status: "running",
       attempts: 1,
@@ -65,12 +66,15 @@ try {
   tasks = JSON.parse(await readFile(queue, "utf8"));
   assert.equal(tasks[1].status, "approved", "future work must not run");
   assert.equal(tasks[2].status, "proposed", "approval gate must hold");
-  assert.equal(tasks[3].status, "approved", "business identity mismatch must not run");
-  assert.equal(tasks[4].status, "completed", "stale work should be retried");
-  assert.equal(tasks[4].attempts, 2);
-  assert.ok(tasks[4].audit.some(item => item.type === "retry_scheduled"));
-  assert.equal(tasks[5].status, "failed", "retry cap must fail closed");
-  assert.ok(tasks[5].audit.some(item => item.type === "failed"));
+  assert.equal(tasks[3].status, "blocked", "business identity mismatch must be blocked");
+  assert.equal(tasks[3].audit.at(-1).type, "blocked");
+  assert.equal(tasks[4].status, "blocked", "high-risk work must be blocked");
+  assert.equal(tasks[4].audit.at(-1).type, "blocked");
+  assert.equal(tasks[5].status, "completed", "stale work should be retried");
+  assert.equal(tasks[5].attempts, 2);
+  assert.ok(tasks[5].audit.some(item => item.type === "retry_scheduled"));
+  assert.equal(tasks[6].status, "failed", "retry cap must fail closed");
+  assert.ok(tasks[6].audit.some(item => item.type === "failed"));
   assert.equal((await readdir(results)).length, 2);
 
   assert.equal(run().status, 0);
