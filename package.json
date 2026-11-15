@@ -134,6 +134,7 @@
     "test:goal-account-link": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-goal-account-link.mjs",
     "test:notification-read-dismiss": "node --experimental-strip-types --import ./scripts/register-alias.mjs scripts/test-notification-read-dismiss.mjs",
     "test:jarvis-business-queue": "node scripts/test-jarvis-business-queue.mjs",
+    "jarvis:worker": "node scripts/jarvis-worker.mjs",
     "test:jarvis-worker": "node scripts/test-jarvis-worker.mjs"
   },
   "dependencies": {

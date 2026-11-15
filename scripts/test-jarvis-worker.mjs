@@ -63,6 +63,19 @@ try {
   assert.equal(tasks[0].attempts, 2);
   assert.deepEqual(tasks[0].audit.map(event => event.type), ["proposed", "approved", "claimed", "failed", "claimed", "completed"]);
 
+  await writeFile(queuePath, JSON.stringify([approved({ id: "exhaust-retries" })]));
+  const alwaysFails = { "buxme:research": async () => { throw new Error("permanent test failure"); } };
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    outcome = await run(alwaysFails, () => Date.parse(tasks[0]?.nextAttemptAt ?? "2026-11-15T07:02:00.000Z") + 1);
+    assert.equal(outcome.status, "failed");
+    tasks = JSON.parse(await readFile(queuePath, "utf8"));
+    assert.equal(tasks[0].attempts, attempt);
+    if (attempt < 3) assert.equal(tasks[0].status, "approved");
+  }
+  assert.equal(tasks[0].status, "failed");
+  assert.equal(tasks[0].nextAttemptAt, undefined);
+  assert.equal(tasks[0].audit.filter(event => event.type === "failed").length, 3);
+
   await writeFile(queuePath, JSON.stringify([approved({ id: "isolated", business: "drivenest", model: { kind: "research" } })]));
   outcome = await run({ "buxme:research": async () => ({ action: "wrong-business" }) });
   assert.equal(outcome.status, "idle");
