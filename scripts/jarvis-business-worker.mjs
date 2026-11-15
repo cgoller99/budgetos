@@ -5,12 +5,9 @@ import { dirname, relative, resolve, join } from "node:path";
 import { isDue } from "../lib/jarvis/queuePolicy.mjs";
 import { getBusinessHandler } from "../lib/jarvis/businessHandlers.mjs";
 
-<<<<<<< HEAD
-=======
 export const MAX_ATTEMPTS = 3;
 export const LEASE_MS = 10 * 60 * 1000;
 export const MAX_AUDIT_ENTRIES = 50;
->>>>>>> 331d4e2 (Harden scoped Jarvis business worker)
 const root = process.cwd();
 const queuePath = resolve(process.env.JARVIS_QUEUE_PATH ?? "data/jarvis-queue.json");
 const resultDir = resolve(process.env.JARVIS_RESULTS_DIR ?? "jarvis-output/business-executions");
@@ -23,13 +20,9 @@ const hasApprovalAudit = task => Array.isArray(task.audit) &&
   task.audit.some(entry => entry?.type === "approved");
 
 function audit(task, type, details = {}) {
-<<<<<<< HEAD
   if (!Array.isArray(task.audit)) task.audit = [];
-  if (task.audit.length < 100) task.audit.push({ type, actor, at: now(), ...details });
-=======
-  (task.audit ??= []).push({ type, actor, at: now(), ...details });
+  task.audit.push({ type, actor, at: now(), ...details });
   if (task.audit.length > MAX_AUDIT_ENTRIES) task.audit = task.audit.slice(-MAX_AUDIT_ENTRIES);
->>>>>>> 331d4e2 (Harden scoped Jarvis business worker)
 }
 
 async function load() {
@@ -86,7 +79,6 @@ async function reconcile() {
       } catch (error) {
         if (error.code !== "ENOENT") throw error;
       }
-<<<<<<< HEAD
       if (record?.status === "completed" && record.taskId === task.id && record.executionId === task.executionId &&
         record.business === task.business && record.result?.business === task.business) {
         task.status = "completed";
@@ -105,14 +97,6 @@ async function reconcile() {
         task.failedAt = now();
         audit(task, "lease_expired", { attempts: task.attempts ?? 0, status: task.status });
       }
-=======
-      const started = Date.parse(task.startedAt ?? "");
-      if (!Number.isFinite(started) || Date.now() - started <= LEASE_MS) continue;
-      const retry = (task.attempts ?? 0) < MAX_ATTEMPTS;
-      task.status = retry ? "approved" : "failed";
-      task.nextAttemptAt = retry ? new Date(Date.now() + retryDelay()).toISOString() : undefined;
-      task.lastError = "Execution lease expired before result persistence";
-      audit(task, retry ? "retry_scheduled" : "failed", { attempt: task.attempts ?? 0, reason: task.lastError });
     }
   });
 }
@@ -120,15 +104,14 @@ async function reconcile() {
 async function blockUnsafe() {
   await locked(tasks => {
     for (const task of tasks) {
-      if (!approvedByHuman(task)) continue;
+      if (task.status !== "approved" || !task.reviewedAt || !hasApprovalAudit(task)) continue;
       const reason = task.risk === "high"
         ? "High-risk work requires a separate reviewed flow"
-        : !handlerFor(task.business, task.model?.kind, task) ? "No business handler registered" : null;
+        : !getBusinessHandler(task.business, task.model?.kind, task) ? "No business handler registered" : null;
       if (!reason) continue;
       task.status = "blocked";
       task.blockedAt = now();
       audit(task, "blocked", { reason });
->>>>>>> 331d4e2 (Harden scoped Jarvis business worker)
     }
   });
 }
@@ -142,13 +125,8 @@ async function claim() {
       item.risk !== "high" &&
       isDue(item) &&
       (!item.nextAttemptAt || Date.parse(item.nextAttemptAt) <= Date.now()) &&
-<<<<<<< HEAD
       (item.attempts ?? 0) < maxAttempts &&
       getBusinessHandler(item.business, item.model?.kind)
-=======
-      (item.attempts ?? 0) < MAX_ATTEMPTS &&
-      handlerFor(item.business, item.model?.kind, item),
->>>>>>> 331d4e2 (Harden scoped Jarvis business worker)
     );
     if (!task) return null;
     task.status = "running";
@@ -197,7 +175,6 @@ if (!claimed) {
 }
 
 try {
-<<<<<<< HEAD
   if (process.env.JARVIS_TEST_FAIL_ONCE === `${claimed.id}:${claimed.attempts}`) {
     throw Error("Injected handler failure for retry test");
   }
@@ -215,12 +192,6 @@ try {
   if (!result || result.business !== claimed.business || result.kind !== claimed.model.kind) {
     throw Error("Handler returned a cross-business or invalid result");
   }
-=======
-  if (process.env.JARVIS_TEST_FAIL_ONCE === `${claimed.id}:${claimed.attempts}`) throw new Error("Injected handler failure");
-  const handler = handlerFor(claimed.business, claimed.model.kind, claimed);
-  const result = await handler({ root, task: claimed });
-  const resultPath = join(resultDir, `${claimed.executionId}.json`);
->>>>>>> 331d4e2 (Harden scoped Jarvis business worker)
   const record = {
     taskId: claimed.id,
     executionId: claimed.executionId,
@@ -233,26 +204,11 @@ try {
     completedAt: now(),
     result,
   };
-<<<<<<< HEAD
   await mkdir(resultDir, { recursive: true });
   const resultPath = join(resultDir, `${claimed.executionId}.json`);
   await writeFile(resultPath, JSON.stringify(record, null, 2) + "\n", { flag: "wx", mode: 0o600 });
   await complete(claimed, record, resultPath);
   console.log(JSON.stringify({ taskId: claimed.id, business: claimed.business, status: "completed", resultPath }, null, 2));
-=======
-  await persistResult(record, resultPath);
-  await locked(tasks => {
-    const task = tasks.find(item => item.id === claimed.id);
-    if (!task || task.executionId !== claimed.executionId) throw new Error("Execution claim changed");
-    if (task.status === "completed") return;
-    if (task.status !== "running") throw new Error("Execution claim changed");
-    task.status = "completed";
-    task.completedAt = record.completedAt;
-    task.resultPath = relative(root, resultPath).replaceAll("\\", "/");
-    audit(task, "completed", { executionId: claimed.executionId, resultPath: task.resultPath });
-  });
-  console.log(JSON.stringify({ taskId: claimed.id, business: claimed.business, status: "completed" }));
->>>>>>> 331d4e2 (Harden scoped Jarvis business worker)
 } catch (error) {
   await fail(claimed, error);
   console.error(error);
