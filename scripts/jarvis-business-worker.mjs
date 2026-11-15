@@ -7,6 +7,7 @@ import { handlerFor } from "../lib/jarvis/businessHandlers.mjs";
 
 export const MAX_ATTEMPTS = 3;
 export const LEASE_MS = 10 * 60 * 1000;
+export const MAX_AUDIT_ENTRIES = 50;
 const root = process.cwd();
 const queuePath = resolve(process.env.JARVIS_QUEUE_PATH ?? "data/jarvis-queue.json");
 const resultDir = resolve(process.env.JARVIS_RESULTS_DIR ?? "jarvis-output/business-executions");
@@ -16,6 +17,7 @@ const now = () => new Date().toISOString();
 
 function audit(task, type, details = {}) {
   (task.audit ??= []).push({ type, actor, at: now(), ...details });
+  if (task.audit.length > MAX_AUDIT_ENTRIES) task.audit = task.audit.slice(-MAX_AUDIT_ENTRIES);
 }
 
 async function load() {
@@ -101,7 +103,7 @@ async function blockUnsafe() {
       if (!approvedByHuman(task)) continue;
       const reason = task.risk === "high"
         ? "High-risk work requires a separate reviewed flow"
-        : !handlerFor(task.business, task.model?.kind) ? "No business handler registered" : null;
+        : !handlerFor(task.business, task.model?.kind, task) ? "No business handler registered" : null;
       if (!reason) continue;
       task.status = "blocked";
       task.blockedAt = now();
@@ -118,7 +120,7 @@ async function claim() {
       isDue(item) &&
       (!item.nextAttemptAt || Date.parse(item.nextAttemptAt) <= Date.now()) &&
       (item.attempts ?? 0) < MAX_ATTEMPTS &&
-      handlerFor(item.business, item.model?.kind),
+      handlerFor(item.business, item.model?.kind, item),
     );
     if (!task) return null;
     task.status = "running";
@@ -161,7 +163,7 @@ if (!claimed) {
 
 try {
   if (process.env.JARVIS_TEST_FAIL_ONCE === `${claimed.id}:${claimed.attempts}`) throw new Error("Injected handler failure");
-  const handler = handlerFor(claimed.business, claimed.model.kind);
+  const handler = handlerFor(claimed.business, claimed.model.kind, claimed);
   const result = await handler({ root, task: claimed });
   const resultPath = join(resultDir, `${claimed.executionId}.json`);
   const record = {
@@ -179,7 +181,9 @@ try {
   await persistResult(record, resultPath);
   await locked(tasks => {
     const task = tasks.find(item => item.id === claimed.id);
-    if (!task || task.status !== "running" || task.executionId !== claimed.executionId) throw new Error("Execution claim changed");
+    if (!task || task.executionId !== claimed.executionId) throw new Error("Execution claim changed");
+    if (task.status === "completed") return;
+    if (task.status !== "running") throw new Error("Execution claim changed");
     task.status = "completed";
     task.completedAt = record.completedAt;
     task.resultPath = relative(root, resultPath).replaceAll("\\", "/");

@@ -50,21 +50,35 @@ try {
     businessName: "Website-building agency",
     title: "Build a landing page",
     model: { kind: "coding", model: "openai/gpt-4o-mini" },
+  }), task("three", {
+    business: "drivenest",
+    businessName: "DriveNest Auto Care",
+    title: "Review customer booking",
+    model: { kind: "business", model: "openai/gpt-4o-mini" },
   }), task("unsafe", { risk: "high", title: "Send customer payment email" }), task("future", {
     scheduledAt: new Date(Date.now() + 60_000).toISOString(),
   }), task("unreviewed", { status: "proposed", reviewedAt: undefined, audit: [{ type: "proposed" }] }),
-  task("unsupported", { business: "unknown-business", model: { kind: "business" } })]));
+  task("unsupported", { business: "unknown-business", model: { kind: "business" } }),
+  task("mismatch", {
+    business: "drivenest",
+    businessName: "Buxme",
+    model: { kind: "business", model: "openai/gpt-4o-mini" },
+  })]));
 
-  const codes = await Promise.all([runAsync(), runAsync()]);
+  const codes = await Promise.all([runAsync(), runAsync(), runAsync()]);
   assert.ok(codes.every(code => code === 0), codes);
   let tasks = JSON.parse(await readFile(queue, "utf8"));
-  assert.equal(tasks.filter(item => item.status === "completed").length, 2);
+  assert.equal(tasks.filter(item => item.status === "completed").length, 3);
   assert.equal(tasks.find(item => item.id === "unsafe").status, "blocked");
   assert.equal(tasks.find(item => item.id === "unsupported").status, "blocked");
+  assert.equal(tasks.find(item => item.id === "mismatch").status, "blocked");
   assert.equal(tasks.find(item => item.id === "future").status, "approved");
   assert.equal(tasks.find(item => item.id === "unreviewed").status, "proposed");
-  assert.deepEqual(tasks.find(item => item.id === "one").audit.map(item => item.type), ["proposed", "approved", "claimed", "completed"]);
-  assert.deepEqual(tasks.find(item => item.id === "two").audit.map(item => item.type), ["proposed", "approved", "claimed", "completed"]);
+  for (const id of ["one", "two"]) {
+    const events = tasks.find(item => item.id === id).audit.map(item => item.type);
+    assert.deepEqual(events.slice(0, 3), ["proposed", "approved", "claimed"]);
+    assert.ok(["completed", "reconciled"].includes(events.at(-1)));
+  }
 
   const completed = tasks.find(item => item.id === "one");
   const record = JSON.parse(await readFile(join(results, `${completed.executionId}.json`), "utf8"));
@@ -72,7 +86,8 @@ try {
   assert.equal(record.result.taskId, "one");
   assert.deepEqual(record.result.sideEffects, []);
   assert.ok(Array.isArray(record.result.evidence));
-  assert.equal(await readdir(results).then(items => items.length), 2);
+  assert.equal(JSON.parse(await readFile(join(results, `${tasks.find(item => item.id === "three").executionId}.json`), "utf8")).result.handler, "drivenest.business.inventory");
+  assert.equal(await readdir(results).then(items => items.length), 3);
 
   await writeFile(queue, JSON.stringify([task("retry")]));
   assert.notEqual(run({ JARVIS_TEST_FAIL_ONCE: "retry:1" }).status, 0);
