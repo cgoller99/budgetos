@@ -21,6 +21,8 @@ try {
 
   const future = new Date(Date.now() + 60_000).toISOString();
   assert.equal(run("schedule", "drive-booking", future).status, 0);
+  assert.notEqual(run("schedule", "drive-booking", new Date(Date.now() + 32 * 24 * 60 * 60 * 1000).toISOString()).status, 0);
+  assert.notEqual(run("schedule", "drive-booking", new Date(Date.now() - 1_000).toISOString()).status, 0);
   assert.notEqual(run("review", "drive-booking", "approved").status, 0);
   assert.equal(run("review", "buxme-insights", "approved").status, 0);
   tasks = JSON.parse(await readFile(queue, "utf8"));

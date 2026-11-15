@@ -1,7 +1,7 @@
-/** Run one due task from the durable queue through the claim-aware read-only worker. */
+/** Run one due task through the bounded, lock-aware scheduled trigger. */
 import { spawn } from "node:child_process";
 
-const child = spawn(process.execPath, ["scripts/jarvis-business-worker.mjs"], {
+const child = spawn(process.execPath, ["scripts/jarvis-scheduled-trigger.mjs"], {
   cwd: process.cwd(),
   env: {
     ...process.env,
