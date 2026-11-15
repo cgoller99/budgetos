@@ -19,6 +19,8 @@ The scheduled worker is periodic, not a 24/7 process. It observes signals, ranks
 
 The read-only executor is intentionally manual-only and uses the protected `jarvis-coding` environment. Do not add automatic triggers or broader GitHub token permissions without an explicit security review.
 
+The three-business queue and worker are validated locally and are not a production customer-operation channel. The scheduled execution workflow is disabled unless `JARVIS_AUTONOMOUS_EXECUTION_ENABLED` is explicitly set to `true`; it has read-only repository permissions and does not persist queue mutations between GitHub runners. Enablement therefore requires an approved durable queue handoff and an operator verification, neither of which is included in this MVP.
+
 ## Remaining operator actions
 
 1. Configure and verify the repository's protected `jarvis-coding` environment reviewer.
@@ -26,6 +28,8 @@ The read-only executor is intentionally manual-only and uses the protected `jarv
 3. Review proposal issues and dispatch the protected coding workflow with a single approved target file when appropriate.
 4. Inspect the generated patch and CI before manually applying or merging any change.
 5. Keep workflow run `43678769123` paused for its required protected-environment reviewer approval; do not bypass it.
+
+6. Do not treat an empty or runner-local `data/jarvis-queue.json` as durable scheduling state; use the approved manual queue flow until durable persistence is separately reviewed.
 
 ## Validation
 
