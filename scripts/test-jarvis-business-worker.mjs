@@ -30,6 +30,7 @@ try {
     approved("agency-task", "website-agency", "Build a reviewed website plan"),
     approved("unsafe-task", "drivenest", "Email customer about payment", "high"),
     { ...approved("future-task", "drivenest", "Review booking workflow"), scheduledAt: new Date(Date.now() + 60_000).toISOString() },
+    { ...approved("unreviewed-task", "buxme", "Routine internal review"), reviewedAt: undefined, audit: [{ type: "proposed" }] },
     approved("retry-me", "buxme", "Routine internal review"),
     { ...approved("stale-task", "buxme", "Routine stale review"), status: "running", attempts: 3,
       startedAt: "2020-01-01T00:00:00.000Z", executionId: "stale-run" },
@@ -43,6 +44,8 @@ try {
   assert.equal(tasks.find(task => task.id === "buxme-task").status, "completed");
   assert.equal(tasks.find(task => task.id === "unsafe-task").status, "blocked");
   assert.equal(tasks.find(task => task.id === "future-task").status, "approved");
+  assert.equal(tasks.find(task => task.id === "unreviewed-task").status, "approved");
+  assert.equal(tasks.find(task => task.id === "unreviewed-task").audit.at(-1).type, "proposed");
   assert.equal(tasks.find(task => task.id === "stale-task").status, "failed");
   const retry = tasks.find(task => task.id === "retry-me");
   assert.equal(retry.status, "approved");
@@ -56,6 +59,7 @@ try {
   tasks = JSON.parse(await readFile(queue, "utf8"));
   assert.equal(tasks.find(task => task.id === "retry-me").status, "completed");
   assert.equal(tasks.find(task => task.id === "agency-task").status, "completed");
+  assert.equal(tasks.find(task => task.id === "unreviewed-task").status, "approved");
   const buxmeResult = JSON.parse(await readFile(join(results, `${executionId("buxme-task", 1)}.json`), "utf8"));
   const agency = tasks.find(task => task.id === "agency-task");
   const agencyResult = JSON.parse(await readFile(join(results, `${agency.executionId}.json`), "utf8"));
