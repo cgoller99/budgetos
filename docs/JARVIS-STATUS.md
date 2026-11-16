@@ -4,7 +4,7 @@ Updated: 2026-11-15
 
 ## Delivered
 
-- Scheduled proposal worker runs every 15 minutes at staggered offsets (`7,22,37,52`).
+- Scheduled proposal worker runs every 10 minutes at staggered offsets (`3,13,23,33,43,53`).
 - Evidence-backed findings are deduplicated into GitHub Issues, which is the durable queue across ephemeral GitHub runners.
 - Local task queue entries now contain bounded audit history, priority, and review events.
 - The approved read-only executor claims one allowlisted task at a time using deterministic priority, creation time, and ID ordering.
