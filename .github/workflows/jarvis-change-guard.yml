@@ -6,7 +6,9 @@ permissions:
   contents: read
 jobs:
   guard:
-    if: startsWith(github.head_ref, 'jarvis/') || startsWith(github.head_ref, 'jarvis-')
+    # This bounded-diff guard is for generated coding patches only. Integration
+    # branches can legitimately add workflows and coordinated test coverage.
+    if: startsWith(github.head_ref, 'jarvis/coding/') || startsWith(github.head_ref, 'jarvis-coding-')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

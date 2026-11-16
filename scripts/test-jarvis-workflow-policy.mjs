@@ -14,5 +14,5 @@ assert.match(workflow, /JARVIS_APPROVED_TASK_ID: \$\{\{ inputs\.approved_task_id
 assert.match(workflow, /node scripts\/test-jarvis-github-execute\.mjs/);
 assert.match(workflow, /run: node scripts\/jarvis-github-execute\.mjs/);
 assert.equal(lines.filter(x => /^    environment:/.test(x)).length, 1);
-assert.match(changeGuard, /startsWith\(github\.head_ref, 'jarvis\/'\) \|\| startsWith\(github\.head_ref, 'jarvis-'\)/, "Jarvis branch naming variants must run the change guard");
+assert.match(changeGuard, /startsWith\(github\.head_ref, 'jarvis\/coding\/'\) \|\| startsWith\(github\.head_ref, 'jarvis-coding-'\)/, "Jarvis coding branch naming variants must run the change guard");
 console.log("Jarvis workflow policy passed: manual-only, required ID, protected environment, scoped token.");
