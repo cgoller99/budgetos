@@ -1,5 +1,9 @@
 ﻿import assert from "node:assert/strict";
 import { classifyJarvisTask, selectJarvisModel } from "../lib/jarvis/modelRouting.ts";
+import {
+  classifyJarvisTask as classifyShared,
+  selectJarvisModel as selectShared,
+} from "../lib/jarvis/modelRouting.mjs";
 
 const env = {
   JARVIS_CODING_MODEL: "anthropic/claude-sonnet-4",
@@ -15,7 +19,11 @@ for (const [prompt, kind, model] of [
 ]) {
   assert.equal(classifyJarvisTask(prompt), kind, prompt);
   assert.deepEqual(selectJarvisModel(kind, env), { kind, model, configured: true });
+  assert.equal(classifyShared(prompt), kind, `shared ${prompt}`);
+  assert.deepEqual(selectShared(kind, env), { kind, model, configured: true });
 }
 assert.equal(selectJarvisModel("routine", { JARVIS_CHAT_MODEL: "openai/gpt-4o-mini" }).configured, false);
 assert.throws(() => selectJarvisModel("coding", { JARVIS_CODING_MODEL: "invalid model" }), /Invalid Jarvis model/);
+assert.equal(classifyJarvisTask("Plan a website build"), "coding");
+assert.equal(classifyShared("Plan a website build"), "coding");
 console.log("Jarvis model routing passed: Anthropic, OpenAI, Gemini selection; fallback and invalid-ID rejection.");
