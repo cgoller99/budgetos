@@ -28,7 +28,14 @@ export async function GET() {
     const autonomousTasks = issuesData.filter(issue => !issue.pull_request && issue.body?.includes("<!-- jarvis-signal:")).map(issue => ({
       number: issue.number, title: issue.title.replace(/^\[Jarvis\]\s*/, ""), status: issue.state === "closed" ? "completed" : "awaiting_review", agent: issue.body?.match(/Assigned agent: (developer|marketing|analytics|operations)/)?.[1] ?? "unassigned", url: issue.html_url,
     }));
+    const pullResponse = await fetch(`https://api.github.com/repos/${repo}/pulls?state=open&per_page=50`, {
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" },
+      cache: "no-store", signal: AbortSignal.timeout(8000),
+    }).catch(() => null);
+    const pullData = pullResponse?.ok ? await pullResponse.json() as Array<{ number: number; title: string; html_url: string; head: { ref: string; sha: string }; draft: boolean }> : [];
+    const developmentPulls = pullData.filter(pr => pr.head.ref.includes("jarvis") || [143, 144, 146].includes(pr.number)).map(pr => ({ number: pr.number, title: pr.title, url: pr.html_url, branch: pr.head.ref, commit: pr.head.sha.slice(0, 7), draft: pr.draft }));
     return NextResponse.json({
+      developmentPulls, developmentPullsAvailable: Boolean(pullResponse?.ok),
       autonomousTasks, autonomousQueueAvailable: Boolean(issuesResponse?.ok),
       connected: true,
       runs: (data.workflow_runs ?? []).map(normalize),
