@@ -13,10 +13,21 @@ try {
   assert.notEqual(run("add", "../escape", "Invalid").status, 0);
   let tasks = JSON.parse(run("list").stdout);
   assert.equal(tasks[0].status, "proposed");
+  assert.equal(run("add", "scheduled-task", "Review scheduled work").status, 0);
+  assert.equal(run("schedule", "scheduled-task", new Date(Date.now() + 60_000).toISOString()).status, 0);
+  assert.equal(run("review", "scheduled-task", "approved").status, 0);
+  tasks = JSON.parse(run("list").stdout);
+  assert.equal(tasks[1].status, "approved");
+  assert.ok(tasks[1].scheduledAt);
+  assert.notEqual(run("schedule", "scheduled-task", new Date().toISOString()).status, 0);
   assert.equal(run("review", "fix-sync", "approved").status, 0);
   assert.notEqual(run("review", "fix-sync", "approved").status, 0);
   tasks = JSON.parse(run("list").stdout);
   assert.equal(tasks[0].status, "approved");
   assert.equal(tasks[0].attempts, 0);
+  assert.equal(tasks[0].priority, 0);
+  assert.deepEqual(tasks[0].audit.map(entry => entry.event), ["created", "reviewed"]);
+  assert.equal(tasks[1].status, "approved");
+  assert.deepEqual(tasks[1].audit.map(entry => entry.event), ["created", "scheduled", "reviewed"]);
   console.log("Jarvis task queue tests passed.");
 } finally { await rm(dir, { recursive: true, force: true }); }
