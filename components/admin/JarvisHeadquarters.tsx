@@ -4,7 +4,7 @@ import { JarvisChat } from "./JarvisChat";
 import { JarvisTasks } from "./JarvisTasks";
 import { JarvisAgents } from "./JarvisAgents";
 import { JarvisSetup } from "./JarvisSetup";
-const sections = ["Overview", "Agents", "Setup", "Chat", "Work queue", "Businesses", "Approvals", "Activity"] as const;
+const sections = ["Overview", "Agents", "Setup", "Voice & chat", "Work queue", "Businesses", "Approvals", "Activity"] as const;
 const businesses = [
   { name: "Buxme", description: "Engineering, subscriber reporting and growth", status: "Development" },
 ];
@@ -25,7 +25,7 @@ export function JarvisHeadquarters() {
       {worker?.autonomousTasks?.map(t => <a key={t.number} href={t.url} target="_blank" rel="noopener noreferrer" className="mt-3 block text-sm text-blue-300 underline">#{t.number} {t.title} — {t.agent ?? "unassigned"} — {t.status.replaceAll("_", " ")}</a>)}
     </article><JarvisAgents /></>}
     {section === "Setup" && <JarvisSetup />}
-    {section === "Chat" && <JarvisChat />}
+    {section === "Voice & chat" && <JarvisChat />}
     {section === "Businesses" && <div className="grid gap-4 md:grid-cols-3">{businesses.map(b => <article key={b.name} className="rounded-2xl border border-white/10 bg-slate-900 p-6"><h2 className="text-xl font-semibold">{b.name}</h2><p className="my-4 text-sm text-slate-400">{b.description}</p><span className="rounded-lg bg-blue-950 px-3 py-2 text-xs text-blue-200">{b.status}</span></article>)}</div>}
     {section === "Work queue" && <JarvisTasks />}
     {section === "Approvals" && <JarvisAgents approvalsOnly />}
