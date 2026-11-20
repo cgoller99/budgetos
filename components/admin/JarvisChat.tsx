@@ -164,6 +164,8 @@ export function JarvisChat() {
   }
   async function startListening() {
     if (busyRef.current || playbackRef.current || startingRef.current || listeningRef.current) return;
+    // A single tap on Speak must enable audible replies as well as microphone input.
+    if (!voiceOnRef.current) setVoice(true);
     startingRef.current = true;
     setMicStatus("Checking microphone...");
     const browser = window as SpeechWindow;
