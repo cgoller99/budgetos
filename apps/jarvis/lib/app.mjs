@@ -1,0 +1,498 @@
+import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { dirname, join, normalize, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import {
+  authConfigured,
+  clearCookie,
+  clientHeaderOk,
+  issueSession,
+  originAllowed,
+  passwordsMatch,
+  readSession,
+  sessionCookie,
+  sessionSecret,
+} from "./auth.mjs";
+import { commandFrom, think } from "./brain.mjs";
+import { spendCap } from "./routing.mjs";
+import { BUSINESSES, createStore, defaultGates } from "./store.mjs";
+import { createLimiter } from "./limits.mjs";
+import { commitApprovedSandbox } from "./gitGate.mjs";
+import { createTask, reviewTask, runWorker, suggestTasks } from "./worker.mjs";
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const publicDir = join(root, "public");
+const DAY = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" });
+
+function dayKey(now) {
+  return DAY.format(now);
+}
+
+function json(body, status = 200, extra = {}) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store",
+      "X-Content-Type-Options": "nosniff",
+      "Referrer-Policy": "no-referrer",
+      ...extra,
+    },
+  });
+}
+
+function services(env) {
+  const cap = spendCap(env);
+  return {
+    aiGateway: {
+      configured: Boolean(env.AI_GATEWAY_API_KEY?.trim()),
+      spendAuthorized: cap.authorized,
+      spendNote: cap.authorized ? `Up to ${cap.cap} model requests per day.` : cap.reason,
+      requiredEnv: ["AI_GATEWAY_API_KEY", "JARVIS_DAILY_REQUEST_CAP"],
+    },
+    redis: {
+      configured: Boolean(env.UPSTASH_REDIS_REST_URL?.trim() && env.UPSTASH_REDIS_REST_TOKEN?.trim()),
+      requiredEnv: ["UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN"],
+      note: "Used only when it already exists. Jarvis does not create a database.",
+    },
+    github: {
+      configured: Boolean(env.GITHUB_TOKEN?.trim() || env.GH_TOKEN?.trim()),
+      requiredEnv: ["GITHUB_TOKEN"],
+      note: "Presence of a token is not a pull request. Nothing is pushed from this screen.",
+    },
+    speech: {
+      browser: true,
+      neural: Boolean(env.AI_GATEWAY_API_KEY?.trim() && cap.authorized && env.JARVIS_ENABLE_NEURAL_SPEECH === "1"),
+      note: "Device speech works without a provider. Neural speech also requires JARVIS_ENABLE_NEURAL_SPEECH=1 and a daily request cap.",
+    },
+    repository: {
+      configured: Boolean(env.JARVIS_REPO_ROOT?.trim()),
+      requiredEnv: ["JARVIS_REPO_ROOT"],
+      note: "Read-only file search. Buxme production is not modified.",
+    },
+    buxmeMetrics: {
+      configured: false,
+      requiredEnv: [],
+      note: "No Buxme production metric connector is configured. Counts shown elsewhere are records in this Jarvis app.",
+    },
+    drivenestStore: {
+      configured: false,
+      requiredEnv: [],
+      note: "DriveNest store performance is not connected. Jarvis will not invent sales.",
+    },
+    git: {
+      localCommit: env.JARVIS_ALLOW_GIT === "1",
+      push: env.JARVIS_ALLOW_GIT_PUSH === "1",
+      pullRequest: env.JARVIS_ALLOW_PULL_REQUEST === "1",
+      sandbox: Boolean(env.JARVIS_SANDBOX_REPO?.trim()),
+      note: "Git runs only in a repository whose toplevel is JARVIS_SANDBOX_REPO, and only after confirmation.",
+    },
+    auth: { configured: authConfigured(env), requiredEnv: ["JARVIS_OWNER_PASSWORD", "JARVIS_SESSION_SECRET"] },
+    persistence: { mode: "file", note: "Tasks on this server are stored on local disk. Serverless hosts need an existing Redis store for durability." },
+  };
+}
+
+async function readJson(request) {
+  const text = await request.text();
+  if (!text) return {};
+  if (text.length > 1_000_000) throw Object.assign(new Error("Request is too large."), { status: 413 });
+  try {
+    const body = JSON.parse(text);
+    if (!body || typeof body !== "object" || Array.isArray(body)) throw new Error("Invalid JSON");
+    return body;
+  } catch (error) {
+    if (error.status) throw error;
+    throw Object.assign(new Error("Invalid JSON"), { status: 400 });
+  }
+}
+
+function safeUrl(value) {
+  if (!value) return "";
+  try {
+    const url = new URL(String(value));
+    if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+    return url.toString().slice(0, 300);
+  } catch {
+    return null;
+  }
+}
+
+export function createApp(options = {}) {
+  const env = options.env ?? process.env;
+  const dataDir = options.dataDir ?? env.JARVIS_DATA_DIR ?? join(root, "data");
+  const store = options.store ?? createStore(dataDir);
+  const nowFn = options.now ?? (() => Date.now());
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const limiter = options.limiter ?? createLimiter({ fetchImpl, now: nowFn });
+  const execFileImpl = options.execFileImpl;
+  let failOnce = options.failOnce ?? null;
+
+  function secure(request) {
+    return request.url.startsWith("https:") || env.VERCEL === "1";
+  }
+
+  function session(request) {
+    const password = env.JARVIS_OWNER_PASSWORD?.trim() ?? "";
+    const secret = sessionSecret(env, password);
+    return readSession(request.headers.get("cookie"), secret, nowFn());
+  }
+
+  async function guard(request, { auth = true, mutate = false, bucket = "api", limit = 60, windowMs = 60_000 } = {}) {
+    if (mutate && (!originAllowed(request) || !clientHeaderOk(request))) {
+      return json({ error: "This action must come from the Jarvis dashboard." }, 403);
+    }
+    const decision = await limiter.allow({
+      key: `${bucket}:${request.headers.get("x-jarvis-ip") || "local"}`,
+      limit: Number(env[`JARVIS_${bucket.toUpperCase()}_LIMIT`] ?? limit),
+      windowMs,
+      env,
+    });
+    if (!decision.allowed) return json({ error: "Too many requests. Wait and try again." }, 429);
+    if (auth && !session(request)) return json({ error: "Sign in to Jarvis first." }, 401);
+    return null;
+  }
+
+  async function converse(state, text) {
+    const clean = String(text ?? "").trim();
+    if (!clean || clean.length > 2000) throw Object.assign(new Error("Message must be 1 to 2000 characters."), { status: 400 });
+    state.messages.push({ id: randomUUID(), role: "user", content: clean, at: new Date(nowFn()).toISOString() });
+    const command = commandFrom(clean);
+    let reply;
+    let commandResult = null;
+    if (command?.type === "task") {
+      const task = createTask(state, { title: command.title }, env);
+      reply = `I saved “${task.title}” as proposal ${task.id}. I have not started it. Approve it before I work on it.`;
+      commandResult = { taskId: task.id, performed: false };
+    } else if (command?.type === "approve" || command?.type === "reject") {
+      const task = reviewTask(state, command.id, command.type === "approve" ? "approved" : "rejected");
+      reply = command.type === "approve"
+        ? `Approved ${task.id}. I still have not executed it. Say “run worker” when you want the next safe step.`
+        : `Rejected ${task.id}. Nothing was executed.`;
+      commandResult = { taskId: task.id, performed: false };
+    } else if (command?.type === "worker") {
+      const report = await runWorker(state, { env, repoRoot: env.JARVIS_REPO_ROOT, dataDir, now: nowFn, failOnce });
+      failOnce = null;
+      reply = `Worker finished. Completed ${report.completed.length}, blocked ${report.blocked.length}, failed ${report.failed.length}. No external account was changed.`;
+      commandResult = report;
+    } else {
+      const thought = await think({ text: clean, state, env, fetchImpl, now: new Date(nowFn()) });
+      state.usage = thought.usage;
+      reply = thought.reply;
+      commandResult = { provider: thought.provider, model: thought.model, attempted: thought.attempted };
+    }
+    state.messages.push({ id: randomUUID(), role: "assistant", content: reply, at: new Date(nowFn()).toISOString() });
+    if (state.messages.length > 80) state.messages.splice(0, state.messages.length - 80);
+    return { reply, commandResult, speak: { text: reply, engine: "browser" } };
+  }
+
+  async function handle(request) {
+    const url = new URL(request.url);
+    const path = url.pathname.replace(/\/+$/, "") || "/";
+    try {
+      if (path === "/api/health" && request.method === "GET") {
+        return json({
+          ok: true,
+          product: "jarvis",
+          separateFrom: "buxme",
+          time: new Date(nowFn()).toISOString(),
+          authConfigured: authConfigured(env),
+          persistence: "file",
+        });
+      }
+      if (path === "/api/session" && request.method === "GET") {
+        return json({ authenticated: Boolean(session(request)), product: "jarvis" });
+      }
+      if (path === "/api/session" && request.method === "POST") {
+        const blocked = await guard(request, { auth: false, mutate: true, bucket: "login", limit: 8, windowMs: 15 * 60_000 });
+        if (blocked) return blocked;
+        if (!authConfigured(env)) {
+          return json({ error: "Set JARVIS_OWNER_PASSWORD to at least 10 characters, and JARVIS_SESSION_SECRET to at least 16 characters in production." }, 503);
+        }
+        const body = await readJson(request);
+        const password = String(body.password ?? "");
+        if (!passwordsMatch(password, env.JARVIS_OWNER_PASSWORD.trim())) return json({ error: "Incorrect password." }, 401);
+        const secret = sessionSecret(env, password);
+        if (!secret) return json({ error: "Set JARVIS_SESSION_SECRET to at least 16 characters before production sign-in." }, 503);
+        return json({ authenticated: true }, 200, { "Set-Cookie": sessionCookie(issueSession(secret, nowFn()), secure(request)) });
+      }
+      if (path === "/api/session" && request.method === "DELETE") {
+        const blocked = await guard(request, { auth: false, mutate: true, bucket: "login", limit: 20, windowMs: 60_000 });
+        if (blocked) return blocked;
+        return json({ authenticated: false }, 200, { "Set-Cookie": clearCookie(secure(request)) });
+      }
+      if (!path.startsWith("/api/")) return serveStatic(path);
+
+      const read = request.method === "GET" || request.method === "HEAD";
+      const blocked = await guard(request, { mutate: !read, bucket: read ? "read" : "write", limit: read ? 300 : 60 });
+      if (blocked) return blocked;
+      if (request.method === "GET" && path === "/api/services") return json({ services: services(env) });
+      if (request.method === "GET" && path === "/api/status") {
+        const state = await store.read(dayKey(new Date(nowFn())));
+        return json({
+          services: services(env),
+          counts: {
+            tasks: state.tasks.length,
+            proposed: state.tasks.filter(task => task.status === "proposed").length,
+            completed: state.tasks.filter(task => task.status === "completed").length,
+            blocked: state.tasks.filter(task => task.status === "blocked").length,
+            leads: state.leads.length,
+            drafts: state.drafts.length,
+            messages: state.messages.length,
+          },
+          usage: state.usage,
+          gates: state.settings.gates,
+        });
+      }
+      if (request.method === "GET" && path === "/api/chat") {
+        const state = await store.read(dayKey(new Date(nowFn())));
+        return json({ messages: state.messages });
+      }
+      if (request.method === "POST" && (path === "/api/chat" || path === "/api/voice/turn")) {
+        const body = await readJson(request);
+        const text = path === "/api/voice/turn" ? body.transcript : body.text;
+        const result = await store.update(dayKey(new Date(nowFn())), state => converse(state, text));
+        const last = result.messages.at(-1);
+        return json({ reply: last.content, messages: result.messages, speak: { text: last.content, engine: "browser" } });
+      }
+      if (request.method === "POST" && path === "/api/speech") {
+        const cap = spendCap(env);
+        const enabled = env.JARVIS_ENABLE_NEURAL_SPEECH === "1" && Boolean(env.AI_GATEWAY_API_KEY?.trim()) && cap.authorized;
+        if (!enabled) {
+          return json({ error: "Neural voice is off. Set AI_GATEWAY_API_KEY, JARVIS_DAILY_REQUEST_CAP, and JARVIS_ENABLE_NEURAL_SPEECH=1. This device can still speak the reply.", fallback: "browser" }, 503);
+        }
+        const body = await readJson(request);
+        const transcript = String(body.text ?? "").trim();
+        if (!transcript || transcript.length > 2400) return json({ error: "Speech text must be 1 to 2400 characters.", fallback: "browser" }, 400);
+        const state = await store.read(dayKey(new Date(nowFn())));
+        const usage = state.usage?.day === dayKey(new Date(nowFn())) ? state.usage : { day: dayKey(new Date(nowFn())), requests: 0, promptTokens: 0, completionTokens: 0, errors: [], byModel: {} };
+        if (usage.requests >= cap.cap) return json({ error: "Daily model cap is used, so neural voice is paused. Device speech still works.", fallback: "browser" }, 429);
+        const response = await fetchImpl("https://ai-gateway.vercel.sh/v1/audio/speech", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${env.AI_GATEWAY_API_KEY.trim()}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ model: env.JARVIS_SPEECH_MODEL?.trim() || "openai/gpt-4o-mini-tts", voice: "onyx", input: transcript, response_format: "mp3" }),
+          signal: AbortSignal.timeout(20000),
+        });
+        if (!response.ok) return json({ error: "Neural voice did not answer. Device speech will be used.", fallback: "browser" }, 502);
+        await store.update(dayKey(new Date(nowFn())), current => {
+          current.usage = usage;
+          current.usage.requests += 1;
+        });
+        return new Response(await response.arrayBuffer(), { headers: { "Content-Type": "audio/mpeg", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
+      }
+      if (request.method === "GET" && path === "/api/tasks") {
+        const state = await store.read(dayKey(new Date(nowFn())));
+        return json({ tasks: state.tasks });
+      }
+      if (request.method === "POST" && path === "/api/tasks") {
+        const body = await readJson(request);
+        const state = await store.update(dayKey(new Date(nowFn())), current => {
+          createTask(current, body, env);
+        });
+        return json({ task: state.tasks.at(-1) }, 201);
+      }
+      const retry = path.match(/^\/api\/tasks\/([0-9a-f-]{36})\/retry$/);
+      if (retry && request.method === "POST") {
+        const state = await store.update(dayKey(new Date(nowFn())), current => {
+          const task = current.tasks.find(item => item.id === retry[1]);
+          if (!task || !["failed", "blocked"].includes(task.status)) throw Object.assign(new Error("Only a failed or blocked task can be retried."), { status: 400 });
+          task.ownerRetries = (task.ownerRetries ?? 0) + 1;
+          if (task.ownerRetries > 3) throw Object.assign(new Error("Retry limit reached for this task."), { status: 400 });
+          task.status = "proposed";
+          task.attempts = 0;
+          task.audit.push({ type: "retry_requested", at: new Date(nowFn()).toISOString(), actor: "owner" });
+        });
+        return json({ task: state.tasks.find(item => item.id === retry[1]), performed: false });
+      }
+      const review = path.match(/^\/api\/tasks\/([0-9a-f-]{36})\/review$/);
+      if (review && request.method === "POST") {
+        const body = await readJson(request);
+        const state = await store.update(dayKey(new Date(nowFn())), current => {
+          reviewTask(current, review[1], body.decision);
+        });
+        return json({ task: state.tasks.find(task => task.id === review[1]), performed: false });
+      }
+      if (request.method === "POST" && path === "/api/worker/run") {
+        const state = await store.update(dayKey(new Date(nowFn())), current => runWorker(current, {
+          env,
+          repoRoot: env.JARVIS_REPO_ROOT,
+          dataDir,
+          now: nowFn,
+          failOnce,
+        }));
+        failOnce = null;
+        return json({
+          tasks: state.tasks,
+          logs: state.logs.slice(-20),
+          note: "The worker finished this pass. External publishing, spending, and deploys were not performed.",
+        });
+      }
+      if (request.method === "POST" && path === "/api/suggestions") {
+        const state = await store.update(dayKey(new Date(nowFn())), current => {
+          suggestTasks(current, env);
+        });
+        return json({ tasks: state.tasks.filter(task => task.status === "proposed") });
+      }
+      if (request.method === "GET" && path === "/api/logs") {
+        const state = await store.read(dayKey(new Date(nowFn())));
+        return json({ logs: state.logs.slice(-100) });
+      }
+      if (request.method === "GET" && path === "/api/businesses") {
+        const state = await store.read(dayKey(new Date(nowFn())));
+        return json({
+          businesses: Object.values(BUSINESSES).map(business => ({
+            ...business,
+            metricsConnected: false,
+            leads: state.leads.filter(lead => lead.business === business.id),
+            drafts: state.drafts.filter(draft => draft.business === business.id),
+          })),
+        });
+      }
+      if (request.method === "POST" && path === "/api/leads") {
+        const body = await readJson(request);
+        const name = String(body.name ?? "").trim();
+        const urlValue = safeUrl(body.url);
+        if (!BUSINESSES[body.business]) return json({ error: "Unknown business." }, 400);
+        if (name.length < 2 || name.length > 80 || /[\r\n]/.test(name)) return json({ error: "Lead name must be 2 to 80 characters." }, 400);
+        if (body.url && !urlValue) return json({ error: "Lead URL must start with http:// or https://." }, 400);
+        const state = await store.update(dayKey(new Date(nowFn())), current => {
+          if (current.leads.length >= 200) throw Object.assign(new Error("Lead list is full."), { status: 400 });
+          current.leads.push({
+            id: randomUUID(),
+            business: body.business,
+            name,
+            url: urlValue || "",
+            note: String(body.note ?? "").slice(0, 1000),
+            stage: "new",
+            createdAt: new Date(nowFn()).toISOString(),
+          });
+          current.logs.push({ id: randomUUID(), at: new Date(nowFn()).toISOString(), level: "info", message: `Recorded lead ${name}. No outreach was sent.`, taskId: null });
+        });
+        return json({ lead: state.leads.at(-1), sent: false }, 201);
+      }
+      const stage = path.match(/^\/api\/leads\/([0-9a-f-]{36})\/stage$/);
+      if (stage && request.method === "POST") {
+        const body = await readJson(request);
+        if (!["new", "drafted", "responded", "closed"].includes(body.stage)) return json({ error: "Unknown stage." }, 400);
+        const state = await store.update(dayKey(new Date(nowFn())), current => {
+          const lead = current.leads.find(item => item.id === stage[1]);
+          if (!lead) throw Object.assign(new Error("Lead not found."), { status: 404 });
+          lead.stage = body.stage;
+          lead.stageRecordedAt = new Date(nowFn()).toISOString();
+          current.logs.push({ id: randomUUID(), at: lead.stageRecordedAt, level: "info", message: `You recorded ${lead.name} as ${lead.stage}. Jarvis did not contact them.`, taskId: null });
+        });
+        return json({ lead: state.leads.find(item => item.id === stage[1]), contacted: false });
+      }
+      if (request.method === "POST" && path === "/api/drafts") {
+        const body = await readJson(request);
+        const notes = String(body.notes ?? "").trim();
+        if (!BUSINESSES[body.business]) return json({ error: "Unknown business." }, 400);
+        if (notes.length < 3) return json({ error: "Add the facts to include. Jarvis will not invent them." }, 400);
+        const state = await store.update(dayKey(new Date(nowFn())), current => {
+          current.drafts.push({
+            id: randomUUID(),
+            business: body.business,
+            leadId: body.leadId ?? null,
+            kind: ["outreach", "listing", "campaign", "marketing", "development"].includes(body.kind) ? body.kind : "marketing",
+            title: String(body.title ?? "Untitled draft").trim().slice(0, 120) || "Untitled draft",
+            body: `Draft for ${BUSINESSES[body.business].name}\n\n${notes.slice(0, 4000)}\n\nSource: the note you entered. This was not sent, published, or purchased.`,
+            status: "draft",
+            externalAction: "not_performed",
+            createdAt: new Date(nowFn()).toISOString(),
+          });
+        });
+        return json({ draft: state.drafts.at(-1), sent: false }, 201);
+      }
+      const approval = path.match(/^\/api\/drafts\/([0-9a-f-]{36})\/approval$/);
+      if (approval && request.method === "POST") {
+        const body = await readJson(request);
+        const action = String(body.action ?? "");
+        if (!["publish", "outreach", "ads", "purchase", "account"].includes(action)) return json({ error: "Unknown approval action." }, 400);
+        const state = await store.update(dayKey(new Date(nowFn())), current => {
+          const draft = current.drafts.find(item => item.id === approval[1]);
+          if (!draft) throw Object.assign(new Error("Draft not found."), { status: 404 });
+          createTask(current, {
+            title: `Approval required before ${action}: ${draft.title}`.slice(0, 180),
+            detail: draft.body,
+            business: draft.business,
+            priority: 5,
+          }, env);
+        });
+        return json({ task: state.tasks.at(-1), performed: false, externalAction: "not_performed" }, 202);
+      }
+      if (request.method === "GET" && path === "/api/settings") {
+        const state = await store.read(dayKey(new Date(nowFn())));
+        return json({ gates: state.settings.gates });
+      }
+      if (request.method === "POST" && path === "/api/settings") {
+        const body = await readJson(request);
+        const state = await store.update(dayKey(new Date(nowFn())), current => {
+          const next = { ...defaultGates() };
+          for (const key of Object.keys(defaultGates())) next[key] = Boolean(body.gates?.[key]);
+          current.settings.gates = next;
+          current.logs.push({ id: randomUUID(), at: new Date(nowFn()).toISOString(), level: "info", message: "Approval gates updated by the owner.", taskId: null });
+        });
+        return json({ gates: state.settings.gates, saved: true });
+      }
+      if (request.method === "POST" && path === "/api/git") {
+        const body = await readJson(request);
+        if (body.confirm !== "commit-local" && body.confirm !== "open-pull-request") {
+          return json({ performed: false, reason: "Confirmation was missing, so no git command ran." }, 400);
+        }
+        const sandbox = env.JARVIS_SANDBOX_REPO?.trim();
+        if (!sandbox) {
+          return json({ performed: false, pushed: false, pullRequest: false, reason: "Set JARVIS_SANDBOX_REPO to a dedicated repository. Jarvis will not use the Buxme checkout." });
+        }
+        try {
+          const result = await commitApprovedSandbox({
+            repoDir: sandbox,
+            branch: `jarvis/${String(body.taskId ?? "").slice(0, 36)}`.replace(/[^a-z0-9/-]/g, "").slice(0, 48),
+            message: "Prepare Jarvis sandbox note",
+            files: Array.isArray(body.files) ? body.files : [],
+            allowGit: env.JARVIS_ALLOW_GIT === "1" && body.confirm === "commit-local" || (env.JARVIS_ALLOW_GIT === "1" && body.confirm === "open-pull-request"),
+            allowPush: env.JARVIS_ALLOW_GIT_PUSH === "1",
+            allowPullRequest: env.JARVIS_ALLOW_PULL_REQUEST === "1",
+            pushApproved: body.confirm === "open-pull-request",
+            pullRequestApproved: body.confirm === "open-pull-request",
+            remoteRepo: env.JARVIS_GIT_REMOTE ?? "",
+            execFileImpl,
+          });
+          return json(result);
+        } catch (error) {
+          return json({ performed: false, pushed: false, pullRequest: false, reason: String(error.message ?? error).slice(0, 300) });
+        }
+      }
+      return json({ error: "Unknown Jarvis route." }, 404);
+    } catch (error) {
+      const message = String(error.message ?? "Request failed.").slice(0, 300);
+      const status = error.status || (/must be|Unknown|full|not found|too long|Invalid|Only a|Retry limit|Confirmation/i.test(message) ? 400 : 500);
+      const safe = status === 500 ? "Jarvis could not complete that request." : message;
+      if (status === 500) console.error("Jarvis request failed", { name: error.name ?? "Error" });
+      return json({ error: safe }, status);
+    }
+  }
+
+  return { handle, store, env, setFailOnce(value) { failOnce = value; } };
+}
+
+async function serveStatic(path) {
+  const requested = path === "/" ? "/index.html" : path;
+  const file = resolve(publicDir, normalize(`.${requested}`));
+  if (file !== publicDir && !file.startsWith(`${publicDir}/`)) return json({ error: "Not found." }, 404);
+  try {
+    const body = await readFile(file);
+    const type = file.endsWith(".css") ? "text/css; charset=utf-8"
+      : file.endsWith(".js") ? "text/javascript; charset=utf-8"
+        : file.endsWith(".webmanifest") ? "application/manifest+json"
+          : "text/html; charset=utf-8";
+    return new Response(body, {
+      headers: {
+        "Content-Type": type,
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
+        "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; media-src 'self' blob:; img-src 'self' data:; base-uri 'none'; form-action 'self'",
+      },
+    });
+  } catch {
+    return json({ error: "Not found." }, 404);
+  }
+}

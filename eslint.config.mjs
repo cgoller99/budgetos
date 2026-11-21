@@ -18,6 +18,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Standalone Jarvis is a separate product and is not part of the Buxme app.
+    "apps/jarvis/**",
   ]),
 ]);
 
