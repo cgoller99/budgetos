@@ -13,12 +13,12 @@ import {
   sessionCookie,
   sessionSecret,
 } from "./auth.mjs";
-import { commandFrom, think } from "./brain.mjs";
-import { spendCap } from "./routing.mjs";
+import { commandFrom, connectionFor, think } from "./brain.mjs";
+import { modelChain, spendCap } from "./routing.mjs";
 import { BUSINESSES, createStore, defaultGates } from "./store.mjs";
 import { createLimiter } from "./limits.mjs";
 import { commitApprovedSandbox } from "./gitGate.mjs";
-import { createTask, reviewTask, runWorker, suggestTasks } from "./worker.mjs";
+import { beginWorker, createTask, finishWorker, produceTaskResult, reviewTask, suggestTasks } from "./worker.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const publicDir = join(root, "public");
@@ -26,6 +26,20 @@ const DAY = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" });
 
 function dayKey(now) {
   return DAY.format(now);
+}
+
+function modelRoutes(env) {
+  const routes = {};
+  for (const kind of ["routine", "coding", "research", "business"]) {
+    try { routes[kind] = modelChain(kind, env); }
+    catch { routes[kind] = []; }
+  }
+  return routes;
+}
+
+function speechEngine(env) {
+  const cap = spendCap(env);
+  return env.JARVIS_ENABLE_NEURAL_SPEECH === "1" && env.AI_GATEWAY_API_KEY?.trim() && cap.authorized ? "neural" : "browser";
 }
 
 function json(body, status = 200, extra = {}) {
@@ -47,7 +61,9 @@ function services(env) {
     aiGateway: {
       configured: Boolean(env.AI_GATEWAY_API_KEY?.trim()),
       spendAuthorized: cap.authorized,
+      connected: Boolean(env.AI_GATEWAY_API_KEY?.trim()) && cap.authorized,
       spendNote: cap.authorized ? `Up to ${cap.cap} model requests per day.` : cap.reason,
+      routes: modelRoutes(env),
       requiredEnv: ["AI_GATEWAY_API_KEY", "JARVIS_DAILY_REQUEST_CAP"],
     },
     redis: {
@@ -152,37 +168,101 @@ export function createApp(options = {}) {
     return null;
   }
 
+  function remember(state, content, meta) {
+    state.messages.push({
+      id: randomUUID(),
+      role: "assistant",
+      content,
+      at: new Date(nowFn()).toISOString(),
+      source: meta.source,
+      provider: meta.provider ?? "",
+      model: meta.model ?? "",
+      kind: meta.kind ?? "",
+      error: meta.error ?? "",
+      attempted: meta.attempted ?? [],
+    });
+    if (state.messages.length > 80) state.messages.splice(0, state.messages.length - 80);
+  }
+
+  async function executeWorker() {
+    const day = dayKey(new Date(nowFn()));
+    let begun = { claimed: [], ownedLock: false, skipped: [], blocked: [], recovered: [] };
+    await store.update(day, state => {
+      begun = beginWorker(state, { env, now: nowFn });
+    });
+    const outcomes = [];
+    let usage = (await store.read(day)).usage;
+    for (const task of begun.claimed) {
+      try {
+        if (failOnce === `${task.id}:${task.attempts}`) throw new Error("Injected failure before completion.");
+        const produced = await produceTaskResult(task, {
+          env,
+          repoRoot: env.JARVIS_REPO_ROOT,
+          dataDir,
+          fetchImpl,
+          usage,
+          now: new Date(nowFn()),
+        });
+        if (produced.usage) usage = produced.usage;
+        outcomes.push({ id: task.id, ok: true, result: produced.result, model: produced.model, usage: produced.usage });
+      } catch (error) {
+        if (error.usage) usage = error.usage;
+        outcomes.push({ id: task.id, ok: false, error: String(error.message ?? error).slice(0, 300), usage: error.usage });
+      }
+    }
+    failOnce = null;
+    let finished = { completed: [], failed: [] };
+    await store.update(day, current => {
+      finished = finishWorker(current, outcomes, { now: nowFn, ownedLock: begun.ownedLock });
+      if (usage) current.usage = usage;
+    });
+    return { ...finished, blocked: begun.blocked, recovered: begun.recovered, skipped: begun.skipped };
+  }
+
   async function converse(state, text) {
     const clean = String(text ?? "").trim();
     if (!clean || clean.length > 2000) throw Object.assign(new Error("Message must be 1 to 2000 characters."), { status: 400 });
     state.messages.push({ id: randomUUID(), role: "user", content: clean, at: new Date(nowFn()).toISOString() });
     const command = commandFrom(clean);
-    let reply;
-    let commandResult = null;
+    if (command?.type === "worker") throw Object.assign(new Error("Run the worker from the worker route."), { status: 400 });
     if (command?.type === "task") {
       const task = createTask(state, { title: command.title }, env);
-      reply = `I saved “${task.title}” as proposal ${task.id}. I have not started it. Approve it before I work on it.`;
-      commandResult = { taskId: task.id, performed: false };
+      remember(state, `I saved “${task.title}” as proposal ${task.id}. I have not started it. Approve it before I work on it.`, { source: "queue" });
     } else if (command?.type === "approve" || command?.type === "reject") {
       const task = reviewTask(state, command.id, command.type === "approve" ? "approved" : "rejected");
-      reply = command.type === "approve"
+      const reply = command.type === "approve"
         ? `Approved ${task.id}. I still have not executed it. Say “run worker” when you want the next safe step.`
         : `Rejected ${task.id}. Nothing was executed.`;
-      commandResult = { taskId: task.id, performed: false };
-    } else if (command?.type === "worker") {
-      const report = await runWorker(state, { env, repoRoot: env.JARVIS_REPO_ROOT, dataDir, now: nowFn, failOnce });
-      failOnce = null;
-      reply = `Worker finished. Completed ${report.completed.length}, blocked ${report.blocked.length}, failed ${report.failed.length}. No external account was changed.`;
-      commandResult = report;
+      remember(state, reply, { source: "queue" });
     } else {
       const thought = await think({ text: clean, state, env, fetchImpl, now: new Date(nowFn()) });
       state.usage = thought.usage;
-      reply = thought.reply;
-      commandResult = { provider: thought.provider, model: thought.model, attempted: thought.attempted };
+      remember(state, thought.reply, {
+        source: thought.source,
+        provider: thought.provider,
+        model: thought.model,
+        kind: thought.kind,
+        error: thought.error ?? "",
+        attempted: thought.attempted,
+      });
     }
-    state.messages.push({ id: randomUUID(), role: "assistant", content: reply, at: new Date(nowFn()).toISOString() });
-    if (state.messages.length > 80) state.messages.splice(0, state.messages.length - 80);
-    return { reply, commandResult, speak: { text: reply, engine: "browser" } };
+    return state.messages.at(-1);
+  }
+
+  function spoken(messages) {
+    const last = messages.at(-1) ?? {};
+    return {
+      reply: last.content ?? "",
+      provider: last.provider ?? "",
+      model: last.model ?? "",
+      kind: last.kind ?? "",
+      source: last.source ?? "",
+      error: last.error || null,
+      attempted: last.attempted ?? [],
+      connected: last.source === "gateway",
+      messages,
+      speak: { text: last.content ?? "", engine: speechEngine(env) },
+    };
   }
 
   async function handle(request) {
@@ -233,26 +313,44 @@ export function createApp(options = {}) {
           counts: {
             tasks: state.tasks.length,
             proposed: state.tasks.filter(task => task.status === "proposed").length,
+            approved: state.tasks.filter(task => task.status === "approved").length,
+            running: state.tasks.filter(task => task.status === "running").length,
             completed: state.tasks.filter(task => task.status === "completed").length,
+            failed: state.tasks.filter(task => task.status === "failed").length,
             blocked: state.tasks.filter(task => task.status === "blocked").length,
+            rejected: state.tasks.filter(task => task.status === "rejected").length,
             leads: state.leads.length,
             drafts: state.drafts.length,
             messages: state.messages.length,
           },
+          connection: connectionFor(env, state.usage, new Date(nowFn())),
           usage: state.usage,
           gates: state.settings.gates,
+          lastError: state.usage?.errors?.at(-1) ?? null,
         });
       }
       if (request.method === "GET" && path === "/api/chat") {
         const state = await store.read(dayKey(new Date(nowFn())));
-        return json({ messages: state.messages });
+        return json({ messages: state.messages, connection: connectionFor(env, state.usage, new Date(nowFn())) });
       }
       if (request.method === "POST" && (path === "/api/chat" || path === "/api/voice/turn")) {
         const body = await readJson(request);
         const text = path === "/api/voice/turn" ? body.transcript : body.text;
+        const clean = String(text ?? "").trim();
+        if (commandFrom(clean)?.type === "worker") {
+          if (!clean || clean.length > 2000) return json({ error: "Message must be 1 to 2000 characters." }, 400);
+          await store.update(dayKey(new Date(nowFn())), state => {
+            state.messages.push({ id: randomUUID(), role: "user", content: clean, at: new Date(nowFn()).toISOString() });
+          });
+          const report = await executeWorker();
+          const reply = `Worker finished. Completed ${report.completed.length}, blocked ${report.blocked.length}, failed ${report.failed.length}. No external account was changed.`;
+          const result = await store.update(dayKey(new Date(nowFn())), state => {
+            remember(state, reply, { source: "queue" });
+          });
+          return json(spoken(result.messages));
+        }
         const result = await store.update(dayKey(new Date(nowFn())), state => converse(state, text));
-        const last = result.messages.at(-1);
-        return json({ reply: last.content, messages: result.messages, speak: { text: last.content, engine: "browser" } });
+        return json(spoken(result.messages));
       }
       if (request.method === "POST" && path === "/api/speech") {
         const cap = spendCap(env);
@@ -312,17 +410,12 @@ export function createApp(options = {}) {
         return json({ task: state.tasks.find(task => task.id === review[1]), performed: false });
       }
       if (request.method === "POST" && path === "/api/worker/run") {
-        const state = await store.update(dayKey(new Date(nowFn())), current => runWorker(current, {
-          env,
-          repoRoot: env.JARVIS_REPO_ROOT,
-          dataDir,
-          now: nowFn,
-          failOnce,
-        }));
-        failOnce = null;
+        const report = await executeWorker();
+        const state = await store.read(dayKey(new Date(nowFn())));
         return json({
           tasks: state.tasks,
           logs: state.logs.slice(-20),
+          report,
           note: "The worker finished this pass. External publishing, spending, and deploys were not performed.",
         });
       }

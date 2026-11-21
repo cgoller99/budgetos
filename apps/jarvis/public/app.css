@@ -43,6 +43,8 @@ label { display: grid; gap: 6px; font-size: 0.84rem; color: var(--muted); }
 .kicker { letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold); font-size: 0.72rem; margin: 0; }
 h1, h2, h3 { margin: 0; font-weight: 650; }
 .muted { color: var(--muted); }
+.meta { color: var(--gold); font-size: 0.78rem; margin: 4px 0; }
+.ok { color: var(--ok); font-size: 0.84rem; margin: 4px 0 0; }
 .error { background: rgba(255, 120, 120, 0.12); color: var(--danger); border-radius: 12px; padding: 10px 12px; }
 .shell { display: grid; grid-template-columns: 220px minmax(220px, 300px) minmax(0, 1fr); gap: 16px; padding: 16px; }
 .nav, .orb-wrap, .content { min-width: 0; }

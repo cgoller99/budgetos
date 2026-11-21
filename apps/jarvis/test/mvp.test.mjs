@@ -86,6 +86,46 @@ test("provider errors fall back and are recorded", async () => {
   assert.equal(result.usage.byModel[calls[0]].errors, 1);
 });
 
+test("chat and an approved task use the routed model when spending is authorized", async () => {
+  const dataDir = await mkdtemp(join(tmpdir(), "jarvis-model-"));
+  const calls = [];
+  const app = createApp({
+    dataDir,
+    env: env({
+      AI_GATEWAY_API_KEY: "test-key",
+      JARVIS_DAILY_REQUEST_CAP: "4",
+      JARVIS_CODING_MODEL: "anthropic/claude-sonnet-4",
+      JARVIS_ROUTINE_MODEL: "openai/gpt-4o-mini",
+    }),
+    fetchImpl: async (_url, options) => {
+      const model = JSON.parse(options.body).model;
+      calls.push(model);
+      return { ok: true, status: 200, json: async () => ({ choices: [{ message: { content: `Answer from ${model}.` } }], usage: { prompt_tokens: 2, completion_tokens: 2 } }) };
+    },
+  });
+  const cookie = await signIn(app);
+  const chat = await read(await app.handle(request("/api/chat", { method: "POST", cookie, body: { text: "What should I do next?" } })));
+  assert.equal(chat.status, 200);
+  assert.equal(chat.body.connected, true);
+  assert.equal(chat.body.provider, "gateway");
+  assert.equal(chat.body.model, "openai/gpt-4o-mini");
+  assert.equal(chat.body.messages.at(-1).model, "openai/gpt-4o-mini");
+  assert.match(chat.body.reply, /Answer from openai\/gpt-4o-mini/);
+  const created = await read(await app.handle(request("/api/tasks", { method: "POST", cookie, body: { title: "Fix the TypeScript bug in the header", detail: "The header overlaps the menu.", business: "buxme" } })));
+  await app.handle(request(`/api/tasks/${created.body.task.id}/review`, { method: "POST", cookie, body: { decision: "approved" } }));
+  await app.handle(request("/api/worker/run", { method: "POST", cookie, body: {} }));
+  const task = (await read(await app.handle(request("/api/tasks", { cookie })))).body.tasks.find(item => item.id === created.body.task.id);
+  assert.equal(task.status, "completed");
+  assert.equal(task.result.source, "gateway");
+  assert.match(task.result.text, /anthropic\/claude-sonnet-4/);
+  assert.match(task.result.text, /was not sent/i);
+  assert.deepEqual(task.externalSideEffects, []);
+  assert.equal(calls.includes("anthropic/claude-sonnet-4"), true);
+  const status = await read(await app.handle(request("/api/status", { cookie })));
+  assert.equal(status.body.connection.connected, true);
+  assert.equal(status.body.counts.completed >= 1, true);
+});
+
 test("authentication, voice turn, tasks, and approval gates", async () => {
   const dataDir = await mkdtemp(join(tmpdir(), "jarvis-app-"));
   const app = createApp({ dataDir, env: env({ JARVIS_LOGIN_LIMIT: "4" }) });
@@ -98,9 +138,13 @@ test("authentication, voice turn, tasks, and approval gates", async () => {
   const cookie = await signIn(app);
   const voice = await read(await app.handle(request("/api/voice/turn", { method: "POST", cookie, body: { transcript: "What is Buxme revenue?" } })));
   assert.equal(voice.status, 200);
+  assert.equal(voice.body.connected, false);
+  assert.equal(voice.body.source, "unavailable");
   assert.match(voice.body.reply, /not connected/i);
+  assert.match(voice.body.error, /AI_GATEWAY_API_KEY|spending cap|JARVIS_DAILY_REQUEST_CAP/i);
   assert.equal(voice.body.speak.engine, "browser");
   assert.equal(voice.body.messages.length, 2);
+  assert.equal(voice.body.messages.at(-1).source, "unavailable");
   const created = await read(await app.handle(request("/api/chat", { method: "POST", cookie, body: { text: "create task Draft the spring listing" } })));
   assert.match(created.body.reply, /have not started/i);
   await app.handle(request("/api/worker/run", { method: "POST", cookie, body: {} }));
@@ -270,8 +314,11 @@ test("the dashboard is served with a mobile viewport and the voice pipeline", as
     const script = await readFile(new URL("../public/app.js", import.meta.url), "utf8");
     assert.match(script, /function handleTranscript/);
     assert.match(script, /SpeechRecognition/);
+    assert.match(script, /getUserMedia/);
     assert.match(script, /speechSynthesis/);
     assert.match(script, /Interrupt/);
+    assert.match(script, /source === "gateway"/);
+    assert.match(script, /setInterval/);
     const css = await (await fetch(`${server.url}/app.css`)).text();
     assert.match(css, /100dvh/);
     assert.match(css, /safe-area-inset-bottom/);

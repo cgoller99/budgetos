@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
+import { connectionFor } from "./brain.mjs";
+import { think } from "./brain.mjs";
 import { classifyJarvisTask, modelChain, riskFor, selectJarvisModel } from "./routing.mjs";
 import { readBusinessInventory } from "./inventory.mjs";
 import { BUSINESSES } from "./store.mjs";
@@ -96,9 +98,7 @@ function preparation(task) {
   };
 }
 
-async function safeResult(task, ctx) {
-  const inventory = await readBusinessInventory(ctx.repoRoot, task.business);
-  const chain = modelChain(task.kind, ctx.env);
+function notesResult(task, chain, inventory) {
   if (/\b(draft|outreach|listing|campaign|research|email|publish)\b/i.test(`${task.title}\n${task.detail}`)) {
     const facts = task.detail.trim();
     return {
@@ -110,19 +110,11 @@ async function safeResult(task, ctx) {
         : "No notes were supplied, so there is no personalized draft. Add the facts and run this task again. Nothing was sent.",
       inventory,
       externalSideEffects: [],
+      source: "notes",
     };
   }
   if (task.kind === "coding") {
-    const artifact = await writePlan(ctx.dataDir, task, chain, inventory);
-    return {
-      handler: "code-plan",
-      modelConsidered: chain[0],
-      fallbacks: chain.slice(1),
-      text: "Prepared a coding plan. No application file was edited, and no branch, commit, or pull request was created.",
-      artifact,
-      inventory,
-      externalSideEffects: [],
-    };
+    return { chain, inventory, coding: true };
   }
   return {
     handler: "status",
@@ -130,6 +122,88 @@ async function safeResult(task, ctx) {
     text: `Recorded work for ${task.businessName}: ${task.title}. ${inventory.note} No external action was performed.`,
     inventory,
     externalSideEffects: [],
+    source: "notes",
+  };
+}
+
+function instant(value) {
+  if (typeof value === "function") return new Date(value());
+  if (value instanceof Date || typeof value === "number") return new Date(value);
+  return new Date();
+}
+
+export async function produceTaskResult(task, ctx) {
+  const inventory = await readBusinessInventory(ctx.repoRoot, task.business);
+  const chain = modelChain(task.kind, ctx.env);
+  const now = instant(ctx.now);
+  const connection = connectionFor(ctx.env, ctx.usage, now);
+  if (connection.connected) {
+    const usage = {
+      day: new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(now),
+      requests: 0,
+      promptTokens: 0,
+      completionTokens: 0,
+      errors: [],
+      byModel: {},
+      ...(ctx.usage ?? {}),
+    };
+    const prompt = [
+      `Do this approved task for ${task.businessName}: ${task.title}`,
+      task.detail?.trim() ? `Owner notes:\n${task.detail.trim()}` : "The owner supplied no notes.",
+      inventory.note,
+      "Use only these notes and this inventory. Do not invent metrics, customers, or revenue. Do not claim that a message was sent, money was spent, code was changed, or a deployment happened.",
+    ].join("\n\n");
+    const thought = await think({
+      text: prompt,
+      state: { tasks: [], messages: [], usage },
+      env: ctx.env,
+      fetchImpl: ctx.fetchImpl,
+      now,
+      kind: task.kind,
+    });
+    if (thought.provider !== "gateway") {
+      const error = new Error(thought.error || "The model did not answer.");
+      error.usage = thought.usage;
+      throw error;
+    }
+    return {
+      result: {
+        handler: "model",
+        source: "gateway",
+        modelConsidered: thought.model,
+        fallbacks: thought.attempted.filter(model => model !== thought.model),
+        text: `${thought.reply}\n\nThis was not sent, published, purchased, or deployed.`,
+        inventory,
+        externalSideEffects: [],
+      },
+      usage: thought.usage,
+      model: thought.model,
+    };
+  }
+  const prepared = notesResult(task, chain, inventory);
+  const reason = connection.reason;
+  if (prepared.coding) {
+    const artifact = await writePlan(ctx.dataDir, task, chain, inventory);
+    return {
+      result: {
+        handler: "code-plan",
+        source: "notes",
+        modelConsidered: chain[0],
+        fallbacks: chain.slice(1),
+        text: `Prepared a coding plan. No model was called because ${reason} No application file was edited, and no branch, commit, or pull request was created.`,
+        artifact,
+        inventory,
+        externalSideEffects: [],
+        connectionError: reason,
+      },
+      usage: null,
+      model: chain[0],
+    };
+  }
+  return {
+    result: { ...prepared, connectionError: reason },
+    usage: null,
+    model: chain[0],
   };
 }
 
@@ -155,15 +229,15 @@ async function writePlan(dataDir, task, chain, inventory) {
   return relative(resolve(dataDir), join(directory, filename)).replaceAll("\\", "/");
 }
 
-export async function runWorker(state, ctx) {
+export function beginWorker(state, ctx) {
   const now = ctx.now ? ctx.now() : Date.now();
-  const report = { recovered: [], blocked: [], completed: [], failed: [], skipped: [] };
+  const report = { recovered: [], blocked: [], claimed: [], skipped: [], ownedLock: false };
   if (state.workerLockUntil && Date.parse(state.workerLockUntil) > now) {
     return { ...report, skipped: ["worker-already-running"] };
   }
   state.workerLockUntil = new Date(now + 60 * 1000).toISOString();
-  try {
-    for (const task of state.tasks) {
+  report.ownedLock = true;
+  for (const task of state.tasks) {
       if (task.status !== "running") continue;
       const expired = !task.claimExpiresAt || Date.parse(task.claimExpiresAt) <= now;
       if (!expired) continue;
@@ -211,32 +285,63 @@ export async function runWorker(state, ctx) {
       task.attempts += 1;
       task.claimId = randomUUID();
       task.claimExpiresAt = new Date(now + LEASE_MS).toISOString();
+      task.progress = [...(task.progress ?? []), { at: new Date(now).toISOString(), message: `Selected ${route.model}` }].slice(-12);
       audit(task, "claimed", { attempt: task.attempts, model: route.model, claimId: task.claimId });
-      try {
-        if (ctx.failOnce === `${task.id}:${task.attempts}`) throw new Error("Injected failure before completion.");
-        const result = await safeResult(task, ctx);
-        if (result.externalSideEffects?.length) throw new Error("Handler tried to record an external side effect.");
-        task.status = "completed";
-        task.completedAt = new Date().toISOString();
-        task.result = result;
-        task.externalSideEffects = [];
-        audit(task, "completed", { handler: result.handler, model: route.model });
-        log(state, `Completed ${task.id} with ${result.handler}. No external action was performed.`, task.id);
-        report.completed.push(task.id);
-      } catch (error) {
-        const retry = task.attempts < MAX_ATTEMPTS;
-        task.status = retry ? "approved" : "failed";
-        task.lastError = String(error.message ?? error).slice(0, 300);
-        task.nextAttemptAt = retry ? new Date(now + 1000).toISOString() : undefined;
-        audit(task, retry ? "retry_scheduled" : "failed", { error: task.lastError });
-        log(state, `${retry ? "Will retry" : "Failed"} ${task.id}: ${task.lastError}`, task.id);
-        report.failed.push(task.id);
-      }
+      log(state, `Claimed ${task.id} for ${route.model}.`, task.id);
+      report.claimed.push({
+        id: task.id,
+        title: task.title,
+        detail: task.detail,
+        business: task.business,
+        businessName: task.businessName,
+        kind: task.kind,
+        attempts: task.attempts,
+      });
     }
-    return report;
-  } finally {
-    state.workerLockUntil = null;
+  return report;
+}
+
+export function finishWorker(state, outcomes, ctx = {}) {
+  const now = ctx.now ? ctx.now() : Date.now();
+  const report = { completed: [], failed: [] };
+  for (const outcome of outcomes) {
+    const task = state.tasks.find(item => item.id === outcome.id && item.status === "running");
+    if (!task) continue;
+    if (!outcome.ok) {
+      const retry = task.attempts < MAX_ATTEMPTS;
+      task.status = retry ? "approved" : "failed";
+      task.lastError = String(outcome.error ?? "The model did not answer.").slice(0, 300);
+      task.nextAttemptAt = retry ? new Date(now + 1000).toISOString() : undefined;
+      task.progress = [...(task.progress ?? []), { at: new Date(now).toISOString(), message: task.lastError }].slice(-12);
+      audit(task, retry ? "retry_scheduled" : "failed", { error: task.lastError });
+      log(state, `${retry ? "Will retry" : "Failed"} ${task.id}: ${task.lastError}`, task.id);
+      report.failed.push(task.id);
+      continue;
+    }
+    if (outcome.result?.externalSideEffects?.length) {
+      task.status = "failed";
+      task.lastError = "Handler tried to record an external side effect.";
+      audit(task, "failed", { error: task.lastError });
+      log(state, task.lastError, task.id);
+      report.failed.push(task.id);
+      continue;
+    }
+    task.status = "completed";
+    task.completedAt = new Date(now).toISOString();
+    task.result = outcome.result;
+    task.externalSideEffects = [];
+    task.lastError = "";
+    if (outcome.model) task.model = { ...(task.model ?? {}), model: outcome.model, answered: outcome.result?.source === "gateway" };
+    const progress = outcome.result?.source === "gateway"
+      ? `Answered with ${outcome.model}.`
+      : "Prepared from recorded notes. No model was called.";
+    task.progress = [...(task.progress ?? []), { at: task.completedAt, message: progress }].slice(-12);
+    audit(task, "completed", { handler: outcome.result?.handler, model: outcome.model, source: outcome.result?.source });
+    log(state, `Completed ${task.id} with ${outcome.result?.handler}. ${progress} No external action was performed.`, task.id);
+    report.completed.push(task.id);
   }
+  if (ctx.ownedLock) state.workerLockUntil = null;
+  return report;
 }
 
 export function suggestTasks(state, env = process.env) {

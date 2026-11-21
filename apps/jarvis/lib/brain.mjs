@@ -20,36 +20,32 @@ function dayKey(now) {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(now);
 }
 
-export function localReply({ text, context }) {
-  const trimmed = text.trim();
-  const lower = trimmed.toLowerCase();
-  if (/\b(revenue|mrr|profit|sales|conversion rate|store performance)\b/i.test(lower)) {
-    return "I cannot answer that with a number. Buxme metrics and DriveNest store performance are not connected, and I will not estimate them.";
+export function connectionFor(env, usage, now = new Date()) {
+  const cap = spendCap(env);
+  const day = dayKey(now);
+  const requests = usage?.day === day ? Number(usage.requests) || 0 : 0;
+  if (!env.AI_GATEWAY_API_KEY?.trim()) {
+    return { connected: false, reason: "Model calls are off because AI_GATEWAY_API_KEY is not configured.", cap, requests };
   }
-  if (/^(hi|hello|hey|good morning|good evening)\b/i.test(lower)) {
-    return `I'm here. ${context.modelNote} You have ${context.taskCount} recorded task${context.taskCount === 1 ? "" : "s"}. I have not contacted anyone or changed an external account.`;
-  }
-  if (/\b(status|health|what can you do|capabilities)\b/i.test(lower)) {
-    return `Chat and device voice are available. ${context.modelNote} Approval is still required for publishing, outreach, advertising, purchases, deploys, and account changes. Nothing external has been sent.`;
-  }
-  if (/\b(draft|outreach|listing|campaign)\b/i.test(lower)) {
-    return `I can draft that from notes you supply. I will not invent a customer or a result, and I will not send it. Add the business, the recipient or product, and the facts you want included.`;
-  }
-  return `${context.modelNote} I can take a task, draft from your notes, or report what is actually connected. I do not have an answer beyond that for this message, and I have not taken an external action.`;
+  if (!cap.authorized) return { connected: false, reason: cap.reason, cap, requests };
+  if (requests >= cap.cap) return { connected: false, reason: `The daily model cap of ${cap.cap} is already used.`, cap, requests };
+  return { connected: true, reason: "", cap, requests };
 }
 
 function contextFrom(text, state, env, now) {
-  const cap = spendCap(env);
-  const key = Boolean(env.AI_GATEWAY_API_KEY?.trim());
-  let modelNote = "Model calls are off because no spending cap is authorized.";
-  if (!key) modelNote = "Model calls are off because AI_GATEWAY_API_KEY is not configured.";
-  else if (!cap.authorized) modelNote = cap.reason;
-  else modelNote = `Model calls are authorized for up to ${cap.cap} requests today.`;
+  const day = dayKey(now);
+  const usage = state.usage?.day === day
+    ? state.usage
+    : { day, requests: 0, promptTokens: 0, completionTokens: 0, errors: [], byModel: {} };
+  const connection = connectionFor(env, usage, now);
   return {
-    modelNote,
-    taskCount: state.tasks.length,
-    day: dayKey(now),
+    modelNote: connection.connected ? `Model calls are authorized for up to ${connection.cap.cap} requests today.` : connection.reason,
+    connection,
+    taskCount: state.tasks?.length ?? 0,
+    tasks: (state.tasks ?? []).slice(-6).map(task => `${task.status}: ${task.title}`).join("; ") || "none",
+    day,
     kind: classifyJarvisTask(text),
+    usage,
   };
 }
 
@@ -80,33 +76,41 @@ async function callGateway({ model, messages, env, fetchImpl, signal }) {
   };
 }
 
-export async function think({ text, state, env, fetchImpl = fetch, now = new Date() }) {
+export async function think({ text, state, env, fetchImpl = fetch, now = new Date(), kind }) {
   const context = contextFrom(text, state, env, now);
-  const cap = spendCap(env);
-  const usage = state.usage?.day === context.day ? state.usage : { day: context.day, requests: 0, promptTokens: 0, completionTokens: 0, errors: [], byModel: {} };
+  if (kind && ["coding", "business", "research", "routine"].includes(kind)) context.kind = kind;
+  const usage = context.usage;
   const base = {
     kind: context.kind,
-    provider: "local",
+    provider: "unavailable",
     model: "",
     usage,
     attempted: [],
+    connected: context.connection.connected,
+    source: "unavailable",
+    error: context.connection.reason || null,
   };
-  if (!env.AI_GATEWAY_API_KEY?.trim() || !cap.authorized || usage.requests >= cap.cap) {
-    const reason = !env.AI_GATEWAY_API_KEY?.trim() || !cap.authorized
-      ? context.modelNote
-      : `The daily model cap of ${cap.cap} is already used.`;
-    const reply = localReply({ text, context });
-    return { ...base, reply: reply.includes(reason) ? reply : `${reply} ${reason}`.trim() };
+  if (!context.connection.connected) {
+    const metric = /\b(revenue|mrr|profit|sales|conversion rate|store performance)\b/i.test(text);
+    return {
+      ...base,
+      reply: metric
+        ? "I cannot answer that with a number. Buxme metrics and DriveNest store performance are not connected, and I will not estimate them."
+        : context.connection.reason,
+    };
   }
-  const history = state.messages.slice(-8).map(message => ({ role: message.role, content: message.content }));
+  const history = (state.messages ?? []).slice(-8)
+    .filter(message => message.role === "user" || message.role === "assistant")
+    .map(message => ({ role: message.role, content: message.content }));
+  if (history.at(-1)?.role === "user" && history.at(-1).content === text) history.pop();
   const messages = [
-    { role: "system", content: `${SYSTEM}\n\nConnected context: ${context.modelNote} Recorded tasks: ${context.taskCount}.` },
+    { role: "system", content: `${SYSTEM}\n\nConnected context: ${context.modelNote} Recorded tasks: ${context.taskCount}. Queue: ${context.tasks}.` },
     ...history,
     { role: "user", content: text },
   ];
   let lastError = "No model responded.";
   for (const model of modelChain(context.kind, env)) {
-    if (usage.requests >= cap.cap) break;
+    if (usage.requests >= context.connection.cap.cap) break;
     usage.requests += 1;
     usage.byModel[model] ??= { requests: 0, errors: 0 };
     usage.byModel[model].requests += 1;
@@ -121,7 +125,7 @@ export async function think({ text, state, env, fetchImpl = fetch, now = new Dat
       });
       usage.promptTokens += result.tokens.prompt;
       usage.completionTokens += result.tokens.completion;
-      return { ...base, provider: "gateway", model, reply: result.reply, usage };
+      return { ...base, provider: "gateway", source: "gateway", model, reply: result.reply, usage, connected: true, error: null };
     } catch (error) {
       usage.byModel[model].errors += 1;
       usage.errors.push({ at: now.toISOString(), model, status: error.status ?? 0, message: redact(error.message) });
@@ -133,7 +137,11 @@ export async function think({ text, state, env, fetchImpl = fetch, now = new Dat
   }
   return {
     ...base,
-    reply: `${localReply({ text, context })} The configured models did not answer (${lastError}).`,
+    provider: "unavailable",
+    source: "unavailable",
+    connected: false,
+    error: lastError,
+    reply: `The configured models did not answer (${lastError}).`,
     usage,
   };
 }

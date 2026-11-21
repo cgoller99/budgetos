@@ -74,6 +74,30 @@ async function speak(text) {
   audio?.pause();
   window.speechSynthesis?.cancel();
   setOrb("speaking");
+  if (state.services?.speech?.neural) {
+    try {
+      const response = await fetch("/api/speech", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-jarvis-client": "dashboard" },
+        body: JSON.stringify({ text }),
+      });
+      if (response.ok) {
+        const url = URL.createObjectURL(await response.blob());
+        await new Promise((resolve, reject) => {
+          audio = new Audio(url);
+          audio.onended = () => { URL.revokeObjectURL(url); resolve(); };
+          audio.onerror = () => { URL.revokeObjectURL(url); reject(new Error("playback")); };
+          audio.play().catch(reject);
+        });
+        if (sequence !== speakSeq) return;
+        setOrb(state.handsFree ? "listening" : "idle");
+        if (state.handsFree) startListening();
+        return;
+      }
+    } catch {
+      state.error = "Neural speech did not play. Device speech will be used.";
+    }
+  }
   if (!window.speechSynthesis || typeof window.SpeechSynthesisUtterance !== "function") {
     state.error = "This browser cannot play speech. The reply is on screen.";
     setOrb("idle");
@@ -122,7 +146,20 @@ async function handleTranscript(text) {
     render();
   }
 }
-function startListening() {
+async function startListening() {
+  if (navigator.mediaDevices?.getUserMedia) {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      for (const track of stream.getTracks()) track.stop();
+    } catch (error) {
+      if (error?.name === "NotAllowedError" || error?.name === "SecurityError") {
+        state.error = "Microphone permission was blocked. Allow it for this site, then tap Listen again.";
+        setOrb("idle");
+        render();
+        return;
+      }
+    }
+  }
   const Ctor = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!Ctor) {
     state.error = "This browser has no speech recognition. Type the words in Voice, and Jarvis will answer and speak. On iPhone, open this page in Safari and allow the microphone.";
@@ -168,6 +205,28 @@ async function refresh() {
   state.status = status;
   state.gates = settings.gates;
 }
+function connectionText() {
+  const ai = state.services?.aiGateway;
+  const link = state.status?.connection;
+  if (link?.connected || ai?.connected) return `AI connected. ${ai?.spendNote || "The model router can answer."}`;
+  return link?.reason || ai?.spendNote || "AI is not connected.";
+}
+function routeText() {
+  const routes = state.services?.aiGateway?.routes || {};
+  const parts = ["routine", "coding", "research", "business"].map(kind => routes[kind]?.[0] ? `${kind}: ${routes[kind][0]}` : "").filter(Boolean);
+  return parts.length ? parts.join(" · ") : "Model routes are unavailable.";
+}
+function queueText() {
+  const counts = state.status?.counts || {};
+  return `Approval required ${counts.proposed ?? 0} · Queued ${counts.approved ?? 0} · Running ${counts.running ?? 0} · Completed ${counts.completed ?? 0} · Failed ${counts.failed ?? 0} · Blocked ${counts.blocked ?? 0}`;
+}
+function serviceLabel(name, service) {
+  if (name === "aiGateway") return service.connected ? "Connected" : service.configured ? "Key present, spending cap off" : "Not connected";
+  if (name === "speech") return service.neural ? "Neural speech on" : "Device speech";
+  if (name === "persistence") return "Local disk";
+  if (service.configured === true || service.localCommit === true) return "Configured";
+  return "Not configured";
+}
 function field(label, control) { return el("label", {}, [label, control]); }
 function button(label, onClick, className) { return el("button", { type: "button", class: className, onclick: onClick }, [label]); }
 
@@ -193,13 +252,41 @@ function renderLogin() {
   root.replaceChildren(el("main", { class: "login" }, [form]));
 }
 
+const STATUS_LABEL = {
+  proposed: "approval required",
+  approved: "queued",
+  running: "running",
+  completed: "completed",
+  failed: "failed",
+  blocked: "blocked",
+  rejected: "rejected",
+};
+function bubble(message) {
+  const meta = message.role !== "assistant" ? ""
+    : message.source === "gateway" ? `${message.kind || "request"} · ${message.model}`
+      : message.source === "queue" ? "Task queue · no model call"
+        : "";
+  const failure = message.role === "assistant" && message.source === "unavailable" ? (message.error || "AI is not connected.") : "";
+  return el("div", { class: `bubble ${message.role}` }, [
+    el("strong", {}, [message.role === "user" ? "You" : "Jarvis"]),
+    meta ? el("p", { class: "meta" }, [meta]) : null,
+    failure && failure !== message.content ? el("p", { class: "error" }, [failure]) : null,
+    el("p", {}, [message.content]),
+  ]);
+}
 function taskCard(task) {
+  const model = task.result?.source === "gateway"
+    ? `answered by ${task.model?.model}`
+    : task.status === "running" ? `running on ${task.model?.model || "the selected model"}`
+      : task.model?.model ? `selected ${task.model.model}` : "model pending";
   return el("article", { class: "item" }, [
     el("strong", {}, [task.title]),
-    el("p", { class: "muted" }, [`${task.businessName} · ${task.status} · ${task.risk} risk · ${task.kind} · ${task.model?.model || "model pending"}`]),
-    task.lastError ? el("p", {}, [task.lastError]) : null,
+    el("p", { class: "muted" }, [`${task.businessName} · ${STATUS_LABEL[task.status] || task.status} · ${task.risk} risk · ${task.kind} · ${model}`]),
+    task.result?.connectionError ? el("p", { class: "meta" }, [task.result.connectionError]) : null,
+    task.lastError ? el("p", { class: "error" }, [task.lastError]) : null,
     task.result?.text ? el("p", {}, [task.result.text]) : null,
     task.result?.summary ? el("p", {}, [task.result.summary]) : null,
+    ...(task.progress || []).slice(-4).map(entry => el("p", { class: "muted" }, [`${formatTime(entry.at)} · ${entry.message}`])),
     el("div", { class: "row" }, [
       task.status === "proposed" ? button("Approve", () => act(`/api/tasks/${task.id}/review`, { decision: "approved" })) : null,
       task.status === "proposed" ? button("Reject", () => act(`/api/tasks/${task.id}/review`, { decision: "rejected" }), "warn") : null,
@@ -219,11 +306,14 @@ function renderPanel() {
     return el("section", { class: "grid" }, [
       stat("Recorded tasks", counts.tasks ?? 0, "Stored in this Jarvis app"),
       stat("Waiting for approval", counts.proposed ?? 0, "Not started"),
+      stat("Running", counts.running ?? 0, "Claimed by the worker"),
       stat("Completed here", counts.completed ?? 0, "No external action is implied"),
       stat("Buxme metrics", "Not connected", "No revenue is shown"),
       el("article", { class: "panel" }, [
         el("h2", {}, ["What is true right now"]),
-        el("p", {}, [state.services?.aiGateway?.spendNote || "Model status is unavailable."]),
+        el("p", {}, [connectionText()]),
+        el("p", { class: "muted" }, [routeText()]),
+        state.status?.lastError ? el("p", { class: "error" }, [`${state.status.lastError.model || "model"}: ${state.status.lastError.message}`]) : null,
         el("p", { class: "muted" }, ["DriveNest store performance is not connected. Agency outreach is drafted only when you enter the facts."]),
       ]),
     ]);
@@ -231,10 +321,7 @@ function renderPanel() {
   if (state.section === "Chat") {
     const box = el("textarea", { "aria-label": "Message Jarvis", maxlength: "2000" });
     return el("section", { class: "panel" }, [
-      el("div", { class: "thread", "aria-live": "polite" }, state.messages.map(message => el("div", { class: `bubble ${message.role}` }, [
-        el("strong", {}, [message.role === "user" ? "You" : "Jarvis"]),
-        el("p", {}, [message.content]),
-      ]))),
+      el("div", { class: "thread", "aria-live": "polite" }, state.messages.map(bubble)),
       el("div", { class: "composer" }, [box, el("div", { class: "row" }, [
         button("Send", async () => {
           const text = box.value.trim();
@@ -263,10 +350,7 @@ function renderPanel() {
     return el("section", { class: "panel" }, [
       el("h2", {}, ["Speak and listen"]),
       el("p", { class: "muted" }, ["Tap Listen, speak, and Jarvis answers out loud. If recognition is unavailable, type the same words. Interrupt stops playback immediately."]),
-      el("div", { class: "thread", "aria-live": "polite" }, state.messages.slice(-6).map(message => el("div", { class: `bubble ${message.role}` }, [
-        el("strong", {}, [message.role === "user" ? "You" : "Jarvis"]),
-        el("p", {}, [message.content]),
-      ]))),
+      el("div", { class: "thread", "aria-live": "polite" }, state.messages.slice(-6).map(bubble)),
       el("div", { class: "row" }, [
         button("Listen", () => { unlockAudio(); state.error = ""; startListening(); }, "primary"),
         button("Interrupt", interruptSpeech, "warn"),
@@ -286,7 +370,8 @@ function renderPanel() {
     ]);
     return el("section", { class: "panel" }, [
       el("h2", {}, [state.section === "Agents" ? "Authorized worker" : "Tasks"]),
-      el("p", { class: "muted" }, ["The worker prepares approved, low-risk work. Publishing, spending, outreach, and deploys stay blocked."]),
+      el("p", { class: "muted" }, [queueText()]),
+      el("p", { class: "muted" }, ["The worker uses the same model router as chat when a spending cap is authorized. Publishing, spending, outreach, and deploys stay blocked."]),
       field("Title", title), field("Notes", detail), field("Business", business),
       el("div", { class: "row" }, [
         button("Create task", async () => {
@@ -352,7 +437,7 @@ function renderPanel() {
     return el("section", { class: "list" }, entries.map(([name, service]) => el("article", { class: "panel" }, [
       el("h2", {}, [name]),
       el("p", {}, [service.note || service.spendNote || ""]),
-      el("p", { class: "pill" }, [service.mode === "file" ? "Local disk" : service.configured === true || service.neural === true || service.localCommit === true ? "Configured" : service.browser === true ? "Device speech available" : "Not configured"]),
+      el("p", { class: "pill" }, [serviceLabel(name, service)]),
       button("Show setup", () => { state.setup = state.setup === name ? "" : name; render(); }),
       state.setup === name ? el("p", {}, [`Set these environment variables on the Jarvis host: ${(service.requiredEnv || []).join(", ") || "None. This connector is intentionally absent."}`]) : null,
     ])));
@@ -397,8 +482,12 @@ function renderPanel() {
     el("h2", {}, ["System health"]),
     el("p", {}, [`Auth configured: ${state.services?.auth?.configured ? "yes" : "no"}`]),
     el("p", {}, [`Persistence: ${state.services?.persistence?.mode || "unknown"}`]),
+    el("p", {}, [connectionText()]),
+    el("p", {}, [routeText()]),
+    el("p", {}, [`Speech: ${state.services?.speech?.neural ? "neural voice and device speech" : "device speech"}`]),
     el("p", {}, [`Model requests recorded today: ${state.status?.usage?.requests ?? 0}`]),
     el("p", {}, [`Provider errors recorded: ${state.status?.usage?.errors?.length ?? 0}`]),
+    state.status?.lastError ? el("p", { class: "error" }, [`${state.status.lastError.model || "model"}: ${state.status.lastError.message}`]) : null,
     el("p", {}, [`Tasks: ${counts.tasks ?? 0}. Leads: ${counts.leads ?? 0}. Drafts: ${counts.drafts ?? 0}.`]),
     button("Refresh health", async () => { try { await refresh(); state.notice = "Health reloaded from this server."; } catch (error) { state.error = error.message; } render(); }, "primary"),
   ]);
@@ -422,7 +511,11 @@ function render() {
     ]),
     el("main", { class: "content" }, [
       el("header", { class: "top" }, [
-        el("div", {}, [el("p", { class: "kicker" }, ["Jarvis"]), el("h1", {}, [state.section])]),
+        el("div", {}, [
+          el("p", { class: "kicker" }, ["Jarvis"]),
+          el("h1", {}, [state.section]),
+          el("p", { class: state.status?.connection?.connected ? "ok" : "meta" }, [connectionText()]),
+        ]),
         button("Sign out", async () => { await api("/api/session", { method: "DELETE" }); state.authenticated = false; render(); }),
       ]),
       state.error ? el("p", { class: "error", role: "alert" }, [state.error]) : null,
@@ -435,6 +528,32 @@ function render() {
   if (thread) thread.scrollTop = thread.scrollHeight;
 }
 window.jarvisHandleTranscript = handleTranscript;
+setInterval(async () => {
+  if (!state.authenticated) return;
+  const active = document.activeElement;
+  const typing = active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA");
+  try {
+    const [tasks, logs, status, services] = await Promise.all([
+      api("/api/tasks"), api("/api/logs"), api("/api/status"), api("/api/services"),
+    ]);
+    let changed = JSON.stringify(tasks.tasks) !== JSON.stringify(state.tasks)
+      || JSON.stringify(logs.logs) !== JSON.stringify(state.logs)
+      || JSON.stringify(status.counts) !== JSON.stringify(state.status?.counts)
+      || JSON.stringify(status.connection) !== JSON.stringify(state.status?.connection);
+    state.tasks = tasks.tasks;
+    state.logs = logs.logs;
+    state.status = status;
+    state.services = services.services;
+    if (state.section === "Chat" || state.section === "Voice") {
+      const chat = await api("/api/chat");
+      if (JSON.stringify(chat.messages) !== JSON.stringify(state.messages)) {
+        state.messages = chat.messages;
+        changed = true;
+      }
+    }
+    if (changed && !typing) render();
+  } catch { /* keep the last saved state on screen */ }
+}, 3000);
 api("/api/session").then(async data => {
   state.authenticated = data.authenticated;
   if (state.authenticated) await refresh();
