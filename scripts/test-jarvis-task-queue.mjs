@@ -20,3 +20,6 @@ try {
   assert.equal(tasks[0].attempts, 0);
   console.log("Jarvis task queue tests passed.");
 } finally { await rm(dir, { recursive: true, force: true }); }
+
+const mounted = spawnSync(process.execPath, ["--test", "apps/jarvis/test/mount.test.mjs"], { stdio: "inherit" });
+if (mounted.status !== 0) process.exit(mounted.status ?? 1);
