@@ -15,6 +15,7 @@ import {
 } from "./auth.mjs";
 import { commandFrom, connectionFor, think } from "./brain.mjs";
 import { modelChain, spendCap } from "./routing.mjs";
+import { createRedisStore } from "./redisStore.mjs";
 import { BUSINESSES, createStore, defaultGates } from "./store.mjs";
 import { createLimiter } from "./limits.mjs";
 import { commitApprovedSandbox } from "./gitGate.mjs";
@@ -35,6 +36,10 @@ function modelRoutes(env) {
     catch { routes[kind] = []; }
   }
   return routes;
+}
+
+function redisConfigured(env) {
+  return Boolean(env.UPSTASH_REDIS_REST_URL?.trim() && env.UPSTASH_REDIS_REST_TOKEN?.trim());
 }
 
 function speechEngine(env) {
@@ -104,7 +109,9 @@ function services(env) {
       note: "Git runs only in a repository whose toplevel is JARVIS_SANDBOX_REPO, and only after confirmation.",
     },
     auth: { configured: authConfigured(env), requiredEnv: ["JARVIS_OWNER_PASSWORD", "JARVIS_SESSION_SECRET"] },
-    persistence: { mode: "file", note: "Tasks on this server are stored on local disk. Serverless hosts need an existing Redis store for durability." },
+    persistence: redisConfigured(env)
+      ? { mode: "redis", configured: true, requiredEnv: ["UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN"], note: "Conversations, tasks, approvals, and logs are stored in the existing Redis database and survive a restart." }
+      : { mode: "file", configured: false, requiredEnv: ["UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN"], note: "This server stores data on local disk. A serverless deploy loses that disk on restart until an existing Upstash Redis database is configured. Jarvis does not create a database." },
   };
 }
 
@@ -136,9 +143,11 @@ function safeUrl(value) {
 export function createApp(options = {}) {
   const env = options.env ?? process.env;
   const dataDir = options.dataDir ?? env.JARVIS_DATA_DIR ?? join(root, "data");
-  const store = options.store ?? createStore(dataDir);
   const nowFn = options.now ?? (() => Date.now());
   const fetchImpl = options.fetchImpl ?? fetch;
+  const store = options.store ?? (redisConfigured(env)
+    ? createRedisStore({ url: env.UPSTASH_REDIS_REST_URL.trim(), token: env.UPSTASH_REDIS_REST_TOKEN.trim(), fetchImpl })
+    : createStore(dataDir));
   const limiter = options.limiter ?? createLimiter({ fetchImpl, now: nowFn });
   const execFileImpl = options.execFileImpl;
   let failOnce = options.failOnce ?? null;
@@ -276,7 +285,7 @@ export function createApp(options = {}) {
           separateFrom: "buxme",
           time: new Date(nowFn()).toISOString(),
           authConfigured: authConfigured(env),
-          persistence: "file",
+          persistence: store.mode,
         });
       }
       if (path === "/api/session" && request.method === "GET") {

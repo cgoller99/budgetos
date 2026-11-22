@@ -19,6 +19,18 @@ export function defaultGates() {
   };
 }
 
+export function normalizeState(parsed, day) {
+  if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.tasks)) throw new Error("Jarvis store is unreadable.");
+  parsed.settings ??= { gates: defaultGates() };
+  parsed.settings.gates = { ...defaultGates(), ...(parsed.settings.gates ?? {}) };
+  parsed.messages ??= [];
+  parsed.logs ??= [];
+  parsed.leads ??= [];
+  parsed.drafts ??= [];
+  parsed.usage ??= emptyState(day).usage;
+  return parsed;
+}
+
 export function emptyState(day) {
   return {
     version: 1,
@@ -63,15 +75,7 @@ export function createStore(directory) {
   async function readUnlocked(day) {
     try {
       const parsed = JSON.parse(await readFile(file, "utf8"));
-      if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.tasks)) throw new Error("Jarvis store is unreadable.");
-      parsed.settings ??= { gates: defaultGates() };
-      parsed.settings.gates = { ...defaultGates(), ...(parsed.settings.gates ?? {}) };
-      parsed.messages ??= [];
-      parsed.logs ??= [];
-      parsed.leads ??= [];
-      parsed.drafts ??= [];
-      parsed.usage ??= emptyState(day).usage;
-      return parsed;
+      return normalizeState(parsed, day);
     } catch (error) {
       if (error.code === "ENOENT") return emptyState(day);
       throw error;
@@ -95,6 +99,7 @@ export function createStore(directory) {
   }
 
   return {
+    mode: "file",
     directory,
     read(day) {
       return exclusive(() => withLock(async () => structuredClone(await readUnlocked(day))));

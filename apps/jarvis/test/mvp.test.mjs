@@ -297,6 +297,51 @@ test("approval gates change what the worker may prepare", async () => {
   assert.match(task.result.text, /was not sent|Nothing was sent|not sent/i);
 });
 
+test("configured Redis keeps the conversation after a new process starts", async () => {
+  const db = new Map();
+  const fetchImpl = async (url, options) => {
+    assert.equal(String(url).includes("token"), false);
+    if (!options.body) return { ok: true, json: async () => ({ result: 1 }) };
+    const args = JSON.parse(options.body);
+    const [command, key, value] = args;
+    assert.equal(url, "https://redis.example.invalid");
+    if (command === "SET" && args[3] === "NX") {
+      if (db.has(key)) return { ok: true, json: async () => ({ result: null }) };
+      db.set(key, value);
+      return { ok: true, json: async () => ({ result: "OK" }) };
+    }
+    if (command === "GET") return { ok: true, json: async () => ({ result: db.has(key) ? db.get(key) : null }) };
+    if (command === "DEL") {
+      db.delete(key);
+      return { ok: true, json: async () => ({ result: 1 }) };
+    }
+    if (command === "SET") {
+      db.set(key, value);
+      return { ok: true, json: async () => ({ result: "OK" }) };
+    }
+    return { ok: false, status: 500, json: async () => ({ error: "unexpected" }) };
+  };
+  const shared = { UPSTASH_REDIS_REST_URL: "https://redis.example.invalid", UPSTASH_REDIS_REST_TOKEN: "token" };
+  const first = createApp({ env: env(shared), fetchImpl });
+  const cookie = await signIn(first);
+  const sent = await read(await first.handle(request("/api/chat", { method: "POST", cookie, body: { text: "Remember the blue notebook" } })));
+  assert.equal(sent.status, 200);
+  assert.equal((await read(await first.handle(request("/api/health")))).body.persistence, "redis");
+  const second = createApp({ env: env(shared), fetchImpl });
+  const again = await signIn(second);
+  const history = await read(await second.handle(request("/api/chat", { cookie: again })));
+  assert.match(JSON.stringify(history.body.messages), /Remember the blue notebook/);
+  const services = await read(await second.handle(request("/api/services", { cookie: again })));
+  assert.equal(services.body.services.persistence.mode, "redis");
+  assert.equal(JSON.stringify(services.body).includes("redis.example"), false);
+  assert.equal(JSON.stringify(services.body).includes("Bearer"), false);
+  const task = await read(await second.handle(request("/api/tasks", { method: "POST", cookie: again, body: { title: "Keep the approved note", business: "buxme" } })));
+  await second.handle(request(`/api/tasks/${task.body.task.id}/review`, { method: "POST", cookie: again, body: { decision: "approved" } }));
+  const third = createApp({ env: env(shared), fetchImpl });
+  const kept = await read(await third.handle(request("/api/tasks", { cookie: await signIn(third) })));
+  assert.equal(kept.body.tasks.find(item => item.id === task.body.task.id).status, "approved");
+});
+
 test("static files cannot escape the public directory", async () => {
   const dataDir = await mkdtemp(join(tmpdir(), "jarvis-static-"));
   const app = createApp({ dataDir, env: env() });

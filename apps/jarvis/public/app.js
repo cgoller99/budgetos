@@ -223,7 +223,7 @@ function queueText() {
 function serviceLabel(name, service) {
   if (name === "aiGateway") return service.connected ? "Connected" : service.configured ? "Key present, spending cap off" : "Not connected";
   if (name === "speech") return service.neural ? "Neural speech on" : "Device speech";
-  if (name === "persistence") return "Local disk";
+  if (name === "persistence") return service.mode === "redis" ? "Redis" : "Local disk";
   if (service.configured === true || service.localCommit === true) return "Configured";
   return "Not configured";
 }
