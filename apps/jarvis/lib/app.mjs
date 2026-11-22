@@ -582,10 +582,7 @@ async function serveStatic(path) {
   if (file !== publicDir && !file.startsWith(`${publicDir}/`)) return json({ error: "Not found." }, 404);
   try {
     const body = await readFile(file);
-    const type = file.endsWith(".css") ? "text/css; charset=utf-8"
-      : file.endsWith(".js") ? "text/javascript; charset=utf-8"
-        : file.endsWith(".webmanifest") ? "application/manifest+json"
-          : "text/html; charset=utf-8";
+    const type = file.endsWith(".css") ? "text/css; charset=utf-8" : file.endsWith(".js") ? "text/javascript; charset=utf-8" : file.endsWith(".webmanifest") ? "application/manifest+json" : file.endsWith(".wav") ? "audio/wav" : file.endsWith(".ico") ? "image/x-icon" : "text/html; charset=utf-8";
     return new Response(body, {
       headers: {
         "Content-Type": type,

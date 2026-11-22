@@ -19,6 +19,7 @@ const state = {
 let recognition = null;
 let audio = null;
 let speakSeq = 0;
+const base = new URL(".", import.meta.url).pathname.replace(/\/$/, "");
 const root = document.querySelector("#root");
 
 function el(tag, attrs = {}, children = []) {
@@ -40,7 +41,7 @@ function formatTime(iso) {
   return `${new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(iso))} ET`;
 }
 async function api(path, { method = "GET", body } = {}) {
-  const response = await fetch(path, {
+  const response = await fetch(`${base}${path}`, {
     method,
     headers: { "Content-Type": "application/json", "x-jarvis-client": "dashboard" },
     body: body ? JSON.stringify(body) : undefined,
@@ -53,7 +54,7 @@ async function api(path, { method = "GET", body } = {}) {
 function setOrb(next) { state.orb = next; const orb = document.querySelector(".orb"); if (orb) orb.dataset.state = next; const label = document.querySelector("#orb-label"); if (label) label.textContent = next; }
 function unlockAudio() {
   try {
-    const silent = new Audio("/silence.wav");
+    const silent = new Audio(`${base}/silence.wav`);
     silent.play().catch(() => undefined);
   } catch { /* playback can still use speech synthesis */ }
   if (window.speechSynthesis) {
@@ -76,7 +77,7 @@ async function speak(text) {
   setOrb("speaking");
   if (state.services?.speech?.neural) {
     try {
-      const response = await fetch("/api/speech", {
+      const response = await fetch(`${base}/api/speech`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-jarvis-client": "dashboard" },
         body: JSON.stringify({ text }),
