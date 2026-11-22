@@ -1,9 +1,14 @@
 ﻿import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
+const workflow = readFileSync(new URL("../.github/workflows/jarvis-change-guard.yml", import.meta.url), "utf8");
+assert.match(workflow, /startsWith\(github\.head_ref, 'jarvis\/'\)/);
+assert.match(workflow, /startsWith\(github\.head_ref, 'cursor\/jarvis-'\)/);
+assert.doesNotMatch(workflow, /continue-on-error:\s*true/);
 const root = await mkdtemp(join(tmpdir(), "jarvis-guard-test-"));
 const guard = join(process.cwd(), "scripts/jarvis-guard-diff.mjs");
 function git(...args) {

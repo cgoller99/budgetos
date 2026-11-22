@@ -1,0 +1,13 @@
+{
+  "name": "jarvis",
+  "private": true,
+  "type": "module",
+  "description": "Standalone Jarvis assistant. This is not the Buxme application.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test test/mvp.test.mjs"
+  }
+}

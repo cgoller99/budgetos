@@ -1,0 +1,8 @@
+{
+  "name": "Jarvis",
+  "short_name": "Jarvis",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#061018",
+  "theme_color": "#061018"
+}
