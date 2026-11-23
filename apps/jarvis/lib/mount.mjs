@@ -22,7 +22,14 @@ export function clientAddress(headers) {
   return (parts.at(-1) || "local").slice(0, 80);
 }
 
-export async function mountJarvis(request, app, prefix = PREFIX) {
+/**
+ * @param {Request} request
+ * @param {{ handle: (request: Request, access?: { buxme?: string, userId?: string } | null) => Promise<Response> }} app
+ * @param {string} [prefix]
+ * @param {{ buxme?: string, userId?: string } | null} [access]
+ * @returns {Promise<Response>}
+ */
+export async function mountJarvis(request, app, prefix = PREFIX, access = null) {
   if (prefix !== PREFIX) return text("Not found.", 404);
   const incoming = new URL(request.url);
   const path = incoming.pathname;
@@ -42,12 +49,13 @@ export async function mountJarvis(request, app, prefix = PREFIX) {
   const headers = new Headers(request.headers);
   headers.delete("x-jarvis-ip");
   headers.set("x-jarvis-ip", clientAddress(headers));
+  headers.delete("x-jarvis-user");
   const forwarded = new Request(url, {
     method,
     headers,
     body: method === "GET" || method === "HEAD" ? undefined : await request.arrayBuffer(),
   });
-  return adaptResponse(await app.handle(forwarded), prefix, stripped);
+  return adaptResponse(await app.handle(forwarded, access), prefix, stripped);
 }
 
 function pageShell() {
