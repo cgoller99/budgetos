@@ -162,7 +162,14 @@ export function createApp(options = {}) {
     return readSession(request.headers.get("cookie"), secret, nowFn());
   }
 
-  async function guard(request, { auth = true, mutate = false, bucket = "api", limit = 60, windowMs = 60_000 } = {}) {
+  function actorFor(request, access) {
+    if (access?.buxme === "required") {
+      return typeof access.userId === "string" && access.userId ? { role: "owner", userId: access.userId, source: "buxme" } : null;
+    }
+    return session(request);
+  }
+
+  async function guard(request, { auth = true, mutate = false, bucket = "api", limit = 60, windowMs = 60_000, access = null } = {}) {
     if (mutate && (!originAllowed(request) || !clientHeaderOk(request))) {
       return json({ error: "This action must come from the Jarvis dashboard." }, 403);
     }
@@ -173,7 +180,7 @@ export function createApp(options = {}) {
       env,
     });
     if (!decision.allowed) return json({ error: "Too many requests. Wait and try again." }, 429);
-    if (auth && !session(request)) return json({ error: "Sign in to Jarvis first." }, 401);
+    if (auth && !actorFor(request, access)) return json({ error: "Sign in to Jarvis first." }, 401);
     return null;
   }
 
@@ -274,9 +281,19 @@ export function createApp(options = {}) {
     };
   }
 
-  async function handle(request) {
+  /**
+   * @param {Request} request
+   * @param {{ buxme?: string, userId?: string } | null} [access]
+   */
+  async function handle(request, access = null) {
     const url = new URL(request.url);
     const path = url.pathname.replace(/\/+$/, "") || "/";
+    const buxme = access?.buxme === "required";
+    function visibleServices() {
+      const body = services(env);
+      if (buxme && access.userId) body.auth = { configured: true, source: "buxme", requiredEnv: [] };
+      return body;
+    }
     try {
       if (path === "/api/health" && request.method === "GET") {
         return json({
@@ -289,11 +306,12 @@ export function createApp(options = {}) {
         });
       }
       if (path === "/api/session" && request.method === "GET") {
-        return json({ authenticated: Boolean(session(request)), product: "jarvis" });
+        return json({ authenticated: Boolean(actorFor(request, access)), product: "jarvis", buxme });
       }
       if (path === "/api/session" && request.method === "POST") {
-        const blocked = await guard(request, { auth: false, mutate: true, bucket: "login", limit: 8, windowMs: 15 * 60_000 });
+        const blocked = await guard(request, { auth: false, mutate: true, bucket: "login", limit: 8, windowMs: 15 * 60_000, access });
         if (blocked) return blocked;
+        if (buxme) return json({ error: "Jarvis uses your Buxme admin session." }, 403);
         if (!authConfigured(env)) {
           return json({ error: "Set JARVIS_OWNER_PASSWORD to at least 10 characters, and JARVIS_SESSION_SECRET to at least 16 characters in production." }, 503);
         }
@@ -305,20 +323,21 @@ export function createApp(options = {}) {
         return json({ authenticated: true }, 200, { "Set-Cookie": sessionCookie(issueSession(secret, nowFn()), secure(request)) });
       }
       if (path === "/api/session" && request.method === "DELETE") {
-        const blocked = await guard(request, { auth: false, mutate: true, bucket: "login", limit: 20, windowMs: 60_000 });
+        const blocked = await guard(request, { auth: false, mutate: true, bucket: "login", limit: 20, windowMs: 60_000, access });
         if (blocked) return blocked;
+        if (buxme) return json({ authenticated: Boolean(actorFor(request, access)), buxme: true });
         return json({ authenticated: false }, 200, { "Set-Cookie": clearCookie(secure(request)) });
       }
       if (!path.startsWith("/api/")) return serveStatic(path);
 
       const read = request.method === "GET" || request.method === "HEAD";
-      const blocked = await guard(request, { mutate: !read, bucket: read ? "read" : "write", limit: read ? 300 : 60 });
+      const blocked = await guard(request, { mutate: !read, bucket: read ? "read" : "write", limit: read ? 300 : 60, access });
       if (blocked) return blocked;
-      if (request.method === "GET" && path === "/api/services") return json({ services: services(env) });
+      if (request.method === "GET" && path === "/api/services") return json({ services: visibleServices() });
       if (request.method === "GET" && path === "/api/status") {
         const state = await store.read(dayKey(new Date(nowFn())));
         return json({
-          services: services(env),
+          services: visibleServices(),
           counts: {
             tasks: state.tasks.length,
             proposed: state.tasks.filter(task => task.status === "proposed").length,

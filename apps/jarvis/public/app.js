@@ -1,6 +1,7 @@
 const sections = ["Overview", "Chat", "Voice", "Tasks", "Agents", "Business", "Services", "History", "Settings", "Health"];
 const state = {
   authenticated: false,
+  buxme: false,
   section: "Overview",
   messages: [],
   tasks: [],
@@ -232,6 +233,16 @@ function field(label, control) { return el("label", {}, [label, control]); }
 function button(label, onClick, className) { return el("button", { type: "button", class: className, onclick: onClick }, [label]); }
 
 function renderLogin() {
+  if (state.buxme) {
+    root.replaceChildren(el("main", { class: "login" }, [el("section", { class: "card" }, [
+      el("p", { class: "kicker" }, ["Jarvis"]),
+      el("h1", {}, ["Command"]),
+      el("p", { class: "muted" }, ["Sign in to Buxme with the admin account. Jarvis opens from that session."]),
+      state.error ? el("p", { class: "error", role: "alert" }, [state.error]) : null,
+      el("a", { href: "/login?redirect=/jarvis" }, ["Sign in to Buxme"]),
+    ])]));
+    return;
+  }
   const password = el("input", { type: "password", autocomplete: "current-password", "aria-label": "Password" });
   const form = el("form", { class: "card", onsubmit: async event => {
     event.preventDefault();
@@ -517,7 +528,7 @@ function render() {
           el("h1", {}, [state.section]),
           el("p", { class: state.status?.connection?.connected ? "ok" : "meta" }, [connectionText()]),
         ]),
-        button("Sign out", async () => { await api("/api/session", { method: "DELETE" }); state.authenticated = false; render(); }),
+        state.buxme ? el("a", { href: "/settings" }, ["Buxme account"]) : button("Sign out", async () => { await api("/api/session", { method: "DELETE" }); state.authenticated = false; render(); }),
       ]),
       state.error ? el("p", { class: "error", role: "alert" }, [state.error]) : null,
       state.notice ? el("p", { class: "muted" }, [state.notice]) : null,
@@ -557,6 +568,7 @@ setInterval(async () => {
 }, 3000);
 api("/api/session").then(async data => {
   state.authenticated = data.authenticated;
+  state.buxme = data.buxme === true;
   if (state.authenticated) await refresh();
   render();
 }).catch(error => { state.error = error.message; renderLogin(); });

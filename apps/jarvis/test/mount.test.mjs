@@ -48,5 +48,29 @@ test("the mount keeps Jarvis under /jarvis and leaves the Buxme root alone", asy
   assert.match(login.headers.get("set-cookie"), /Path=\/jarvis/);
   assert.equal(clientAddress(new Headers({ "x-forwarded-for": "203.0.113.4, 198.51.100.8" })), "198.51.100.8");
   const proxy = await readFile(new URL("../../../proxy.ts", import.meta.url), "utf8");
-  assert.match(proxy, /jarvis\(\?:\/\|\$\)/);
+  assert.doesNotMatch(proxy, /jarvis\(\?:\/\|\$\)/);
+  const route = await readFile(new URL("../../../app/jarvis/[[...path]]/route.ts", import.meta.url), "utf8");
+  assert.match(route, /verifyJarvisAdmin/);
+  const gate = await readFile(new URL("../../../lib/jarvis/buxmeAdmin.ts", import.meta.url), "utf8");
+  assert.match(gate, /getUserById/);
+  assert.match(gate, /canAccessAdminDashboard\(record\?\.email\)/);
+});
+
+test("the Buxme mount admits only the server-confirmed admin and ignores a password", async () => {
+  const dataDir = await mkdtemp(join(tmpdir(), "jarvis-buxme-"));
+  const app = createApp({ dataDir, env: env() });
+  const open = await mountJarvis(new Request("https://buxme.co/jarvis/api/session", { headers: { host: "buxme.co" } }), app, "/jarvis", { buxme: "required", userId: "user-1" });
+  assert.equal((await open.json()).authenticated, true);
+  const tasks = await mountJarvis(new Request("https://buxme.co/jarvis/api/tasks", { headers: { host: "buxme.co" } }), app, "/jarvis", { buxme: "required", userId: "user-1" });
+  assert.equal(tasks.status, 200);
+  const password = await mountJarvis(new Request("https://buxme.co/jarvis/api/session", {
+    method: "POST",
+    headers: { host: "buxme.co", origin: "https://buxme.co", "content-type": "application/json", "x-jarvis-client": "dashboard", "x-jarvis-user": "user-1" },
+    body: JSON.stringify({ password: "correct-horse" }),
+  }), app, "/jarvis", { buxme: "required", userId: "user-1" });
+  assert.equal(password.status, 403);
+  const anonymous = await mountJarvis(new Request("https://buxme.co/jarvis/api/tasks", {
+    headers: { host: "buxme.co", "x-jarvis-user": "user-1" },
+  }), app);
+  assert.equal(anonymous.status, 401);
 });
