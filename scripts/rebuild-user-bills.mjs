@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Admin rebuild: sync Plaid, reconcile bill payments, and print diagnostics.
+ * Admin rebuild: reconcile bill payments, and print diagnostics.
  *
  * Usage:
  *   node --env-file=.env.local scripts/rebuild-user-bills.mjs --email user@example.com
@@ -9,9 +9,6 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
-import { Configuration, PlaidApi, PlaidEnvironments } from "plaid";
-import crypto from "node:crypto";
-
 const ROOT = path.resolve(import.meta.dirname, "..");
 const ENV_PATH = path.join(ROOT, ".env.local");
 
@@ -41,31 +38,12 @@ function getArg(name) {
   return index === -1 ? null : process.argv[index + 1] ?? null;
 }
 
-function decryptToken(connection, encryptionKey) {
-  const iv = Buffer.from(connection.access_token_iv, "base64");
-  const tag = Buffer.from(connection.access_token_tag, "base64");
-  const ciphertext = Buffer.from(connection.access_token_encrypted, "base64");
-  const decipher = crypto.createDecipheriv(
-    "aes-256-gcm",
-    Buffer.from(encryptionKey, "base64"),
-    iv,
-  );
-  decipher.setAuthTag(tag);
-  return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString("utf8");
-}
-
 async function main() {
   const fileEnv = loadEnvFile(ENV_PATH);
   const url = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? fileEnv.NEXT_PUBLIC_SUPABASE_URL ?? "").replace(/\/$/, "");
   const serviceRoleKey =
     process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
     fileEnv.SUPABASE_SERVICE_ROLE_KEY?.trim();
-  const plaidClientId = process.env.PLAID_CLIENT_ID ?? fileEnv.PLAID_CLIENT_ID;
-  const plaidSecret = process.env.PLAID_SECRET ?? fileEnv.PLAID_SECRET;
-  const plaidEnv = process.env.PLAID_ENV ?? fileEnv.PLAID_ENV ?? "production";
-  const encryptionKey =
-    process.env.PLAID_TOKEN_ENCRYPTION_KEY ?? fileEnv.PLAID_TOKEN_ENCRYPTION_KEY;
-
   if (!url || !serviceRoleKey) {
     console.error("Missing Supabase service role credentials.");
     process.exit(1);
@@ -97,37 +75,6 @@ async function main() {
 
   const userId = user.id;
   console.log(`Rebuilding bills for user ${userId}`);
-
-  const { data: connections } = await supabase
-    .from("bank_connections")
-    .select("*")
-    .eq("user_id", userId)
-    .neq("status", "disconnected");
-
-  if (plaidClientId && plaidSecret && encryptionKey && connections?.length) {
-    const plaid = new PlaidApi(
-      new Configuration({
-        basePath: PlaidEnvironments[plaidEnv] ?? PlaidEnvironments.production,
-        baseOptions: {
-          headers: {
-            "PLAID-CLIENT-ID": plaidClientId,
-            "PLAID-SECRET": plaidSecret,
-          },
-        },
-      }),
-    );
-
-    for (const connection of connections) {
-      if (!connection.access_token_encrypted) continue;
-      try {
-        const accessToken = decryptToken(connection, encryptionKey);
-        await plaid.transactionsRefresh({ access_token: accessToken });
-        console.log(`Requested Plaid refresh for connection ${connection.id}`);
-      } catch (error) {
-        console.warn(`Plaid refresh skipped for ${connection.id}: ${error.message}`);
-      }
-    }
-  }
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? fileEnv.NEXT_PUBLIC_SITE_URL ?? "https://buxme.co";
   const rebuildResponse = await fetch(`${siteUrl}/api/admin/users/${userId}/finance-audit`, {

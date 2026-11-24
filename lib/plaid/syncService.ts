@@ -100,19 +100,6 @@ async function ensureInitialSyncWindow(accessToken: string): Promise<void> {
   });
 }
 
-async function requestTransactionsRefresh(accessToken: string): Promise<boolean> {
-  try {
-    const client = getPlaidClient();
-    await client.transactionsRefresh({ access_token: accessToken });
-    return true;
-  } catch (error) {
-    console.warn("[plaid/sync] transactionsRefresh failed", {
-      message: getPlaidErrorMessage(error),
-    });
-    return false;
-  }
-}
-
 async function resolveInstitutionName(params: {
   connection: BankConnectionRow;
   itemInstitutionId: string | null;
@@ -290,17 +277,8 @@ async function syncPlaidTransactions(params: {
   removedFromPlaid: number;
 }> {
   const shouldPrimeInitialWindow = !params.connection.transactions_cursor;
-  const shouldForceRefresh =
+  const shouldRetryEmptySync =
     params.newAccountExternalIds.length > 0 || shouldPrimeInitialWindow;
-
-  let refreshRequested = false;
-
-  if (shouldForceRefresh) {
-    refreshRequested = await requestTransactionsRefresh(params.accessToken);
-    if (refreshRequested) {
-      await sleep(SYNC_RETRY_DELAY_MS);
-    }
-  }
 
   let latest = await syncPlaidTransactionsOnce({
     ...params,
@@ -311,15 +289,13 @@ async function syncPlaidTransactions(params: {
 
   const needsRetry = () =>
     Boolean(latest.pendingError) ||
-    (shouldForceRefresh &&
+    (shouldRetryEmptySync &&
       latest.fetchedFromPlaid === 0 &&
       latest.added === 0 &&
       latest.modified === 0);
 
   while (needsRetry() && syncAttempts < MAX_SYNC_ATTEMPTS) {
     syncAttempts += 1;
-    refreshRequested =
-      (await requestTransactionsRefresh(params.accessToken)) || refreshRequested;
     await sleep(SYNC_RETRY_DELAY_MS * syncAttempts);
     latest = await syncPlaidTransactionsOnce({
       ...params,
@@ -334,7 +310,7 @@ async function syncPlaidTransactions(params: {
     skipped: latest.skipped,
     nextCursor: latest.nextCursor,
     pendingError: latest.pendingError,
-    refreshRequested,
+    refreshRequested: false,
     syncAttempts,
     fetchedFromPlaid: latest.fetchedFromPlaid,
     addedFromPlaid: latest.addedFromPlaid,
@@ -522,9 +498,6 @@ export async function syncPlaidConnection(params: {
           lastFour: account.lastFour ? `****${account.lastFour}` : null,
         })),
       });
-
-      await requestTransactionsRefresh(accessToken);
-      await sleep(SYNC_RETRY_DELAY_MS);
 
       backfillResult = await backfillHistoricalTransactions({
         accessToken,
