@@ -27,6 +27,7 @@ export function normalizeState(parsed, day) {
   parsed.logs ??= [];
   parsed.leads ??= [];
   parsed.drafts ??= [];
+  parsed.inbox ??= [];
   parsed.usage ??= emptyState(day).usage;
   return parsed;
 }
@@ -39,6 +40,7 @@ export function emptyState(day) {
     logs: [],
     leads: [],
     drafts: [],
+    inbox: [],
     settings: { gates: defaultGates() },
     usage: { day, requests: 0, promptTokens: 0, completionTokens: 0, errors: [], byModel: {} },
   };
