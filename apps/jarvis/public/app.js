@@ -2,7 +2,10 @@ const sections = ["Overview", "Chat", "Voice", "Tasks", "Agents", "Business", "S
 const state = {
   authenticated: false,
   buxme: false,
-  section: "Overview",
+  section: "Home",
+  desk: null,
+  chatOpen: false,
+  muted: false,
   messages: [],
   tasks: [],
   logs: [],
@@ -149,6 +152,7 @@ async function handleTranscript(text) {
   }
 }
 async function startListening() {
+  if (state.muted) { setOrb("muted"); return; }
   if (navigator.mediaDevices?.getUserMedia) {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -196,9 +200,10 @@ async function startListening() {
   }
 }
 async function refresh() {
-  const [chat, tasks, logs, businesses, services, status, settings] = await Promise.all([
-    api("/api/chat"), api("/api/tasks"), api("/api/logs"), api("/api/businesses"), api("/api/services"), api("/api/status"), api("/api/settings"),
+  const [chat, tasks, logs, businesses, services, status, settings, desk] = await Promise.all([
+    api("/api/chat"), api("/api/tasks"), api("/api/logs"), api("/api/businesses"), api("/api/services"), api("/api/status"), api("/api/settings"), api("/api/desk"),
   ]);
+  state.desk = desk;
   state.messages = chat.messages;
   state.tasks = tasks.tasks;
   state.logs = logs.logs;
@@ -312,7 +317,65 @@ async function act(path, body) {
   catch (error) { state.error = error.message; }
   render();
 }
+function renderHome() {
+  const desk = state.desk;
+  const waiting = desk?.waiting || [];
+  return el("section", { class: "home" }, [
+    el("p", { class: "greeting" }, [desk?.greeting || "Good evening, Christian"]),
+    el("p", { class: "headline" }, [desk?.headline || "Nothing new has been recorded."]),
+    desk?.headlineAt ? el("p", { class: "muted" }, [formatTime(desk.headlineAt)]) : null,
+    el("p", { class: state.status?.connection?.connected ? "ok" : "meta" }, [connectionText()]),
+    state.services?.persistence?.configured ? null : el("p", { class: "muted" }, ["Work saved here can disappear on restart. Add UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN on the budgetos project."]),
+    waiting.length ? el("div", { class: "list" }, waiting.map(item => el("article", { class: "item" }, [
+      el("h2", {}, [item.title]),
+      el("p", { class: "muted" }, [`Needs you · ${formatTime(item.at)} · not sent`]),
+      button("Open", () => { state.section = item.business === "website-agency" ? "Agency" : "Home"; render(); }),
+    ]))) : el("p", { class: "muted" }, ["Nothing is waiting on you."]),
+    button(state.chatOpen ? "Hide chat" : "Chat", () => { state.chatOpen = !state.chatOpen; render(); }),
+    state.chatOpen ? renderChat() : null,
+  ]);
+}
+function renderDesk(id) {
+  const names = { buxme: "buxme", "website-agency": "agency", drivenest: "drivenest" };
+  const key = names[id] || id;
+  const card = state.desk?.businesses?.[key];
+  const saved = (state.businesses || []).find(item => item.id === id);
+  const drafts = (saved?.drafts || []).filter(draft => draft.status === "needs-christian" || draft.status === "draft");
+  return el("section", { class: "panel" }, [
+    el("h2", {}, [card?.question || "This workspace"]),
+    el("p", {}, [card?.answer || "This source has not reported yet."]),
+    card?.blocker ? el("p", { class: "error" }, [card.blocker]) : null,
+    el("p", { class: "muted" }, [card?.recovery || ""]),
+    ...drafts.map(draft => el("article", { class: "item" }, [
+      el("h3", {}, [draft.title]),
+      el("p", { class: "muted" }, [formatTime(draft.createdAt)]),
+      el("p", {}, [draft.body]),
+      button("Approve response", () => act(`/api/drafts/${draft.id}/approval`, { action: "outreach" }), "primary"),
+    ])),
+  ]);
+}
+function renderChat() {
+  const box = el("textarea", { "aria-label": "Message Jarvis", maxlength: "2000" });
+  return el("div", { class: "panel" }, [
+    el("div", { class: "thread", "aria-live": "polite" }, state.messages.map(bubble)),
+    box,
+    button("Send", async () => {
+      const text = box.value.trim();
+      if (!text) return;
+      try {
+        const data = await api("/api/chat", { method: "POST", body: { text } });
+        state.messages = data.messages;
+        render();
+        if (state.voiceOn) await speak(data.reply);
+      } catch (error) { state.error = error.message; render(); }
+    }, "primary"),
+  ]);
+}
 function renderPanel() {
+  if (state.section === "Home" || state.section === "Overview") return renderHome();
+  if (state.section === "Buxme") return renderDesk("buxme");
+  if (state.section === "Agency") return renderDesk("website-agency");
+  if (state.section === "DriveNest") return renderDesk("drivenest");
   if (state.section === "Overview") {
     const counts = state.status?.counts || {};
     return el("section", { class: "grid" }, [
@@ -509,32 +572,28 @@ function stat(label, value, detail) {
 }
 function render() {
   if (!state.authenticated) { renderLogin(); return; }
-  const nav = buttons => buttons.map(section => el("button", {
+  const tabs = ["Buxme", "Agency", "DriveNest"].map(section => el("button", {
     type: "button",
+    class: `tab tab-${section.toLowerCase()}`,
     "aria-current": state.section === section ? "page" : null,
-    onclick: async () => { state.section = section; state.error = ""; await refresh().catch(error => { state.error = error.message; }); render(); },
+    onclick: async () => { state.section = state.section === section ? "Home" : section; state.error = ""; await refresh().catch(error => { state.error = error.message; }); render(); },
   }, [section]));
-  root.replaceChildren(el("div", { class: "shell" }, [
-    el("nav", { class: "nav", "aria-label": "Jarvis sections" }, nav(sections)),
+  const voiceState = state.muted ? "muted" : state.orb;
+  root.replaceChildren(el("div", { class: "shell phone" }, [
+    el("header", { class: "top" }, [
+      el("p", { class: "kicker" }, ["Jarvis"]),
+      button(state.muted ? "Unmute" : "Mute", () => { state.muted = !state.muted; if (state.muted) interruptSpeech(); setOrb(state.muted ? "muted" : "idle"); render(); }),
+    ]),
     el("aside", { class: "orb-wrap" }, [
-      el("div", { class: "orb", "data-state": state.orb, role: "img", "aria-label": `Jarvis is ${state.orb}` }),
-      el("p", { id: "orb-label" }, [state.orb]),
-      el("p", { class: "muted" }, [formatTime(new Date().toISOString())]),
+      el("button", { class: "orb", type: "button", "data-state": voiceState, "aria-label": state.muted ? "Jarvis is muted" : `Jarvis is ${voiceState}. Talk.`, onclick: () => { if (state.muted) return; unlockAudio(); state.error = ""; startListening(); } }),
+      el("p", { id: "orb-label" }, [voiceState]),
     ]),
     el("main", { class: "content" }, [
-      el("header", { class: "top" }, [
-        el("div", {}, [
-          el("p", { class: "kicker" }, ["Jarvis"]),
-          el("h1", {}, [state.section]),
-          el("p", { class: state.status?.connection?.connected ? "ok" : "meta" }, [connectionText()]),
-        ]),
-        state.buxme ? el("a", { href: "/settings" }, ["Buxme account"]) : button("Sign out", async () => { await api("/api/session", { method: "DELETE" }); state.authenticated = false; render(); }),
-      ]),
       state.error ? el("p", { class: "error", role: "alert" }, [state.error]) : null,
       state.notice ? el("p", { class: "muted" }, [state.notice]) : null,
       renderPanel(),
     ]),
-    el("nav", { class: "tabbar", "aria-label": "Jarvis sections" }, nav(sections)),
+    el("nav", { class: "tabbar", "aria-label": "Businesses" }, tabs),
   ]));
   const thread = document.querySelector(".thread");
   if (thread) thread.scrollTop = thread.scrollHeight;
@@ -545,18 +604,20 @@ setInterval(async () => {
   const active = document.activeElement;
   const typing = active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA");
   try {
-    const [tasks, logs, status, services] = await Promise.all([
-      api("/api/tasks"), api("/api/logs"), api("/api/status"), api("/api/services"),
+    const [tasks, logs, status, services, desk] = await Promise.all([
+      api("/api/tasks"), api("/api/logs"), api("/api/status"), api("/api/services"), api("/api/desk"),
     ]);
     let changed = JSON.stringify(tasks.tasks) !== JSON.stringify(state.tasks)
       || JSON.stringify(logs.logs) !== JSON.stringify(state.logs)
       || JSON.stringify(status.counts) !== JSON.stringify(state.status?.counts)
-      || JSON.stringify(status.connection) !== JSON.stringify(state.status?.connection);
+      || JSON.stringify(status.connection) !== JSON.stringify(state.status?.connection)
+      || JSON.stringify(desk.waiting) !== JSON.stringify(state.desk?.waiting);
+    state.desk = desk;
     state.tasks = tasks.tasks;
     state.logs = logs.logs;
     state.status = status;
     state.services = services.services;
-    if (state.section === "Chat" || state.section === "Voice") {
+    if (state.chatOpen || state.section === "Chat" || state.section === "Voice") {
       const chat = await api("/api/chat");
       if (JSON.stringify(chat.messages) !== JSON.stringify(state.messages)) {
         state.messages = chat.messages;

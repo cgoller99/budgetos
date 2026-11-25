@@ -14,6 +14,7 @@ import {
   sessionSecret,
 } from "./auth.mjs";
 import { commandFrom, connectionFor, think } from "./brain.mjs";
+import { answerFromRecords, businessDesk, briefing, ingestAgencyReply } from "./operator.mjs";
 import { modelChain, spendCap } from "./routing.mjs";
 import { createRedisStore } from "./redisStore.mjs";
 import { BUSINESSES, createStore, defaultGates } from "./store.mjs";
@@ -251,6 +252,11 @@ export function createApp(options = {}) {
         : `Rejected ${task.id}. Nothing was executed.`;
       remember(state, reply, { source: "queue" });
     } else {
+      const recorded = answerFromRecords(clean, state);
+      if (recorded) {
+        remember(state, recorded, { source: "records" });
+        return state.messages.at(-1);
+      }
       const thought = await think({ text: clean, state, env, fetchImpl, now: new Date(nowFn()) });
       state.usage = thought.usage;
       remember(state, thought.reply, {
@@ -457,6 +463,10 @@ export function createApp(options = {}) {
         const state = await store.read(dayKey(new Date(nowFn())));
         return json({ logs: state.logs.slice(-100) });
       }
+      if (request.method === "GET" && path === "/api/desk") {
+        const current = await store.read(dayKey(new Date(nowFn())));
+        return json({ ...briefing(current, new Date(nowFn())), businesses: businessDesk(current), connection: connectionFor(env, current.usage, new Date(nowFn())) });
+      }
       if (request.method === "GET" && path === "/api/businesses") {
         const state = await store.read(dayKey(new Date(nowFn())));
         return json({
@@ -592,7 +602,15 @@ export function createApp(options = {}) {
     }
   }
 
-  return { handle, store, env, setFailOnce(value) { failOnce = value; } };
+  async function ingest(event) {
+    let result = null;
+    await store.update(dayKey(new Date(nowFn())), current => {
+      result = ingestAgencyReply(current, event, new Date(nowFn()));
+    });
+    return result;
+  }
+
+  return { handle, ingest, store, env, setFailOnce(value) { failOnce = value; } };
 }
 
 async function serveStatic(path) {

@@ -55,6 +55,15 @@ export function spendCap(env = process.env) {
   return { authorized: true, cap, reason: "" };
 }
 
+export function spendCeiling(env = process.env) {
+  const raw = env.JARVIS_DAILY_SPEND_CENTS;
+  const cents = raw == null || String(raw).trim() === "" ? 500 : Number(raw);
+  if (!Number.isInteger(cents) || cents < 1 || cents > 500) {
+    return { ok: false, cents: 0, reason: "The spending ceiling is $5. JARVIS_DAILY_SPEND_CENTS must be an integer from 1 to 500." };
+  }
+  return { ok: true, cents, reason: "" };
+}
+
 export function riskFor(text) {
   const value = String(text ?? "");
   if (/\b(payment|bank|banking|charge|purchase|buy|ads|advertising|ad spend|spend|deploy|production|customer data|password|secret|bulk outreach|send email|send the email|text customer)\b/i.test(value)) return "high";
