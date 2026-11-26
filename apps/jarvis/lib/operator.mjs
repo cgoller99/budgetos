@@ -159,7 +159,7 @@ export function businessDesk(state) {
       question: "Did anybody reply, and who needs me?",
       connected: true,
       answer: waiting.length ? `${waiting.length} draft${waiting.length === 1 ? "" : "s"} waiting on you.` : "No reply is waiting.",
-      recovery: "The daily check handles 10 unread replies, then continues with the next 10. Sending still requires your approval.",
+      recovery: "The business check runs every hour at :15 UTC and handles 10 unread replies, then continues on the next hour. Sending still requires your approval.",
       records: waiting,
     },
     drivenest: {

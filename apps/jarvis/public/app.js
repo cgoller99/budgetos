@@ -463,7 +463,7 @@ function renderHome() {
         ]))) : el("p", { class: "muted" }, ["Nothing is waiting on you."]),
       ]),
     ]),
-    el("p", { class: "muted" }, [desk?.operator?.wait || "The hosted check runs once a day."]),
+    el("p", { class: "muted" }, [desk?.operator?.wait || "The business check runs every hour at :15 UTC."]),
     el("div", { class: "row" }, [
       button(state.chatOpen ? "Hide chat" : "Chat", () => { state.chatOpen = !state.chatOpen; render(); }),
       button("Settings", () => { state.section = "Settings"; render(); }),
@@ -699,7 +699,7 @@ function renderPanel() {
     return el("section", { class: "panel" }, [
       el("h2", {}, ["Connection"]),
       el("p", { class: state.status?.connection?.connected ? "ok" : "meta" }, [connectionText()]),
-      el("p", { class: "muted" }, [state.services?.inbox?.reason || state.services?.inbox?.replyRoute || "The inbox check runs once a day."]),
+      el("p", { class: "muted" }, [state.services?.inbox?.reason || state.services?.inbox?.replyRoute || "The business check runs every hour at :15 UTC."]),
       state.services?.persistence?.configured ? el("p", { class: "muted" }, ["Work is saved in Redis and survives a restart."]) : el("p", { class: "muted" }, ["Work saved here can disappear on restart. Add UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN on the budgetos project."]),
       el("p", { class: "muted" }, [deskWait()]),
       el("h2", {}, ["Approval gates"]),

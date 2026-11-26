@@ -17,7 +17,10 @@ async function agencyInbox() {
     return { connected: false, reason: "Inbox check failed.", created: 0, duplicates: 0, drafts: [], sent: false };
   }
 }
-/** Daily schedule. Priority notes stay read-only. The inbox check saves drafts and does not send. */
+/** Business execution runs every hour at minute 15 UTC (`15 * * * *`), including 7:15 UTC.
+ *  collectInbox is that worker. It does not send mail, dial outside 8:00 AM–9:00 PM ET, or repeat a finished hour.
+ *  The priority block below stays proposal-only. The GitHub workflow jarvis-proposals.yml is a separate reviewer and is not this worker.
+ */
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET?.trim();
   if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {

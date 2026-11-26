@@ -15,24 +15,67 @@ export function inboxConnection(env = process.env) {
   return { connected: true, address, replyRoute, reason: "" };
 }
 
+export const CHECK_SCHEDULE = "15 * * * *";
+const CHECK_LOCK_MS = 10 * 60 * 1000;
+
+export function checkSlot(now = new Date()) {
+  const date = new Date(now);
+  if (Number.isNaN(date.getTime())) return "";
+  if (date.getUTCMinutes() < 15) date.setUTCHours(date.getUTCHours() - 1);
+  return date.toISOString().slice(0, 13);
+}
+
+export function nextCheckAt(now = new Date(), ahead = 0) {
+  const date = new Date(now);
+  const extraHours = Math.ceil(Math.max(0, Number(ahead) || 0) / PER_RUN);
+  const next = new Date(date);
+  next.setUTCMinutes(15, 0, 0);
+  if (next.getTime() <= date.getTime()) next.setUTCHours(next.getUTCHours() + 1);
+  next.setUTCHours(next.getUTCHours() + extraHours);
+  return { next, extraHours };
+}
+
 export function pickupDelay(now = new Date(), ahead = 0) {
-  const day = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  const windowEnd = day + 8 * 60 * 60 * 1000 - 1000;
-  const latestToday = now.getTime() < day + 7 * 60 * 60 * 1000 ? windowEnd : windowEnd + 24 * 60 * 60 * 1000;
-  const extraDays = Math.floor(Math.max(0, Number(ahead) || 0) / PER_RUN);
-  const latest = new Date(latestToday + extraDays * 24 * 60 * 60 * 1000);
-  const maxWaitMinutes = Math.max(1, Math.ceil((latest.getTime() - now.getTime()) / 60000));
+  const { next, extraHours } = nextCheckAt(now, ahead);
+  const maxWaitMinutes = Math.max(1, Math.ceil((next.getTime() - new Date(now).getTime()) / 60000));
   const hours = Math.floor(maxWaitMinutes / 60);
   const minutes = maxWaitMinutes % 60;
   return {
-    schedule: "15 7 * * *",
+    schedule: CHECK_SCHEDULE,
     perRun: PER_RUN,
     ahead: Math.max(0, Number(ahead) || 0),
-    extraDays,
-    nextCheckBy: latest.toISOString(),
+    extraHours,
+    nextCheckBy: next.toISOString(),
     maxWaitMinutes,
-    summary: `A reply can wait up to ${hours}h ${minutes}m. The check runs once during the 7:00 UTC hour and handles ${PER_RUN} unread messages. Later unread mail waits for the following check.`,
+    summary: `A reply can wait up to ${hours}h ${minutes}m. The business check runs every hour at :15 UTC, including 7:15 UTC, and handles ${PER_RUN} unread messages. The GitHub proposal workflow is separate and does not send mail.`,
   };
+}
+
+export function beginCheck(state, now = new Date()) {
+  const slot = checkSlot(now);
+  const time = new Date(now).getTime();
+  if (state.checkLockUntil && Date.parse(state.checkLockUntil) > time) {
+    return { started: false, slot, reason: "A check is already running. This run did not overlap it." };
+  }
+  if (state.lastCheckSlot === slot) {
+    return { started: false, slot, reason: "This hour's check already finished. Completed actions were not repeated." };
+  }
+  state.checkLockUntil = new Date(time + CHECK_LOCK_MS).toISOString();
+  state.checkSlotClaim = slot;
+  return { started: true, slot, reason: "" };
+}
+
+export function finishCheck(state, slot) {
+  if (!slot || state.checkSlotClaim !== slot) return;
+  state.lastCheckSlot = slot;
+  state.checkLockUntil = null;
+  state.checkSlotClaim = null;
+}
+
+export function releaseCheck(state, slot) {
+  if (!slot || state.checkSlotClaim !== slot) return;
+  state.checkLockUntil = null;
+  state.checkSlotClaim = null;
 }
 
 function senderName(from) {

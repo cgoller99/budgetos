@@ -14,7 +14,7 @@ import {
   sessionSecret,
 } from "./auth.mjs";
 import { commandFrom, connectionFor, think } from "./brain.mjs";
-import { inboxConnection, pickupDelay, pullAgencyInbox } from "./inbox.mjs";
+import { beginCheck, finishCheck, inboxConnection, pickupDelay, pullAgencyInbox, releaseCheck } from "./inbox.mjs";
 import { answerFromRecords, businessDesk, briefing, ingestAgencyReply, recordOperatorRun, rememberSkip } from "./operator.mjs";
 import { previewDocument, previewForToken, sharePreview } from "./preview.mjs";
 import { modelChain, spendCap, spendCeiling } from "./routing.mjs";
@@ -97,12 +97,17 @@ function services(env) {
     buxmeMetrics: {
       configured: false,
       requiredEnv: [],
-      note: "No Buxme production metric connector is configured. Counts shown elsewhere are records in this Jarvis app.",
+      note: "Publishing, signups, subscriptions, and revenue are not connected. Jarvis will not invent a count or publish a post.",
     },
     drivenestStore: {
       configured: false,
       requiredEnv: [],
-      note: "DriveNest store performance is not connected. Jarvis will not invent sales.",
+      note: "No supplier, shipping, or inventory connector is configured. Delivered cost and margin stay unknown.",
+    },
+    phone: {
+      configured: [env.TWILIO_ACCOUNT_SID, env.TWILIO_AUTH_TOKEN, env.TWILIO_PHONE_NUMBER, env.JARVIS_VERIFIED_PHONE_NUMBER, env.JARVIS_PUBLIC_ORIGIN].every(value => String(value ?? "").trim()),
+      requiredEnv: ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_PHONE_NUMBER", "JARVIS_VERIFIED_PHONE_NUMBER", "JARVIS_PUBLIC_ORIGIN"],
+      note: "Calls can go only to JARVIS_VERIFIED_PHONE_NUMBER, and only from 8:00 AM to 9:00 PM ET. Nothing is dialed while any of these values is missing.",
     },
     git: {
       localCommit: env.JARVIS_ALLOW_GIT === "1",
@@ -677,36 +682,67 @@ export function createApp(options = {}) {
   }
 
   async function collectInbox(trigger = "schedule") {
-    const current = await store.read(dayKey(new Date(nowFn())));
-    const seen = new Set((current.inbox ?? []).map(item => item.messageId));
-    const pulled = await pullAgencyInbox({ env, fetchImpl, seen });
-    const durable = redisConfigured(env);
-    const once = pulled.connected ? await applyEvents(pulled.events) : { created: 0, duplicates: 0, drafts: [] };
-    const twice = pulled.connected ? await applyEvents(pulled.events) : { duplicates: 0 };
-    if (pulled.skipIds?.length) {
-      await store.update(dayKey(new Date(nowFn())), state => {
-        for (const id of pulled.skipIds) rememberSkip(state, id, new Date(nowFn()));
-      });
-    }
-    const saved = await store.update(dayKey(new Date(nowFn())), state => {
-      recordOperatorRun(state, { trigger, connected: pulled.connected, created: once.created, now: new Date(nowFn()) });
+    const now = new Date(nowFn());
+    const day = dayKey(now);
+    let gate = { started: false, slot: "", reason: "" };
+    await store.update(day, state => {
+      gate = beginCheck(state, now);
     });
-    const run = saved.runs.at(-1);
-    const approved = (saved.tasks ?? []).some(task => task.status === "approved");
-    const worker = run?.action === "reply" || !approved
-      ? { completed: [], blocked: [], failed: [], skipped: run?.action === "reply" ? ["reply-first"] : [] }
-      : await executeWorker();
-    const report = { sent: false, performedExternal: false, durable, delay: pulled.delay, run, worker };
-    if (!pulled.connected) return { connected: false, reason: pulled.reason, created: 0, duplicates: 0, drafts: [], remaining: 0, ...report };
-    return {
-      connected: true,
-      reason: durable ? "Saved. Sending still requires your approval." : "Saved on this server only. Add UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN or the phone will not see this draft.",
-      created: once.created,
-      duplicates: twice.duplicates,
-      drafts: once.drafts,
-      remaining: pulled.remaining ?? 0,
-      ...report,
-    };
+    if (!gate.started) {
+      return {
+        connected: false,
+        skipped: true,
+        reason: gate.reason,
+        created: 0,
+        duplicates: 0,
+        drafts: [],
+        sent: false,
+        performedExternal: false,
+        durable: redisConfigured(env),
+        remaining: 0,
+        delay: pickupDelay(now),
+        run: null,
+        worker: { completed: [], blocked: [], failed: [], skipped: ["hour-already-checked"] },
+      };
+    }
+    try {
+      const current = await store.read(day);
+      const seen = new Set((current.inbox ?? []).map(item => item.messageId));
+      const pulled = await pullAgencyInbox({ env, fetchImpl, seen });
+      const durable = redisConfigured(env);
+      const once = pulled.connected ? await applyEvents(pulled.events) : { created: 0, duplicates: 0, drafts: [] };
+      const twice = pulled.connected ? await applyEvents(pulled.events) : { duplicates: 0 };
+      if (pulled.skipIds?.length) {
+        await store.update(day, state => {
+          for (const id of pulled.skipIds) rememberSkip(state, id, new Date(nowFn()));
+        });
+      }
+      const saved = await store.update(day, state => {
+        recordOperatorRun(state, { trigger, connected: pulled.connected, created: once.created, now: new Date(nowFn()) });
+      });
+      const run = saved.runs.at(-1);
+      const approved = (saved.tasks ?? []).some(task => task.status === "approved");
+      const worker = run?.action === "reply" || !approved
+        ? { completed: [], blocked: [], failed: [], skipped: run?.action === "reply" ? ["reply-first"] : [] }
+        : await executeWorker();
+      const report = { skipped: false, sent: false, performedExternal: false, durable, delay: pulled.delay, run, worker };
+      const result = !pulled.connected
+        ? { connected: false, reason: pulled.reason, created: 0, duplicates: 0, drafts: [], remaining: 0, ...report }
+        : {
+          connected: true,
+          reason: durable ? "Saved. Sending still requires your approval." : "Saved on this server only. Add UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN or the phone will not see this draft.",
+          created: once.created,
+          duplicates: twice.duplicates,
+          drafts: once.drafts,
+          remaining: pulled.remaining ?? 0,
+          ...report,
+        };
+      await store.update(day, state => finishCheck(state, gate.slot));
+      return result;
+    } catch (error) {
+      await store.update(day, state => releaseCheck(state, gate.slot));
+      throw error;
+    }
   }
 
   return { handle, ingest, collectInbox, store, env, setFailOnce(value) { failOnce = value; } };
