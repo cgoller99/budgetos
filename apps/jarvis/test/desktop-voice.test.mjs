@@ -12,6 +12,7 @@ test("two spoken turns ask who replied and then open that draft", () => {
   assert.equal(isEcho("thanks", answer), false);
   const second = commandFromSpeech("Open that draft");
   assert.equal(second.type, "open-draft");
+  assert.equal(commandFromSpeech("Open the preview").type, "open-preview");
 });
 
 test("a won job queues one call and a missed call is not repeated", () => {

@@ -15,7 +15,8 @@ import {
 } from "./auth.mjs";
 import { commandFrom, connectionFor, think } from "./brain.mjs";
 import { inboxConnection, pickupDelay, pullAgencyInbox } from "./inbox.mjs";
-import { answerFromRecords, businessDesk, briefing, ingestAgencyReply, rememberSkip } from "./operator.mjs";
+import { answerFromRecords, businessDesk, briefing, ingestAgencyReply, recordOperatorRun, rememberSkip } from "./operator.mjs";
+import { previewDocument } from "./preview.mjs";
 import { modelChain, spendCap, spendCeiling } from "./routing.mjs";
 import { createRedisStore } from "./redisStore.mjs";
 import { BUSINESSES, createStore, defaultGates } from "./store.mjs";
@@ -258,7 +259,7 @@ export function createApp(options = {}) {
         : `Rejected ${task.id}. Nothing was executed.`;
       remember(state, reply, { source: "queue" });
     } else {
-      const recorded = answerFromRecords(clean, state);
+      const recorded = answerFromRecords(clean, state, new Date(nowFn()));
       if (recorded) {
         remember(state, recorded, { source: "records" });
         return state.messages.at(-1);
@@ -339,6 +340,21 @@ export function createApp(options = {}) {
         if (blocked) return blocked;
         if (buxme) return json({ authenticated: Boolean(actorFor(request, access)), buxme: true });
         return json({ authenticated: false }, 200, { "Set-Cookie": clearCookie(secure(request)) });
+      }
+      const previewPath = path.match(/^\/preview\/([0-9a-f-]{36})$/);
+      if (previewPath && (request.method === "GET" || request.method === "HEAD")) {
+        if (!actorFor(request, access)) return new Response("Sign in to Buxme first.", { status: 401, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });
+        const current = await store.read(dayKey(new Date(nowFn())));
+        const preview = (current.previews ?? []).find(item => item.id === previewPath[1]);
+        if (!preview) return new Response("That preview is not on this server.", { status: 404, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });
+        return new Response(request.method === "HEAD" ? null : previewDocument(preview), {
+          headers: {
+            "Content-Type": "text/html; charset=utf-8",
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+            "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'",
+          },
+        });
       }
       if (!path.startsWith("/api/")) return serveStatic(path);
 
@@ -635,19 +651,23 @@ export function createApp(options = {}) {
     return { created, duplicates, drafts };
   }
 
-  async function collectInbox() {
+  async function collectInbox(trigger = "schedule") {
     const current = await store.read(dayKey(new Date(nowFn())));
     const seen = new Set((current.inbox ?? []).map(item => item.messageId));
     const pulled = await pullAgencyInbox({ env, fetchImpl, seen });
     const durable = redisConfigured(env);
-    if (!pulled.connected) return { connected: false, reason: pulled.reason, created: 0, duplicates: 0, drafts: [], sent: false, durable, delay: pulled.delay, remaining: 0 };
-    const once = await applyEvents(pulled.events);
-    const twice = await applyEvents(pulled.events);
+    const once = pulled.connected ? await applyEvents(pulled.events) : { created: 0, duplicates: 0, drafts: [] };
+    const twice = pulled.connected ? await applyEvents(pulled.events) : { duplicates: 0 };
     if (pulled.skipIds?.length) {
       await store.update(dayKey(new Date(nowFn())), state => {
         for (const id of pulled.skipIds) rememberSkip(state, id, new Date(nowFn()));
       });
     }
+    const saved = await store.update(dayKey(new Date(nowFn())), state => {
+      recordOperatorRun(state, { trigger, connected: pulled.connected, created: once.created, now: new Date(nowFn()) });
+    });
+    const run = saved.runs.at(-1);
+    if (!pulled.connected) return { connected: false, reason: pulled.reason, created: 0, duplicates: 0, drafts: [], sent: false, durable, delay: pulled.delay, remaining: 0, run };
     return {
       connected: true,
       reason: durable ? "Saved. Sending still requires your approval." : "Saved on this server only. Add UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN or the phone will not see this draft.",
@@ -658,6 +678,7 @@ export function createApp(options = {}) {
       durable,
       remaining: pulled.remaining ?? 0,
       delay: pulled.delay,
+      run,
     };
   }
 
