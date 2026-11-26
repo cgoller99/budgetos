@@ -425,6 +425,12 @@ function renderHome() {
         ]))) : el("p", { class: "muted" }, ["Nothing is waiting on you."]),
       ]),
     ]),
+    el("article", { class: "panel" }, [
+      el("h2", {}, ["While the PC is off"]),
+      el("p", {}, [desk?.hosted?.decision || "The hosted pass has not chosen work on this server yet."]),
+      el("p", { class: "muted" }, [desk?.hosted?.pickupMinutes == null ? `Backlog: ${desk?.hosted?.backlog ?? 0}.` : `Pickup delay ${desk.hosted.pickupMinutes} minutes. Backlog: ${desk.hosted.backlog}.`]),
+      ...(desk?.hosted?.calls || []).map(call => el("p", { class: call.status === "missed" || call.status === "failed" || call.status === "uncertain" ? "error" : "muted" }, [`${call.status}: ${call.note || call.script}`])),
+    ]),
     el("p", { class: state.status?.connection?.connected ? "ok" : "meta" }, [connectionText()]),
     el("p", { class: "muted" }, [state.services?.inbox?.reason || state.services?.inbox?.summary || "The inbox check runs once a day."]),
     state.services?.persistence?.configured ? null : el("p", { class: "muted" }, ["Work saved here can disappear on restart. Add UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN on the budgetos project."]),
