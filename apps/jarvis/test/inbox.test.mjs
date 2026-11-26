@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { createApp } from "../lib/app.mjs";
-import { pickupDelay } from "../lib/inbox.mjs";
+import { beginCheck, checkSlot, finishCheck, pickupDelay } from "../lib/inbox.mjs";
 import { answerFromRecords } from "../lib/operator.mjs";
 
 const id = "4f1c9a0e-1111-4222-8333-444455556666";
@@ -44,6 +44,29 @@ test("a scheduled read saves one draft and a second pass does not", async () => 
   assert.match(saved.drafts[0].title, /Northline Dental/);
   assert.match(answerFromRecords("Who replied?", saved), /Northline Dental/);
   assert.match(answerFromRecords("Who replied?", saved), /not been sent/);
+});
+
+test("the same hour does not read the inbox again", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "jarvis-hour-"));
+  const mail = mailbox([{
+    id,
+    from: "Northline Dental <owner@northline.example>",
+    to: ["agency@buxme.co"],
+    subject: "Website",
+    text: "Yes, we are interested in a new website.",
+  }]);
+  const app = createApp({ dataDir: dir, env, fetchImpl: mail.fetchImpl, now: () => Date.parse("2026-11-26T07:15:30Z") });
+  const first = await app.collectInbox();
+  const reads = mail.calls.length;
+  const second = await app.collectInbox();
+  assert.equal(first.skipped, false);
+  assert.equal(first.created, 1);
+  assert.equal(second.skipped, true);
+  assert.equal(second.created, 0);
+  assert.equal(mail.calls.length, reads);
+  const saved = await app.store.read("2026-11-26");
+  assert.equal(saved.drafts.length, 1);
+  assert.equal(saved.lastCheckSlot, "2026-11-26T07");
 });
 
 test("mail for another address and a missing key are ignored", async () => {
@@ -91,8 +114,10 @@ test("the next check reads past the first ten unread messages", async () => {
     const pageIndex = after ? 1 : 0;
     return { ok: true, status: 200, json: async () => ({ data: pages[pageIndex], has_more: pageIndex === 0 }) };
   };
-  const app = createApp({ dataDir: dir, env, fetchImpl });
+  let clock = Date.parse("2026-11-26T07:15:00Z");
+  const app = createApp({ dataDir: dir, env, fetchImpl, now: () => clock });
   const opened = await app.collectInbox();
+  clock = Date.parse("2026-11-26T08:15:00Z");
   const continued = await app.collectInbox();
   assert.equal(opened.created, 10);
   assert.equal(opened.duplicates, 10);
@@ -104,15 +129,31 @@ test("the next check reads past the first ten unread messages", async () => {
   assert.match(answerFromRecords("Who replied?", saved), /Harbor Dental/);
 });
 
-test("a lead waits until the daily window and one extra day after ten unread", () => {
-  const beforeWindow = pickupDelay(new Date("2026-11-26T06:00:00Z"), 0);
-  const afterWindow = pickupDelay(new Date("2026-11-26T08:00:00Z"), 0);
-  const behind = pickupDelay(new Date("2026-11-26T08:00:00Z"), 10);
-  assert.equal(beforeWindow.maxWaitMinutes <= 120, true);
-  assert.equal(afterWindow.maxWaitMinutes > 23 * 60, true);
-  assert.equal(afterWindow.maxWaitMinutes < 25 * 60, true);
-  assert.equal(behind.extraDays, 1);
-  assert.equal(behind.maxWaitMinutes > afterWindow.maxWaitMinutes + 20 * 60, true);
+test("the next business check is the next :15 UTC, including 7:15", () => {
+  const before = pickupDelay(new Date("2026-11-26T07:00:00Z"), 0);
+  const atSevenFifteen = pickupDelay(new Date("2026-11-26T07:15:00Z"), 0);
+  const after = pickupDelay(new Date("2026-11-26T07:16:00Z"), 0);
+  const behind = pickupDelay(new Date("2026-11-26T07:16:00Z"), 10);
+  assert.equal(before.schedule, "15 * * * *");
+  assert.equal(before.nextCheckBy, "2026-11-26T07:15:00.000Z");
+  assert.equal(atSevenFifteen.nextCheckBy, "2026-11-26T08:15:00.000Z");
+  assert.equal(after.nextCheckBy, "2026-11-26T08:15:00.000Z");
+  assert.equal(behind.extraHours, 1);
+  assert.equal(behind.nextCheckBy, "2026-11-26T09:15:00.000Z");
+  assert.match(before.summary, /every hour/);
+  assert.match(before.summary, /7:15 UTC/);
+});
+
+test("one hour runs once and the next hour can continue", () => {
+  const state = {};
+  const now = new Date("2026-11-26T07:15:30Z");
+  const first = beginCheck(state, now);
+  assert.equal(first.started, true);
+  assert.equal(first.slot, checkSlot(now));
+  assert.equal(beginCheck(state, new Date("2026-11-26T07:16:00Z")).started, false);
+  finishCheck(state, first.slot);
+  assert.equal(beginCheck(state, new Date("2026-11-26T07:20:00Z")).started, false);
+  assert.equal(beginCheck(state, new Date("2026-11-26T08:15:00Z")).started, true);
 });
 
 test("the cron routes accept a bearer GET and do not send", async () => {
@@ -123,5 +164,15 @@ test("the cron routes accept a bearer GET and do not send", async () => {
   assert.match(inbox, /collectInbox/);
   assert.match(priorities, /collectInbox/);
   assert.match(priorities, /Bearer \$\{secret\}/);
+  assert.match(priorities, /15 \* \* \* \*/);
+  assert.match(priorities, /proposal-only/);
   assert.doesNotMatch(inbox, /api\.resend\.com\/emails"/);
+  const vercel = JSON.parse(await readFile(new URL("../../../vercel.json", import.meta.url), "utf8"));
+  const business = vercel.crons.find(cron => cron.path === "/api/cron/jarvis-priorities");
+  const paychecks = vercel.crons.find(cron => cron.path === "/api/cron/run-paychecks");
+  assert.equal(business.schedule, "15 * * * *");
+  assert.equal(paychecks.schedule, "0 6 * * *");
+  const proposals = await readFile(new URL("../../../.github/workflows/jarvis-proposals.yml", import.meta.url), "utf8");
+  assert.match(proposals, /cron: '7,22,37,52 \* \* \* \*'/);
+  assert.doesNotMatch(proposals, /collectInbox/);
 });
