@@ -466,6 +466,7 @@ function renderHome() {
     el("p", { class: "muted" }, [desk?.operator?.wait || "The hosted check runs once a day."]),
     el("div", { class: "row" }, [
       button(state.chatOpen ? "Hide chat" : "Chat", () => { state.chatOpen = !state.chatOpen; render(); }),
+      button("Tasks", () => { state.section = "Tasks"; render(); }),
       button("Settings", () => { state.section = "Settings"; render(); }),
     ]),
     state.chatOpen ? renderChat() : null,
@@ -477,7 +478,8 @@ function renderDesk(id) {
   const card = state.desk?.businesses?.[key];
   const saved = (state.businesses || []).find(item => item.id === id);
   const drafts = (saved?.drafts || []).filter(draft => draft.status === "needs-christian" || draft.status === "draft");
-  const working = (state.tasks || []).filter(task => task.status === "running" || task.status === "approved");
+  const working = (state.tasks || []).filter(task => task.business === id && (task.status === "running" || task.status === "approved"));
+  const proposed = (state.tasks || []).filter(task => task.business === id && task.status === "proposed");
   return el("section", { class: "panel" }, [
     el("h2", {}, [card?.question || "This workspace"]),
     el("h3", {}, ["What Jarvis did"]),
@@ -487,6 +489,8 @@ function renderDesk(id) {
     renderBusinessWork(id),
     (saved?.leads || []).length ? el("h3", {}, ["Prospects"]) : null,
     ...(saved?.leads || []).slice(-5).map(lead => el("p", {}, [`${lead.stage}: ${lead.name}. ${lead.stage === "won" ? "Nobody was called." : "Not contacted."}`])),
+    el("h3", {}, ["Proposed"]),
+    proposed.length ? el("div", { class: "list" }, proposed.slice(-5).map(task => el("p", {}, [`${task.title}. Not started.`]))) : el("p", { class: "muted" }, ["No task is proposed."]),
     el("h3", {}, ["Working on"]),
     working.length ? el("div", { class: "list" }, working.map(task => el("p", {}, [`${task.status}: ${task.title}`]))) : el("p", { class: "muted" }, ["Nothing is running."]),
     el("h3", {}, ["Needs your decision"]),
