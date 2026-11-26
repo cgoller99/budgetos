@@ -484,6 +484,8 @@ function renderDesk(id) {
     el("p", {}, [card?.answer || "This source has not reported yet."]),
     card?.blocker ? el("p", { class: "error" }, [card.blocker]) : null,
     el("p", { class: "muted" }, [card?.recovery || ""]),
+    card?.next ? el("p", {}, [card.next]) : null,
+    id === "drivenest" ? renderVerifiedCost() : null,
     el("h3", {}, ["Working on"]),
     working.length ? el("div", { class: "list" }, working.map(task => el("p", {}, [`${task.status}: ${task.title}`]))) : el("p", { class: "muted" }, ["Nothing is running."]),
     el("h3", {}, ["Needs your decision"]),
@@ -508,6 +510,26 @@ function renderDesk(id) {
       (state.desk?.waiting || []).some(item => item.id === draft.id && item.previewId) ? button("Open preview", () => { openPreview(draft.id); render(); }) : null,
     ])),
     drafts.length ? null : el("p", { class: "muted" }, ["No decision is waiting."]),
+  ]);
+}
+function renderVerifiedCost() {
+  const name = el("input", { "aria-label": "Product you verified", maxlength: "80" });
+  const price = el("input", { "aria-label": "Selling price you chose", maxlength: "20" });
+  const cost = el("input", { "aria-label": "Delivered cost you verified", maxlength: "20" });
+  return el("div", {}, [
+    el("h3", {}, ["Verified cost"]),
+    field("Product", name),
+    field("Selling price", price),
+    field("Delivered cost, including shipping", cost),
+    button("Save verified cost", async () => {
+      state.error = "";
+      try {
+        await api("/api/products", { method: "POST", body: { name: name.value, price: price.value, deliveredCost: cost.value } });
+        state.notice = "Cost saved. Nothing was purchased or published.";
+        await refresh();
+      } catch (error) { state.error = error.message; }
+      render();
+    }, "primary"),
   ]);
 }
 function renderChat() {
