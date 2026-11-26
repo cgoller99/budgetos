@@ -502,7 +502,7 @@ function renderDiscovery() {
   const prospects = report?.prospects || [];
   return [
     el("h3", {}, ["Find businesses"]),
-    el("p", { class: "muted" }, ["Jarvis searches OpenStreetMap for one industry in this city, then a second if the first has no gap. It saves a business only when the map or the page shows a missing or outdated website. It does not contact anyone."]),
+    el("p", { class: "muted" }, ["Jarvis matches a business by name and street address or phone, then checks the website. A blank map field is not a missing website. It saves an opportunity only after that check, and it does not contact anyone."]),
     field("City", area),
     button("Find businesses", async () => {
       const typed = area.value.trim();

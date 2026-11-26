@@ -6,31 +6,25 @@ import test from "node:test";
 import { createApp } from "../lib/app.mjs";
 import { chooseWork, industryFor, pageEvidence, pipeline, publicHttpUrl, searchBusinesses } from "../lib/discover.mjs";
 import { createTask, reviewTask } from "../lib/worker.mjs";
-
 const now = new Date("2026-11-25T15:00:00Z");
 const day = "2026-11-25";
 const access = { buxme: "required", userId: "demo-admin" };
-
 function town() {
   return { ok: true, json: async () => [
     { type: "administrative", addresstype: "county", display_name: "Decatur County, Georgia, United States", boundingbox: ["30.69", "31.07", "-84.87", "-84.37"] },
     { type: "administrative", addresstype: "town", display_name: "Decatur, Georgia, United States", boundingbox: ["33.75", "33.79", "-84.32", "-84.27"] },
   ] };
 }
-
 function elementsFor(industry) {
   const tag = { [industry.key]: industry.value };
+  const place = (housenumber, street) => ({ "addr:housenumber": housenumber, "addr:street": street, "addr:city": "Decatur" });
   return [
-    { type: "node", id: 1, tags: { name: "Example Dental", ...tag } },
-    { type: "node", id: 2, tags: { name: "Example Legal", ...tag, website: "https://facebook.com/examplelegal" } },
-    { type: "node", id: 3, tags: { name: "Healthy Cafe", ...tag, website: "https://healthy.example" } },
-    { type: "node", id: 4, tags: { name: "Reynolds and Sons Automotive", ...tag } },
-    { type: "node", id: 5, tags: { name: "Old Shop", ...tag, website: "http://oldshop.home.comcast.net" } },
-    { type: "node", id: 6, tags: { name: "Wrong Trade", amenity: "not-the-query" } },
-    { type: "node", id: 7, tags: { name: "Local Only", ...tag, website: "http://127.0.0.1/secret" } },
+    { type: "node", id: 567189376, tags: { name: "Decatur Family Dental", ...tag, ...place("814", "Church Street") } },
+    { type: "node", id: 4, tags: { name: "Reynolds and Sons Automotive", ...tag, ...place("1", "Oak Street") } },
+    { type: "node", id: 8, tags: { name: "Blank Map Dental", ...tag } },
+    { type: "node", id: 9, tags: { name: "Gap Dental", ...tag, ...place("20", "Peachtree Street") } },
   ];
 }
-
 function mapFetch(elements) {
   const calls = [];
   const fetchImpl = async (url, options = {}) => {
@@ -38,12 +32,17 @@ function mapFetch(elements) {
     calls.push({ address, body: options.body ?? "" });
     if (address.includes("nominatim")) return town();
     if (address.includes("overpass")) return { ok: true, json: async () => ({ elements }) };
-    if (address.startsWith("https://stale.example")) return { ok: true, url: address, headers: { get: () => "text/html" }, text: async () => "Copyright 2012" };
+    if (address.includes("duckduckgo.com")) {
+      const query = decodeURIComponent(address.split("q=")[1] || "");
+      const link = query.includes("Decatur Family Dental") ? `result__a&uddg=${encodeURIComponent("https://www.decfamilydental.com/")}` : "result__a";
+      return { ok: true, text: async () => link };
+    }
+    if (address.includes("decfamilydental.com")) return { ok: true, url: address, headers: { get: () => "text/html" }, text: async () => "Decatur Family Dental 814 Church Street Decatur GA 30030" };
+    if (address.startsWith("https://stale.example")) return { ok: true, url: address, headers: { get: () => "text/html" }, text: async () => "Stale Page Dental 9 Oak Road Copyright 2012" };
     throw new Error(`unexpected ${address}`);
   };
   return { calls, fetchImpl };
 }
-
 test("revenue counts only a contacted deposit or sale", () => {
   const discovered = { business: "website-agency", source: "openstreetmap", stage: "discovered", contacted: false, depositCents: 50000 };
   assert.equal(pipeline({ leads: [discovered], drafts: [] }).revenueCents, 0);
@@ -58,7 +57,6 @@ test("revenue counts only a contacted deposit or sale", () => {
   assert.equal(pipeline({ leads: [], drafts: [blank] }).quotes, 0);
   assert.equal(pipeline({ leads: [], drafts: [priced] }).quotes, 1);
 });
-
 test("an approval outranks an unpriced offer", () => {
   const offer = chooseWork({ drafts: [{ kind: "offer", status: "draft", title: "Offer for Example Dental", business: "website-agency" }], settings: { discoveryArea: "Decatur, Georgia" } });
   assert.match(offer.reason, /needs a price/);
@@ -67,7 +65,6 @@ test("an approval outranks an unpriced offer", () => {
   assert.match(waiting.reason, /Reply to Northline Dental/);
   assert.match(chooseWork({}).reason, /None have been invented/);
 });
-
 test("page evidence and private urls stay factual", () => {
   assert.match(pageEvidence("This domain is parked", now), /unfinished or for sale/);
   assert.match(pageEvidence("Copyright 2014", now), /2014/);
@@ -77,7 +74,6 @@ test("page evidence and private urls stay factual", () => {
   assert.equal(publicHttpUrl("https://user:pass@healthy.example"), "");
   assert.equal(industryFor(new Date("2026-01-01T15:00:00Z")).id, "dental");
 });
-
 test("a saved city stores only evidenced businesses and an unpriced offer", async () => {
   const industry = industryFor(now);
   const map = mapFetch(elementsFor(industry));
@@ -85,6 +81,8 @@ test("a saved city stores only evidenced businesses and an unpriced offer", asyn
   const app = createApp({ dataDir: dir, env: {}, fetchImpl: map.fetchImpl, now: () => now.getTime() });
   await app.store.update(day, state => {
     state.settings.discoveryArea = "Decatur, Georgia";
+    state.leads.push({ id: "bad-decatur", business: "website-agency", name: "Decatur Family Dental", url: "", note: "OpenStreetMap lists no website.", stage: "discovered", source: "openstreetmap", sourceId: "node/567189376", sourceUrl: "https://www.openstreetmap.org/node/567189376", industry: "dental", evidence: "OpenStreetMap lists no website.", contacted: false, createdAt: now.toISOString() });
+    state.drafts.push({ id: "bad-offer", business: "website-agency", leadId: "bad-decatur", kind: "offer", status: "draft", title: "Offer for Decatur Family Dental", body: "Price: blank until you set it.", externalAction: "not_performed", createdAt: now.toISOString() });
     reviewTask(state, createTask(state, { title: "Prepare scanner notes", business: "drivenest", detail: "Supplier cost is unknown." }, {}).id, "approved");
   });
   const first = await app.collectInbox();
@@ -97,23 +95,32 @@ test("a saved city stores only evidenced businesses and an unpriced offer", asyn
   assert.match(map.calls.find(call => call.address.includes("overpass")).body, /33\.75/);
   assert.doesNotMatch(map.calls.find(call => call.address.includes("overpass")).body, /30\.69/);
   const saved = await app.store.read(day);
-  assert.deepEqual(saved.leads.map(lead => lead.name), ["Example Dental", "Example Legal", "Old Shop"]);
-  assert.equal(saved.leads.every(lead => lead.contacted === false && lead.stage === "discovered" && lead.source === "openstreetmap"), true);
+  const decatur = saved.leads.find(lead => lead.name === "Decatur Family Dental");
+  const gap = saved.leads.find(lead => lead.name === "Gap Dental");
+  assert.equal(decatur.stage, "checked");
+  assert.equal(decatur.url, "https://www.decfamilydental.com/");
+  assert.match(decatur.evidence, /address/);
+  assert.doesNotMatch(decatur.evidence, /lists no website/);
+  assert.equal(gap.stage, "discovered");
+  assert.match(gap.evidence, /No website matched Gap Dental at 20 Peachtree Street/);
+  assert.equal(saved.leads.some(lead => lead.name === "Blank Map Dental" || lead.name === "Reynolds and Sons Automotive"), false);
   assert.equal(saved.reports.at(-1).pipeline.revenueCents, 0);
-  assert.equal(saved.reports.at(-1).pipeline.discovered, 3);
-  assert.equal(saved.reports.at(-1).pipeline.contacted, 0);
+  assert.equal(saved.reports.at(-1).pipeline.discovered, 1);
+  assert.equal(saved.drafts.length, 1);
+  assert.match(saved.drafts[0].title, /Gap Dental/);
+  assert.doesNotMatch(saved.drafts.map(draft => draft.title).join(" "), /Decatur/);
   assert.match(saved.drafts[0].body, /not been contacted/);
   assert.match(saved.drafts[0].body, /not revenue/);
   assert.doesNotMatch(saved.drafts[0].body, /\$\s?\d/);
   assert.match(saved.logs.map(entry => entry.message).join(" "), /exclusion list/);
   assert.match(saved.reports.at(-1).blocked.join(" "), /No campaign was ranked/);
   assert.match(saved.reports.at(-1).blocked.join(" "), /No DriveNest product was recommended/);
-  assert.match(saved.reports.at(-1).choice, /Offer for Example Dental/);
+  assert.match(saved.reports.at(-1).choice, /Offer for Gap Dental/);
+  assert.match(saved.reports.at(-1).accomplished.join(" "), /decfamilydental\.com/);
 });
-
 test("an outdated page is evidence and a failed lookup invents nothing", async () => {
   const industry = industryFor(now);
-  const stale = [{ type: "node", id: 9, tags: { name: "Stale Page Dental", [industry.key]: industry.value, website: "https://stale.example" } }];
+  const stale = [{ type: "node", id: 9, tags: { name: "Stale Page Dental", [industry.key]: industry.value, website: "https://stale.example", "addr:housenumber": "9", "addr:street": "Oak Road", "addr:city": "Decatur" } }];
   const found = await searchBusinesses({ area: "Decatur, Georgia", now, fetchImpl: mapFetch(stale).fetchImpl });
   assert.equal(found.prospects.length, 1);
   assert.match(found.prospects[0].evidence, /2012/);
@@ -129,7 +136,6 @@ test("an outdated page is evidence and a failed lookup invents nothing", async (
   assert.match(missing.error, /not found/);
   assert.equal(missing.prospects.length, 0);
 });
-
 test("the daily check does not search or invent prospects until a city is saved", async () => {
   const dir = await mkdtemp(join(tmpdir(), "jarvis-quiet-"));
   let called = false;
@@ -140,7 +146,6 @@ test("the daily check does not search or invent prospects until a city is saved"
   assert.equal(saved.leads.length, 0);
   assert.match(saved.reports[0].accomplished[0], /No prospects were invented/);
 });
-
 test("the city route refuses a blank city and does not contact anyone", async () => {
   const industry = industryFor(now);
   const map = mapFetch(elementsFor(industry));

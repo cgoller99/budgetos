@@ -536,7 +536,7 @@ export function createApp(options = {}) {
         const repeat = current.settings?.discoveryArea === area && current.settings?.lastDiscoveryDay === today && current.settings?.lastDiscoveryOk !== false;
         let found = null;
         if (!repeat) {
-          try { found = await searchBusinesses({ area, now, fetchImpl }); }
+          try { found = await searchBusinesses({ area, now, fetchImpl, prefer: (current.leads ?? []).filter(lead => /lists no website/i.test(`${lead.evidence || ""} ${lead.note || ""}`)).map(lead => lead.sourceId) }); }
           catch { found = { prospects: [], scanned: 0, industry: "", error: "The business search did not respond. No prospects were invented." }; }
         }
         const state = await store.update(today, next => {
@@ -721,7 +721,7 @@ export function createApp(options = {}) {
     const searchDue = Boolean(area) && (current.settings?.lastDiscoveryDay !== today || current.settings?.lastDiscoveryOk === false);
     let found = null;
     if (searchDue) {
-      try { found = await searchBusinesses({ area, now, fetchImpl }); }
+      try { found = await searchBusinesses({ area, now, fetchImpl, prefer: (current.leads ?? []).filter(lead => /lists no website/i.test(`${lead.evidence || ""} ${lead.note || ""}`)).map(lead => lead.sourceId) }); }
       catch { found = { prospects: [], scanned: 0, industry: "", error: "The business search did not respond. No prospects were invented." }; }
     }
     const saved = await store.update(today, state => {
