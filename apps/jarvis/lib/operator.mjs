@@ -95,7 +95,7 @@ export function businessDesk(state) {
       question: "Did anybody reply, and who needs me?",
       connected: true,
       answer: waiting.length ? `${waiting.length} draft${waiting.length === 1 ? "" : "s"} waiting on you.` : "No reply is waiting.",
-      recovery: "Replies arrive through the inbox route. Sending still requires your approval.",
+      recovery: "The daily cron reads the agency inbox. Sending still requires your approval.",
       records: waiting,
     },
     drivenest: {

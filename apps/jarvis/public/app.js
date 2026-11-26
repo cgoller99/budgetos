@@ -215,8 +215,11 @@ async function refresh() {
 function connectionText() {
   const ai = state.services?.aiGateway;
   const link = state.status?.connection;
-  if (link?.connected || ai?.connected) return `AI connected. ${ai?.spendNote || "The model router can answer."}`;
-  return link?.reason || ai?.spendNote || "AI is not connected.";
+  const ceiling = state.services?.spendCeiling?.note || "Model spend stops at $5 per day.";
+  const statusText = link?.connected || ai?.connected
+    ? `AI connected. ${ai?.spendNote || "The model router can answer."}`
+    : (link?.reason || ai?.spendNote || "AI is not connected.");
+  return `${statusText} ${ceiling}`;
 }
 function routeText() {
   const routes = state.services?.aiGateway?.routes || {};
@@ -325,6 +328,7 @@ function renderHome() {
     el("p", { class: "headline" }, [desk?.headline || "Nothing new has been recorded."]),
     desk?.headlineAt ? el("p", { class: "muted" }, [formatTime(desk.headlineAt)]) : null,
     el("p", { class: state.status?.connection?.connected ? "ok" : "meta" }, [connectionText()]),
+    el("p", { class: "muted" }, [state.services?.inbox?.connected ? "Agency inbox is connected. Sending still needs your approval." : (state.services?.inbox?.reason || "Agency inbox is not connected.")]),
     state.services?.persistence?.configured ? null : el("p", { class: "muted" }, ["Work saved here can disappear on restart. Add UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN on the budgetos project."]),
     waiting.length ? el("div", { class: "list" }, waiting.map(item => el("article", { class: "item" }, [
       el("h2", {}, [item.title]),

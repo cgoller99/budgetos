@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { think } from "../lib/brain.mjs";
-import { classifyJarvisTask, modelChain, selectJarvisModel, spendCap } from "../lib/routing.mjs";
+import { classifyJarvisTask, estimateSpendCents, modelChain, selectJarvisModel, spendCap } from "../lib/routing.mjs";
 
 const day = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date());
 
@@ -54,4 +54,20 @@ test("provider errors fall back and are recorded", async () => {
   assert.equal(calls.length, 2);
   assert.equal(result.usage.errors.length, 1);
   assert.equal(result.usage.byModel[calls[0]].errors, 1);
+  assert.equal(result.usage.spendCents, 1);
+});
+
+test("the five dollar ceiling stops the next model call", async () => {
+  let called = false;
+  const blocked = await think({
+    text: "Give me a status update",
+    state: { tasks: [], messages: [], usage: { day, requests: 1, spendCents: 480, errors: [], byModel: {} } },
+    env: { AI_GATEWAY_API_KEY: "test-key", JARVIS_DAILY_REQUEST_CAP: "20" },
+    fetchImpl: async () => { called = true; throw new Error("should not spend"); },
+    now: new Date(),
+  });
+  assert.equal(called, false);
+  assert.match(blocked.reply, /\$5 daily spending ceiling/);
+  assert.equal(estimateSpendCents({ prompt: 4, completion: 3 }), 1);
+  assert.equal(estimateSpendCents({ prompt: 0, completion: 0 }), 1);
 });

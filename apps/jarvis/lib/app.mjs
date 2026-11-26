@@ -14,8 +14,9 @@ import {
   sessionSecret,
 } from "./auth.mjs";
 import { commandFrom, connectionFor, think } from "./brain.mjs";
+import { inboxConnection, pullAgencyInbox } from "./inbox.mjs";
 import { answerFromRecords, businessDesk, briefing, ingestAgencyReply } from "./operator.mjs";
-import { modelChain, spendCap } from "./routing.mjs";
+import { modelChain, spendCap, spendCeiling } from "./routing.mjs";
 import { createRedisStore } from "./redisStore.mjs";
 import { BUSINESSES, createStore, defaultGates } from "./store.mjs";
 import { createLimiter } from "./limits.mjs";
@@ -110,6 +111,11 @@ function services(env) {
       note: "Git runs only in a repository whose toplevel is JARVIS_SANDBOX_REPO, and only after confirmation.",
     },
     auth: { configured: authConfigured(env), requiredEnv: ["JARVIS_OWNER_PASSWORD", "JARVIS_SESSION_SECRET"] },
+    inbox: { ...inboxConnection(env), requiredEnv: ["RESEND_API_KEY", "JARVIS_AGENCY_INBOX"] },
+    spendCeiling: (() => {
+      const ceiling = spendCeiling(env);
+      return { cents: ceiling.cents, ok: ceiling.ok, note: ceiling.ok ? `Model spend stops at $${ceiling.cents / 100} per day.` : ceiling.reason };
+    })(),
     persistence: redisConfigured(env)
       ? { mode: "redis", configured: true, requiredEnv: ["UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN"], note: "Conversations, tasks, approvals, and logs are stored in the existing Redis database and survive a restart." }
       : { mode: "file", configured: false, requiredEnv: ["UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN"], note: "This server stores data on local disk. A serverless deploy loses that disk on restart until an existing Upstash Redis database is configured. Jarvis does not create a database." },
@@ -610,7 +616,43 @@ export function createApp(options = {}) {
     return result;
   }
 
-  return { handle, ingest, store, env, setFailOnce(value) { failOnce = value; } };
+  async function applyEvents(events) {
+    let created = 0;
+    let duplicates = 0;
+    const drafts = [];
+    for (const event of events) {
+      try {
+        const result = await ingest(event);
+        if (result?.duplicate) duplicates += 1;
+        if (result?.created && result.draft) {
+          created += 1;
+          drafts.push({ id: result.draft.id, title: result.draft.title });
+        }
+      } catch {
+        continue;
+      }
+    }
+    return { created, duplicates, drafts };
+  }
+
+  async function collectInbox() {
+    const pulled = await pullAgencyInbox({ env, fetchImpl });
+    if (!pulled.connected) return { connected: false, reason: pulled.reason, created: 0, duplicates: 0, drafts: [], sent: false, durable: redisConfigured(env) };
+    const once = await applyEvents(pulled.events);
+    const twice = await applyEvents(pulled.events);
+    const durable = redisConfigured(env);
+    return {
+      connected: true,
+      reason: durable ? "Saved. Sending still requires your approval." : "Saved on this server only. Add UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN or the phone will not see this draft.",
+      created: once.created,
+      duplicates: twice.duplicates,
+      drafts: once.drafts,
+      sent: false,
+      durable,
+    };
+  }
+
+  return { handle, ingest, collectInbox, store, env, setFailOnce(value) { failOnce = value; } };
 }
 
 async function serveStatic(path) {
