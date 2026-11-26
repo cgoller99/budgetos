@@ -101,7 +101,7 @@ button.orb { min-height: 0; border-radius: 50%; }
 .orb[data-state="listening"] { box-shadow: 0 0 90px rgba(142, 240, 194, 0.72); }
 .orb[data-state="speaking"] { box-shadow: 0 0 90px rgba(228, 194, 122, 0.72); }
 @keyframes pulse { 50% { transform: scale(0.96); } }
-.tabbar { display: grid; grid-template-columns: repeat(3, 1fr); position: fixed; left: 0; right: 0; bottom: 0; gap: 8px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); background: rgba(4, 12, 24, 0.96); border-top: 1px solid var(--line); }
+.tabbar { display: grid; grid-template-columns: repeat(4, 1fr); position: fixed; left: 0; right: 0; bottom: 0; gap: 8px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); background: rgba(4, 12, 24, 0.96); border-top: 1px solid var(--line); }
 .tab { min-height: 52px; font-size: 1rem; }
 .tab-buxme { box-shadow: inset 0 -3px #7ee0ff; }
 .tab-agency { box-shadow: inset 0 -3px #e4c27a; }

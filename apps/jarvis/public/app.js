@@ -411,6 +411,12 @@ function renderHome() {
     el("p", { class: "greeting" }, [desk?.greeting || "Good evening, Christian"]),
     el("p", { class: "headline" }, [desk?.headline || "Nothing new has been recorded."]),
     desk?.headlineAt ? el("p", { class: "muted" }, [formatTime(desk.headlineAt)]) : null,
+    el("article", { class: "panel" }, [
+      el("h2", {}, ["While the PC is off"]),
+      el("p", {}, [desk?.hosted?.decision || "The hosted pass has not chosen work on this server yet."]),
+      el("p", { class: "muted" }, [desk?.hosted?.pickupMinutes == null ? `Backlog: ${desk?.hosted?.backlog ?? 0}.` : `Pickup delay ${desk.hosted.pickupMinutes} minutes. Backlog: ${desk.hosted.backlog}.`]),
+      ...(desk?.hosted?.calls || []).map(call => el("p", { class: call.status === "missed" || call.status === "failed" || call.status === "uncertain" ? "error" : "muted" }, [`${call.status}: ${call.note || call.script}`])),
+    ]),
     el("div", { class: "home-grid" }, [
       el("article", { class: "panel" }, [
         el("h2", {}, ["Recent work"]),
@@ -424,12 +430,6 @@ function renderHome() {
           button("Open", () => { openDraft(item.id); render(); }),
         ]))) : el("p", { class: "muted" }, ["Nothing is waiting on you."]),
       ]),
-    ]),
-    el("article", { class: "panel" }, [
-      el("h2", {}, ["While the PC is off"]),
-      el("p", {}, [desk?.hosted?.decision || "The hosted pass has not chosen work on this server yet."]),
-      el("p", { class: "muted" }, [desk?.hosted?.pickupMinutes == null ? `Backlog: ${desk?.hosted?.backlog ?? 0}.` : `Pickup delay ${desk.hosted.pickupMinutes} minutes. Backlog: ${desk.hosted.backlog}.`]),
-      ...(desk?.hosted?.calls || []).map(call => el("p", { class: call.status === "missed" || call.status === "failed" || call.status === "uncertain" ? "error" : "muted" }, [`${call.status}: ${call.note || call.script}`])),
     ]),
     el("p", { class: state.status?.connection?.connected ? "ok" : "meta" }, [connectionText()]),
     el("p", { class: "muted" }, [state.services?.inbox?.reason || state.services?.inbox?.summary || "The inbox check runs once a day."]),
@@ -681,11 +681,11 @@ function stat(label, value, detail) {
 }
 function render() {
   if (!state.authenticated) { renderLogin(); return; }
-  const tabs = ["Buxme", "Agency", "DriveNest"].map(section => el("button", {
+  const tabs = ["Home", "Buxme", "Agency", "DriveNest"].map(section => el("button", {
     type: "button",
     class: `tab tab-${section.toLowerCase()}`,
     "aria-current": state.section === section ? "page" : null,
-    onclick: async () => { state.section = state.section === section ? "Home" : section; state.error = ""; await refresh().catch(error => { state.error = error.message; }); render(); },
+    onclick: async () => { state.section = section; state.error = ""; await refresh().catch(error => { state.error = error.message; }); render(); },
   }, [section]));
   const voiceState = state.muted ? "muted" : state.orb;
   const micSelect = el("select", {
