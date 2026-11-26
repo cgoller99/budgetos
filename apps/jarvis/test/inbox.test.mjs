@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { createApp } from "../lib/app.mjs";
+import { pickupDelay } from "../lib/inbox.mjs";
 import { answerFromRecords } from "../lib/operator.mjs";
 
 const id = "4f1c9a0e-1111-4222-8333-444455556666";
@@ -57,6 +58,61 @@ test("mail for another address and a missing key are ignored", async () => {
   const result = await app.collectInbox();
   assert.equal(result.created, 0);
   assert.equal(result.drafts.length, 0);
+});
+
+function uuid(n) {
+  return `4f1c9a0e-1111-4222-8333-${n.toString(16).padStart(12, "0")}`;
+}
+
+test("the next check reads past the first ten unread messages", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "jarvis-pages-"));
+  const first = Array.from({ length: 10 }, (_, index) => ({
+    id: uuid(index + 1),
+    from: "Northline Dental <owner@northline.example>",
+    to: ["agency@buxme.co"],
+    subject: "Website",
+    text: "Yes, we are interested in a new website.",
+  }));
+  const second = [{
+    id: uuid(11),
+    from: "Harbor Dental <owner@harbor.example>",
+    to: ["agency@buxme.co"],
+    subject: "Re: website proposal",
+    text: "Thursday works for a call.",
+  }];
+  const pages = [first, second];
+  const fetchImpl = async (url) => {
+    const address = String(url);
+    if (!address.includes("?")) {
+      const item = [...first, ...second].find(entry => address.endsWith(entry.id));
+      return { ok: true, status: 200, json: async () => item };
+    }
+    const after = new URL(address).searchParams.get("after");
+    const pageIndex = after ? 1 : 0;
+    return { ok: true, status: 200, json: async () => ({ data: pages[pageIndex], has_more: pageIndex === 0 }) };
+  };
+  const app = createApp({ dataDir: dir, env, fetchImpl });
+  const opened = await app.collectInbox();
+  const continued = await app.collectInbox();
+  assert.equal(opened.created, 10);
+  assert.equal(opened.duplicates, 10);
+  assert.equal(continued.created, 1);
+  assert.equal(continued.drafts[0].title.includes("Harbor Dental"), true);
+  const day = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date());
+  const saved = await app.store.read(day);
+  assert.equal(saved.drafts.length, 11);
+  assert.match(answerFromRecords("Who replied?", saved), /Harbor Dental/);
+});
+
+test("a lead waits until the daily window and one extra day after ten unread", () => {
+  const beforeWindow = pickupDelay(new Date("2026-11-26T06:00:00Z"), 0);
+  const afterWindow = pickupDelay(new Date("2026-11-26T08:00:00Z"), 0);
+  const behind = pickupDelay(new Date("2026-11-26T08:00:00Z"), 10);
+  assert.equal(beforeWindow.maxWaitMinutes <= 120, true);
+  assert.equal(afterWindow.maxWaitMinutes > 23 * 60, true);
+  assert.equal(afterWindow.maxWaitMinutes < 25 * 60, true);
+  assert.equal(behind.extraDays, 1);
+  assert.equal(behind.maxWaitMinutes > afterWindow.maxWaitMinutes + 20 * 60, true);
 });
 
 test("the cron routes accept a bearer GET and do not send", async () => {

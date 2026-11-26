@@ -35,6 +35,23 @@ test("one agency reply becomes one draft and a second delivery does not", async 
   assert.match(answerFromRecords("Who replied?", again), /not been sent/);
 });
 
+test("a reply to an offer becomes one draft and an opt-out does not", () => {
+  const state = { inbox: [], drafts: [], logs: [] };
+  const reply = ingestAgencyReply(state, {
+    messageId: "msg-reply-0001",
+    from: "Northline Dental",
+    text: "Re: website proposal\nThursday works for a call.",
+  });
+  const optOut = ingestAgencyReply(state, {
+    messageId: "msg-optout-001",
+    from: "Northline Dental",
+    text: "Please unsubscribe me from these emails.",
+  });
+  assert.equal(reply.draft.status, "needs-christian");
+  assert.equal(optOut.draft, null);
+  assert.equal(state.drafts.length, 1);
+});
+
 test("the exclusion list never becomes a draft", () => {
   const state = { inbox: [], drafts: [], logs: [] };
   const result = ingestAgencyReply(state, {

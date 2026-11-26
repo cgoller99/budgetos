@@ -20,13 +20,17 @@ export function ingestAgencyReply(state, event, now = new Date()) {
   if (from.length < 3 || text.length < 3) throw Object.assign(new Error("The reply needs a sender and a message."), { status: 400 });
   const excluded = EXCLUSIONS.find(item => item.test.test(from) || item.test.test(text));
   const at = new Date(now).toISOString();
+  const optedOut = /\b(unsubscribe|stop emailing|remove me|do not contact|opt out)\b/i.test(text);
+  const replyToOffer = /^\s*re\s*:/i.test(text);
   const interested = /\b(interested|yes|let's|lets|quote|how much|available|website)\b/i.test(text);
-  const item = { messageId, from, text, at, business: "website-agency", excluded: Boolean(excluded), interested, draftId: null };
+  const item = { messageId, from, text, at, business: "website-agency", excluded: Boolean(excluded), interested: interested || replyToOffer, draftId: null };
   state.inbox.push(item);
   let draft = null;
   if (excluded) {
     state.logs.push({ id: randomUUID(), at, level: "info", message: `Ignored a message from ${from}. ${excluded.name} is on the exclusion list. Nothing was sent.`, taskId: null });
-  } else if (interested) {
+  } else if (optedOut) {
+    state.logs.push({ id: randomUUID(), at, level: "info", message: `Recorded an opt-out from ${from}. Nothing was sent.`, taskId: null });
+  } else if (interested || replyToOffer) {
     draft = {
       id: randomUUID(),
       business: "website-agency",
@@ -45,6 +49,16 @@ export function ingestAgencyReply(state, event, now = new Date()) {
     state.logs.push({ id: randomUUID(), at, level: "info", message: `Recorded a reply from ${from}. It did not ask for a quote, so no draft was created.`, taskId: null });
   }
   return { created: true, duplicate: false, item, draft };
+}
+
+export function rememberSkip(state, messageId, now = new Date()) {
+  state.inbox ??= [];
+  if (!MESSAGE_ID.test(messageId) || state.inbox.some(item => item.messageId === messageId)) return;
+  state.inbox.push({ messageId, from: "", text: "", at: new Date(now).toISOString(), business: "website-agency", excluded: false, interested: false, draftId: null, skipped: true });
+  const skips = state.inbox.filter(item => item.skipped);
+  if (skips.length <= 200) return;
+  const drop = new Set(skips.slice(0, skips.length - 200).map(item => item.messageId));
+  state.inbox = state.inbox.filter(item => !drop.has(item.messageId));
 }
 
 export function briefing(state, now = new Date()) {
@@ -95,7 +109,7 @@ export function businessDesk(state) {
       question: "Did anybody reply, and who needs me?",
       connected: true,
       answer: waiting.length ? `${waiting.length} draft${waiting.length === 1 ? "" : "s"} waiting on you.` : "No reply is waiting.",
-      recovery: "The daily cron reads the agency inbox. Sending still requires your approval.",
+      recovery: "The daily check handles 10 unread replies, then continues with the next 10. Sending still requires your approval.",
       records: waiting,
     },
     drivenest: {
