@@ -27,7 +27,7 @@ export function clientAddress(headers) {
  * @param {Request} request
  * @param {{ handle: (request: Request, access?: { buxme?: string, userId?: string } | null) => Promise<Response> }} app
  * @param {string} [prefix]
- * @param {{ buxme?: string, userId?: string } | null} [access]
+ * @param {{ buxme?: string, userId?: string, shareToken?: string } | null} [access]
  * @returns {Promise<Response>}
  */
 export async function mountJarvis(request, app, prefix = PREFIX, access = null) {
@@ -37,6 +37,8 @@ export async function mountJarvis(request, app, prefix = PREFIX, access = null) 
   if (path !== prefix && !path.startsWith(`${prefix}/`)) return text("Not found.", 404);
   const stripped = path.slice(prefix.length) || "/";
   const method = request.method.toUpperCase();
+  const shareToken = typeof access?.shareToken === "string" ? access.shareToken : "";
+  if (shareToken && stripped !== `/share/${shareToken}`) return text("Not found.", 404);
   if ((stripped === "/" || stripped === "/index.html") && (method === "GET" || method === "HEAD")) {
     return adaptResponse(new Response(method === "HEAD" ? null : pageShell(), { headers: PAGE_HEADERS }), prefix, stripped);
   }

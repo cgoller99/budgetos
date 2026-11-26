@@ -103,14 +103,18 @@ export function briefing(state, now = new Date()) {
     greeting,
     headline: latest?.message ?? "Nothing new has been recorded.",
     headlineAt: latest?.at ?? null,
-    waiting: waiting.map(draft => ({
-      id: draft.id,
-      title: draft.title,
-      at: draft.createdAt,
-      business: draft.business,
-      sent: false,
-      previewId: (state.previews ?? []).find(preview => preview.draftId === draft.id)?.id ?? null,
-    })),
+    waiting: waiting.map(draft => {
+      const preview = (state.previews ?? []).find(item => item.draftId === draft.id);
+      return {
+        id: draft.id,
+        title: draft.title,
+        at: draft.createdAt,
+        business: draft.business,
+        sent: false,
+        previewId: preview?.id ?? null,
+        sharePath: preview?.shareToken ? `/jarvis/share/${preview.shareToken}` : null,
+      };
+    }),
     operator: {
       lastRunAt: state.runs?.at(-1)?.at ?? null,
       decision: state.runs?.at(-1)?.decision ?? "The hosted check has not run on this server yet.",
