@@ -51,6 +51,8 @@ export function createTask(state, { title, detail = "", business = "buxme", prio
   if (!BUSINESSES[business]) throw new Error("Unknown business.");
   if (String(detail).length > 4000) throw new Error("Task detail is too long.");
   if (state.tasks.length >= 200) throw new Error("Task queue is full.");
+  const open = state.tasks.find(task => task.business === business && task.title === cleanTitle && ["proposed", "approved", "running", "blocked"].includes(task.status));
+  if (open) return open;
   const kind = classifyJarvisTask(`${cleanTitle}\n${detail}`);
   const risk = riskFor(`${cleanTitle}\n${detail}`);
   const model = selectJarvisModel(kind, env);

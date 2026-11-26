@@ -7,6 +7,18 @@ import { createApp } from "../lib/app.mjs";
 import { chooseNext } from "../lib/planner.mjs";
 import { createTask, reviewTask } from "../lib/worker.mjs";
 
+test("an open task is not proposed twice", () => {
+  const state = { tasks: [], logs: [] };
+  const first = createTask(state, { title: "Prepare scanner notes", business: "drivenest" }, {});
+  const second = createTask(state, { title: "Prepare scanner notes", business: "drivenest" }, {});
+  assert.equal(second.id, first.id);
+  assert.equal(state.tasks.length, 1);
+  reviewTask(state, first.id, "rejected");
+  const third = createTask(state, { title: "Prepare scanner notes", business: "drivenest" }, {});
+  assert.notEqual(third.id, first.id);
+  assert.equal(state.tasks.length, 2);
+});
+
 test("a reply waits on Christian before any approved work runs", () => {
   const choice = chooseNext({
     drafts: [{ status: "needs-christian", title: "Reply to Northline Dental" }],
