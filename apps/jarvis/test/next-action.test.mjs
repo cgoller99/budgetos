@@ -6,6 +6,7 @@ import test from "node:test";
 import { createApp } from "../lib/app.mjs";
 import { claimForDial } from "../lib/calls.mjs";
 import { applyHostedPass, scannerMargin } from "../lib/nextAction.mjs";
+import { businessDesk } from "../lib/operator.mjs";
 
 const id = "4f1c9a0e-1111-4222-8333-444455556666";
 const line = {
@@ -139,6 +140,11 @@ test("scanner margin, fulfillment, and a duplicate Buxme post stay inside their 
   assert.match(state.drafts[0].body, /not published/);
   assert.match(state.logs.map(entry => entry.message).join("\n"), /was not posted again/);
   assert.equal(state.calls.length, 0);
+  const desk = businessDesk(state);
+  assert.match(desk.drivenest.answer, /above the \$10 target/);
+  assert.equal(desk.drivenest.records.length, 1);
+  assert.equal(desk.agency.records.length, 0);
+  assert.match(desk.buxme.answer, /was not posted again/);
   const claimed = claimForDial(state, now);
   assert.equal(claimed, null);
 });

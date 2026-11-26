@@ -203,6 +203,7 @@ export function applyHostedPass(state, now = new Date()) {
     if ((item.kind === "won" || item.kind === "exception") && callsQueued >= 1) continue;
     const result = handle(state, item, now);
     item.handledAt = new Date(now).toISOString();
+    item.result = result.detail;
     if (result.queuedCall) callsQueued += 1;
     const waited = Math.max(0, Math.round((new Date(now) - new Date(item.createdAt)) / 60000));
     pickupMinutes = pickupMinutes == null ? waited : Math.max(pickupMinutes, waited);
