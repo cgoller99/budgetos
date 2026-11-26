@@ -15,6 +15,7 @@ import {
 } from "./auth.mjs";
 import { commandFrom, connectionFor, think } from "./brain.mjs";
 import { inboxConnection, pickupDelay, pullAgencyInbox } from "./inbox.mjs";
+import { advanceBusinesses, saveBuxmeReading, saveProductCost } from "./operations.mjs";
 import { answerFromRecords, businessDesk, briefing, ingestAgencyReply, recordOperatorRun, rememberSkip } from "./operator.mjs";
 import { previewDocument, previewForToken, sharePreview } from "./preview.mjs";
 import { modelChain, spendCap, spendCeiling } from "./routing.mjs";
@@ -573,6 +574,14 @@ export function createApp(options = {}) {
         });
         return json({ draft: state.drafts.at(-1), sent: false }, 201);
       }
+      if (request.method === "POST" && path === "/api/products") {
+        const body = await readJson(request);
+        let result = null;
+        await store.update(dayKey(new Date(nowFn())), current => {
+          result = saveProductCost(current, body, new Date(nowFn()));
+        });
+        return json({ ...result, purchased: false, published: false }, 201);
+      }
       const approval = path.match(/^\/api\/drafts\/([0-9a-f-]{36})\/approval$/);
       if (approval && request.method === "POST") {
         const body = await readJson(request);
@@ -688,15 +697,17 @@ export function createApp(options = {}) {
         for (const id of pulled.skipIds) rememberSkip(state, id, new Date(nowFn()));
       });
     }
+    let work = null;
     const saved = await store.update(dayKey(new Date(nowFn())), state => {
       recordOperatorRun(state, { trigger, connected: pulled.connected, created: once.created, now: new Date(nowFn()) });
+      work = advanceBusinesses(state, new Date(nowFn()));
     });
     const run = saved.runs.at(-1);
     const approved = (saved.tasks ?? []).some(task => task.status === "approved");
     const worker = run?.action === "reply" || !approved
       ? { completed: [], blocked: [], failed: [], skipped: run?.action === "reply" ? ["reply-first"] : [] }
       : await executeWorker();
-    const report = { sent: false, performedExternal: false, durable, delay: pulled.delay, run, worker };
+    const report = { sent: false, performedExternal: false, durable, delay: pulled.delay, run, worker, work };
     if (!pulled.connected) return { connected: false, reason: pulled.reason, created: 0, duplicates: 0, drafts: [], remaining: 0, ...report };
     return {
       connected: true,
@@ -709,7 +720,15 @@ export function createApp(options = {}) {
     };
   }
 
-  return { handle, ingest, collectInbox, store, env, setFailOnce(value) { failOnce = value; } };
+  async function recordBuxmeReading(reading) {
+    let result = null;
+    await store.update(dayKey(new Date(nowFn())), state => {
+      result = saveBuxmeReading(state, reading, new Date(nowFn()));
+    });
+    return result;
+  }
+
+  return { handle, ingest, collectInbox, recordBuxmeReading, store, env, setFailOnce(value) { failOnce = value; } };
 }
 
 async function serveStatic(path) {

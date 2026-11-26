@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { pickupDelay } from "./inbox.mjs";
+import { describeBusinesses } from "./operations.mjs";
 import { chooseNext } from "./planner.mjs";
 
 export const EXCLUSIONS = [
@@ -137,38 +138,18 @@ export function answerFromRecords(text, state, now = new Date()) {
     return logs.slice(-5).map(entry => entry.message).join(" ");
   }
   if (/scanner|drivenest|margin|supplier/.test(asked)) {
-    return "DriveNest supplier cost is not connected, so delivered cost and margin are unknown. I will not estimate them. The scanner launch is held on that missing cost.";
+    const product = (state.products ?? []).find(item => item.deliveredCents != null);
+    if (!product) return "DriveNest supplier cost is not connected, so delivered cost and margin are unknown. I will not estimate them. The scanner launch is held on that missing cost.";
+    const desk = describeBusinesses(state).drivenest;
+    return desk.answer;
   }
   if (/video|signup|sign up|subscription/.test(asked) && /buxme|yesterday/.test(asked)) {
-    return "Buxme publishing, signups, and subscriptions are not connected. I cannot say whether yesterday’s video went out or whether anyone signed up.";
+    if (!state.buxmeReading) return "Buxme publishing, signups, and subscriptions are not connected. I cannot say whether yesterday’s video went out or whether anyone signed up.";
+    return describeBusinesses(state).buxme.answer;
   }
   return null;
 }
 
 export function businessDesk(state) {
-  const waiting = (state.drafts ?? []).filter(draft => draft.status === "needs-christian");
-  return {
-    buxme: {
-      question: "Did yesterday’s video go out, and did anyone sign up?",
-      connected: false,
-      answer: "Publishing, signups, and subscriptions are not connected.",
-      recovery: "Connect the video schedule and the signup source on the budgetos project. Until then Jarvis will not invent a count.",
-      records: [],
-    },
-    agency: {
-      question: "Did anybody reply, and who needs me?",
-      connected: true,
-      answer: waiting.length ? `${waiting.length} draft${waiting.length === 1 ? "" : "s"} waiting on you.` : "No reply is waiting.",
-      recovery: "The daily check handles 10 unread replies, then continues with the next 10. Sending still requires your approval.",
-      records: waiting,
-    },
-    drivenest: {
-      question: "What’s holding up the scanner launch?",
-      connected: false,
-      answer: "Supplier cost is unknown, so margin is unknown.",
-      recovery: "Connect supplier cost, shipping, and inventory before Jarvis quotes a margin or publishes a listing.",
-      blocker: "Supplier cost is not connected.",
-      records: [],
-    },
-  };
+  return describeBusinesses(state);
 }
