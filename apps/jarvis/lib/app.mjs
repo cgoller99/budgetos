@@ -14,6 +14,7 @@ import {
   sessionSecret,
 } from "./auth.mjs";
 import { commandFrom, connectionFor, think } from "./brain.mjs";
+import { connectionChecklist, recoverCheck, saveBrief, saveFollowUp, saveOffer, saveProspect, saveSupplier } from "./close.mjs";
 import { inboxConnection, pickupDelay, pullAgencyInbox } from "./inbox.mjs";
 import { answerFromRecords, businessDesk, briefing, ingestAgencyReply, recordOperatorRun, rememberSkip } from "./operator.mjs";
 import { previewDocument, previewForToken, sharePreview } from "./preview.mjs";
@@ -113,6 +114,11 @@ function services(env) {
     },
     auth: { configured: authConfigured(env), requiredEnv: ["JARVIS_OWNER_PASSWORD", "JARVIS_SESSION_SECRET"] },
     inbox: { ...inboxConnection(env), ...pickupDelay(new Date()), requiredEnv: ["RESEND_API_KEY", "JARVIS_AGENCY_INBOX"] },
+    phone: {
+      configured: connectionChecklist(env).phone.configured,
+      requiredEnv: connectionChecklist(env).phone.requiredEnv,
+      note: connectionChecklist(env).phone.unlocks,
+    },
     spendCeiling: (() => {
       const ceiling = spendCeiling(env);
       return { cents: ceiling.cents, ok: ceiling.ok, note: ceiling.ok ? `Model spend stops at $${ceiling.cents / 100} per day.` : ceiling.reason };
@@ -573,6 +579,11 @@ export function createApp(options = {}) {
         });
         return json({ draft: state.drafts.at(-1), sent: false }, 201);
       }
+      if (request.method === "POST" && path === "/api/prospects") return await respondSaved(saveProspect, request);
+      if (request.method === "POST" && path === "/api/offers") return await respondSaved(saveOffer, request);
+      if (request.method === "POST" && path === "/api/follow-ups") return await respondSaved(saveFollowUp, request);
+      if (request.method === "POST" && path === "/api/briefs") return await respondSaved(saveBrief, request);
+      if (request.method === "POST" && path === "/api/suppliers") return await respondSaved(saveSupplier, request);
       const approval = path.match(/^\/api\/drafts\/([0-9a-f-]{36})\/approval$/);
       if (approval && request.method === "POST") {
         const body = await readJson(request);
@@ -649,6 +660,19 @@ export function createApp(options = {}) {
     }
   }
 
+  async function saveRecord(save, body) {
+    let result = null;
+    await store.update(dayKey(new Date(nowFn())), current => {
+      result = save(current, body, new Date(nowFn()));
+    });
+    return { ...result, sent: false, published: false, purchased: false };
+  }
+
+  async function respondSaved(save, request) {
+    const result = await saveRecord(save, await readJson(request));
+    return json(result, result.created ? 201 : 200);
+  }
+
   async function ingest(event) {
     let result = null;
     await store.update(dayKey(new Date(nowFn())), current => {
@@ -693,9 +717,15 @@ export function createApp(options = {}) {
     });
     const run = saved.runs.at(-1);
     const approved = (saved.tasks ?? []).some(task => task.status === "approved");
-    const worker = run?.action === "reply" || !approved
-      ? { completed: [], blocked: [], failed: [], skipped: run?.action === "reply" ? ["reply-first"] : [] }
-      : await executeWorker();
+    let worker = { completed: [], blocked: [], failed: [], skipped: [] };
+    try {
+      worker = run?.action === "reply" || !approved
+        ? { completed: [], blocked: [], failed: [], skipped: run?.action === "reply" ? ["reply-first"] : [] }
+        : await executeWorker();
+    } catch (error) {
+      await store.update(dayKey(new Date(nowFn())), state => recoverCheck(state, error, new Date(nowFn())));
+      worker = { completed: [], blocked: [], failed: ["check"], skipped: [] };
+    }
     const report = { sent: false, performedExternal: false, durable, delay: pulled.delay, run, worker };
     if (!pulled.connected) return { connected: false, reason: pulled.reason, created: 0, duplicates: 0, drafts: [], remaining: 0, ...report };
     return {

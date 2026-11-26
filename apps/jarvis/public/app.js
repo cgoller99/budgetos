@@ -484,6 +484,9 @@ function renderDesk(id) {
     el("p", {}, [card?.answer || "This source has not reported yet."]),
     card?.blocker ? el("p", { class: "error" }, [card.blocker]) : null,
     el("p", { class: "muted" }, [card?.recovery || ""]),
+    renderBusinessWork(id),
+    (saved?.leads || []).length ? el("h3", {}, ["Prospects"]) : null,
+    ...(saved?.leads || []).slice(-5).map(lead => el("p", {}, [`${lead.stage}: ${lead.name}. Not contacted.`])),
     el("h3", {}, ["Working on"]),
     working.length ? el("div", { class: "list" }, working.map(task => el("p", {}, [`${task.status}: ${task.title}`]))) : el("p", { class: "muted" }, ["Nothing is running."]),
     el("h3", {}, ["Needs your decision"]),
@@ -509,6 +512,71 @@ function renderDesk(id) {
     ])),
     drafts.length ? null : el("p", { class: "muted" }, ["No decision is waiting."]),
   ]);
+}
+function inputBox(label, multiline) {
+  return el(multiline ? "textarea" : "input", { "aria-label": label, maxlength: multiline ? "800" : "160" });
+}
+async function saveWork(path, body, notice) {
+  state.error = "";
+  try {
+    const result = await api(path, { method: "POST", body });
+    state.notice = result.duplicate ? "Already saved. It was not repeated." : notice;
+    await refresh();
+  } catch (error) { state.error = error.message; }
+  render();
+}
+function renderBusinessWork(id) {
+  if (id === "website-agency") {
+    const name = inputBox("Prospect name");
+    const url = inputBox("Prospect page");
+    const note = inputBox("Why this prospect fits", true);
+    const prospect = inputBox("Offer prospect");
+    const scope = inputBox("Offer scope");
+    const price = inputBox("Offer price you approve");
+    const deadline = inputBox("Offer deadline");
+    const next = inputBox("Offer next step");
+    const follow = inputBox("Follow-up prospect");
+    const followNote = inputBox("Follow-up you want saved", true);
+    return el("div", {}, [
+      el("h3", {}, ["Qualify"]),
+      field("Name", name), field("Page", url), field("Why they fit", note),
+      button("Save prospect", () => saveWork("/api/prospects", { name: name.value, url: url.value, note: note.value }, "Prospect qualified. Nobody was contacted.")),
+      el("h3", {}, ["Offer"]),
+      field("Prospect", prospect), field("Scope", scope), field("Price", price), field("Deadline", deadline), field("Next step", next),
+      button("Save offer", () => saveWork("/api/offers", { prospect: prospect.value, scope: scope.value, price: price.value, deadline: deadline.value, next: next.value }, "Offer saved. Nothing was sent."), "primary"),
+      el("h3", {}, ["Follow up"]),
+      field("Prospect", follow), field("Note", followNote),
+      button("Save follow-up", () => saveWork("/api/follow-ups", { prospect: follow.value, note: followNote.value }, "Follow-up saved. Nothing was sent.")),
+    ]);
+  }
+  if (id === "buxme") {
+    const title = inputBox("Content title");
+    const outline = inputBox("Outline you want used", true);
+    return el("div", {}, [
+      el("h3", {}, ["Content draft"]),
+      field("Title", title), field("Outline", outline),
+      button("Save content draft", () => saveWork("/api/briefs", { title: title.value, outline: outline.value }, "Draft saved. It was not published."), "primary"),
+    ]);
+  }
+  if (id === "drivenest") {
+    const supplier = inputBox("Supplier you verified");
+    const product = inputBox("Product");
+    const shipping = inputBox("Shipping fact you verified");
+    const page = inputBox("Supplier page");
+    const price = inputBox("Selling price");
+    const cost = inputBox("Delivered cost you verified");
+    const verified = el("input", { type: "checkbox", "aria-label": "I verified this supplier" });
+    return el("div", {}, [
+      el("h3", {}, ["Supplier check"]),
+      field("Supplier", supplier), field("Product", product), field("Shipping", shipping), field("Page", page), field("Selling price", price), field("Delivered cost", cost),
+      el("label", {}, [verified, " I verified this supplier"]),
+      button("Save supplier check", () => saveWork("/api/suppliers", {
+        supplier: supplier.value, product: product.value, shipping: shipping.value, url: page.value,
+        price: price.value, deliveredCost: cost.value, verified: verified.checked,
+      }, "Listing draft saved. Nothing was purchased."), "primary"),
+    ]);
+  }
+  return null;
 }
 function renderChat() {
   const box = el("textarea", { "aria-label": "Message Jarvis", maxlength: "2000" });
@@ -701,6 +769,7 @@ function renderPanel() {
       el("p", { class: state.status?.connection?.connected ? "ok" : "meta" }, [connectionText()]),
       el("p", { class: "muted" }, [state.services?.inbox?.reason || state.services?.inbox?.replyRoute || "The inbox check runs once a day."]),
       state.services?.persistence?.configured ? el("p", { class: "muted" }, ["Work is saved in Redis and survives a restart."]) : el("p", { class: "muted" }, ["Work saved here can disappear on restart. Add UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN on the budgetos project."]),
+      el("p", { class: "muted" }, [state.services?.phone?.configured ? "The phone line is configured. Calls still wait for your approval." : `Phone is not connected. Add ${(state.services?.phone?.requiredEnv || []).join(", ")} on the budgetos project.`]),
       el("p", { class: "muted" }, [deskWait()]),
       el("h2", {}, ["Approval gates"]),
       el("p", { class: "muted" }, ["Turning a gate off does not send email, spend money, or deploy. Those actions are still not executed from this app."]),
