@@ -16,6 +16,7 @@ import {
 import { commandFrom, connectionFor, think } from "./brain.mjs";
 import { inboxConnection, pickupDelay, pullAgencyInbox } from "./inbox.mjs";
 import { answerFromRecords, businessDesk, briefing, ingestAgencyReply, recordOperatorRun, rememberSkip } from "./operator.mjs";
+import { advanceMoney, chooseFocus, recoverStep, saveMoney } from "./pipeline.mjs";
 import { previewDocument, previewForToken, sharePreview } from "./preview.mjs";
 import { modelChain, spendCap, spendCeiling } from "./routing.mjs";
 import { createRedisStore } from "./redisStore.mjs";
@@ -505,7 +506,7 @@ export function createApp(options = {}) {
       }
       if (request.method === "GET" && path === "/api/desk") {
         const current = await store.read(dayKey(new Date(nowFn())));
-        return json({ ...briefing(current, new Date(nowFn())), businesses: businessDesk(current), connection: connectionFor(env, current.usage, new Date(nowFn())) });
+        return json({ ...briefing(current, new Date(nowFn())), businesses: businessDesk(current), focus: chooseFocus(current, new Date(nowFn())), connection: connectionFor(env, current.usage, new Date(nowFn())) });
       }
       if (request.method === "GET" && path === "/api/businesses") {
         const state = await store.read(dayKey(new Date(nowFn())));
@@ -573,6 +574,7 @@ export function createApp(options = {}) {
         });
         return json({ draft: state.drafts.at(-1), sent: false }, 201);
       }
+      if (request.method === "POST" && path === "/api/money") return await postMoney(request);
       const approval = path.match(/^\/api\/drafts\/([0-9a-f-]{36})\/approval$/);
       if (approval && request.method === "POST") {
         const body = await readJson(request);
@@ -649,6 +651,15 @@ export function createApp(options = {}) {
     }
   }
 
+  async function postMoney(request) {
+    const body = await readJson(request);
+    let result = null;
+    await store.update(dayKey(new Date(nowFn())), current => {
+      result = saveMoney(current, body, new Date(nowFn()));
+    });
+    return json({ ...result, sent: false, published: false, purchased: false, called: false }, result.created ? 201 : 200);
+  }
+
   async function ingest(event) {
     let result = null;
     await store.update(dayKey(new Date(nowFn())), current => {
@@ -689,13 +700,21 @@ export function createApp(options = {}) {
       });
     }
     const saved = await store.update(dayKey(new Date(nowFn())), state => {
+      try { advanceMoney(state, new Date(nowFn())); }
+      catch (error) { recoverStep(state, error, new Date(nowFn())); }
       recordOperatorRun(state, { trigger, connected: pulled.connected, created: once.created, now: new Date(nowFn()) });
     });
     const run = saved.runs.at(-1);
     const approved = (saved.tasks ?? []).some(task => task.status === "approved");
-    const worker = run?.action === "reply" || !approved
-      ? { completed: [], blocked: [], failed: [], skipped: run?.action === "reply" ? ["reply-first"] : [] }
-      : await executeWorker();
+    let worker = { completed: [], blocked: [], failed: [], skipped: [] };
+    try {
+      worker = run?.action === "reply" || !approved
+        ? { completed: [], blocked: [], failed: [], skipped: run?.action === "reply" ? ["reply-first"] : [] }
+        : await executeWorker();
+    } catch (error) {
+      await store.update(dayKey(new Date(nowFn())), state => recoverStep(state, error, new Date(nowFn())));
+      worker = { completed: [], blocked: [], failed: ["check"], skipped: [] };
+    }
     const report = { sent: false, performedExternal: false, durable, delay: pulled.delay, run, worker };
     if (!pulled.connected) return { connected: false, reason: pulled.reason, created: 0, duplicates: 0, drafts: [], remaining: 0, ...report };
     return {

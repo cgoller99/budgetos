@@ -463,6 +463,8 @@ function renderHome() {
         ]))) : el("p", { class: "muted" }, ["Nothing is waiting on you."]),
       ]),
     ]),
+    desk?.focus?.reason ? el("p", {}, [desk.focus.reason]) : null,
+    desk?.operator?.decision ? el("p", {}, [desk.operator.decision]) : null,
     el("p", { class: "muted" }, [desk?.operator?.wait || "The hosted check runs once a day."]),
     el("div", { class: "row" }, [
       button(state.chatOpen ? "Hide chat" : "Chat", () => { state.chatOpen = !state.chatOpen; render(); }),
@@ -484,6 +486,10 @@ function renderDesk(id) {
     el("p", {}, [card?.answer || "This source has not reported yet."]),
     card?.blocker ? el("p", { class: "error" }, [card.blocker]) : null,
     el("p", { class: "muted" }, [card?.recovery || ""]),
+    renderMoney(id),
+    el("h3", {}, ["Recorded"]),
+    ...(card?.progress || []).map(line => el("p", {}, [line])),
+    ...(saved?.leads || []).slice(-3).map(lead => el("p", {}, [`${lead.stage}: ${lead.name}. ${lead.scoreNote || "Not contacted."}`])),
     el("h3", {}, ["Working on"]),
     working.length ? el("div", { class: "list" }, working.map(task => el("p", {}, [`${task.status}: ${task.title}`]))) : el("p", { class: "muted" }, ["Nothing is running."]),
     el("h3", {}, ["Needs your decision"]),
@@ -494,7 +500,7 @@ function renderDesk(id) {
       (state.desk?.waiting || []).find(item => item.id === draft.id)?.sharePath
         ? el("p", { class: "muted" }, [`Prospect link: ${location.origin}${(state.desk.waiting || []).find(item => item.id === draft.id).sharePath}`])
         : null,
-      button("Approve response", async () => {
+      id === "website-agency" && draft.status === "needs-christian" ? button("Approve response", async () => {
         state.error = "";
         try {
           const result = await api(`/api/drafts/${draft.id}/approval`, { method: "POST", body: { action: "outreach" } });
@@ -504,10 +510,83 @@ function renderDesk(id) {
             : "Saved. No external account was changed.";
         } catch (error) { state.error = error.message; }
         render();
-      }, "primary"),
+      }, "primary") : null,
       (state.desk?.waiting || []).some(item => item.id === draft.id && item.previewId) ? button("Open preview", () => { openPreview(draft.id); render(); }) : null,
     ])),
     drafts.length ? null : el("p", { class: "muted" }, ["No decision is waiting."]),
+  ]);
+}
+function box(label, multiline) {
+  return el(multiline ? "textarea" : "input", { "aria-label": label, maxlength: multiline ? "800" : "160" });
+}
+async function saveMoney(path, body, notice) {
+  state.error = "";
+  try {
+    const result = await api(path, { method: "POST", body });
+    state.notice = result.duplicate ? "Already saved. It was not repeated." : notice;
+    await refresh();
+  } catch (error) { state.error = error.message; }
+  render();
+}
+function renderMoney(id) {
+  if (id === "website-agency") {
+    const name = box("Prospect name");
+    const industry = el("select", { "aria-label": "Industry" }, ["dental", "legal", "home services", "restaurant", "fitness", "retail", "professional", "automotive", "other"].map(item => el("option", { value: item }, [item])));
+    const url = box("Prospect page");
+    const note = box("Why they may need a website", true);
+    const budget = box("Budget they named");
+    const noSite = el("input", { type: "checkbox", "aria-label": "They have no website" });
+    const asked = el("input", { type: "checkbox", "aria-label": "They asked about a website" });
+    const offerName = box("Offer prospect");
+    const scope = box("Offer scope");
+    const concept = box("Concept you wrote", true);
+    const price = box("Offer price you approve");
+    const deadline = box("Offer deadline");
+    const next = box("Offer next step");
+    const follow = box("Follow-up prospect");
+    const followNote = box("Follow-up note", true);
+    const followDate = box("Follow-up date");
+    const closeName = box("Payment prospect");
+    const basis = el("select", { "aria-label": "Payment basis" }, [el("option", { value: "accepted" }, ["Quote accepted"]), el("option", { value: "deposit" }, ["Deposit paid"])]);
+    const amount = box("Deposit amount received");
+    return el("div", {}, [
+      el("h3", {}, ["Prospect"]),
+      field("Name", name), field("Industry", industry), field("Page", url), field("Why they may need a site", note), field("Budget they named", budget),
+      el("label", {}, [noSite, " They have no website"]),
+      el("label", {}, [asked, " They asked about a website"]),
+      button("Save prospect", () => saveMoney("/api/money", { kind: "prospect", name: name.value, industry: industry.value, url: url.value, note: note.value, budget: budget.value, noWebsite: noSite.checked, asked: asked.checked }, "Prospect recorded. Nobody was contacted.")),
+      el("h3", {}, ["Offer"]),
+      field("Prospect", offerName), field("Scope", scope), field("Concept", concept), field("Price", price), field("Deadline", deadline), field("Next", next),
+      button("Save offer", () => saveMoney("/api/money", { kind: "offer", prospect: offerName.value, scope: scope.value, concept: concept.value, price: price.value, deadline: deadline.value, next: next.value }, "Offer saved. Nothing was sent."), "primary"),
+      el("h3", {}, ["Follow up"]),
+      field("Prospect", follow), field("Note", followNote), field("Date", followDate),
+      button("Save follow-up", () => saveMoney("/api/money", { kind: "follow-up", prospect: follow.value, note: followNote.value, date: followDate.value }, "Follow-up saved. Nothing was sent.")),
+      el("h3", {}, ["Payment"]),
+      field("Prospect", closeName), field("What happened", basis), field("Deposit received", amount),
+      button("Record payment", () => saveMoney("/api/money", { kind: "payment", prospect: closeName.value, basis: basis.value, amount: amount.value }, "Payment recorded. Nobody was called.")),
+    ]);
+  }
+  if (id === "buxme") {
+    const title = box("Content title");
+    const outline = box("Outline you want used", true);
+    return el("div", {}, [
+      el("h3", {}, ["Content draft"]),
+      field("Title", title), field("Outline", outline),
+      button("Save content draft", () => saveMoney("/api/money", { kind: "brief", title: title.value, outline: outline.value }, "Draft saved. It was not published."), "primary"),
+    ]);
+  }
+  const supplier = box("Supplier you verified");
+  const product = box("Product");
+  const demand = box("Demand fact you checked", true);
+  const shipping = box("Shipping fact you verified");
+  const price = box("Selling price");
+  const cost = box("Delivered cost you verified");
+  const verified = el("input", { type: "checkbox", "aria-label": "I verified this supplier" });
+  return el("div", {}, [
+    el("h3", {}, ["Product check"]),
+    field("Supplier", supplier), field("Product", product), field("Demand", demand), field("Shipping", shipping), field("Selling price", price), field("Delivered cost", cost),
+    el("label", {}, [verified, " I verified this supplier"]),
+    button("Save product check", () => saveMoney("/api/money", { kind: "product", supplier: supplier.value, name: product.value, demand: demand.value, shipping: shipping.value, price: price.value, deliveredCost: cost.value, verified: verified.checked }, "Listing draft saved. Nothing was purchased."), "primary"),
   ]);
 }
 function renderChat() {
