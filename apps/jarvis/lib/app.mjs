@@ -692,18 +692,20 @@ export function createApp(options = {}) {
       recordOperatorRun(state, { trigger, connected: pulled.connected, created: once.created, now: new Date(nowFn()) });
     });
     const run = saved.runs.at(-1);
-    if (!pulled.connected) return { connected: false, reason: pulled.reason, created: 0, duplicates: 0, drafts: [], sent: false, durable, delay: pulled.delay, remaining: 0, run };
+    const approved = (saved.tasks ?? []).some(task => task.status === "approved");
+    const worker = run?.action === "reply" || !approved
+      ? { completed: [], blocked: [], failed: [], skipped: run?.action === "reply" ? ["reply-first"] : [] }
+      : await executeWorker();
+    const report = { sent: false, performedExternal: false, durable, delay: pulled.delay, run, worker };
+    if (!pulled.connected) return { connected: false, reason: pulled.reason, created: 0, duplicates: 0, drafts: [], remaining: 0, ...report };
     return {
       connected: true,
       reason: durable ? "Saved. Sending still requires your approval." : "Saved on this server only. Add UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN or the phone will not see this draft.",
       created: once.created,
       duplicates: twice.duplicates,
       drafts: once.drafts,
-      sent: false,
-      durable,
       remaining: pulled.remaining ?? 0,
-      delay: pulled.delay,
-      run,
+      ...report,
     };
   }
 
