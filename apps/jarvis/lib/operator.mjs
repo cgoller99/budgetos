@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { pickupDelay } from "./inbox.mjs";
+import { chooseNext } from "./planner.mjs";
 
 export const EXCLUSIONS = [
   { name: "Atlanta Auto Diesel", test: /atlanta auto diesel/i },
@@ -71,14 +72,11 @@ export function etDay(value) {
 export function recordOperatorRun(state, { trigger = "schedule", connected = false, created = 0, now = new Date() } = {}) {
   state.runs ??= [];
   const at = new Date(now).toISOString();
-  const waiting = (state.drafts ?? []).filter(draft => draft.status === "needs-christian");
-  const followUp = pickupDelay(new Date(now), 0);
-  const decision = !connected
-    ? "The agency inbox is not connected, so no mail was read and nothing was sent."
-    : waiting.length
-      ? `Left ${waiting.length} draft${waiting.length === 1 ? "" : "s"} in Needs Christian. ${created} new draft${created === 1 ? "" : "s"} this check. Nothing was sent.`
-      : "No reply needs a draft. Nothing was sent.";
-  const run = { id: randomUUID(), at, trigger: String(trigger).slice(0, 40), created, decision, followUpAt: followUp.nextCheckBy, wait: followUp.summary };
+  const next = chooseNext(state, now);
+  const decision = connected
+    ? next.summary
+    : `The agency inbox is not connected, so no mail was read. ${next.summary}`;
+  const run = { id: randomUUID(), at, trigger: String(trigger).slice(0, 40), created, action: next.action, decision, followUpAt: next.followUpAt, wait: next.wait };
   state.runs.push(run);
   if (state.runs.length > 40) state.runs.splice(0, state.runs.length - 40);
   return run;
