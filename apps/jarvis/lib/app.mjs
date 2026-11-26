@@ -14,7 +14,9 @@ import {
   sessionSecret,
 } from "./auth.mjs";
 import { commandFrom, connectionFor, think } from "./brain.mjs";
+import { callConnection, claimForDial, placeVerifiedCall, recordCallReceipt } from "./calls.mjs";
 import { inboxConnection, pickupDelay, pullAgencyInbox } from "./inbox.mjs";
+import { acceptWork, applyHostedPass, hostedView, noteAgencyReply } from "./nextAction.mjs";
 import { answerFromRecords, businessDesk, briefing, ingestAgencyReply, recordOperatorRun, rememberSkip } from "./operator.mjs";
 import { previewDocument, previewForToken, sharePreview } from "./preview.mjs";
 import { modelChain, spendCap, spendCeiling } from "./routing.mjs";
@@ -505,7 +507,11 @@ export function createApp(options = {}) {
       }
       if (request.method === "GET" && path === "/api/desk") {
         const current = await store.read(dayKey(new Date(nowFn())));
-        return json({ ...briefing(current, new Date(nowFn())), businesses: businessDesk(current), connection: connectionFor(env, current.usage, new Date(nowFn())) });
+        return json({ ...briefing(current, new Date(nowFn())), businesses: businessDesk(current), hosted: hostedView(current), connection: connectionFor(env, current.usage, new Date(nowFn())) });
+      }
+      if (request.method === "POST" && path === "/api/work") {
+        const result = await recordWork(await readJson(request));
+        return json(result, result.duplicate ? 200 : 201);
       }
       if (request.method === "GET" && path === "/api/businesses") {
         const state = await store.read(dayKey(new Date(nowFn())));
@@ -653,8 +659,51 @@ export function createApp(options = {}) {
     let result = null;
     await store.update(dayKey(new Date(nowFn())), current => {
       result = ingestAgencyReply(current, event, new Date(nowFn()));
+      if (result?.created) noteAgencyReply(current, result.item, new Date(nowFn()));
     });
     return result;
+  }
+
+  async function deliverOneCall() {
+    const line = callConnection(env);
+    if (!line.ready) return { attempted: false, status: "queued", reason: line.reason, sent: false };
+    let claim = null;
+    await store.update(dayKey(new Date(nowFn())), state => {
+      claim = claimForDial(state, new Date(nowFn()));
+    });
+    if (!claim) return { attempted: false, status: "none", reason: "No call is waiting.", sent: false };
+    const place = options.placeCall ?? ((request) => placeVerifiedCall(request, env, fetchImpl));
+    try {
+      const result = await place({ to: line.to, approvedByUser: true, reason: claim.script, callbackUrl: `${line.origin}/api/jarvis/voice` });
+      await store.update(dayKey(new Date(nowFn())), state => {
+        const call = recordCallReceipt(state, claim.eventId, { ok: true, sid: result?.sid, status: result?.status });
+        state.logs.push({ id: randomUUID(), at: new Date(nowFn()).toISOString(), level: "info", message: `${call?.status === "connected" ? "Connected" : "Dialed"} once. ${call?.note ?? ""}`.slice(0, 300), taskId: null });
+      });
+      return { attempted: true, status: "dialed", sid: result?.sid ?? null, sent: true };
+    } catch (error) {
+      const uncertain = Boolean(error.uncertain) || !error.status || error.status >= 500 || /timeout|network|fetch failed/i.test(String(error.message ?? ""));
+      await store.update(dayKey(new Date(nowFn())), state => {
+        recordCallReceipt(state, claim.eventId, { uncertain });
+      });
+      return { attempted: true, status: uncertain ? "uncertain" : "failed", sent: false };
+    }
+  }
+
+  async function finishPass(base) {
+    const saved = await store.update(dayKey(new Date(nowFn())), state => {
+      applyHostedPass(state, new Date(nowFn()));
+    });
+    const call = await deliverOneCall();
+    return { ...base, decision: saved.decisions.at(-1) ?? null, call, sent: false };
+  }
+
+  async function recordWork(item) {
+    let result = null;
+    await store.update(dayKey(new Date(nowFn())), current => {
+      result = acceptWork(current, item, new Date(nowFn()));
+    });
+    const finished = await finishPass({ created: result.created, duplicate: result.duplicate, id: result.item.id });
+    return finished;
   }
 
   async function applyEvents(events) {
@@ -688,7 +737,8 @@ export function createApp(options = {}) {
         for (const id of pulled.skipIds) rememberSkip(state, id, new Date(nowFn()));
       });
     }
-    const saved = await store.update(dayKey(new Date(nowFn())), state => {
+const saved = await store.update(dayKey(new Date(nowFn())), state => {
+      applyHostedPass(state, new Date(nowFn()));
       recordOperatorRun(state, { trigger, connected: pulled.connected, created: once.created, now: new Date(nowFn()) });
     });
     const run = saved.runs.at(-1);
@@ -696,7 +746,8 @@ export function createApp(options = {}) {
     const worker = run?.action === "reply" || !approved
       ? { completed: [], blocked: [], failed: [], skipped: run?.action === "reply" ? ["reply-first"] : [] }
       : await executeWorker();
-    const report = { sent: false, performedExternal: false, durable, delay: pulled.delay, run, worker };
+    const call = await deliverOneCall();
+    const report = { sent: false, performedExternal: false, durable, delay: pulled.delay, run, worker, decision: saved.decisions.at(-1) ?? null, call };
     if (!pulled.connected) return { connected: false, reason: pulled.reason, created: 0, duplicates: 0, drafts: [], remaining: 0, ...report };
     return {
       connected: true,
@@ -709,7 +760,7 @@ export function createApp(options = {}) {
     };
   }
 
-  return { handle, ingest, collectInbox, store, env, setFailOnce(value) { failOnce = value; } };
+  return { handle, ingest, collectInbox, recordWork, store, env, setFailOnce(value) { failOnce = value; } };
 }
 
 async function serveStatic(path) {

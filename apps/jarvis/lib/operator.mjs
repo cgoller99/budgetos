@@ -146,29 +146,33 @@ export function answerFromRecords(text, state, now = new Date()) {
 }
 
 export function businessDesk(state) {
-  const waiting = (state.drafts ?? []).filter(draft => draft.status === "needs-christian");
+  const waiting = (business) => (state.drafts ?? []).filter(draft => draft.status === "needs-christian" && draft.business === business);
+  const latest = (kind) => [...(state.work ?? [])].reverse().find(item => item.kind === kind && item.result);
+  const sourcing = latest("sourcing");
+  const growth = latest("growth");
+  const agency = waiting("website-agency");
   return {
     buxme: {
       question: "Did yesterday’s video go out, and did anyone sign up?",
-      connected: false,
-      answer: "Publishing, signups, and subscriptions are not connected.",
+      connected: Boolean(growth?.postUrl),
+      answer: growth?.result ?? "Publishing, signups, and subscriptions are not connected.",
       recovery: "Connect the video schedule and the signup source on the budgetos project. Until then Jarvis will not invent a count.",
-      records: [],
+      records: waiting("buxme"),
     },
     agency: {
       question: "Did anybody reply, and who needs me?",
       connected: true,
-      answer: waiting.length ? `${waiting.length} draft${waiting.length === 1 ? "" : "s"} waiting on you.` : "No reply is waiting.",
+      answer: agency.length ? `${agency.length} draft${agency.length === 1 ? "" : "s"} waiting on you.` : "No reply is waiting.",
       recovery: "The daily check handles 10 unread replies, then continues with the next 10. Sending still requires your approval.",
-      records: waiting,
+      records: agency,
     },
     drivenest: {
       question: "What’s holding up the scanner launch?",
-      connected: false,
-      answer: "Supplier cost is unknown, so margin is unknown.",
-      recovery: "Connect supplier cost, shipping, and inventory before Jarvis quotes a margin or publishes a listing.",
-      blocker: "Supplier cost is not connected.",
-      records: [],
+      connected: Boolean(sourcing?.result),
+      answer: sourcing?.result ?? "Supplier cost is unknown, so margin is unknown.",
+      recovery: latest("fulfillment")?.result ?? "Connect supplier cost, shipping, and inventory before Jarvis quotes a margin or publishes a listing.",
+      blocker: sourcing?.result ? "" : "Supplier cost is not connected.",
+      records: waiting("drivenest"),
     },
   };
 }
