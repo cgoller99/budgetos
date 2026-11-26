@@ -329,6 +329,8 @@ function renderHome() {
     desk?.headlineAt ? el("p", { class: "muted" }, [formatTime(desk.headlineAt)]) : null,
     el("p", { class: state.status?.connection?.connected ? "ok" : "meta" }, [connectionText()]),
     el("p", { class: "muted" }, [state.services?.inbox?.connected ? "Agency inbox is connected. Sending still needs your approval." : (state.services?.inbox?.reason || "Agency inbox is not connected.")]),
+    el("p", { class: "muted" }, [state.services?.inbox?.summary || "The inbox check runs once a day and handles 10 unread messages."]),
+    el("p", { class: "muted" }, [state.services?.inbox?.replyRoute || "Replies sent to christiangoller99@gmail.com stay in Gmail until they are forwarded."]),
     state.services?.persistence?.configured ? null : el("p", { class: "muted" }, ["Work saved here can disappear on restart. Add UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN on the budgetos project."]),
     waiting.length ? el("div", { class: "list" }, waiting.map(item => el("article", { class: "item" }, [
       el("h2", {}, [item.title]),

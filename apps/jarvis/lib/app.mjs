@@ -14,8 +14,8 @@ import {
   sessionSecret,
 } from "./auth.mjs";
 import { commandFrom, connectionFor, think } from "./brain.mjs";
-import { inboxConnection, pullAgencyInbox } from "./inbox.mjs";
-import { answerFromRecords, businessDesk, briefing, ingestAgencyReply } from "./operator.mjs";
+import { inboxConnection, pickupDelay, pullAgencyInbox } from "./inbox.mjs";
+import { answerFromRecords, businessDesk, briefing, ingestAgencyReply, rememberSkip } from "./operator.mjs";
 import { modelChain, spendCap, spendCeiling } from "./routing.mjs";
 import { createRedisStore } from "./redisStore.mjs";
 import { BUSINESSES, createStore, defaultGates } from "./store.mjs";
@@ -111,7 +111,7 @@ function services(env) {
       note: "Git runs only in a repository whose toplevel is JARVIS_SANDBOX_REPO, and only after confirmation.",
     },
     auth: { configured: authConfigured(env), requiredEnv: ["JARVIS_OWNER_PASSWORD", "JARVIS_SESSION_SECRET"] },
-    inbox: { ...inboxConnection(env), requiredEnv: ["RESEND_API_KEY", "JARVIS_AGENCY_INBOX"] },
+    inbox: { ...inboxConnection(env), ...pickupDelay(new Date()), requiredEnv: ["RESEND_API_KEY", "JARVIS_AGENCY_INBOX"] },
     spendCeiling: (() => {
       const ceiling = spendCeiling(env);
       return { cents: ceiling.cents, ok: ceiling.ok, note: ceiling.ok ? `Model spend stops at $${ceiling.cents / 100} per day.` : ceiling.reason };
@@ -636,11 +636,18 @@ export function createApp(options = {}) {
   }
 
   async function collectInbox() {
-    const pulled = await pullAgencyInbox({ env, fetchImpl });
-    if (!pulled.connected) return { connected: false, reason: pulled.reason, created: 0, duplicates: 0, drafts: [], sent: false, durable: redisConfigured(env) };
+    const current = await store.read(dayKey(new Date(nowFn())));
+    const seen = new Set((current.inbox ?? []).map(item => item.messageId));
+    const pulled = await pullAgencyInbox({ env, fetchImpl, seen });
+    const durable = redisConfigured(env);
+    if (!pulled.connected) return { connected: false, reason: pulled.reason, created: 0, duplicates: 0, drafts: [], sent: false, durable, delay: pulled.delay, remaining: 0 };
     const once = await applyEvents(pulled.events);
     const twice = await applyEvents(pulled.events);
-    const durable = redisConfigured(env);
+    if (pulled.skipIds?.length) {
+      await store.update(dayKey(new Date(nowFn())), state => {
+        for (const id of pulled.skipIds) rememberSkip(state, id, new Date(nowFn()));
+      });
+    }
     return {
       connected: true,
       reason: durable ? "Saved. Sending still requires your approval." : "Saved on this server only. Add UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN or the phone will not see this draft.",
@@ -649,6 +656,8 @@ export function createApp(options = {}) {
       drafts: once.drafts,
       sent: false,
       durable,
+      remaining: pulled.remaining ?? 0,
+      delay: pulled.delay,
     };
   }
 
