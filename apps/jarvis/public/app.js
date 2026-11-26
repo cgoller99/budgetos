@@ -1,3 +1,4 @@
+import { commandFromSpeech, isEcho } from "./voice-commands.mjs";
 const sections = ["Overview", "Chat", "Voice", "Tasks", "Agents", "Business", "Services", "History", "Settings", "Health"];
 const state = {
   authenticated: false,
@@ -19,7 +20,16 @@ const state = {
   handsFree: false,
   orb: "idle",
   setup: "",
+  micId: storedMic(),
+  mics: [],
+  lastSpoken: "",
+  lastDraftId: null,
+  focusDraft: null,
+  micStream: null,
 };
+function storedMic() {
+  try { return localStorage.getItem("jarvis-mic") || ""; } catch { return ""; }
+}
 let recognition = null;
 let audio = null;
 let speakSeq = 0;
@@ -67,15 +77,32 @@ function unlockAudio() {
     window.speechSynthesis.speak(primer);
   }
 }
+function stopMic() {
+  state.micStream?.getTracks().forEach(track => track.stop());
+  state.micStream = null;
+}
 function interruptSpeech() {
   speakSeq += 1;
   audio?.pause();
   window.speechSynthesis?.cancel();
+  recognition?.abort?.();
   recognition?.stop();
-  setOrb("idle");
+  stopMic();
+  setOrb(state.muted ? "muted" : "idle");
+}
+function muteNow() {
+  state.muted = true;
+  state.handsFree = false;
+  interruptSpeech();
+  setOrb("muted");
+  render();
 }
 async function speak(text) {
   const sequence = ++speakSeq;
+  state.lastSpoken = text;
+  stopMic();
+  recognition?.abort?.();
+  recognition?.stop();
   audio?.pause();
   window.speechSynthesis?.cancel();
   setOrb("speaking");
@@ -90,13 +117,14 @@ async function speak(text) {
         const url = URL.createObjectURL(await response.blob());
         await new Promise((resolve, reject) => {
           audio = new Audio(url);
+          audio.volume = 1;
           audio.onended = () => { URL.revokeObjectURL(url); resolve(); };
           audio.onerror = () => { URL.revokeObjectURL(url); reject(new Error("playback")); };
           audio.play().catch(reject);
         });
-        if (sequence !== speakSeq) return;
+        if (sequence !== speakSeq || state.muted) return;
         setOrb(state.handsFree ? "listening" : "idle");
-        if (state.handsFree) startListening();
+        if (state.handsFree) setTimeout(() => { if (!state.muted && speakSeq === sequence) startListening(); }, 400);
         return;
       }
     } catch {
@@ -129,20 +157,53 @@ async function speak(text) {
       finish();
     }
   });
-  if (sequence !== speakSeq) return;
+  if (sequence !== speakSeq || state.muted) return;
   setOrb(state.handsFree ? "listening" : "idle");
-  if (state.handsFree) startListening();
+  if (state.handsFree) setTimeout(() => { if (!state.muted && speakSeq === sequence) startListening(); }, 400);
+}
+function rememberDraft(reply) {
+  const waiting = state.desk?.waiting || [];
+  const hit = waiting.find(item => String(reply || "").includes(item.title));
+  state.lastDraftId = hit?.id || waiting[0]?.id || state.lastDraftId;
+}
+function sectionFor(business) {
+  if (business === "website-agency") return "Agency";
+  if (business === "drivenest") return "DriveNest";
+  if (business === "buxme") return "Buxme";
+  return "Home";
+}
+function openDraft(id) {
+  const waiting = state.desk?.waiting || [];
+  const item = waiting.find(entry => entry.id === id) || waiting[0];
+  if (!item) {
+    state.error = "There is no draft to open.";
+    render();
+    return null;
+  }
+  state.focusDraft = item.id;
+  state.lastDraftId = item.id;
+  state.section = sectionFor(item.business);
+  state.notice = `Opened ${item.title}.`;
+  return item;
 }
 async function handleTranscript(text) {
-  const clean = text.trim();
-  if (!clean) return;
+  if (state.muted || isEcho(text, state.lastSpoken)) return;
+  const command = commandFromSpeech(text);
+  if (command.type === "ignore") return;
   interruptSpeech();
+  if (command.type === "open-draft") {
+    const item = openDraft(state.lastDraftId);
+    render();
+    if (item) await speak(`Opening ${item.title}.`);
+    return;
+  }
   setOrb("thinking");
   state.error = "";
   try {
-    const data = await api("/api/voice/turn", { method: "POST", body: { transcript: clean } });
+    const data = await api("/api/voice/turn", { method: "POST", body: { transcript: command.text } });
     state.messages = data.messages;
     state.voiceOn = true;
+    rememberDraft(data.reply);
     render();
     await speak(data.reply);
   } catch (error) {
@@ -151,50 +212,72 @@ async function handleTranscript(text) {
     render();
   }
 }
+async function loadMics(stream) {
+  if (!navigator.mediaDevices?.enumerateDevices) return;
+  const devices = await navigator.mediaDevices.enumerateDevices();
+  state.mics = devices.filter(device => device.kind === "audioinput").map((device, index) => ({ id: device.deviceId, label: device.label || `Microphone ${index + 1}` }));
+  if (stream && !state.micId) state.micId = stream.getAudioTracks()[0]?.getSettings?.().deviceId || "";
+}
 async function startListening() {
-  if (state.muted) { setOrb("muted"); return; }
-  if (navigator.mediaDevices?.getUserMedia) {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      for (const track of stream.getTracks()) track.stop();
-    } catch (error) {
-      if (error?.name === "NotAllowedError" || error?.name === "SecurityError") {
-        state.error = "Microphone permission was blocked. Allow it for this site, then tap Listen again.";
-        setOrb("idle");
-        render();
-        return;
-      }
-    }
-  }
+  if (state.muted) { stopMic(); setOrb("muted"); return; }
   const Ctor = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!Ctor) {
-    state.error = "This browser has no speech recognition. Type the words in Voice, and Jarvis will answer and speak. On iPhone, open this page in Safari and allow the microphone.";
+    state.error = "This browser has no speech recognition. Use the latest Chrome or Edge on Windows, allow the microphone, then click the globe once.";
     setOrb("idle");
     render();
     return;
   }
+  if (navigator.mediaDevices?.getUserMedia) {
+    try {
+      stopMic();
+      const audioConstraints = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+      if (state.micId) audioConstraints.deviceId = { exact: state.micId };
+      state.micStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
+      await loadMics(state.micStream);
+    } catch (error) {
+      if (error?.name === "NotAllowedError" || error?.name === "SecurityError") {
+        state.error = "Microphone permission was blocked. Allow it for this site in Windows, then click the globe again.";
+        setOrb("idle");
+        render();
+        return;
+      }
+      state.error = "The selected microphone did not open. Choose another microphone, then click the globe.";
+      setOrb("idle");
+      render();
+      return;
+    }
+  }
+  recognition?.abort?.();
   recognition?.stop();
   recognition = new Ctor();
   recognition.lang = "en-US";
   recognition.interimResults = false;
   recognition.continuous = false;
-  recognition.onresult = event => handleTranscript(event.results?.[0]?.[0]?.transcript || "");
+  recognition.onresult = event => {
+    if (state.muted || state.orb === "speaking") return;
+    handleTranscript(event.results?.[0]?.[0]?.transcript || "");
+  };
   recognition.onerror = event => {
     const code = event.error;
+    if (code === "aborted" || state.muted || state.orb === "speaking") return;
     state.error = code === "not-allowed"
-      ? "Microphone permission was blocked. Allow it for this site, then tap Listen again."
+      ? "Microphone permission was blocked. Allow it for this site in Windows, then click the globe again."
       : code === "no-speech"
-        ? "I did not hear anything. Tap Listen and try again."
-        : "Listening failed. Tap Listen to try again, or type instead.";
+        ? ""
+        : "Listening failed. Click the globe to try again.";
+    if (code === "no-speech" && state.handsFree && !state.muted) {
+      setTimeout(() => { if (state.handsFree && !state.muted) startListening(); }, 300);
+      return;
+    }
     setOrb("idle");
     render();
   };
-  recognition.onend = () => { if (state.orb === "listening") setOrb("idle"); };
+  recognition.onend = () => { if (state.orb === "listening" && !state.handsFree) setOrb("idle"); };
   try {
     recognition.start();
     setOrb("listening");
   } catch (error) {
-    state.error = "The microphone did not start. Tap Listen once more.";
+    state.error = "The microphone did not start. Click the globe once more.";
     setOrb("idle");
     render();
   }
@@ -323,20 +406,28 @@ async function act(path, body) {
 function renderHome() {
   const desk = state.desk;
   const waiting = desk?.waiting || [];
+  const recent = (state.logs || []).slice(-5).reverse();
   return el("section", { class: "home" }, [
     el("p", { class: "greeting" }, [desk?.greeting || "Good evening, Christian"]),
     el("p", { class: "headline" }, [desk?.headline || "Nothing new has been recorded."]),
     desk?.headlineAt ? el("p", { class: "muted" }, [formatTime(desk.headlineAt)]) : null,
+    el("div", { class: "home-grid" }, [
+      el("article", { class: "panel" }, [
+        el("h2", {}, ["Recent work"]),
+        recent.length ? el("div", { class: "list" }, recent.map(entry => el("p", { class: "item" }, [entry.message, el("span", { class: "muted" }, [` ${formatTime(entry.at)}`])]))) : el("p", { class: "muted" }, ["Nothing has been recorded."]),
+      ]),
+      el("article", { class: "panel" }, [
+        el("h2", {}, ["Needs Christian"]),
+        waiting.length ? el("div", { class: "list" }, waiting.map(item => el("article", { class: "item" }, [
+          el("h3", {}, [item.title]),
+          el("p", { class: "muted" }, [`${formatTime(item.at)} · not sent`]),
+          button("Open", () => { openDraft(item.id); render(); }),
+        ]))) : el("p", { class: "muted" }, ["Nothing is waiting on you."]),
+      ]),
+    ]),
     el("p", { class: state.status?.connection?.connected ? "ok" : "meta" }, [connectionText()]),
-    el("p", { class: "muted" }, [state.services?.inbox?.connected ? "Agency inbox is connected. Sending still needs your approval." : (state.services?.inbox?.reason || "Agency inbox is not connected.")]),
-    el("p", { class: "muted" }, [state.services?.inbox?.summary || "The inbox check runs once a day and handles 10 unread messages."]),
-    el("p", { class: "muted" }, [state.services?.inbox?.replyRoute || "Replies sent to christiangoller99@gmail.com stay in Gmail until they are forwarded."]),
+    el("p", { class: "muted" }, [state.services?.inbox?.reason || state.services?.inbox?.summary || "The inbox check runs once a day."]),
     state.services?.persistence?.configured ? null : el("p", { class: "muted" }, ["Work saved here can disappear on restart. Add UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN on the budgetos project."]),
-    waiting.length ? el("div", { class: "list" }, waiting.map(item => el("article", { class: "item" }, [
-      el("h2", {}, [item.title]),
-      el("p", { class: "muted" }, [`Needs you · ${formatTime(item.at)} · not sent`]),
-      button("Open", () => { state.section = item.business === "website-agency" ? "Agency" : "Home"; render(); }),
-    ]))) : el("p", { class: "muted" }, ["Nothing is waiting on you."]),
     button(state.chatOpen ? "Hide chat" : "Chat", () => { state.chatOpen = !state.chatOpen; render(); }),
     state.chatOpen ? renderChat() : null,
   ]);
@@ -347,17 +438,23 @@ function renderDesk(id) {
   const card = state.desk?.businesses?.[key];
   const saved = (state.businesses || []).find(item => item.id === id);
   const drafts = (saved?.drafts || []).filter(draft => draft.status === "needs-christian" || draft.status === "draft");
+  const working = (state.tasks || []).filter(task => task.status === "running" || task.status === "approved");
   return el("section", { class: "panel" }, [
     el("h2", {}, [card?.question || "This workspace"]),
+    el("h3", {}, ["What Jarvis did"]),
     el("p", {}, [card?.answer || "This source has not reported yet."]),
     card?.blocker ? el("p", { class: "error" }, [card.blocker]) : null,
     el("p", { class: "muted" }, [card?.recovery || ""]),
-    ...drafts.map(draft => el("article", { class: "item" }, [
+    el("h3", {}, ["Working on"]),
+    working.length ? el("div", { class: "list" }, working.map(task => el("p", {}, [`${task.status}: ${task.title}`]))) : el("p", { class: "muted" }, ["Nothing is running."]),
+    el("h3", {}, ["Needs your decision"]),
+    ...drafts.map(draft => el("article", { class: draft.id === state.focusDraft ? "item focus" : "item", id: `draft-${draft.id}` }, [
       el("h3", {}, [draft.title]),
       el("p", { class: "muted" }, [formatTime(draft.createdAt)]),
       el("p", {}, [draft.body]),
       button("Approve response", () => act(`/api/drafts/${draft.id}/approval`, { action: "outreach" }), "primary"),
     ])),
+    drafts.length ? null : el("p", { class: "muted" }, ["No decision is waiting."]),
   ]);
 }
 function renderChat() {
@@ -585,13 +682,20 @@ function render() {
     onclick: async () => { state.section = state.section === section ? "Home" : section; state.error = ""; await refresh().catch(error => { state.error = error.message; }); render(); },
   }, [section]));
   const voiceState = state.muted ? "muted" : state.orb;
-  root.replaceChildren(el("div", { class: "shell phone" }, [
+  const micSelect = el("select", {
+    "aria-label": "Microphone",
+    onchange: event => {
+      state.micId = event.target.value;
+      try { localStorage.setItem("jarvis-mic", state.micId); } catch { /* the choice still applies this session */ }
+    },
+  }, [el("option", { value: "" }, ["Default microphone"]), ...state.mics.map(mic => el("option", { value: mic.id, selected: mic.id === state.micId }, [mic.label]))]);
+  root.replaceChildren(el("div", { class: "shell desktop" }, [
     el("header", { class: "top" }, [
       el("p", { class: "kicker" }, ["Jarvis"]),
-      button(state.muted ? "Unmute" : "Mute", () => { state.muted = !state.muted; if (state.muted) interruptSpeech(); setOrb(state.muted ? "muted" : "idle"); render(); }),
+      el("div", { class: "row" }, [micSelect, button(state.muted ? "Unmute" : "Mute", () => { if (state.muted) { state.muted = false; setOrb("idle"); render(); } else muteNow(); })]),
     ]),
     el("aside", { class: "orb-wrap" }, [
-      el("button", { class: "orb", type: "button", "data-state": voiceState, "aria-label": state.muted ? "Jarvis is muted" : `Jarvis is ${voiceState}. Talk.`, onclick: () => { if (state.muted) return; unlockAudio(); state.error = ""; startListening(); } }),
+      el("button", { class: "orb", type: "button", "data-state": voiceState, "aria-label": state.muted ? "Jarvis is muted" : `Jarvis is ${voiceState}. Talk.`, onclick: () => { if (state.muted) return; state.handsFree = true; unlockAudio(); state.error = ""; startListening(); } }),
       el("p", { id: "orb-label" }, [voiceState]),
     ]),
     el("main", { class: "content" }, [
@@ -603,6 +707,9 @@ function render() {
   ]));
   const thread = document.querySelector(".thread");
   if (thread) thread.scrollTop = thread.scrollHeight;
+  const focused = state.focusDraft ? document.getElementById(`draft-${state.focusDraft}`) : null;
+  const content = document.querySelector(".content");
+  if (focused && content) content.scrollTop = focused.offsetTop - 12;
 }
 window.jarvisHandleTranscript = handleTranscript;
 setInterval(async () => {

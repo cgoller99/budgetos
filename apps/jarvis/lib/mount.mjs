@@ -6,6 +6,7 @@ const PREFIX = "/jarvis";
 export const dashboardAssets = [
   join(process.cwd(), "apps/jarvis/public/app.js"),
   join(process.cwd(), "apps/jarvis/public/app.css"),
+  join(process.cwd(), "apps/jarvis/public/voice-commands.mjs"),
 ];
 
 const PAGE_HEADERS = {
