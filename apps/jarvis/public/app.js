@@ -491,7 +491,20 @@ function renderDesk(id) {
       el("h3", {}, [draft.title]),
       el("p", { class: "muted" }, [formatTime(draft.createdAt)]),
       el("p", {}, [draft.body]),
-      button("Approve response", () => act(`/api/drafts/${draft.id}/approval`, { action: "outreach" }), "primary"),
+      (state.desk?.waiting || []).find(item => item.id === draft.id)?.sharePath
+        ? el("p", { class: "muted" }, [`Prospect link: ${location.origin}${(state.desk.waiting || []).find(item => item.id === draft.id).sharePath}`])
+        : null,
+      button("Approve response", async () => {
+        state.error = "";
+        try {
+          const result = await api(`/api/drafts/${draft.id}/approval`, { method: "POST", body: { action: "outreach" } });
+          await refresh();
+          state.notice = result.previewPath
+            ? `Approved. Nothing was sent. The prospect can open ${location.origin}${result.previewPath}`
+            : "Saved. No external account was changed.";
+        } catch (error) { state.error = error.message; }
+        render();
+      }, "primary"),
       (state.desk?.waiting || []).some(item => item.id === draft.id && item.previewId) ? button("Open preview", () => { openPreview(draft.id); render(); }) : null,
     ])),
     drafts.length ? null : el("p", { class: "muted" }, ["No decision is waiting."]),

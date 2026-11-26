@@ -1,3 +1,26 @@
+import { randomBytes, timingSafeEqual } from "node:crypto";
+
+export function sharePreview(state, draftId, now = new Date()) {
+  const preview = (state.previews ?? []).find(item => item.draftId === draftId);
+  if (!preview || preview.shared) return preview ?? null;
+  preview.shared = true;
+  preview.shareToken = randomBytes(32).toString("base64url");
+  preview.sharedAt = new Date(now).toISOString();
+  return preview;
+}
+
+export function previewForToken(previews, token) {
+  const given = String(token ?? "");
+  if (!/^[A-Za-z0-9_-]{43}$/.test(given)) return null;
+  const provided = Buffer.from(given);
+  for (const preview of previews ?? []) {
+    if (!preview?.shared || typeof preview.shareToken !== "string") continue;
+    const stored = Buffer.from(preview.shareToken);
+    if (stored.length === provided.length && timingSafeEqual(stored, provided)) return preview;
+  }
+  return null;
+}
+
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[char]));
 }

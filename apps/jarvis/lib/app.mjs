@@ -16,7 +16,7 @@ import {
 import { commandFrom, connectionFor, think } from "./brain.mjs";
 import { inboxConnection, pickupDelay, pullAgencyInbox } from "./inbox.mjs";
 import { answerFromRecords, businessDesk, briefing, ingestAgencyReply, recordOperatorRun, rememberSkip } from "./operator.mjs";
-import { previewDocument } from "./preview.mjs";
+import { previewDocument, previewForToken, sharePreview } from "./preview.mjs";
 import { modelChain, spendCap, spendCeiling } from "./routing.mjs";
 import { createRedisStore } from "./redisStore.mjs";
 import { BUSINESSES, createStore, defaultGates } from "./store.mjs";
@@ -308,6 +308,24 @@ export function createApp(options = {}) {
       return body;
     }
     try {
+      if (typeof access?.shareToken === "string") {
+        const headers = { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store", "X-Robots-Tag": "noindex" };
+        if (request.method !== "GET" && request.method !== "HEAD") return new Response("Not found.", { status: 404, headers });
+        if (path !== `/share/${access.shareToken}`) return new Response("Not found.", { status: 404, headers });
+        const sharedState = await store.read(dayKey(new Date(nowFn())));
+        const shared = previewForToken(sharedState.previews, access.shareToken);
+        if (!shared) return new Response("That preview is not available.", { status: 404, headers });
+        return new Response(request.method === "HEAD" ? null : previewDocument(shared), {
+          headers: {
+            "Content-Type": "text/html; charset=utf-8",
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+            "X-Robots-Tag": "noindex",
+            "Referrer-Policy": "no-referrer",
+            "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'",
+          },
+        });
+      }
       if (path === "/api/health" && request.method === "GET") {
         return json({
           ok: true,
@@ -560,6 +578,7 @@ export function createApp(options = {}) {
         const body = await readJson(request);
         const action = String(body.action ?? "");
         if (!["publish", "outreach", "ads", "purchase", "account"].includes(action)) return json({ error: "Unknown approval action." }, 400);
+        let shared = null;
         const state = await store.update(dayKey(new Date(nowFn())), current => {
           const draft = current.drafts.find(item => item.id === approval[1]);
           if (!draft) throw Object.assign(new Error("Draft not found."), { status: 404 });
@@ -569,8 +588,14 @@ export function createApp(options = {}) {
             business: draft.business,
             priority: 5,
           }, env);
+          shared = sharePreview(current, draft.id, new Date(nowFn()));
         });
-        return json({ task: state.tasks.at(-1), performed: false, externalAction: "not_performed" }, 202);
+        return json({
+          task: state.tasks.at(-1),
+          performed: false,
+          externalAction: "not_performed",
+          previewPath: shared?.shareToken ? `/jarvis/share/${shared.shareToken}` : null,
+        }, 202);
       }
       if (request.method === "GET" && path === "/api/settings") {
         const state = await store.read(dayKey(new Date(nowFn())));
