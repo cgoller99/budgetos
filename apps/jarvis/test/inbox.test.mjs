@@ -40,8 +40,9 @@ test("a scheduled read saves one draft and a second pass does not", async () => 
   assert.equal(mail.calls.every(call => call.method === "GET" && call.url.startsWith("https://api.resend.com/emails/receiving")), true);
   const day = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date());
   const saved = await app.store.read(day);
-  assert.equal(saved.drafts.length, 1);
-  assert.match(saved.drafts[0].title, /Northline Dental/);
+  const agencyDrafts = saved.drafts.filter(draft => draft.business === "website-agency");
+  assert.equal(agencyDrafts.length, 1);
+  assert.match(agencyDrafts[0].title, /Northline Dental/);
   assert.match(answerFromRecords("Who replied?", saved), /Northline Dental/);
   assert.match(answerFromRecords("Who replied?", saved), /not been sent/);
 });
@@ -100,7 +101,7 @@ test("the next check reads past the first ten unread messages", async () => {
   assert.equal(continued.drafts[0].title.includes("Harbor Dental"), true);
   const day = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date());
   const saved = await app.store.read(day);
-  assert.equal(saved.drafts.length, 11);
+  assert.equal(saved.drafts.filter(draft => draft.business === "website-agency").length, 11);
   assert.match(answerFromRecords("Who replied?", saved), /Harbor Dental/);
 });
 

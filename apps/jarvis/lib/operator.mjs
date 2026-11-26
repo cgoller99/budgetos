@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { pickupDelay } from "./inbox.mjs";
 import { chooseNext } from "./planner.mjs";
+import { progressLines } from "./pipeline.mjs";
 
 export const EXCLUSIONS = [
   { name: "Atlanta Auto Diesel", test: /atlanta auto diesel/i },
@@ -73,9 +74,8 @@ export function recordOperatorRun(state, { trigger = "schedule", connected = fal
   state.runs ??= [];
   const at = new Date(now).toISOString();
   const next = chooseNext(state, now);
-  const decision = connected
-    ? next.summary
-    : `The agency inbox is not connected, so no mail was read. ${next.summary}`;
+  const focus = next.focus?.reason ? ` Focus: ${next.focus.reason}` : "";
+  const decision = `${connected ? next.summary : `The agency inbox is not connected, so no mail was read. ${next.summary}`}${focus}`;
   const run = { id: randomUUID(), at, trigger: String(trigger).slice(0, 40), created, action: next.action, decision, followUpAt: next.followUpAt, wait: next.wait };
   state.runs.push(run);
   if (state.runs.length > 40) state.runs.splice(0, state.runs.length - 40);
@@ -137,6 +137,11 @@ export function answerFromRecords(text, state, now = new Date()) {
     return logs.slice(-5).map(entry => entry.message).join(" ");
   }
   if (/scanner|drivenest|margin|supplier/.test(asked)) {
+    const priced = (state.products ?? []).filter(item => Number.isInteger(item.marginCents));
+    if (priced.length) {
+      const best = priced.reduce((left, right) => left.marginCents >= right.marginCents ? left : right);
+      return `${best.name} has a recorded margin of ${best.marginText}. This is not a sales forecast. Nothing was purchased.`;
+    }
     return "DriveNest supplier cost is not connected, so delivered cost and margin are unknown. I will not estimate them. The scanner launch is held on that missing cost.";
   }
   if (/video|signup|sign up|subscription/.test(asked) && /buxme|yesterday/.test(asked)) {
@@ -147,6 +152,7 @@ export function answerFromRecords(text, state, now = new Date()) {
 
 export function businessDesk(state) {
   const waiting = (state.drafts ?? []).filter(draft => draft.status === "needs-christian");
+  const lines = progressLines(state);
   return {
     buxme: {
       question: "Did yesterday’s video go out, and did anyone sign up?",
@@ -154,6 +160,7 @@ export function businessDesk(state) {
       answer: "Publishing, signups, and subscriptions are not connected.",
       recovery: "Connect the video schedule and the signup source on the budgetos project. Until then Jarvis will not invent a count.",
       records: [],
+      progress: lines.buxme,
     },
     agency: {
       question: "Did anybody reply, and who needs me?",
@@ -161,6 +168,7 @@ export function businessDesk(state) {
       answer: waiting.length ? `${waiting.length} draft${waiting.length === 1 ? "" : "s"} waiting on you.` : "No reply is waiting.",
       recovery: "The daily check handles 10 unread replies, then continues with the next 10. Sending still requires your approval.",
       records: waiting,
+      progress: lines.agency,
     },
     drivenest: {
       question: "What’s holding up the scanner launch?",
@@ -169,6 +177,7 @@ export function businessDesk(state) {
       recovery: "Connect supplier cost, shipping, and inventory before Jarvis quotes a margin or publishes a listing.",
       blocker: "Supplier cost is not connected.",
       records: [],
+      progress: lines.drivenest,
     },
   };
 }

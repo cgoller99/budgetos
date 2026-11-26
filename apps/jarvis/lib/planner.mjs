@@ -1,4 +1,5 @@
 import { pickupDelay } from "./inbox.mjs";
+import { chooseFocus } from "./pipeline.mjs";
 
 export function chooseNext(state, now = new Date()) {
   const followUp = pickupDelay(new Date(now), 0);
@@ -21,5 +22,5 @@ export function chooseNext(state, now = new Date()) {
     action = "approved";
     summary = `Next permitted work is “${approved[0].title}”. External sending, posting, and purchasing stay off.`;
   }
-  return { action, summary, followUpAt: followUp.nextCheckBy, wait: followUp.summary };
+  return { action, summary, followUpAt: followUp.nextCheckBy, wait: followUp.summary, focus: chooseFocus(state, now) };
 }
