@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { considerCall } from "./calls.mjs";
 import { pickupDelay } from "./inbox.mjs";
 import { chooseNext } from "./planner.mjs";
 
@@ -60,6 +61,7 @@ export function ingestAgencyReply(state, event, now = new Date()) {
   } else {
     state.logs.push({ id: randomUUID(), at, level: "info", message: `Recorded a reply from ${from}. It did not ask for a quote, so no draft was created.`, taskId: null });
   }
+  if (!excluded && !optedOut) considerCall(state, { messageId, from, text }, now);
   return { created: true, duplicate: false, item, draft, preview: state.previews.find(preview => preview.messageId === messageId) ?? null };
 }
 
@@ -120,6 +122,13 @@ export function briefing(state, now = new Date()) {
       nextCheckBy: state.runs?.at(-1)?.followUpAt ?? pickupDelay(now).nextCheckBy,
       wait: state.runs?.at(-1)?.wait ?? pickupDelay(now).summary,
     },
+    calls: (state.calls ?? []).slice(-8).map(call => ({
+      eventId: call.eventId,
+      kind: call.kind,
+      status: call.status,
+      note: call.note || (call.status === "queued" ? "Queued for the verified number. Jarvis has not dialed." : call.status),
+      sent: Boolean(call.sent),
+    })),
   };
 }
 
@@ -135,6 +144,11 @@ export function answerFromRecords(text, state, now = new Date()) {
     const logs = (state.logs ?? []).filter(entry => etDay(entry.at) === today);
     if (!logs.length) return "Nothing has been recorded today.";
     return logs.slice(-5).map(entry => entry.message).join(" ");
+  }
+  if (/\b(did you call|phone call|missed call)\b/.test(asked)) {
+    const calls = state.calls ?? [];
+    if (!calls.length) return "No call is queued. An interested reply does not place a call.";
+    return calls.slice(-3).map(call => call.note || `${call.kind} is ${call.status}.`).join(" ");
   }
   if (/scanner|drivenest|margin|supplier/.test(asked)) {
     return "DriveNest supplier cost is not connected, so delivered cost and margin are unknown. I will not estimate them. The scanner launch is held on that missing cost.";
