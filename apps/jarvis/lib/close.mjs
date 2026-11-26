@@ -171,6 +171,31 @@ export function saveSupplier(state, input, now = new Date()) {
   return { created: true, duplicate: false, draft: saved, marginCents: margin, purchased: false, published: false };
 }
 
+export function recordClose(state, input, now = new Date()) {
+  const prospect = clean(input?.prospect, 80);
+  const basis = input?.basis === "deposit" ? "deposit" : input?.basis === "accepted" ? "accepted" : "";
+  const at = new Date(now).toISOString();
+  if (prospect.length < 2) fail("Name the prospect.");
+  if (!basis) fail("Record a close only when the quote was accepted or a deposit was paid.");
+  if (blocked(prospect)) fail("That prospect is on the exclusion list. Nothing was saved.");
+  const offer = (state.drafts ?? []).find(item => item.business === "website-agency" && item.title === `Offer for ${prospect}`.slice(0, 120));
+  if (!offer) fail("Save the offer first. Jarvis will not close a job that has no price you approved.");
+  const paid = basis === "deposit" ? cents(input?.amount) : null;
+  if (basis === "deposit" && paid == null) fail("Enter the deposit amount you received. Jarvis will not guess it.");
+  const key = `won:${prospect.toLowerCase()}`;
+  if (!remember(state, key, `Won ${prospect}`, at)) return { created: false, duplicate: true, called: false, sent: false };
+  state.leads ??= [];
+  const lead = state.leads.find(item => item.business === "website-agency" && item.name.toLowerCase() === prospect.toLowerCase());
+  if (lead) lead.stage = "won";
+  else if (state.leads.length < 200) {
+    state.leads.push({ id: randomUUID(), business: "website-agency", name: prospect, url: "", note: "Closed from the offer you priced.", stage: "won", createdAt: at, decisionKey: key, qualified: false });
+  }
+  offer.status = "recorded";
+  const reason = basis === "deposit" ? `a deposit of ${money(paid)} was paid` : "you marked the quote accepted";
+  log(state, at, `Recorded ${prospect} as won because ${reason}. Nothing was sent and nobody was called.`);
+  return { created: true, duplicate: false, won: true, called: false, sent: false, amountCents: paid };
+}
+
 export function connectionChecklist(env = process.env) {
   const present = name => Boolean(String(env?.[name] ?? "").trim());
   return {

@@ -14,7 +14,7 @@ import {
   sessionSecret,
 } from "./auth.mjs";
 import { commandFrom, connectionFor, think } from "./brain.mjs";
-import { connectionChecklist, recoverCheck, saveBrief, saveFollowUp, saveOffer, saveProspect, saveSupplier } from "./close.mjs";
+import { connectionChecklist, recordClose, recoverCheck, saveBrief, saveFollowUp, saveOffer, saveProspect, saveSupplier } from "./close.mjs";
 import { inboxConnection, pickupDelay, pullAgencyInbox } from "./inbox.mjs";
 import { answerFromRecords, businessDesk, briefing, ingestAgencyReply, recordOperatorRun, rememberSkip } from "./operator.mjs";
 import { previewDocument, previewForToken, sharePreview } from "./preview.mjs";
@@ -584,6 +584,7 @@ export function createApp(options = {}) {
       if (request.method === "POST" && path === "/api/follow-ups") return await respondSaved(saveFollowUp, request);
       if (request.method === "POST" && path === "/api/briefs") return await respondSaved(saveBrief, request);
       if (request.method === "POST" && path === "/api/suppliers") return await respondSaved(saveSupplier, request);
+      if (request.method === "POST" && path === "/api/closes") return await respondSaved(recordClose, request);
       const approval = path.match(/^\/api\/drafts\/([0-9a-f-]{36})\/approval$/);
       if (approval && request.method === "POST") {
         const body = await readJson(request);

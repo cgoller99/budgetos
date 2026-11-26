@@ -486,7 +486,7 @@ function renderDesk(id) {
     el("p", { class: "muted" }, [card?.recovery || ""]),
     renderBusinessWork(id),
     (saved?.leads || []).length ? el("h3", {}, ["Prospects"]) : null,
-    ...(saved?.leads || []).slice(-5).map(lead => el("p", {}, [`${lead.stage}: ${lead.name}. Not contacted.`])),
+    ...(saved?.leads || []).slice(-5).map(lead => el("p", {}, [`${lead.stage}: ${lead.name}. ${lead.stage === "won" ? "Nobody was called." : "Not contacted."}`])),
     el("h3", {}, ["Working on"]),
     working.length ? el("div", { class: "list" }, working.map(task => el("p", {}, [`${task.status}: ${task.title}`]))) : el("p", { class: "muted" }, ["Nothing is running."]),
     el("h3", {}, ["Needs your decision"]),
@@ -497,7 +497,7 @@ function renderDesk(id) {
       (state.desk?.waiting || []).find(item => item.id === draft.id)?.sharePath
         ? el("p", { class: "muted" }, [`Prospect link: ${location.origin}${(state.desk.waiting || []).find(item => item.id === draft.id).sharePath}`])
         : null,
-      button("Approve response", async () => {
+      id === "website-agency" && draft.status === "needs-christian" ? button("Approve response", async () => {
         state.error = "";
         try {
           const result = await api(`/api/drafts/${draft.id}/approval`, { method: "POST", body: { action: "outreach" } });
@@ -507,7 +507,7 @@ function renderDesk(id) {
             : "Saved. No external account was changed.";
         } catch (error) { state.error = error.message; }
         render();
-      }, "primary"),
+      }, "primary") : null,
       (state.desk?.waiting || []).some(item => item.id === draft.id && item.previewId) ? button("Open preview", () => { openPreview(draft.id); render(); }) : null,
     ])),
     drafts.length ? null : el("p", { class: "muted" }, ["No decision is waiting."]),
@@ -537,6 +537,12 @@ function renderBusinessWork(id) {
     const next = inputBox("Offer next step");
     const follow = inputBox("Follow-up prospect");
     const followNote = inputBox("Follow-up you want saved", true);
+    const closeName = inputBox("Close prospect");
+    const basis = el("select", { "aria-label": "Close basis" }, [
+      el("option", { value: "accepted" }, ["Quote accepted"]),
+      el("option", { value: "deposit" }, ["Deposit paid"]),
+    ]);
+    const amount = inputBox("Deposit amount received");
     return el("div", {}, [
       el("h3", {}, ["Qualify"]),
       field("Name", name), field("Page", url), field("Why they fit", note),
@@ -547,6 +553,9 @@ function renderBusinessWork(id) {
       el("h3", {}, ["Follow up"]),
       field("Prospect", follow), field("Note", followNote),
       button("Save follow-up", () => saveWork("/api/follow-ups", { prospect: follow.value, note: followNote.value }, "Follow-up saved. Nothing was sent.")),
+      el("h3", {}, ["Close"]),
+      field("Prospect", closeName), field("What happened", basis), field("Deposit received", amount),
+      button("Record close", () => saveWork("/api/closes", { prospect: closeName.value, basis: basis.value, amount: amount.value }, "Recorded as won. Nobody was called.")),
     ]);
   }
   if (id === "buxme") {

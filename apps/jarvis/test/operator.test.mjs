@@ -75,6 +75,18 @@ test("the desk states missing sources instead of inventing numbers", () => {
   assert.match(desk.buxme.answer, /not connected/);
   assert.match(desk.drivenest.answer, /margin is unknown/);
   assert.equal(desk.drivenest.blocker.includes("$"), false);
+  const saved = businessDesk({
+    drafts: [
+      { business: "buxme", kind: "campaign", title: "Sunday tip", body: "outline", status: "draft" },
+      { business: "drivenest", kind: "listing", title: "Listing draft: Red V410", body: "Margin: unknown until both numbers are entered\n", status: "draft" },
+    ],
+    leads: [{ business: "website-agency", name: "Harbor Dental", stage: "won" }],
+  });
+  assert.match(saved.buxme.answer, /None were published/);
+  assert.equal(/\d+ signups/.test(saved.buxme.answer), false);
+  assert.match(saved.drivenest.answer, /Margin is unknown/);
+  assert.equal(saved.drivenest.answer.includes("$"), false);
+  assert.match(saved.agency.answer, /Nobody was called/);
 });
 
 test("the spending ceiling stays at five dollars", () => {

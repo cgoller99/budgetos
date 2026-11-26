@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { createApp } from "../lib/app.mjs";
-import { connectionChecklist, recoverCheck, saveBrief, saveOffer, saveProspect, saveSupplier } from "../lib/close.mjs";
+import { connectionChecklist, recordClose, recoverCheck, saveBrief, saveOffer, saveProspect, saveSupplier } from "../lib/close.mjs";
 
 const now = new Date("2026-11-26T15:00:00Z");
 const access = { buxme: "required", userId: "demo-admin" };
@@ -62,6 +62,35 @@ test("the same follow-up is not saved twice", async () => {
   assert.equal((await first.json()).sent, false);
   assert.equal((await second.json()).duplicate, true);
   assert.equal((await app.store.read("2026-11-26")).drafts.length, 1);
+});
+
+test("a close requires the priced offer and does not place a call", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "jarvis-won-"));
+  const app = createApp({ dataDir: dir, env: {}, now: () => now.getTime() });
+  const early = await post(app, "/api/closes", { prospect: "Harbor Dental", basis: "accepted" });
+  assert.equal(early.status, 400);
+  const offer = await post(app, "/api/offers", { prospect: "Harbor Dental", scope: "Five pages", price: "$2,400", deadline: "December 20", next: "Start the preview" });
+  assert.equal(offer.status, 201);
+  const won = await post(app, "/api/closes", { prospect: "Harbor Dental", basis: "accepted" });
+  assert.equal(won.status, 201);
+  const body = await won.json();
+  assert.equal(body.called, false);
+  assert.equal(body.sent, false);
+  const repeat = await post(app, "/api/closes", { prospect: "Harbor Dental", basis: "deposit", amount: "500" });
+  assert.equal((await repeat.json()).duplicate, true);
+  const state = await app.store.read("2026-11-26");
+  assert.equal(state.calls, undefined);
+  assert.equal(state.drafts[0].status, "recorded");
+  assert.equal(state.leads[0].stage, "won");
+  assert.match(state.logs.at(-1).message, /nobody was called/i);
+});
+
+test("a deposit is recorded only when the amount is entered", () => {
+  const state = { drafts: [{ business: "website-agency", title: "Offer for Harbor Dental", status: "needs-christian" }], leads: [], logs: [], decisions: [] };
+  assert.throws(() => recordClose(state, { prospect: "Harbor Dental", basis: "deposit" }, now), /deposit amount/);
+  const saved = recordClose(state, { prospect: "Harbor Dental", basis: "deposit", amount: "500" }, now);
+  assert.equal(saved.amountCents, 50000);
+  assert.equal(saved.called, false);
 });
 
 test("a content outline is saved once and does not invent a signup count", () => {

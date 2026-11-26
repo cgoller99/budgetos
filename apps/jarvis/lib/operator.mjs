@@ -137,6 +137,9 @@ export function answerFromRecords(text, state, now = new Date()) {
     return logs.slice(-5).map(entry => entry.message).join(" ");
   }
   if (/scanner|drivenest|margin|supplier/.test(asked)) {
+    const listing = (state.drafts ?? []).filter(draft => draft.business === "drivenest" && draft.kind === "listing").at(-1);
+    const margin = listing?.body?.match(/Margin: ([^\n]+)/)?.[1];
+    if (margin) return `${listing.title}. Margin is ${margin}. Nothing was purchased or published.`;
     return "DriveNest supplier cost is not connected, so delivered cost and margin are unknown. I will not estimate them. The scanner launch is held on that missing cost.";
   }
   if (/video|signup|sign up|subscription/.test(asked) && /buxme|yesterday/.test(asked)) {
@@ -146,29 +149,42 @@ export function answerFromRecords(text, state, now = new Date()) {
 }
 
 export function businessDesk(state) {
-  const waiting = (state.drafts ?? []).filter(draft => draft.status === "needs-christian");
+  const drafts = state.drafts ?? [];
+  const waiting = drafts.filter(draft => draft.status === "needs-christian");
+  const buxmeDrafts = drafts.filter(draft => draft.business === "buxme");
+  const listing = drafts.filter(draft => draft.business === "drivenest" && draft.kind === "listing").at(-1);
+  const margin = listing?.body?.match(/Margin: ([^\n]+)/)?.[1] ?? "";
+  const leads = (state.leads ?? []).filter(lead => lead.business === "website-agency");
+  const won = leads.filter(lead => lead.stage === "won").length;
+  const agency = [
+    waiting.length ? `${waiting.length} draft${waiting.length === 1 ? "" : "s"} waiting on you.` : "No reply is waiting.",
+    leads.length ? `${leads.length} prospect${leads.length === 1 ? "" : "s"} on file.` : "",
+    won ? `${won} recorded as won. Nobody was called.` : "",
+  ].filter(Boolean).join(" ");
   return {
     buxme: {
       question: "Did yesterday’s video go out, and did anyone sign up?",
       connected: false,
-      answer: "Publishing, signups, and subscriptions are not connected.",
+      answer: buxmeDrafts.length
+        ? `${buxmeDrafts.length} content draft${buxmeDrafts.length === 1 ? "" : "s"} saved. None were published. Signups and subscriptions are not connected.`
+        : "Publishing, signups, and subscriptions are not connected.",
       recovery: "Connect the video schedule and the signup source on the budgetos project. Until then Jarvis will not invent a count.",
-      records: [],
+      records: buxmeDrafts.slice(-5),
     },
     agency: {
       question: "Did anybody reply, and who needs me?",
       connected: true,
-      answer: waiting.length ? `${waiting.length} draft${waiting.length === 1 ? "" : "s"} waiting on you.` : "No reply is waiting.",
+      answer: agency,
       recovery: "The daily check handles 10 unread replies, then continues with the next 10. Sending still requires your approval.",
       records: waiting,
     },
     drivenest: {
       question: "What’s holding up the scanner launch?",
       connected: false,
-      answer: "Supplier cost is unknown, so margin is unknown.",
+      answer: listing ? `${listing.title}. Margin is ${margin}. Nothing was purchased.` : "Supplier cost is unknown, so margin is unknown.",
       recovery: "Connect supplier cost, shipping, and inventory before Jarvis quotes a margin or publishes a listing.",
-      blocker: "Supplier cost is not connected.",
-      records: [],
+      blocker: listing ? "" : "Supplier cost is not connected.",
+      records: listing ? [listing] : [],
     },
   };
 }
