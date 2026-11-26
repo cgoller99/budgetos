@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { createApp } from "../lib/app.mjs";
-import { answerFromRecords, businessDesk, ingestAgencyReply } from "../lib/operator.mjs";
+import { previewDocument } from "../lib/preview.mjs";
+import { answerFromRecords, briefing, businessDesk, ingestAgencyReply, recordOperatorRun } from "../lib/operator.mjs";
 import { createStore } from "../lib/store.mjs";
 import { spendCap, spendCeiling } from "../lib/routing.mjs";
 
@@ -27,6 +28,8 @@ test("one agency reply becomes one draft and a second delivery does not", async 
   assert.equal(first.draft.status, "needs-christian");
   assert.equal(second.duplicate, true);
   assert.equal(saved.drafts.length, 1);
+  assert.equal(saved.previews.length, 1);
+  assert.equal(second.preview.id, first.preview.id);
   assert.equal(saved.inbox.length, 1);
   const reopened = createStore(dir);
   const again = await reopened.read(day);
@@ -50,6 +53,8 @@ test("a reply to an offer becomes one draft and an opt-out does not", () => {
   assert.equal(reply.draft.status, "needs-christian");
   assert.equal(optOut.draft, null);
   assert.equal(state.drafts.length, 1);
+  assert.equal(state.previews.length, 1);
+  assert.match(previewDocument(state.previews[0]), /Not launched/);
 });
 
 test("the exclusion list never becomes a draft", () => {
@@ -61,6 +66,7 @@ test("the exclusion list never becomes a draft", () => {
   });
   assert.equal(result.draft, null);
   assert.equal(state.drafts.length, 0);
+  assert.equal(state.previews.length, 0);
   assert.match(state.logs.at(-1).message, /exclusion list/);
 });
 
@@ -86,4 +92,41 @@ test("the inbox route used by the server keeps the same draft", async () => {
   assert.equal(first.created, true);
   assert.equal(second.duplicate, true);
   assert.equal(second.draft.id, first.draft.id);
+  assert.equal(second.preview.id, first.preview.id);
+  const restarted = createApp({ dataDir: dir, env: { JARVIS_OWNER_PASSWORD: "correct-horse" } });
+  const page = await restarted.handle(new Request(`http://127.0.0.1/preview/${first.preview.id}`), { buxme: "required", userId: "demo-admin" });
+  assert.equal(page.status, 200);
+  const html = await page.text();
+  assert.match(html, /Northline Dental/);
+  assert.match(html, /Not launched/);
+  assert.equal(html.includes("<script"), false);
+  const denied = await restarted.handle(new Request(`http://127.0.0.1/preview/${first.preview.id}`));
+  assert.equal(denied.status, 401);
+});
+
+test("today’s answer skips yesterday and a preview cannot inject markup", () => {
+  const state = { inbox: [], drafts: [], logs: [], previews: [] };
+  ingestAgencyReply(state, {
+    messageId: "msg-escape-001",
+    from: "A <b>Name",
+    text: "Yes, we are interested in a website <script>alert(1)</script>",
+  }, new Date("2026-11-25T22:00:00Z"));
+  state.logs.push({ at: "2026-11-24T15:00:00Z", message: "Yesterday’s note should stay out." });
+  const today = answerFromRecords("What happened today?", state, new Date("2026-11-26T01:00:00Z"));
+  assert.match(today, /A <b>Name/);
+  assert.equal(today.includes("Yesterday"), false);
+  const html = previewDocument(state.previews[0]);
+  assert.match(html, /A &lt;b&gt;Name/);
+  assert.match(html, /&lt;script&gt;/);
+  assert.equal(html.includes("<script>"), false);
+});
+
+test("a hosted check records the decision and does not send", () => {
+  const state = { drafts: [], logs: [], runs: [] };
+  const run = recordOperatorRun(state, { connected: false, now: new Date("2026-11-26T01:00:00Z") });
+  assert.match(run.decision, /not connected/);
+  assert.equal(state.runs.length, 1);
+  const desk = briefing(state, new Date("2026-11-26T01:00:00Z"));
+  assert.equal(desk.operator.backlog, 0);
+  assert.ok(desk.operator.nextCheckBy);
 });

@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { pickupDelay } from "./inbox.mjs";
+import { chooseNext } from "./planner.mjs";
 
 export const EXCLUSIONS = [
   { name: "Atlanta Auto Diesel", test: /atlanta auto diesel/i },
@@ -13,8 +15,17 @@ export function ingestAgencyReply(state, event, now = new Date()) {
   state.inbox ??= [];
   state.drafts ??= [];
   state.logs ??= [];
+  state.previews ??= [];
   const prior = state.inbox.find(item => item.messageId === messageId);
-  if (prior) return { created: false, duplicate: true, item: prior, draft: state.drafts.find(draft => draft.id === prior.draftId) ?? null };
+  if (prior) {
+    return {
+      created: false,
+      duplicate: true,
+      item: prior,
+      draft: state.drafts.find(draft => draft.id === prior.draftId) ?? null,
+      preview: state.previews.find(preview => preview.messageId === messageId) ?? null,
+    };
+  }
   const from = String(event?.from ?? "").replace(/[\r\n]/g, " ").trim().slice(0, 120);
   const text = String(event?.text ?? "").trim().slice(0, 4000);
   if (from.length < 3 || text.length < 3) throw Object.assign(new Error("The reply needs a sender and a message."), { status: 400 });
@@ -44,11 +55,31 @@ export function ingestAgencyReply(state, event, now = new Date()) {
     };
     state.drafts.push(draft);
     item.draftId = draft.id;
+    state.previews.push({ id: draft.id, draftId: draft.id, messageId, prospect: from, brief: text.slice(0, 800), createdAt: at });
     state.logs.push({ id: randomUUID(), at, level: "info", message: `Saved one draft for ${from}. It is waiting on Christian. Nothing was sent.`, taskId: null });
   } else {
     state.logs.push({ id: randomUUID(), at, level: "info", message: `Recorded a reply from ${from}. It did not ask for a quote, so no draft was created.`, taskId: null });
   }
-  return { created: true, duplicate: false, item, draft };
+  return { created: true, duplicate: false, item, draft, preview: state.previews.find(preview => preview.messageId === messageId) ?? null };
+}
+
+export function etDay(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(date);
+}
+
+export function recordOperatorRun(state, { trigger = "schedule", connected = false, created = 0, now = new Date() } = {}) {
+  state.runs ??= [];
+  const at = new Date(now).toISOString();
+  const next = chooseNext(state, now);
+  const decision = connected
+    ? next.summary
+    : `The agency inbox is not connected, so no mail was read. ${next.summary}`;
+  const run = { id: randomUUID(), at, trigger: String(trigger).slice(0, 40), created, action: next.action, decision, followUpAt: next.followUpAt, wait: next.wait };
+  state.runs.push(run);
+  if (state.runs.length > 40) state.runs.splice(0, state.runs.length - 40);
+  return run;
 }
 
 export function rememberSkip(state, messageId, now = new Date()) {
@@ -70,21 +101,40 @@ export function briefing(state, now = new Date()) {
     greeting,
     headline: latest?.message ?? "Nothing new has been recorded.",
     headlineAt: latest?.at ?? null,
-    waiting: waiting.map(draft => ({ id: draft.id, title: draft.title, at: draft.createdAt, business: draft.business, sent: false })),
+    waiting: waiting.map(draft => {
+      const preview = (state.previews ?? []).find(item => item.draftId === draft.id);
+      return {
+        id: draft.id,
+        title: draft.title,
+        at: draft.createdAt,
+        business: draft.business,
+        sent: false,
+        previewId: preview?.id ?? null,
+        sharePath: preview?.shareToken ? `/jarvis/share/${preview.shareToken}` : null,
+      };
+    }),
+    operator: {
+      lastRunAt: state.runs?.at(-1)?.at ?? null,
+      decision: state.runs?.at(-1)?.decision ?? "The hosted check has not run on this server yet.",
+      backlog: waiting.length,
+      nextCheckBy: state.runs?.at(-1)?.followUpAt ?? pickupDelay(now).nextCheckBy,
+      wait: state.runs?.at(-1)?.wait ?? pickupDelay(now).summary,
+    },
   };
 }
 
-export function answerFromRecords(text, state) {
+export function answerFromRecords(text, state, now = new Date()) {
   const asked = String(text ?? "").toLowerCase();
   if (/\bwho replied\b|\bwho needs me\b/.test(asked)) {
     const waiting = (state.drafts ?? []).filter(draft => draft.status === "needs-christian" && draft.business === "website-agency");
     if (!waiting.length) return "Nobody is waiting on you. No agency reply has been saved.";
-    return waiting.map(draft => `${draft.title}. It is in Needs Christian and has not been sent.`).join(" ");
+    return waiting.map(draft => `${draft.title}. It is in Needs Christian and has not been sent.${(state.previews ?? []).some(preview => preview.draftId === draft.id) ? " A website preview is ready and has not been launched." : ""}`).join(" ");
   }
   if (/what happened/.test(asked)) {
-    const logs = (state.logs ?? []).slice(-5);
-    if (!logs.length) return "Nothing has been recorded since this server started.";
-    return logs.map(entry => entry.message).join(" ");
+    const today = etDay(now);
+    const logs = (state.logs ?? []).filter(entry => etDay(entry.at) === today);
+    if (!logs.length) return "Nothing has been recorded today.";
+    return logs.slice(-5).map(entry => entry.message).join(" ");
   }
   if (/scanner|drivenest|margin|supplier/.test(asked)) {
     return "DriveNest supplier cost is not connected, so delivered cost and margin are unknown. I will not estimate them. The scanner launch is held on that missing cost.";

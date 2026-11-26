@@ -165,6 +165,7 @@ function rememberDraft(reply) {
   const waiting = state.desk?.waiting || [];
   const hit = waiting.find(item => String(reply || "").includes(item.title));
   state.lastDraftId = hit?.id || waiting[0]?.id || state.lastDraftId;
+  state.lastPreviewId = hit?.previewId || waiting.find(item => item.id === state.lastDraftId)?.previewId || state.lastPreviewId;
 }
 function sectionFor(business) {
   if (business === "website-agency") return "Agency";
@@ -180,11 +181,36 @@ function openDraft(id) {
     render();
     return null;
   }
+  state.error = "";
   state.focusDraft = item.id;
   state.lastDraftId = item.id;
+  state.lastPreviewId = item.previewId || state.lastPreviewId;
   state.section = sectionFor(item.business);
   state.notice = `Opened ${item.title}.`;
   return item;
+}
+function openPreview(id) {
+  const waiting = state.desk?.waiting || [];
+  const item = waiting.find(entry => entry.previewId === id) || waiting.find(entry => entry.id === state.lastDraftId) || waiting.find(entry => entry.previewId);
+  const previewId = item?.previewId || id;
+  if (!previewId) {
+    state.error = "There is no preview to open. Click the globe and ask who replied.";
+    render();
+    return null;
+  }
+  state.error = "";
+  state.focusPreview = previewId;
+  state.lastPreviewId = previewId;
+  state.section = "Preview";
+  state.notice = `Opened the preview for ${item?.title || "this reply"}.`;
+  return item || { title: "the preview", previewId };
+}
+function openActivity(message) {
+  const waiting = state.desk?.waiting || [];
+  const hit = waiting.find(item => message.includes(item.title) || message.includes(item.title.replace(/^Reply to /, "")));
+  if (hit) return openDraft(hit.id);
+  state.notice = "That note has no saved item to open.";
+  return null;
 }
 async function handleTranscript(text) {
   if (state.muted || isEcho(text, state.lastSpoken)) return;
@@ -197,6 +223,12 @@ async function handleTranscript(text) {
     if (item) await speak(`Opening ${item.title}.`);
     return;
   }
+  if (command.type === "open-preview") {
+    const item = openPreview(state.lastPreviewId);
+    render();
+    if (item) await speak(`Opening the preview for ${item.title}.`);
+    return;
+  }
   setOrb("thinking");
   state.error = "";
   try {
@@ -207,7 +239,7 @@ async function handleTranscript(text) {
     render();
     await speak(data.reply);
   } catch (error) {
-    state.error = error.message;
+    state.error = `${error.message} The last answer stays on screen. Click the globe to try again.`;
     setOrb("idle");
     render();
   }
@@ -294,6 +326,11 @@ async function refresh() {
   state.services = services.services;
   state.status = status;
   state.gates = settings.gates;
+}
+function deskWait() {
+  const operator = state.desk?.operator;
+  if (!operator) return "The hosted check has not run on this server yet.";
+  return operator.lastRunAt ? `${operator.decision} Last check ${formatTime(operator.lastRunAt)}.` : operator.decision;
 }
 function connectionText() {
   const ai = state.services?.aiGateway;
@@ -420,7 +457,7 @@ function renderHome() {
     el("div", { class: "home-grid" }, [
       el("article", { class: "panel" }, [
         el("h2", {}, ["Recent work"]),
-        recent.length ? el("div", { class: "list" }, recent.map(entry => el("p", { class: "item" }, [entry.message, el("span", { class: "muted" }, [` ${formatTime(entry.at)}`])]))) : el("p", { class: "muted" }, ["Nothing has been recorded."]),
+        recent.length ? el("div", { class: "list" }, recent.map(entry => button(`${entry.message} ${formatTime(entry.at)}`, () => { openActivity(entry.message); render(); }, "item"))) : el("p", { class: "muted" }, ["Nothing has been recorded."]),
       ]),
       el("article", { class: "panel" }, [
         el("h2", {}, ["Needs Christian"]),
@@ -428,13 +465,15 @@ function renderHome() {
           el("h3", {}, [item.title]),
           el("p", { class: "muted" }, [`${formatTime(item.at)} · not sent`]),
           button("Open", () => { openDraft(item.id); render(); }),
+          item.previewId ? button("Open preview", () => { openPreview(item.previewId); render(); }) : null,
         ]))) : el("p", { class: "muted" }, ["Nothing is waiting on you."]),
       ]),
     ]),
-    el("p", { class: state.status?.connection?.connected ? "ok" : "meta" }, [connectionText()]),
-    el("p", { class: "muted" }, [state.services?.inbox?.reason || state.services?.inbox?.summary || "The inbox check runs once a day."]),
-    state.services?.persistence?.configured ? null : el("p", { class: "muted" }, ["Work saved here can disappear on restart. Add UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN on the budgetos project."]),
-    button(state.chatOpen ? "Hide chat" : "Chat", () => { state.chatOpen = !state.chatOpen; render(); }),
+    el("p", { class: "muted" }, [desk?.operator?.wait || "The hosted check runs once a day."]),
+    el("div", { class: "row" }, [
+      button(state.chatOpen ? "Hide chat" : "Chat", () => { state.chatOpen = !state.chatOpen; render(); }),
+      button("Settings", () => { state.section = "Settings"; render(); }),
+    ]),
     state.chatOpen ? renderChat() : null,
   ]);
 }
@@ -458,7 +497,21 @@ function renderDesk(id) {
       el("h3", {}, [draft.title]),
       el("p", { class: "muted" }, [formatTime(draft.createdAt)]),
       el("p", {}, [draft.body]),
-      button("Approve response", () => act(`/api/drafts/${draft.id}/approval`, { action: "outreach" }), "primary"),
+      (state.desk?.waiting || []).find(item => item.id === draft.id)?.sharePath
+        ? el("p", { class: "muted" }, [`Prospect link: ${location.origin}${(state.desk.waiting || []).find(item => item.id === draft.id).sharePath}`])
+        : null,
+      button("Approve response", async () => {
+        state.error = "";
+        try {
+          const result = await api(`/api/drafts/${draft.id}/approval`, { method: "POST", body: { action: "outreach" } });
+          await refresh();
+          state.notice = result.previewPath
+            ? `Approved. Nothing was sent. The prospect can open ${location.origin}${result.previewPath}`
+            : "Saved. No external account was changed.";
+        } catch (error) { state.error = error.message; }
+        render();
+      }, "primary"),
+      (state.desk?.waiting || []).some(item => item.id === draft.id && item.previewId) ? button("Open preview", () => { openPreview(draft.id); render(); }) : null,
     ])),
     drafts.length ? null : el("p", { class: "muted" }, ["No decision is waiting."]),
   ]);
@@ -481,6 +534,14 @@ function renderChat() {
   ]);
 }
 function renderPanel() {
+  if (state.section === "Preview" && state.focusPreview) {
+    return el("section", { class: "panel" }, [
+      el("h2", {}, ["Website preview"]),
+      el("p", { class: "muted" }, [`${location.origin}${base}/preview/${state.focusPreview}`]),
+      el("iframe", { class: "preview-frame", title: "Website preview", src: `${base}/preview/${state.focusPreview}` }),
+      button("Back to Agency", () => { state.section = "Agency"; render(); }),
+    ]);
+  }
   if (state.section === "Home" || state.section === "Overview") return renderHome();
   if (state.section === "Buxme") return renderDesk("buxme");
   if (state.section === "Agency") return renderDesk("website-agency");
@@ -642,6 +703,11 @@ function renderPanel() {
       return el("label", {}, [input, ` Require approval for ${key}`]);
     });
     return el("section", { class: "panel" }, [
+      el("h2", {}, ["Connection"]),
+      el("p", { class: state.status?.connection?.connected ? "ok" : "meta" }, [connectionText()]),
+      el("p", { class: "muted" }, [state.services?.inbox?.reason || state.services?.inbox?.replyRoute || "The inbox check runs once a day."]),
+      state.services?.persistence?.configured ? el("p", { class: "muted" }, ["Work is saved in Redis and survives a restart."]) : el("p", { class: "muted" }, ["Work saved here can disappear on restart. Add UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN on the budgetos project."]),
+      el("p", { class: "muted" }, [deskWait()]),
       el("h2", {}, ["Approval gates"]),
       el("p", { class: "muted" }, ["Turning a gate off does not send email, spend money, or deploy. Those actions are still not executed from this app."]),
       ...inputs,

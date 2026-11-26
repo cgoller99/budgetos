@@ -92,6 +92,8 @@ h1, h2, h3 { margin: 0; font-weight: 650; }
 .shell.desktop .orb[data-state="speaking"] { transform: scale(1.08); box-shadow: 0 0 130px rgba(228, 194, 122, 0.95); }
 .home-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .item.focus { outline: 2px solid var(--gold); border-radius: 12px; padding: 8px; }
+button.item { width: 100%; text-align: left; }
+.preview-frame { width: 100%; height: 520px; border: 0; border-radius: 12px; background: #f4f7fb; }
 .shell.phone { grid-template-columns: 1fr; padding: 16px 16px calc(96px + env(safe-area-inset-bottom)); }
 .greeting { font-size: 1.7rem; margin: 12px 0 4px; }
 .headline { font-size: 1.05rem; }

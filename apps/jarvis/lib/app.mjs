@@ -17,7 +17,8 @@ import { commandFrom, connectionFor, think } from "./brain.mjs";
 import { callConnection, claimForDial, placeVerifiedCall, recordCallReceipt } from "./calls.mjs";
 import { inboxConnection, pickupDelay, pullAgencyInbox } from "./inbox.mjs";
 import { acceptWork, applyHostedPass, hostedView, noteAgencyReply } from "./nextAction.mjs";
-import { answerFromRecords, businessDesk, briefing, ingestAgencyReply, rememberSkip } from "./operator.mjs";
+import { answerFromRecords, businessDesk, briefing, ingestAgencyReply, recordOperatorRun, rememberSkip } from "./operator.mjs";
+import { previewDocument, previewForToken, sharePreview } from "./preview.mjs";
 import { modelChain, spendCap, spendCeiling } from "./routing.mjs";
 import { createRedisStore } from "./redisStore.mjs";
 import { BUSINESSES, createStore, defaultGates } from "./store.mjs";
@@ -260,7 +261,7 @@ export function createApp(options = {}) {
         : `Rejected ${task.id}. Nothing was executed.`;
       remember(state, reply, { source: "queue" });
     } else {
-      const recorded = answerFromRecords(clean, state);
+      const recorded = answerFromRecords(clean, state, new Date(nowFn()));
       if (recorded) {
         remember(state, recorded, { source: "records" });
         return state.messages.at(-1);
@@ -309,6 +310,24 @@ export function createApp(options = {}) {
       return body;
     }
     try {
+      if (typeof access?.shareToken === "string") {
+        const headers = { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store", "X-Robots-Tag": "noindex" };
+        if (request.method !== "GET" && request.method !== "HEAD") return new Response("Not found.", { status: 404, headers });
+        if (path !== `/share/${access.shareToken}`) return new Response("Not found.", { status: 404, headers });
+        const sharedState = await store.read(dayKey(new Date(nowFn())));
+        const shared = previewForToken(sharedState.previews, access.shareToken);
+        if (!shared) return new Response("That preview is not available.", { status: 404, headers });
+        return new Response(request.method === "HEAD" ? null : previewDocument(shared), {
+          headers: {
+            "Content-Type": "text/html; charset=utf-8",
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+            "X-Robots-Tag": "noindex",
+            "Referrer-Policy": "no-referrer",
+            "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'",
+          },
+        });
+      }
       if (path === "/api/health" && request.method === "GET") {
         return json({
           ok: true,
@@ -341,6 +360,21 @@ export function createApp(options = {}) {
         if (blocked) return blocked;
         if (buxme) return json({ authenticated: Boolean(actorFor(request, access)), buxme: true });
         return json({ authenticated: false }, 200, { "Set-Cookie": clearCookie(secure(request)) });
+      }
+      const previewPath = path.match(/^\/preview\/([0-9a-f-]{36})$/);
+      if (previewPath && (request.method === "GET" || request.method === "HEAD")) {
+        if (!actorFor(request, access)) return new Response("Sign in to Buxme first.", { status: 401, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });
+        const current = await store.read(dayKey(new Date(nowFn())));
+        const preview = (current.previews ?? []).find(item => item.id === previewPath[1]);
+        if (!preview) return new Response("That preview is not on this server.", { status: 404, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });
+        return new Response(request.method === "HEAD" ? null : previewDocument(preview), {
+          headers: {
+            "Content-Type": "text/html; charset=utf-8",
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+            "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'",
+          },
+        });
       }
       if (!path.startsWith("/api/")) return serveStatic(path);
 
@@ -550,6 +584,7 @@ export function createApp(options = {}) {
         const body = await readJson(request);
         const action = String(body.action ?? "");
         if (!["publish", "outreach", "ads", "purchase", "account"].includes(action)) return json({ error: "Unknown approval action." }, 400);
+        let shared = null;
         const state = await store.update(dayKey(new Date(nowFn())), current => {
           const draft = current.drafts.find(item => item.id === approval[1]);
           if (!draft) throw Object.assign(new Error("Draft not found."), { status: 404 });
@@ -559,8 +594,14 @@ export function createApp(options = {}) {
             business: draft.business,
             priority: 5,
           }, env);
+          shared = sharePreview(current, draft.id, new Date(nowFn()));
         });
-        return json({ task: state.tasks.at(-1), performed: false, externalAction: "not_performed" }, 202);
+        return json({
+          task: state.tasks.at(-1),
+          performed: false,
+          externalAction: "not_performed",
+          previewPath: shared?.shareToken ? `/jarvis/share/${shared.shareToken}` : null,
+        }, 202);
       }
       if (request.method === "GET" && path === "/api/settings") {
         const state = await store.read(dayKey(new Date(nowFn())));
@@ -684,7 +725,7 @@ export function createApp(options = {}) {
     return { created, duplicates, drafts };
   }
 
-  async function collectInbox() {
+  async function collectInbox(trigger = "schedule") {
     const current = await store.read(dayKey(new Date(nowFn())));
     const seen = new Set((current.inbox ?? []).map(item => item.messageId));
     const pulled = await pullAgencyInbox({ env, fetchImpl, seen });
@@ -696,18 +737,27 @@ export function createApp(options = {}) {
         for (const id of pulled.skipIds) rememberSkip(state, id, new Date(nowFn()));
       });
     }
-    return finishPass({
-      connected: pulled.connected,
-      reason: pulled.connected
-        ? (durable ? "Saved. Sending still requires your approval." : "Saved on this server only. Add UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN or the phone will not see this draft.")
-        : pulled.reason,
+const saved = await store.update(dayKey(new Date(nowFn())), state => {
+      applyHostedPass(state, new Date(nowFn()));
+      recordOperatorRun(state, { trigger, connected: pulled.connected, created: once.created, now: new Date(nowFn()) });
+    });
+    const run = saved.runs.at(-1);
+    const approved = (saved.tasks ?? []).some(task => task.status === "approved");
+    const worker = run?.action === "reply" || !approved
+      ? { completed: [], blocked: [], failed: [], skipped: run?.action === "reply" ? ["reply-first"] : [] }
+      : await executeWorker();
+    const call = await deliverOneCall();
+    const report = { sent: false, performedExternal: false, durable, delay: pulled.delay, run, worker, decision: saved.decisions.at(-1) ?? null, call };
+    if (!pulled.connected) return { connected: false, reason: pulled.reason, created: 0, duplicates: 0, drafts: [], remaining: 0, ...report };
+    return {
+      connected: true,
+      reason: durable ? "Saved. Sending still requires your approval." : "Saved on this server only. Add UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN or the phone will not see this draft.",
       created: once.created,
       duplicates: twice.duplicates,
       drafts: once.drafts,
-      durable,
       remaining: pulled.remaining ?? 0,
-      delay: pulled.delay,
-    });
+      ...report,
+    };
   }
 
   return { handle, ingest, collectInbox, recordWork, store, env, setFailOnce(value) { failOnce = value; } };

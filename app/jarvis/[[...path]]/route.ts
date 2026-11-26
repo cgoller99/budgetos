@@ -11,7 +11,13 @@ const jarvis = createApp({
   dataDir: process.env.JARVIS_DATA_DIR || (process.env.VERCEL === "1" ? "/tmp/jarvis" : undefined),
 });
 
+const SHARE_PATH = /^\/jarvis\/share\/([A-Za-z0-9_-]{43})$/;
+
 async function handle(request: Request) {
+  const share = new URL(request.url).pathname.match(SHARE_PATH);
+  if (share && (request.method === "GET" || request.method === "HEAD")) {
+    return mountJarvis(request, jarvis, "/jarvis", { shareToken: share[1] });
+  }
   const admin = await verifyJarvisAdmin();
   if (!admin.ok) return denied(request, admin.status, admin.error);
   return mountJarvis(request, jarvis, "/jarvis", { buxme: "required", userId: admin.userId });

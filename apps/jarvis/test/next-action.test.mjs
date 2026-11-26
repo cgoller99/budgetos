@@ -7,6 +7,8 @@ import { createApp } from "../lib/app.mjs";
 import { claimForDial } from "../lib/calls.mjs";
 import { applyHostedPass, scannerMargin } from "../lib/nextAction.mjs";
 import { businessDesk } from "../lib/operator.mjs";
+import { chooseNext } from "../lib/planner.mjs";
+import { createTask, reviewTask } from "../lib/worker.mjs";
 
 const id = "4f1c9a0e-1111-4222-8333-444455556666";
 const line = {
@@ -147,4 +149,48 @@ test("scanner margin, fulfillment, and a duplicate Buxme post stay inside their 
   assert.match(desk.buxme.answer, /was not posted again/);
   const claimed = claimForDial(state, now);
   assert.equal(claimed, null);
+});
+
+test("a reply waits on Christian before any approved work runs", () => {
+  const choice = chooseNext({
+    drafts: [{ status: "needs-christian", title: "Reply to Northline Dental" }],
+    tasks: [{ status: "approved", risk: "low", title: "Prepare notes" }],
+    issues: [{ status: "open", title: "Late shipment" }],
+  }, new Date("2026-11-26T12:00:00Z"));
+  assert.equal(choice.action, "reply");
+  assert.match(choice.summary, /Nothing will be sent/);
+});
+
+test("the daily check completes one approved task and does not repeat it", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "jarvis-next-"));
+  const app = createApp({ dataDir: dir, env: {}, now: () => new Date("2026-11-26T16:00:00Z") });
+  await app.store.update("2026-11-26", state => {
+    const task = createTask(state, { title: "Prepare scanner notes", business: "drivenest", detail: "Red V410. Supplier cost is unknown." }, {});
+    reviewTask(state, task.id, "approved");
+  });
+  const first = await app.collectInbox();
+  const second = await app.collectInbox();
+  assert.equal(first.run.action, "approved");
+  assert.equal(first.sent, false);
+  assert.equal(first.worker.completed.length, 1);
+  assert.equal(second.worker.completed.length, 0);
+  const saved = await app.store.read("2026-11-26");
+  assert.equal(saved.tasks.filter(task => task.status === "completed").length, 1);
+  assert.deepEqual(saved.tasks[0].externalSideEffects, []);
+});
+
+test("a high-risk approval is blocked once and does not purchase anything", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "jarvis-risk-"));
+  const app = createApp({ dataDir: dir, env: {}, now: () => new Date("2026-11-26T16:00:00Z") });
+  await app.store.update("2026-11-26", state => {
+    const task = createTask(state, { title: "Purchase a scanner", business: "drivenest", detail: "Do not buy it." }, {});
+    reviewTask(state, task.id, "approved");
+  });
+  const first = await app.collectInbox();
+  const second = await app.collectInbox();
+  assert.equal(first.worker.blocked.length, 1);
+  assert.equal(second.worker.blocked.length, 0);
+  const saved = await app.store.read("2026-11-26");
+  assert.equal(saved.tasks[0].status, "blocked");
+  assert.deepEqual(saved.tasks[0].externalSideEffects, []);
 });

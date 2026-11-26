@@ -28,6 +28,8 @@ export function normalizeState(parsed, day) {
   parsed.leads ??= [];
   parsed.drafts ??= [];
   parsed.inbox ??= [];
+  parsed.previews ??= [];
+  parsed.runs ??= [];
   parsed.work ??= [];
   parsed.calls ??= [];
   parsed.decisions ??= [];
@@ -45,6 +47,8 @@ export function emptyState(day) {
     leads: [],
     drafts: [],
     inbox: [],
+    previews: [],
+    runs: [],
     work: [],
     calls: [],
     decisions: [],
