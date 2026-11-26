@@ -256,8 +256,12 @@ export function createApp(options = {}) {
     const command = commandFrom(clean);
     if (command?.type === "worker") throw Object.assign(new Error("Run the worker from the worker route."), { status: 400 });
     if (command?.type === "task") {
+      const before = state.tasks.length;
       const task = createTask(state, { title: command.title }, env);
-      remember(state, `I saved “${task.title}” as proposal ${task.id}. I have not started it. Approve it before I work on it.`, { source: "queue" });
+      const reply = state.tasks.length === before
+        ? `“${task.title}” is already proposal ${task.id}. I did not add it again.`
+        : `I saved “${task.title}” as proposal ${task.id}. I have not started it. Approve it before I work on it.`;
+      remember(state, reply, { source: "queue" });
     } else if (command?.type === "approve" || command?.type === "reject") {
       const task = reviewTask(state, command.id, command.type === "approve" ? "approved" : "rejected");
       const reply = command.type === "approve"
@@ -463,10 +467,14 @@ export function createApp(options = {}) {
       }
       if (request.method === "POST" && path === "/api/tasks") {
         const body = await readJson(request);
-        const state = await store.update(dayKey(new Date(nowFn())), current => {
-          createTask(current, body, env);
+        let task = null;
+        let created = false;
+        await store.update(dayKey(new Date(nowFn())), current => {
+          const before = current.tasks.length;
+          task = createTask(current, body, env);
+          created = current.tasks.length > before;
         });
-        return json({ task: state.tasks.at(-1) }, 201);
+        return json({ task, duplicate: !created }, created ? 201 : 200);
       }
       const retry = path.match(/^\/api\/tasks\/([0-9a-f-]{36})\/retry$/);
       if (retry && request.method === "POST") {
@@ -591,10 +599,11 @@ export function createApp(options = {}) {
         const action = String(body.action ?? "");
         if (!["publish", "outreach", "ads", "purchase", "account"].includes(action)) return json({ error: "Unknown approval action." }, 400);
         let shared = null;
-        const state = await store.update(dayKey(new Date(nowFn())), current => {
+        let task = null;
+        await store.update(dayKey(new Date(nowFn())), current => {
           const draft = current.drafts.find(item => item.id === approval[1]);
           if (!draft) throw Object.assign(new Error("Draft not found."), { status: 404 });
-          createTask(current, {
+          task = createTask(current, {
             title: `Approval required before ${action}: ${draft.title}`.slice(0, 180),
             detail: draft.body,
             business: draft.business,
@@ -603,7 +612,7 @@ export function createApp(options = {}) {
           shared = sharePreview(current, draft.id, new Date(nowFn()));
         });
         return json({
-          task: state.tasks.at(-1),
+          task,
           performed: false,
           externalAction: "not_performed",
           previewPath: shared?.shareToken ? `/jarvis/share/${shared.shareToken}` : null,

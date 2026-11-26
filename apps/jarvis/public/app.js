@@ -692,8 +692,8 @@ function renderPanel() {
       el("div", { class: "row" }, [
         button("Create task", async () => {
           try {
-            await api("/api/tasks", { method: "POST", body: { title: title.value, detail: detail.value, business: business.value } });
-            state.notice = "Task proposed. It has not been executed.";
+            const result = await api("/api/tasks", { method: "POST", body: { title: title.value, detail: detail.value, business: business.value } });
+            state.notice = result.duplicate ? "Already saved. It was not repeated." : "Task proposed. It has not been executed.";
             await refresh();
           } catch (error) { state.error = error.message; }
           render();
