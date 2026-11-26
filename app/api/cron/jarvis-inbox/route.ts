@@ -7,11 +7,28 @@ const jarvis = createApp({
   dataDir: process.env.JARVIS_DATA_DIR || (process.env.VERCEL === "1" ? "/tmp/jarvis" : undefined),
 });
 
-export async function POST(request: Request) {
+function denied(request: Request) {
   const secret = process.env.CRON_SECRET?.trim();
   if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
     return Response.json({ error: "Unauthorized" }, { status: 401, headers: { "Cache-Control": "no-store" } });
   }
+  return null;
+}
+
+export async function GET(request: Request) {
+  const rejection = denied(request);
+  if (rejection) return rejection;
+  try {
+    const result = await jarvis.collectInbox();
+    return Response.json({ ...result, trigger: "schedule" });
+  } catch {
+    return Response.json({ error: "Inbox check failed.", sent: false }, { status: 500 });
+  }
+}
+
+export async function POST(request: Request) {
+  const rejection = denied(request);
+  if (rejection) return rejection;
   let body: unknown;
   try {
     body = await request.json();

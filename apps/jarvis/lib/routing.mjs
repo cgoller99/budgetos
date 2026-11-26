@@ -55,6 +55,14 @@ export function spendCap(env = process.env) {
   return { authorized: true, cap, reason: "" };
 }
 
+/** Conservative $15/1M input and $75/1M output, above the routed model prices. */
+export function estimateSpendCents(tokens) {
+  const prompt = Math.max(0, Number(tokens?.prompt) || 0);
+  const completion = Math.max(0, Number(tokens?.completion) || 0);
+  const cents = Math.ceil((prompt * 15 + completion * 75) / 10_000);
+  return Math.max(1, cents);
+}
+
 export function spendCeiling(env = process.env) {
   const raw = env.JARVIS_DAILY_SPEND_CENTS;
   const cents = raw == null || String(raw).trim() === "" ? 500 : Number(raw);

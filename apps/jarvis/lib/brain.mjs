@@ -1,4 +1,4 @@
-import { classifyJarvisTask, modelChain, spendCap, spendCeiling } from "./routing.mjs";
+import { classifyJarvisTask, estimateSpendCents, modelChain, spendCap, spendCeiling } from "./routing.mjs";
 
 const SYSTEM = [
   "You are Jarvis, a calm operations assistant for three separate businesses: Buxme, a website-building agency, and DriveNest Auto Care.",
@@ -22,17 +22,17 @@ function dayKey(now) {
 
 export function connectionFor(env, usage, now = new Date()) {
   const cap = spendCap(env);
+  const ceiling = spendCeiling(env);
   const day = dayKey(now);
   const requests = usage?.day === day ? Number(usage.requests) || 0 : 0;
-  if (!env.AI_GATEWAY_API_KEY?.trim()) {
-    return { connected: false, reason: "Model calls are off because AI_GATEWAY_API_KEY is not configured.", cap, requests };
-  }
-  const ceiling = spendCeiling(env);
   const spent = usage?.day === day ? Number(usage.spendCents) || 0 : 0;
+  if (!env.AI_GATEWAY_API_KEY?.trim()) {
+    return { connected: false, reason: "Model calls are off because AI_GATEWAY_API_KEY is not configured.", cap, requests, ceiling, spent };
+  }
   if (!cap.authorized) return { connected: false, reason: cap.reason, cap, requests, ceiling, spent };
   if (!ceiling.ok) return { connected: false, reason: ceiling.reason, cap, requests, ceiling, spent };
   if (requests >= cap.cap) return { connected: false, reason: `The daily model cap of ${cap.cap} is already used.`, cap, requests, ceiling, spent };
-  if (spent >= ceiling.cents) return { connected: false, reason: "The $5 daily spending ceiling is reached. Model calls are paused until tomorrow.", cap, requests, ceiling, spent };
+  if (spent + 25 > ceiling.cents) return { connected: false, reason: "The $5 daily spending ceiling is reached. Model calls are paused until tomorrow.", cap, requests, ceiling, spent };
   return { connected: true, reason: "", cap, requests, ceiling, spent };
 }
 
@@ -129,7 +129,7 @@ export async function think({ text, state, env, fetchImpl = fetch, now = new Dat
       });
       usage.promptTokens += result.tokens.prompt;
       usage.completionTokens += result.tokens.completion;
-      usage.spendCents = (Number(usage.spendCents) || 0) + 1;
+      usage.spendCents = (Number(usage.spendCents) || 0) + estimateSpendCents(result.tokens);
       return { ...base, provider: "gateway", source: "gateway", model, reply: result.reply, usage, connected: true, error: null };
     } catch (error) {
       usage.byModel[model].errors += 1;
