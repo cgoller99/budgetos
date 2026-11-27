@@ -50,3 +50,6 @@ data/jarvis-reviews/
 data/jarvis-queue.json
 data/jarvis-queue.json.lock
 data/jarvis-queue.json.tmp
+
+# Standalone Jarvis runtime data. Never commit sessions, tasks, or drafts.
+apps/jarvis/data/
