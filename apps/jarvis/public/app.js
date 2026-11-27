@@ -440,6 +440,28 @@ async function act(path, body) {
   catch (error) { state.error = error.message; }
   render();
 }
+function pipelineText(pipe) {
+  if (!pipe) return "No search has been saved. An uncontacted prospect is not revenue.";
+  const revenue = Number.isInteger(pipe.revenueCents) && pipe.revenueCents > 0 ? `$${(pipe.revenueCents / 100).toFixed(2)}` : "none recorded";
+  return `Discovered ${pipe.discovered ?? 0}. Contacted ${pipe.contacted ?? 0}. Replies ${pipe.replies ?? 0}. Quotes ${pipe.quotes ?? 0}. Deposits ${pipe.deposits ?? 0}. Completed sales ${pipe.completed ?? 0}. Recorded revenue: ${revenue}. An uncontacted prospect is not revenue.`;
+}
+function osmLink(url) {
+  if (!/^https:\/\/www\.openstreetmap\.org\/(node|way)\/\d+$/.test(url || "")) return null;
+  return el("a", { href: url, target: "_blank", rel: "noreferrer" }, ["OpenStreetMap"]);
+}
+function renderDaily() {
+  const report = state.desk?.report;
+  if (!report) return el("article", { class: "panel" }, [el("h2", {}, ["Daily report"]), el("p", { class: "muted" }, ["No daily report yet. The hosted check runs once a day."])]);
+  return el("article", { class: "panel" }, [
+    el("h2", {}, ["Daily report"]),
+    el("h3", {}, ["Accomplished"]),
+    ...(report.accomplished || []).map(line => el("p", {}, [line])),
+    el("h3", {}, ["Blocked"]),
+    ...(report.blocked || []).map(line => el("p", {}, [line])),
+    el("h3", {}, ["Needs your approval"]),
+    ...(report.needsApproval || []).length ? (report.needsApproval || []).map(line => el("p", {}, [line])) : [el("p", { class: "muted" }, ["Nothing is waiting on you."])],
+  ]);
+}
 function renderHome() {
   const desk = state.desk;
   const waiting = desk?.waiting || [];
@@ -448,6 +470,9 @@ function renderHome() {
     el("p", { class: "greeting" }, [desk?.greeting || "Good evening, Christian"]),
     el("p", { class: "headline" }, [desk?.headline || "Nothing new has been recorded."]),
     desk?.headlineAt ? el("p", { class: "muted" }, [formatTime(desk.headlineAt)]) : null,
+    el("h2", {}, ["Chosen step"]),
+    el("p", {}, [desk?.choice || "Save a city and Jarvis will look up real businesses. None have been invented."]),
+    renderDaily(),
     el("div", { class: "home-grid" }, [
       el("article", { class: "panel" }, [
         el("h2", {}, ["Recent work"]),
@@ -471,18 +496,60 @@ function renderHome() {
     state.chatOpen ? renderChat() : null,
   ]);
 }
+function renderDiscovery() {
+  const report = state.desk?.report;
+  const area = el("input", { "aria-label": "City to search", maxlength: "80", value: state.discoveryArea || state.desk?.discoveryArea || "" });
+  const prospects = report?.prospects || [];
+  return [
+    el("h3", {}, ["Find businesses"]),
+    el("p", { class: "muted" }, ["Jarvis matches a business by name and street address or phone, then checks the website. A blank map field is not a missing website. It saves an opportunity only after that check, and it does not contact anyone."]),
+    field("City", area),
+    button("Find businesses", async () => {
+      const typed = area.value.trim();
+      state.discoveryArea = typed;
+      state.error = "";
+      try {
+        const result = await api("/api/discovery", { method: "POST", body: { area: typed } });
+        await refresh();
+        state.discoveryArea = "";
+        state.notice = result.report?.accomplished?.[0] || "Search saved. Nothing was sent.";
+      } catch (error) {
+        state.discoveryArea = typed;
+        state.error = error.message;
+      }
+      render();
+    }, "primary"),
+    el("h3", {}, ["Pipeline"]),
+    el("p", {}, [pipelineText(report?.pipeline)]),
+    el("h3", {}, ["Prospects"]),
+    prospects.length ? el("div", { class: "list" }, prospects.map(item => el("article", { class: "item" }, [
+      el("strong", {}, [`${item.industry}: ${item.name}`]),
+      el("p", {}, [`${item.evidence} Not contacted. Not revenue.`]),
+      osmLink(item.sourceUrl),
+    ]))) : el("p", { class: "muted" }, ["No discovered prospect is saved."]),
+    report?.offer ? el("article", { class: "item" }, [
+      el("h3", {}, [report.offer.title]),
+      el("p", {}, [report.offer.body]),
+      el("p", { class: "muted" }, ["The price is blank. Nothing was sent. This is not revenue."]),
+    ]) : null,
+  ];
+}
 function renderDesk(id) {
   const names = { buxme: "buxme", "website-agency": "agency", drivenest: "drivenest" };
   const key = names[id] || id;
   const card = state.desk?.businesses?.[key];
   const saved = (state.businesses || []).find(item => item.id === id);
-  const drafts = (saved?.drafts || []).filter(draft => draft.status === "needs-christian" || draft.status === "draft");
+  const drafts = (saved?.drafts || []).filter(draft => draft.kind !== "offer" && (draft.status === "needs-christian" || draft.status === "draft"));
   const working = (state.tasks || []).filter(task => task.status === "running" || task.status === "approved");
+  const blocked = (state.desk?.report?.blocked || []).find(line => id === "buxme" ? line.startsWith("Buxme") : id === "drivenest" ? line.includes("DriveNest") : false);
   return el("section", { class: "panel" }, [
     el("h2", {}, [card?.question || "This workspace"]),
     el("h3", {}, ["What Jarvis did"]),
     el("p", {}, [card?.answer || "This source has not reported yet."]),
     card?.blocker ? el("p", { class: "error" }, [card.blocker]) : null,
+    id === "buxme" ? el("p", {}, [blocked || "Buxme publishing, signups, and subscriptions are not connected. No campaign was ranked or created."]) : null,
+    id === "drivenest" ? el("p", {}, [blocked || "No verified supplier page with a delivered cost and shipping cost is on file. No DriveNest product was recommended."]) : null,
+    ...(id === "website-agency" ? renderDiscovery() : []),
     el("p", { class: "muted" }, [card?.recovery || ""]),
     el("h3", {}, ["Working on"]),
     working.length ? el("div", { class: "list" }, working.map(task => el("p", {}, [`${task.status}: ${task.title}`]))) : el("p", { class: "muted" }, ["Nothing is running."]),
@@ -657,7 +724,7 @@ function renderPanel() {
         ]),
         ...business.leads.map(lead => el("div", { class: "item" }, [
           el("strong", {}, [lead.name]),
-          el("p", { class: "muted" }, [`${lead.stage} · recorded by you · not contacted by Jarvis`]),
+          el("p", { class: "muted" }, [lead.source === "openstreetmap" ? `${lead.stage} · OpenStreetMap · not contacted · not revenue` : `${lead.stage} · recorded by you · not contacted by Jarvis`]),
           el("div", { class: "row" }, ["drafted", "responded", "closed"].map(stage => button(`Record ${stage}`, () => act(`/api/leads/${lead.id}/stage`, { stage })))),
         ])),
         ...business.drafts.map(draft => el("div", { class: "item" }, [
@@ -790,7 +857,9 @@ setInterval(async () => {
       || JSON.stringify(logs.logs) !== JSON.stringify(state.logs)
       || JSON.stringify(status.counts) !== JSON.stringify(state.status?.counts)
       || JSON.stringify(status.connection) !== JSON.stringify(state.status?.connection)
-      || JSON.stringify(desk.waiting) !== JSON.stringify(state.desk?.waiting);
+      || JSON.stringify(desk.waiting) !== JSON.stringify(state.desk?.waiting)
+      || desk.choice !== state.desk?.choice
+      || JSON.stringify(desk.report?.accomplished) !== JSON.stringify(state.desk?.report?.accomplished);
     state.desk = desk;
     state.tasks = tasks.tasks;
     state.logs = logs.logs;
