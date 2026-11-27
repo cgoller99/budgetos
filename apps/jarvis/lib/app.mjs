@@ -42,8 +42,10 @@ function modelRoutes(env) {
   return routes;
 }
 
-function redisConfigured(env) {
-  return Boolean(env.UPSTASH_REDIS_REST_URL?.trim() && env.UPSTASH_REDIS_REST_TOKEN?.trim());
+export function redisCredentials(env = {}) {
+  const url = String(env.UPSTASH_REDIS_REST_URL || env.KV_REST_API_URL || "").trim();
+  const token = String(env.UPSTASH_REDIS_REST_TOKEN || env.KV_REST_API_TOKEN || "").trim();
+  return url && token ? { url, token } : null;
 }
 
 function speechEngine(env) {
@@ -76,9 +78,9 @@ function services(env) {
       requiredEnv: ["AI_GATEWAY_API_KEY", "JARVIS_DAILY_REQUEST_CAP"],
     },
     redis: {
-      configured: Boolean(env.UPSTASH_REDIS_REST_URL?.trim() && env.UPSTASH_REDIS_REST_TOKEN?.trim()),
+      configured: Boolean(redisCredentials(env)),
       requiredEnv: ["UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN"],
-      note: "Used only when it already exists. Jarvis does not create a database.",
+      note: "Uses the existing Redis database when UPSTASH_REDIS_REST_URL or KV_REST_API_URL is already set. Jarvis does not create a database.",
     },
     github: {
       configured: Boolean(env.GITHUB_TOKEN?.trim() || env.GH_TOKEN?.trim()),
@@ -118,7 +120,7 @@ function services(env) {
       const ceiling = spendCeiling(env);
       return { cents: ceiling.cents, ok: ceiling.ok, note: ceiling.ok ? `Model spend stops at $${ceiling.cents / 100} per day.` : ceiling.reason };
     })(),
-    persistence: redisConfigured(env)
+    persistence: redisCredentials(env)
       ? { mode: "redis", configured: true, requiredEnv: ["UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN"], note: "Conversations, tasks, approvals, and logs are stored in the existing Redis database and survive a restart." }
       : { mode: "file", configured: false, requiredEnv: ["UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN"], note: "This server stores data on local disk. A serverless deploy loses that disk on restart until an existing Upstash Redis database is configured. Jarvis does not create a database." },
   };
@@ -154,8 +156,9 @@ export function createApp(options = {}) {
   const dataDir = options.dataDir ?? env.JARVIS_DATA_DIR ?? join(root, "data");
   const nowFn = options.now ?? (() => Date.now());
   const fetchImpl = options.fetchImpl ?? fetch;
-  const store = options.store ?? (redisConfigured(env)
-    ? createRedisStore({ url: env.UPSTASH_REDIS_REST_URL.trim(), token: env.UPSTASH_REDIS_REST_TOKEN.trim(), fetchImpl })
+  const redis = redisCredentials(env);
+  const store = options.store ?? (redis
+    ? createRedisStore({ url: redis.url, token: redis.token, fetchImpl })
     : createStore(dataDir));
   const limiter = options.limiter ?? createLimiter({ fetchImpl, now: nowFn });
   const execFileImpl = options.execFileImpl;
@@ -709,7 +712,7 @@ export function createApp(options = {}) {
     const current = await store.read(today);
     const seen = new Set((current.inbox ?? []).map(item => item.messageId));
     const pulled = await pullAgencyInbox({ env, fetchImpl, seen });
-    const durable = redisConfigured(env);
+    const durable = Boolean(redisCredentials(env)) || store.mode === "redis";
     const once = pulled.connected ? await applyEvents(pulled.events) : { created: 0, duplicates: 0, drafts: [] };
     const twice = pulled.connected ? await applyEvents(pulled.events) : { duplicates: 0 };
     if (pulled.skipIds?.length) {
@@ -734,7 +737,10 @@ export function createApp(options = {}) {
     const worker = run?.action === "reply" || !approved
       ? { completed: [], blocked: [], failed: [], skipped: run?.action === "reply" ? ["reply-first"] : [] }
       : await executeWorker();
-    const report = { sent: false, performedExternal: false, durable, delay: pulled.delay, run, worker };
+    const picked = (saved.inbox ?? []).filter(item => item.draftId && item.pickedUpAt).at(-1);
+    const preview = picked ? (saved.previews ?? []).find(item => item.draftId === picked.draftId) : null;
+    const pickup = picked ? { repliedAt: picked.repliedAt, pickedUpAt: picked.pickedUpAt, waitedMs: picked.pickupMs, draftId: picked.draftId, previewId: preview?.id ?? null, desk: "https://buxme.co/jarvis" } : null;
+    const report = { sent: false, performedExternal: false, durable, delay: pulled.delay, run, worker, pickup };
     if (!pulled.connected) return { connected: false, reason: pulled.reason, created: 0, duplicates: 0, drafts: [], remaining: 0, ...report };
     return {
       connected: true,
