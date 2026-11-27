@@ -17,6 +17,7 @@ import { commandFrom, connectionFor, think } from "./brain.mjs";
 import { inboxConnection, pickupDelay, pullAgencyInbox } from "./inbox.mjs";
 import { applyDialResults, approveQuote, claimCalls, dialClaimed, recordProviderStatus } from "./calls.mjs";
 import { answerFromRecords, businessDesk, briefing, ingestAgencyReply, recordOperatorRun, rememberSkip } from "./operator.mjs";
+import { applyDiscovery, chooseWork, noteBlockedDay, searchBusinesses } from "./discover.mjs";
 import { previewDocument, previewForToken, sharePreview } from "./preview.mjs";
 import { modelChain, spendCap, spendCeiling } from "./routing.mjs";
 import { createRedisStore } from "./redisStore.mjs";
@@ -506,7 +507,14 @@ export function createApp(options = {}) {
       }
       if (request.method === "GET" && path === "/api/desk") {
         const current = await store.read(dayKey(new Date(nowFn())));
-        return json({ ...briefing(current, new Date(nowFn())), businesses: businessDesk(current), connection: connectionFor(env, current.usage, new Date(nowFn())) });
+        return json({
+          ...briefing(current, new Date(nowFn())),
+          businesses: businessDesk(current),
+          discoveryArea: current.settings?.discoveryArea ?? "",
+          report: current.reports?.at(-1) ?? null,
+          choice: chooseWork(current).reason,
+          connection: connectionFor(env, current.usage, new Date(nowFn())),
+        });
       }
       if (request.method === "GET" && path === "/api/businesses") {
         const state = await store.read(dayKey(new Date(nowFn())));
@@ -518,6 +526,25 @@ export function createApp(options = {}) {
             drafts: state.drafts.filter(draft => draft.business === business.id),
           })),
         });
+      }
+      if (request.method === "POST" && path === "/api/discovery") {
+        const body = await readJson(request);
+        const area = String(body.area ?? "").trim();
+        if (!/^[\p{L}\p{N}\s,.'-]{2,80}$/u.test(area)) return json({ error: "Enter a city name, 2 to 80 characters." }, 400);
+        const now = new Date(nowFn());
+        const today = dayKey(now);
+        const current = await store.read(today);
+        const repeat = current.settings?.discoveryArea === area && current.settings?.lastDiscoveryDay === today && current.settings?.lastDiscoveryOk !== false;
+        let found = null;
+        if (!repeat) {
+          try { found = await searchBusinesses({ area, now, fetchImpl, prefer: (current.leads ?? []).filter(lead => /lists no website/i.test(`${lead.evidence || ""} ${lead.note || ""}`)).map(lead => lead.sourceId) }); }
+          catch { found = { prospects: [], scanned: 0, industry: "", error: "The business search did not respond. No prospects were invented." }; }
+        }
+        const state = await store.update(today, next => {
+          next.settings.discoveryArea = area;
+          if (found) applyDiscovery(next, found, { area, now });
+        });
+        return json({ report: state.reports?.at(-1) ?? null, sent: false, contacted: false }, found ? 201 : 200);
       }
       if (request.method === "POST" && path === "/api/leads") {
         const body = await readJson(request);
@@ -712,19 +739,30 @@ export function createApp(options = {}) {
   }
 
   async function collectInbox(trigger = "schedule") {
-    const current = await store.read(dayKey(new Date(nowFn())));
+    const now = new Date(nowFn());
+    const today = dayKey(now);
+    const current = await store.read(today);
     const seen = new Set((current.inbox ?? []).map(item => item.messageId));
     const pulled = await pullAgencyInbox({ env, fetchImpl, seen });
     const durable = redisConfigured(env);
     const once = pulled.connected ? await applyEvents(pulled.events) : { created: 0, duplicates: 0, drafts: [] };
     const twice = pulled.connected ? await applyEvents(pulled.events) : { duplicates: 0 };
     if (pulled.skipIds?.length) {
-      await store.update(dayKey(new Date(nowFn())), state => {
-        for (const id of pulled.skipIds) rememberSkip(state, id, new Date(nowFn()));
+      await store.update(today, state => {
+        for (const id of pulled.skipIds) rememberSkip(state, id, now);
       });
     }
-    const saved = await store.update(dayKey(new Date(nowFn())), state => {
-      recordOperatorRun(state, { trigger, connected: pulled.connected, created: once.created, now: new Date(nowFn()) });
+    const area = String(current.settings?.discoveryArea ?? "").trim();
+    const searchDue = Boolean(area) && (current.settings?.lastDiscoveryDay !== today || current.settings?.lastDiscoveryOk === false);
+    let found = null;
+    if (searchDue) {
+      try { found = await searchBusinesses({ area, now, fetchImpl, prefer: (current.leads ?? []).filter(lead => /lists no website/i.test(`${lead.evidence || ""} ${lead.note || ""}`)).map(lead => lead.sourceId) }); }
+      catch { found = { prospects: [], scanned: 0, industry: "", error: "The business search did not respond. No prospects were invented." }; }
+    }
+    const saved = await store.update(today, state => {
+      if (found) applyDiscovery(state, found, { area, now });
+      else if (!area) noteBlockedDay(state, now);
+      recordOperatorRun(state, { trigger, connected: pulled.connected, created: once.created, now });
     });
     const run = saved.runs.at(-1);
     const calls = await placeQueuedCalls();
