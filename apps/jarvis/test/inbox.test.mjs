@@ -4,8 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { createApp } from "../lib/app.mjs";
-import { pickupDelay } from "../lib/inbox.mjs";
+import { agencySearchQuery, pickupDelay } from "../lib/inbox.mjs";
 import { answerFromRecords } from "../lib/operator.mjs";
+import { createRedisStore } from "../lib/redisStore.mjs";
 
 const id = "4f1c9a0e-1111-4222-8333-444455556666";
 const env = { RESEND_API_KEY: "re_test_key", JARVIS_AGENCY_INBOX: "agency@buxme.co" };
@@ -44,6 +45,80 @@ test("a scheduled read saves one draft and a second pass does not", async () => 
   assert.match(saved.drafts[0].title, /Northline Dental/);
   assert.match(answerFromRecords("Who replied?", saved), /Northline Dental/);
   assert.match(answerFromRecords("Who replied?", saved), /not been sent/);
+});
+
+function memoryRedis() {
+  const db = new Map();
+  const fetchImpl = async (url, options) => {
+    const args = JSON.parse(options.body);
+    const [command, key, value] = args;
+    if (String(url).includes("token")) throw new Error("token leaked");
+    if (command === "SET" && args[3] === "NX") {
+      if (db.has(key)) return { ok: true, json: async () => ({ result: null }) };
+      db.set(key, value);
+      return { ok: true, json: async () => ({ result: "OK" }) };
+    }
+    if (command === "GET") return { ok: true, json: async () => ({ result: db.has(key) ? db.get(key) : null }) };
+    if (command === "DEL") {
+      db.delete(key);
+      return { ok: true, json: async () => ({ result: 1 }) };
+    }
+    if (command === "SET") {
+      db.set(key, value);
+      return { ok: true, json: async () => ({ result: "OK" }) };
+    }
+    return { ok: false, status: 500, json: async () => ({ error: "unexpected" }) };
+  };
+  return { db, fetchImpl };
+}
+
+test("one scoped Gmail reply survives a second check and a fresh server", async () => {
+  const memory = memoryRedis();
+  const repliedAt = "2026-11-27T19:40:00.000Z";
+  const personal = "Are you free for dinner tonight?";
+  const calls = [];
+  const fetchImpl = async (url, options = {}) => {
+    const address = String(url);
+    if (address.startsWith("https://redis.example.invalid")) return memory.fetchImpl(url, options);
+    calls.push(JSON.parse(options.body));
+    assert.equal(options.headers["x-api-key"], "test-key");
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        successful: true,
+        data: { messages: [
+          { messageId: "18c0aa11bb22cc33", sender: "Buxme App <buxmeapp@gmail.com>", recipient: "christiangoller99@gmail.com", subject: "Re: website offer", messageText: "Yes, we are interested in the website.", messageTimestamp: repliedAt, labelIds: ["INBOX"] },
+          { messageId: "18c0aa11bb22cc44", sender: "Friend <friend@example.com>", recipient: "christiangoller99@gmail.com", subject: "Re: dinner", messageText: personal, messageTimestamp: repliedAt, labelIds: ["INBOX"] },
+        ] },
+      }),
+    };
+  };
+  const env = { COMPOSIO_API_KEY: "test-key", COMPOSIO_USER_ID: "christian", KV_REST_API_URL: "https://redis.example.invalid", KV_REST_API_TOKEN: "token" };
+  const now = () => Date.parse("2026-11-27T19:42:30.000Z");
+  const app = createApp({ env, fetchImpl, now });
+  const first = await app.collectInbox();
+  const second = await app.collectInbox();
+  const restarted = createApp({
+    env,
+    now,
+    fetchImpl: async () => { throw new Error("the fresh server must read Redis without asking Gmail again"); },
+    store: createRedisStore({ url: env.KV_REST_API_URL, token: env.KV_REST_API_TOKEN, fetchImpl: memory.fetchImpl }),
+  });
+  const saved = await restarted.store.read("2026-11-27");
+  assert.equal(calls[0].arguments.query, agencySearchQuery());
+  assert.equal(calls[0].arguments.query.includes("in:inbox"), false);
+  assert.equal(first.created, 1);
+  assert.equal(first.duplicates, 1);
+  assert.equal(first.pickup.waitedMs, 150000);
+  assert.equal(first.pickup.desk, "https://buxme.co/jarvis");
+  assert.equal(second.created, 0);
+  assert.equal(saved.drafts.length, 1);
+  assert.equal(saved.previews.length, 1);
+  assert.equal(saved.drafts[0].id, first.pickup.draftId);
+  assert.equal(saved.previews[0].id, first.pickup.previewId);
+  assert.equal(JSON.stringify(saved).includes(personal), false);
+  assert.match(answerFromRecords("Who replied?", saved), /Buxme App/);
 });
 
 test("mail for another address and a missing key are ignored", async () => {

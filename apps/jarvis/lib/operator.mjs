@@ -31,10 +31,13 @@ export function ingestAgencyReply(state, event, now = new Date()) {
   if (from.length < 3 || text.length < 3) throw Object.assign(new Error("The reply needs a sender and a message."), { status: 400 });
   const excluded = EXCLUSIONS.find(item => item.test.test(from) || item.test.test(text));
   const at = new Date(now).toISOString();
+  const replied = new Date(event?.repliedAt || now);
+  const repliedAt = Number.isNaN(replied.getTime()) ? at : replied.toISOString();
+  const pickupMs = Math.max(0, new Date(now).getTime() - new Date(repliedAt).getTime());
   const optedOut = /\b(unsubscribe|stop emailing|remove me|do not contact|opt out)\b/i.test(text);
   const replyToOffer = /^\s*re\s*:/i.test(text);
   const interested = /\b(interested|yes|let's|lets|quote|how much|available|website)\b/i.test(text);
-  const item = { messageId, from, text, at, business: "website-agency", excluded: Boolean(excluded), interested: interested || replyToOffer, draftId: null };
+  const item = { messageId, from, text, at, repliedAt, pickedUpAt: at, pickupMs, business: "website-agency", excluded: Boolean(excluded), interested: interested || replyToOffer, draftId: null };
   state.inbox.push(item);
   let draft = null;
   if (excluded) {

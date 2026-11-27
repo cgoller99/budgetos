@@ -767,7 +767,7 @@ function renderPanel() {
       el("h2", {}, ["Connection"]),
       el("p", { class: state.status?.connection?.connected ? "ok" : "meta" }, [connectionText()]),
       el("p", { class: "muted" }, [state.services?.inbox?.reason || state.services?.inbox?.replyRoute || "The inbox check runs once a day."]),
-      state.services?.persistence?.configured ? el("p", { class: "muted" }, ["Work is saved in Redis and survives a restart."]) : el("p", { class: "muted" }, ["Work saved here can disappear on restart. Add UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN on the budgetos project."]),
+      state.services?.persistence?.configured ? el("p", { class: "muted" }, ["Work is saved in Redis and survives a restart."]) : el("p", { class: "muted" }, ["Work saved here can disappear on restart. The existing Redis database is used when UPSTASH_REDIS_REST_URL or KV_REST_API_URL is set on the budgetos project."]),
       el("p", { class: "muted" }, [deskWait()]),
       el("h2", {}, ["Approval gates"]),
       el("p", { class: "muted" }, ["Turning a gate off does not send email, spend money, or deploy. Those actions are still not executed from this app."]),
