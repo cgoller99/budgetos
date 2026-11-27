@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { jarvisIntroTwiML, validTwilioSignature } from "@/lib/ai-team/twilioWebhook";
+import { jarvisIntroTwiML, jarvisSayTwiML, validTwilioSignature } from "@/lib/ai-team/twilioWebhook";
 export const runtime = "nodejs";
 export async function POST(request: Request) {
   const token = process.env.TWILIO_AUTH_TOKEN;
@@ -9,9 +9,12 @@ export async function POST(request: Request) {
   const fields = Object.fromEntries(new URLSearchParams(raw));
   const origin = process.env.JARVIS_PUBLIC_ORIGIN;
   if (!origin || !/^https:\/\//.test(origin)) return NextResponse.json({ error: "Voice origin not configured." }, { status: 503 });
-  const canonicalUrl = new URL(new URL(request.url).pathname, origin).toString();
+  const incoming = new URL(request.url);
+  const canonicalUrl = new URL(`${incoming.pathname}${incoming.search}`, origin).toString();
   if (!validTwilioSignature(canonicalUrl, fields, request.headers.get("x-twilio-signature"), token)) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 403 });
   }
-  return new Response(jarvisIntroTwiML(), { status: 200, headers: { "Content-Type": "text/xml; charset=utf-8", "Cache-Control": "no-store" } });
+  const spoken = (incoming.searchParams.get("say") ?? "").trim();
+  const twiml = spoken ? jarvisSayTwiML(spoken) : jarvisIntroTwiML();
+  return new Response(twiml, { status: 200, headers: { "Content-Type": "text/xml; charset=utf-8", "Cache-Control": "no-store" } });
 }

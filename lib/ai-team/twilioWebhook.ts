@@ -11,3 +11,14 @@ export function validTwilioSignature(url: string, fields: Record<string, string>
 export function jarvisIntroTwiML(): string {
   return '<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="alice">Hello. This is Jarvis, your Buxme assistant. Voice conversations are not yet enabled. This is a connection test. Goodbye.</Say><Hangup/></Response>';
 }
+
+export function jarvisSayTwiML(text: string): string {
+  const spoken = String(text ?? "").replace(/[\u0000-\u001f]/g, " ").trim().slice(0, 240);
+  const safe = spoken
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+  return `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="alice">${safe}</Say><Hangup/></Response>`;
+}

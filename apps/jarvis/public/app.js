@@ -487,6 +487,12 @@ function renderHome() {
           item.previewId ? button("Open preview", () => { openPreview(item.previewId); render(); }) : null,
         ]))) : el("p", { class: "muted" }, ["Nothing is waiting on you."]),
       ]),
+      el("article", { class: "panel" }, [
+        el("h2", {}, ["Phone"]),
+        (desk?.calls || []).length
+          ? el("div", { class: "list" }, desk.calls.map(call => el("p", {}, [`${call.kind === "won" ? "Deal won" : "Question"}: ${call.note}`])))
+          : el("p", { class: "muted" }, ["No call is queued. An interested reply does not place a call."]),
+      ]),
     ]),
     el("p", { class: "muted" }, [desk?.operator?.wait || "The hosted check runs once a day."]),
     el("div", { class: "row" }, [
@@ -553,6 +559,7 @@ function renderDesk(id) {
     el("p", { class: "muted" }, [card?.recovery || ""]),
     el("h3", {}, ["Working on"]),
     working.length ? el("div", { class: "list" }, working.map(task => el("p", {}, [`${task.status}: ${task.title}`]))) : el("p", { class: "muted" }, ["Nothing is running."]),
+    id === "website-agency" ? renderQuoteForm() : null,
     el("h3", {}, ["Needs your decision"]),
     ...drafts.map(draft => el("article", { class: draft.id === state.focusDraft ? "item focus" : "item", id: `draft-${draft.id}` }, [
       el("h3", {}, [draft.title]),
@@ -575,6 +582,40 @@ function renderDesk(id) {
       (state.desk?.waiting || []).some(item => item.id === draft.id && item.previewId) ? button("Open preview", () => { openPreview(draft.id); render(); }) : null,
     ])),
     drafts.length ? null : el("p", { class: "muted" }, ["No decision is waiting."]),
+  ]);
+}
+function renderQuoteForm() {
+  const fields = {
+    prospect: el("input", { "aria-label": "Prospect", maxlength: "80" }),
+    scope: el("input", { "aria-label": "Scope", maxlength: "120" }),
+    price: el("input", { "aria-label": "Approved price", maxlength: "40" }),
+    deadline: el("input", { "aria-label": "Deadline", maxlength: "80" }),
+    next: el("input", { "aria-label": "Next step", maxlength: "120" }),
+  };
+  return el("form", { onsubmit: async event => {
+    event.preventDefault();
+    state.error = "";
+    try {
+      await api("/api/quotes", { method: "POST", body: {
+        prospect: fields.prospect.value,
+        scope: fields.scope.value,
+        price: fields.price.value,
+        deadline: fields.deadline.value,
+        next: fields.next.value,
+      } });
+      await refresh();
+      state.notice = "Quote saved. Nothing was sent and no call was placed.";
+    } catch (error) { state.error = error.message; }
+    render();
+  } }, [
+    el("h3", {}, ["Approved quote"]),
+    el("p", { class: "muted" }, ["Enter the terms you approved. Jarvis uses them only after that prospect accepts."]),
+    field("Prospect", fields.prospect),
+    field("Scope", fields.scope),
+    field("Price", fields.price),
+    field("Deadline", fields.deadline),
+    field("Next step", fields.next),
+    el("button", { class: "primary", type: "submit" }, ["Save quote"]),
   ]);
 }
 function renderChat() {
