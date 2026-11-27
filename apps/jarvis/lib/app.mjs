@@ -15,6 +15,7 @@ import {
 } from "./auth.mjs";
 import { commandFrom, connectionFor, think } from "./brain.mjs";
 import { inboxConnection, pickupDelay, pullAgencyInbox } from "./inbox.mjs";
+import { applyDialResults, approveQuote, claimCalls, dialClaimed, recordProviderStatus } from "./calls.mjs";
 import { answerFromRecords, businessDesk, briefing, ingestAgencyReply, recordOperatorRun, rememberSkip } from "./operator.mjs";
 import { applyDiscovery, chooseWork, noteBlockedDay, searchBusinesses } from "./discover.mjs";
 import { previewDocument, previewForToken, sharePreview } from "./preview.mjs";
@@ -580,6 +581,14 @@ export function createApp(options = {}) {
         });
         return json({ lead: state.leads.find(item => item.id === stage[1]), contacted: false });
       }
+      if (request.method === "POST" && path === "/api/quotes") {
+        const body = await readJson(request);
+        const state = await store.update(dayKey(new Date(nowFn())), current => {
+          approveQuote(current, body, new Date(nowFn()));
+          current.logs.push({ id: randomUUID(), at: new Date(nowFn()).toISOString(), level: "info", message: `Saved the quote you approved for ${String(body.prospect ?? "").replace(/[\r\n]/g, " ").trim().slice(0, 80)}. Nothing was sent and no call was placed.`, taskId: null });
+        });
+        return json({ quote: state.quotes.at(-1), sent: false, called: false }, 201);
+      }
       if (request.method === "POST" && path === "/api/drafts") {
         const body = await readJson(request);
         const notes = String(body.notes ?? "").trim();
@@ -676,11 +685,37 @@ export function createApp(options = {}) {
     }
   }
 
+  async function placeQueuedCalls() {
+    const day = dayKey(new Date(nowFn()));
+    const snapshot = await store.read(day);
+    if (!(snapshot.calls ?? []).some(call => call.status === "queued" && !call.sent)) return { held: "", results: [] };
+    let claimed = [];
+    let held = "";
+    await store.update(day, state => {
+      const result = claimCalls(state, { env, now: new Date(nowFn()) });
+      claimed = result.claimed;
+      held = result.held;
+    });
+    if (!claimed.length) return { held, results: [] };
+    const results = await dialClaimed(claimed, { env, fetchImpl });
+    await store.update(day, state => applyDialResults(state, results));
+    return { held, results };
+  }
+
+  async function recordCallStatus(eventId, providerStatus) {
+    let call = null;
+    await store.update(dayKey(new Date(nowFn())), state => {
+      call = recordProviderStatus(state, eventId, providerStatus);
+    });
+    return call;
+  }
+
   async function ingest(event) {
     let result = null;
     await store.update(dayKey(new Date(nowFn())), current => {
       result = ingestAgencyReply(current, event, new Date(nowFn()));
     });
+    await placeQueuedCalls();
     return result;
   }
 
@@ -730,11 +765,12 @@ export function createApp(options = {}) {
       recordOperatorRun(state, { trigger, connected: pulled.connected, created: once.created, now });
     });
     const run = saved.runs.at(-1);
+    const calls = await placeQueuedCalls();
     const approved = (saved.tasks ?? []).some(task => task.status === "approved");
     const worker = run?.action === "reply" || !approved
       ? { completed: [], blocked: [], failed: [], skipped: run?.action === "reply" ? ["reply-first"] : [] }
       : await executeWorker();
-    const report = { sent: false, performedExternal: false, durable, delay: pulled.delay, run, worker };
+    const report = { sent: false, performedExternal: false, durable, delay: pulled.delay, run, worker, calls };
     if (!pulled.connected) return { connected: false, reason: pulled.reason, created: 0, duplicates: 0, drafts: [], remaining: 0, ...report };
     return {
       connected: true,
@@ -747,7 +783,7 @@ export function createApp(options = {}) {
     };
   }
 
-  return { handle, ingest, collectInbox, store, env, setFailOnce(value) { failOnce = value; } };
+  return { handle, ingest, collectInbox, recordCallStatus, store, env, setFailOnce(value) { failOnce = value; } };
 }
 
 async function serveStatic(path) {
