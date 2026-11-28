@@ -18,6 +18,8 @@ try {
   tasks = JSON.parse(run("list").stdout);
   assert.equal(tasks[0].status, "approved");
   assert.equal(tasks[0].attempts, 0);
+  assert.equal(tasks[0].priority, 0);
+  assert.deepEqual(tasks[0].audit.map(entry => entry.event), ["created", "reviewed"]);
   console.log("Jarvis task queue tests passed.");
 } finally { await rm(dir, { recursive: true, force: true }); }
 
