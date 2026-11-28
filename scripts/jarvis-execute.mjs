@@ -18,6 +18,17 @@ const plans = {
   "attribution-inventory": { paths: ["app", "lib"], pattern: /utm_|referrer|campaign|attribution/i },
   "workflow-inventory": { paths: [".github/workflows"], pattern: /schedule:|workflow_dispatch:|permissions:|concurrency:/i },
 };
+const priorities = {
+  "ci-workflow-audit": 100,
+  "revenue-funnel-audit": 80,
+  "upgrade-conversion-review": 70,
+  "organic-marketing-campaign": 60,
+};
+const audit = (task, event, details = {}) => {
+  if (!Array.isArray(task.audit)) task.audit = [];
+  task.audit.push({ event, at: now(), ...details });
+  if (task.audit.length > 50) task.audit = task.audit.slice(-50);
+};
 async function inspect(action) {
   const plan = plans[action], hits = [];
   async function visit(dir) {
@@ -70,19 +81,32 @@ await locked(async tasks => {
     if (record?.taskId === t.id && record?.executionId === t.executionId && record?.status === "completed") {
       t.status = "completed"; t.completedAt = record.completedAt;
       t.resultPath = relative(root, recordPath).replaceAll("\\", "/");
+      audit(t, "reconciled_completed", { executionId: t.executionId });
     } else if (Date.now() - Date.parse(t.startedAt || "") > leaseMs) {
       t.status = (t.attempts || 0) < MAX_ATTEMPTS ? "approved" : "failed";
       t.lastError = "Execution lease expired before result persistence";
       t.failedAt = now();
+      t.nextAttemptAt = undefined;
+      audit(t, "lease_expired", { status: t.status, attempts: t.attempts || 0 });
     }
   }
 });
 const claimed = await locked(tasks => {
-  const t = tasks.find(t => t.status === "approved" && allowed[t.id] && (t.attempts || 0) < MAX_ATTEMPTS);
+  const eligible = tasks
+    .filter(t => t.status === "approved" && allowed[t.id] && (t.attempts || 0) < MAX_ATTEMPTS)
+    .filter(t => !t.nextAttemptAt || Date.parse(t.nextAttemptAt) <= Date.now())
+    .sort((a, b) =>
+      (priorities[b.id] ?? 0) - (priorities[a.id] ?? 0) ||
+      Date.parse(a.createdAt || "9999-12-31T00:00:00.000Z") - Date.parse(b.createdAt || "9999-12-31T00:00:00.000Z") ||
+      a.id.localeCompare(b.id)
+    );
+  const t = eligible[0];
   if (!t) return null;
   t.status = "running"; t.startedAt = now(); t.attempts = (t.attempts || 0) + 1;
+  t.nextAttemptAt = undefined;
   t.agent = allowed[t.id].agent; t.action = allowed[t.id].action;
   t.executionId = createHash("sha256").update(t.id + ":" + t.attempts).digest("hex").slice(0, 20);
+  audit(t, "claimed", { executionId: t.executionId, attempt: t.attempts });
   return { ...t };
 });
 if (!claimed) { console.log("No approved allowlisted tasks available."); process.exit(0); }
@@ -96,6 +120,7 @@ try {
     const t = tasks.find(t => t.id === claimed.id);
     if (!t || t.status !== "running" || t.executionId !== claimed.executionId) throw Error("Execution claim changed");
     t.status = "completed"; t.completedAt = record.completedAt; t.resultPath = relative(root, resultPath).replaceAll("\\", "/");
+    audit(t, "completed", { executionId: claimed.executionId, resultPath: t.resultPath });
   });
   console.log(JSON.stringify({ taskId: claimed.id, agent: claimed.agent, status: "completed", matches: result.matches, resultPath }, null, 2));
 } catch (error) {
@@ -104,6 +129,11 @@ try {
     if (t && t.executionId === claimed.executionId && t.status === "running") {
       t.status = t.attempts < MAX_ATTEMPTS ? "approved" : "failed";
       t.lastError = String(error.message).slice(0, 500); t.failedAt = now();
+      if (t.status === "approved") {
+        const delayMs = Math.min(15 * 60 * 1000, 1000 * 2 ** Math.max(0, t.attempts - 1));
+        t.nextAttemptAt = new Date(Date.now() + delayMs).toISOString();
+      }
+      audit(t, "failed", { status: t.status, attempt: t.attempts, error: t.lastError, nextAttemptAt: t.nextAttemptAt });
     }
   });
   console.error(error); process.exitCode = 1;
