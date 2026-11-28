@@ -75,3 +75,11 @@ jobs:
           node scripts/test-jarvis-workspace.mjs
           node scripts/test-jarvis-review.mjs
           node scripts/test-jarvis-task-queue.mjs
+          node scripts/test-jarvis-scheduled-queue.mjs
+          node scripts/test-jarvis-scheduled-worker.mjs
+          node scripts/test-jarvis-scheduled-execution.mjs
+          node scripts/test-jarvis-business-queue.mjs
+          node scripts/test-jarvis-business-worker.mjs
+          node scripts/test-jarvis-model-routing.mjs
+          node scripts/test-jarvis-workflow-policy.mjs
+          node scripts/test-jarvis-guard-diff.mjs
