@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const workflow = await readFile(".github/workflows/jarvis-safe-execution.yml", "utf8");
+const changeGuard = await readFile(".github/workflows/jarvis-change-guard.yml", "utf8");
 const lines = workflow.split(/\r?\n/);
 assert.match(workflow, /^on:\s*\n  workflow_dispatch:\s*\n/m, "Must be manually dispatched");
 assert.doesNotMatch(workflow, /^\s*(schedule|push|pull_request|workflow_run|repository_dispatch):/m, "No automatic execution triggers");
@@ -13,4 +14,5 @@ assert.match(workflow, /JARVIS_APPROVED_TASK_ID: \$\{\{ inputs\.approved_task_id
 assert.match(workflow, /node scripts\/test-jarvis-github-execute\.mjs/);
 assert.match(workflow, /run: node scripts\/jarvis-github-execute\.mjs/);
 assert.equal(lines.filter(x => /^    environment:/.test(x)).length, 1);
+assert.match(changeGuard, /startsWith\(github\.head_ref, 'jarvis\/'\) \|\| startsWith\(github\.head_ref, 'jarvis-'\)/, "Jarvis branch naming variants must run the change guard");
 console.log("Jarvis workflow policy passed: manual-only, required ID, protected environment, scoped token.");
